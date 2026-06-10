@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Data (user-specific)
+data/hardpoint_overrides.json
+data/defaults_pipe.json
+
+# Logs
+logs/
+
+# Backups
+*.bak
+*.bak.*
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
