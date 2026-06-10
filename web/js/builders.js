@@ -653,9 +653,10 @@ export function buildUndertray() {
             const taper = Math.sin(t * Math.PI);
             const h = skH * taper;
             skVerts.push(x, skY, gc);
+            // Strakes hang DOWNWARD from floor surface toward ground
             const yOff = ySign * h * Math.cos(skAngle);
             const zOff = h * Math.sin(skAngle);
-            skVerts.push(x, skY + yOff, gc + zOff);
+            skVerts.push(x, skY + yOff, Math.max(gc - zOff, 5));
         }
         for (let i = 0; i < skSamples; i++) {
             const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
@@ -787,9 +788,10 @@ export function buildDiffuser() {
             const taper = Math.sin(t * Math.PI);
             const h = strakeH * taper;
             skVerts.push(x, y, z);
+            // Strakes hang DOWNWARD from diffuser surface toward ground, lean inward
             const inwardY = ySign * h * Math.cos(strakeAngle);
             const zOff = h * Math.sin(strakeAngle);
-            skVerts.push(x, y + inwardY, z + zOff);
+            skVerts.push(x, y + inwardY, Math.max(z - zOff, 5));
         }
         for (let i = 0; i < strakeSamples; i++) {
             const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
