@@ -25,391 +25,7 @@
 </script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<style>
-  :root {
-    --bg: #0f0f19; --panel: #0f0f19; --accent: #f43f5e; --text: #e4e4ec;
-    --text-dim: #8888aa; --border: #252540; --input-bg: #1e1e30; --slider-track: #2e2e4a;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  #viewport canvas { display: block; }
-
-  table { width: 100%; border-collapse: collapse; font-size: 0.7rem; }
-  th, td { padding: 3px 4px; text-align: right; border-bottom: 1px solid var(--border); }
-  th { color: var(--text-dim); font-weight: 500; position: sticky; top: 0; background: var(--bg); }
-  td:first-child, th:first-child { text-align: left; color: var(--accent); font-weight: 600; }
-  td input { width: 62px; background: var(--input-bg); color: var(--text); border: 1px solid var(--border);
-             padding: 2px 4px; border-radius: 4px; font-size: 0.78rem; font-family: 'SF Mono','Consolas',monospace; text-align: right; }
-  td input:focus { border-color: var(--accent); outline: none; }
-
-  .info-row { display: flex; justify-content: space-between; font-size: 0.7rem; padding: 2px 0; }
-  .info-row .label { color: var(--text-dim); }
-  .info-row .val  { font-family: 'SF Mono','Consolas',monospace; color: var(--text); }
-
-  input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 4px;
-    background: var(--slider-track); border-radius: 4px; outline: none; cursor: pointer; }
-  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px;
-    border-radius: 50%; background: var(--accent); border: 2px solid #0f0f19; cursor: pointer; }
-
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #2a2a44; border-radius: 8px; }
-</style>
-</head>
-<body class="bg-[#0f0f19] text-[#e4e4ec] h-screen flex overflow-hidden" style="font-family:'Inter','SF Pro Display',system-ui,sans-serif">
-
-<!-- ═══════════════ LEFT PANEL — 操控 ═══════════════ -->
-<div id="leftPanel" class="w-[300px] bg-panel flex flex-col border-r border-white/5 overflow-y-auto shrink-0">
-
-  <!-- header -->
-  <div class="px-4 pt-4 pb-2.5 flex items-center justify-between">
-    <div class="flex items-center gap-2">
-      <span class="text-lg tracking-tight font-semibold text-white">FSAE</span>
-      <span class="text-[0.6rem] tracking-widest font-medium text-muted bg-white/5 px-1.5 py-0.5 rounded">悬架</span>
-    </div>
-    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.5)]" title="已连接"></span>
-  </div>
-  <div class="mx-4 h-px bg-white/5"></div>
-
-  <!-- ═══ 控制滑块 ═══ -->
-  <div class="px-3 py-3 space-y-3">
-    <div class="flex items-center gap-1.5 text-muted text-[0.68rem] tracking-wider font-medium">
-      <i data-lucide="gamepad-2" class="w-3.5 h-3.5 text-dim"></i> 操控
-    </div>
-    <div class="space-y-1">
-      <div class="flex justify-between text-[0.66rem]"><span class="text-muted">前轮跳</span><span id="frontTravelVal" class="text-accent font-mono font-medium">0.0 mm</span></div>
-      <input type="range" id="frontTravelSlider" min="-30" max="30" value="0" step="0.5">
-    </div>
-    <div class="space-y-1">
-      <div class="flex justify-between text-[0.66rem]"><span class="text-muted">后轮跳</span><span id="rearTravelVal" class="text-accent font-mono font-medium">0.0 mm</span></div>
-      <input type="range" id="rearTravelSlider" min="-30" max="30" value="0" step="0.5">
-    </div>
-
-    <!-- ═══ 车身姿态模式 ═══ -->
-    <div class="space-y-2 pt-1">
-      <div class="flex items-center justify-between">
-        <span class="text-muted text-[0.66rem] tracking-wider font-medium">输入模式</span>
-        <label class="relative inline-flex items-center cursor-pointer gap-1.5">
-          <span id="modeLabelWheel" class="text-[0.6rem] text-muted">轮跳</span>
-          <input type="checkbox" id="chassisModeToggle" class="sr-only peer">
-          <div class="w-8 h-4 bg-white/10 rounded-full peer peer-checked:bg-accent/60 after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
-          <span id="modeLabelChassis" class="text-[0.6rem] text-muted">车身</span>
-        </label>
-      </div>
-      <div id="chassisControls" class="space-y-1.5" style="display:none">
-        <div class="flex justify-between text-[0.66rem]"><span class="text-muted">垂向 (Heave)</span><span id="heaveVal" class="text-accent font-mono font-medium">0.0 mm</span></div>
-        <input type="range" id="heaveSlider" min="-30" max="30" value="0" step="1">
-        <div class="flex justify-between text-[0.66rem]"><span class="text-muted">俯仰 (Pitch)</span><span id="pitchVal" class="text-accent font-mono font-medium">0.0°</span></div>
-        <input type="range" id="pitchSlider" min="-3" max="3" value="0" step="0.1">
-        <div class="flex justify-between text-[0.66rem]"><span class="text-muted">侧倾 (Roll)</span><span id="rollVal" class="text-accent font-mono font-medium">0.0°</span></div>
-        <input type="range" id="rollSlider" min="-3" max="3" value="0" step="0.1">
-        <div class="text-[0.55rem] text-dim space-y-0.5 pt-0.5">
-          <div>→ 前轮跳: <span id="chassisFrontTravel" class="text-accent font-mono">0.0</span> mm · 后: <span id="chassisRearTravel" class="text-accent font-mono">0.0</span> mm</div>
-          <div>→ 左前: <span id="chassisFLTravel" class="text-amber-400/80 font-mono">0.0</span> · 右前: <span id="chassisFRTravel" class="text-amber-400/80 font-mono">0.0</span></div>
-        </div>
-      </div>
-    </div>
-    <div class="space-y-1">
-      <div class="flex justify-between text-[0.66rem]"><span class="text-muted">齿条位移 (右+) </span><span id="rackVal" class="text-accent font-mono font-medium">0.0 mm</span></div>
-      <input type="range" id="rackSlider" min="-20" max="20" value="0" step="0.5">
-    </div>
-    <div class="flex gap-2 pt-1">
-      <button id="resetBtn" class="flex-1 bg-white/5 hover:bg-white/10 text-muted hover:text-white text-[0.68rem] py-1.5 rounded-md transition-all flex items-center justify-center gap-1 border border-white/5">
-        <i data-lucide="rotate-ccw" class="w-3 h-3"></i> 重置
-      </button>
-      <button id="applyBtn" class="flex-1 bg-accent hover:bg-accent/85 text-white text-[0.68rem] font-medium py-1.5 rounded-md transition-colors flex items-center justify-center gap-1">
-        <i data-lucide="play" class="w-3 h-3"></i> 应用
-      </button>
-    </div>
-  </div>
-
-  <div class="mx-4 h-px bg-white/5"></div>
-
-  <!-- ═══ 定位角度 ═══ -->
-  <div class="px-3 py-3 space-y-2">
-    <div class="flex items-center gap-1.5 text-muted text-[0.68rem] tracking-wider font-medium">
-      <i data-lucide="gauge" class="w-3.5 h-3.5 text-dim"></i> 定位参数
-    </div>
-    <div class="grid grid-cols-[1fr_0.82fr_0.82fr_0.82fr_0.82fr] gap-x-1.5 gap-y-1.5 text-[0.66rem]">
-      <span class="text-dim"></span>
-      <span class="text-dim text-center font-medium text-[0.58rem] tracking-wider">右前</span>
-      <span class="text-accent2 text-center font-medium text-[0.58rem] tracking-wider">左前</span>
-      <span class="text-amber-500 text-center font-medium text-[0.58rem] tracking-wider">右后</span>
-      <span class="text-amber-500/70 text-center font-medium text-[0.58rem] tracking-wider">左后</span>
-
-      <span class="text-muted">外倾</span><span class="font-mono text-right" id="camberFR">--</span><span class="font-mono text-right" id="camberFL">--</span><span class="font-mono text-right" id="camberRR">--</span><span class="font-mono text-right" id="camberRL">--</span>
-      <span class="text-muted">前束</span><span class="font-mono text-right" id="toeFR">--</span><span class="font-mono text-right" id="toeFL">--</span><span class="font-mono text-right" id="toeRR">--</span><span class="font-mono text-right" id="toeRL">--</span>
-      <span class="text-muted">后倾</span><span class="font-mono text-right" id="casterFR">--</span><span class="font-mono text-right" id="casterFL">--</span><span class="font-mono text-right" id="casterRR">--</span><span class="font-mono text-right" id="casterRL">--</span>
-      <span class="text-muted">内倾</span><span class="font-mono text-right" id="kpiFR">--</span><span class="font-mono text-right" id="kpiFL">--</span><span class="font-mono text-right" id="kpiRR">--</span><span class="font-mono text-right" id="kpiRL">--</span>
-      <span class="text-muted">偏距</span><span class="font-mono text-right" id="scrubFR">--</span><span class="font-mono text-right" id="scrubFL">--</span><span class="font-mono text-right" id="scrubRR">--</span><span class="font-mono text-right" id="scrubRL">--</span>
-      <span class="text-muted">拖距</span><span class="font-mono text-right" id="trailFR">--</span><span class="font-mono text-right" id="trailFL">--</span><span class="font-mono text-right" id="trailRR">--</span><span class="font-mono text-right" id="trailRL">--</span>
-    </div>
-  </div>
-
-  <div class="mx-4 h-px bg-white/5"></div>
-
-  <!-- ═══ 设计参数 ═══ -->
-  <div class="px-3 py-3 collapsed">
-    <div class="flex items-center justify-between cursor-pointer select-none" onclick="this.parentElement.classList.toggle('collapsed')">
-      <div class="flex items-center gap-1.5 text-muted text-[0.68rem] tracking-wider font-medium">
-        <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-dim"></i> 设计参数
-      </div>
-      <i data-lucide="chevron-down" class="w-3 h-3 text-dim transition-transform duration-200 collapsed-rotate"></i>
-    </div>
-    <div class="content mt-2 space-y-2">
-      <select id="paramAxle" class="w-full bg-input text-[#e4e4ec] border border-white/5 rounded-md px-2 py-1 text-[0.72rem] outline-none focus:border-accent/50 transition-colors">
-        <option value="front">前轴</option>
-        <option value="rear">后轴</option>
-      </select>
-      <div id="paramSliders" class="max-h-[260px] overflow-y-auto space-y-2 pr-1"></div>
-      <button id="applyParamsBtn" class="w-full bg-accent2 hover:bg-accent2/85 text-white text-[0.68rem] font-medium py-1.5 rounded-md transition-colors flex items-center justify-center gap-1">
-        <i data-lucide="refresh-cw" class="w-3 h-3"></i> 应用参数
-      </button>
-    </div>
-  </div>
-
-  <style>.collapsed .content { display: none; } .collapsed .collapsed-rotate { transform: rotate(-90deg); }</style>
-
-  <div class="mx-4 h-px bg-white/5"></div>
-
-  <!-- ═══ 衍生数值 ═══ -->
-  <div class="px-3 py-3 pb-5">
-    <div class="flex items-center gap-1.5 text-muted text-[0.68rem] tracking-wider font-medium mb-2">
-      <i data-lucide="ruler" class="w-3.5 h-3.5 text-dim"></i> 衍生数值
-    </div>
-    <div id="derivedInfo" class="bg-card border border-white/5 rounded-lg p-2.5 space-y-1"></div>
-  </div>
-
-</div><!-- /left panel -->
-
-<!-- ═══════════════ 3D VIEWPORT ═══════════════ -->
-<div id="viewport" class="flex-1 relative min-w-0"></div>
-
-<!-- ═══════════════ RIGHT PANEL — 数据 ═══════════════ -->
-<div id="panel" class="w-[340px] bg-panel flex flex-col border-l border-white/5 overflow-y-auto shrink-0">
-
-  <!-- header -->
-  <div class="px-4 pt-4 pb-2.5 flex items-center gap-2">
-    <i data-lucide="database" class="w-3.5 h-3.5 text-dim"></i>
-    <span class="text-[0.68rem] tracking-wider font-medium text-muted">数据面板</span>
-  </div>
-  <div class="mx-4 h-px bg-white/5"></div>
-
-  <!-- ═══ 工具栏 ═══ -->
-  <div class="px-3 py-2.5 space-y-1.5">
-    <div class="flex gap-1.5">
-      <button id="addTubeFromSelectBtn" disabled class="flex-1 bg-accent2 hover:bg-accent2/85 disabled:opacity-30 disabled:cursor-not-allowed text-white text-[0.65rem] font-medium py-1.5 rounded-md transition-all flex items-center justify-center gap-1">
-        <i data-lucide="plus" class="w-3 h-3"></i> 加管件/曲线
-      </button>
-      <button id="createFaceBtn" disabled class="flex-1 bg-amber-600 hover:bg-amber-600/85 disabled:opacity-30 disabled:cursor-not-allowed text-white text-[0.65rem] font-medium py-1.5 rounded-md transition-all flex items-center justify-center gap-1">
-        <i data-lucide="layers" class="w-3 h-3"></i> 覆盖面
-      </button>
-    </div>
-    <div class="flex items-center justify-between">
-      <button id="clearMultiBtn" class="text-[0.6rem] text-muted hover:text-white transition-colors flex items-center gap-1">
-        <i data-lucide="x" class="w-2.5 h-2.5"></i> 清除
-      </button>
-      <span id="multiSelectInfo" class="text-[0.6rem] text-dim">
-        Ctrl+点击选点 · 已选 <span id="multiSelectCount" class="text-accent font-medium">0</span>
-      </span>
-    </div>
-  </div>
-
-  <!-- ═══ 编辑面板 ═══ -->
-  <div id="editSection" class="px-3 pb-2.5" style="display:none">
-    <div class="bg-card border border-white/5 rounded-lg p-2.5 space-y-2.5">
-
-      <!-- 点编辑 -->
-      <div id="editPointMode" style="display:none" class="space-y-2">
-        <div id="editPointName" class="text-[0.75rem] font-medium text-accent tracking-tight"></div>
-        <div class="grid grid-cols-3 gap-1.5">
-          <label class="flex flex-col gap-0.5 text-[0.6rem] text-muted tracking-wider">X <input type="number" id="editX" step="0.1" class="bg-input border border-white/5 rounded-md px-2 py-1 text-[0.72rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50"></label>
-          <label class="flex flex-col gap-0.5 text-[0.6rem] text-muted tracking-wider">Y <input type="number" id="editY" step="0.1" class="bg-input border border-white/5 rounded-md px-2 py-1 text-[0.72rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50"></label>
-          <label class="flex flex-col gap-0.5 text-[0.6rem] text-muted tracking-wider">Z <input type="number" id="editZ" step="0.1" class="bg-input border border-white/5 rounded-md px-2 py-1 text-[0.72rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50"></label>
-        </div>
-        <div class="flex gap-1.5">
-          <button id="saveTempBtn" class="flex-1 bg-accent2 hover:bg-accent2/85 text-white text-[0.65rem] font-medium py-1 rounded-md transition-colors">临时更新</button>
-          <button id="savePermBtn" class="flex-1 bg-accent hover:bg-accent/85 text-white text-[0.65rem] font-medium py-1 rounded-md transition-colors">永久保存</button>
-        </div>
-      </div>
-
-      <!-- 管件编辑 -->
-      <div id="editTubeMode" style="display:none" class="space-y-2">
-        <div id="editTubeName" class="text-[0.75rem] font-medium text-accent tracking-tight"></div>
-        <div id="editTubeType" class="text-[0.65rem] text-dim"></div>
-        <div class="text-[0.6rem] text-muted tracking-wider">颜色</div>
-        <div id="tubeColorPalette" class="flex gap-1 flex-wrap"></div>
-        <div class="flex gap-1.5">
-          <button id="tubeColorTempBtn" class="flex-1 bg-accent2 hover:bg-accent2/85 text-white text-[0.62rem] py-1 rounded-md transition-colors">临时改色</button>
-          <button id="tubeColorPermBtn" class="flex-1 bg-accent hover:bg-accent/85 text-white text-[0.62rem] py-1 rounded-md transition-colors">永久改色</button>
-        </div>
-        <div class="flex gap-1.5">
-          <button id="saveTubePermBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-600/85 text-white text-[0.62rem] py-1 rounded-md transition-colors flex items-center justify-center gap-1">
-            <i data-lucide="save" class="w-2.5 h-2.5"></i> 保存管件
-          </button>
-        </div>
-        <div class="flex gap-1.5">
-          <button id="deleteTempBtn" class="flex-1 bg-rose-700/60 hover:bg-rose-700/85 text-white text-[0.62rem] py-1 rounded-md transition-colors">临时删除</button>
-          <button id="deletePermBtn" class="flex-1 bg-accent hover:bg-accent/85 text-white text-[0.62rem] py-1 rounded-md transition-colors">永久删除</button>
-        </div>
-      </div>
-
-      <!-- 覆盖面编辑 -->
-      <div id="editFaceMode" style="display:none" class="space-y-2">
-        <div id="editFaceName" class="text-[0.75rem] font-medium text-accent tracking-tight"></div>
-        <div class="text-[0.6rem] text-muted tracking-wider">颜色</div>
-        <div id="faceColorPalette" class="flex gap-1 flex-wrap"></div>
-        <div class="flex items-center gap-2">
-          <span class="text-[0.6rem] text-muted tracking-wider">透明度</span>
-          <span id="faceOpacityVal" class="text-[0.68rem] text-accent font-mono font-medium">0.30</span>
-        </div>
-        <input type="range" id="faceOpacitySlider" min="0.05" max="0.95" step="0.05" value="0.30" class="w-full">
-        <div class="flex gap-1.5">
-          <button id="faceUpdateTempBtn" class="flex-1 bg-accent2 hover:bg-accent2/85 text-white text-[0.62rem] py-1 rounded-md transition-colors">临时更新</button>
-          <button id="faceUpdatePermBtn" class="flex-1 bg-accent hover:bg-accent/85 text-white text-[0.62rem] py-1 rounded-md transition-colors">永久保存</button>
-        </div>
-        <div class="flex gap-1.5">
-          <button id="faceDeleteTempBtn" class="flex-1 bg-rose-700/60 hover:bg-rose-700/85 text-white text-[0.62rem] py-1 rounded-md transition-colors">临时删除</button>
-          <button id="faceDeletePermBtn" class="flex-1 bg-accent hover:bg-accent/85 text-white text-[0.62rem] py-1 rounded-md transition-colors">永久删除</button>
-        </div>
-      </div>
-
-      <div id="saveStatus" class="text-[0.62rem] text-muted pt-0.5"></div>
-    </div>
-  </div>
-
-  <div class="mx-4 h-px bg-white/5"></div>
-
-  <!-- ═══ 运动学曲线 ═══ -->
-  <div class="px-3 py-2.5 space-y-1.5">
-    <div class="flex items-center justify-between cursor-pointer select-none" onclick="this.parentElement.classList.toggle('collapsed')">
-      <div class="flex items-center gap-1.5 text-muted text-[0.68rem] tracking-wider font-medium">
-        <i data-lucide="trending-up" class="w-3.5 h-3.5 text-dim"></i> 运动学曲线
-      </div>
-      <i data-lucide="chevron-down" class="w-3 h-3 text-dim transition-transform duration-200 collapsed-rotate"></i>
-    </div>
-    <div class="content space-y-1.5">
-      <select id="curveParam" class="w-full bg-input text-[#e4e4ec] border border-white/5 rounded-md px-2 py-1 text-[0.72rem] outline-none focus:border-accent/50 transition-colors">
-        <option value="camber_deg">外倾角 (°)</option>
-        <option value="toe_deg">前束角 (°)</option>
-        <option value="caster_deg">后倾角 (°)</option>
-        <option value="kpi_deg">内倾角 (°)</option>
-        <option value="scrub_radius_mm">偏距 (mm)</option>
-        <option value="caster_trail_mm">拖距 (mm)</option>
-        <option value="damper_travel">减震器行程 (mm)</option>
-        <option value="motion_ratio">传动比</option>
-      </select>
-      <div class="relative w-full aspect-[4/3] bg-card rounded-lg border border-white/5 p-1">
-        <canvas id="kinCurveChart"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ 前硬点 ═══ -->
-  <div class="px-3 py-2.5">
-    <div class="flex items-center justify-between cursor-pointer select-none" onclick="this.parentElement.classList.toggle('collapsed')">
-      <div class="flex items-center gap-1.5 text-muted text-[0.68rem] tracking-wider font-medium">
-        <i data-lucide="wrench" class="w-3.5 h-3.5 text-dim"></i> 前硬点（右侧）
-      </div>
-      <i data-lucide="chevron-down" class="w-3 h-3 text-dim transition-transform duration-200 collapsed-rotate"></i>
-    </div>
-    <div class="content mt-1.5 max-h-[200px] overflow-y-auto rounded-lg border border-white/5">
-      <table><thead><tr><th>点</th><th>X</th><th>Y</th><th>Z</th></tr></thead><tbody id="hpTableBody"></tbody></table>
-    </div>
-  </div>
-
-  <!-- ═══ 后硬点 ═══ -->
-  <div class="px-3 py-2.5 collapsed">
-    <div class="flex items-center justify-between cursor-pointer select-none" onclick="this.parentElement.classList.toggle('collapsed')">
-      <div class="flex items-center gap-1.5 text-muted text-[0.68rem] tracking-wider font-medium">
-        <i data-lucide="wrench" class="w-3.5 h-3.5 text-dim"></i> 后硬点（右侧）
-      </div>
-      <i data-lucide="chevron-down" class="w-3 h-3 text-dim transition-transform duration-200 collapsed-rotate"></i>
-    </div>
-    <div class="content mt-1.5 max-h-[200px] overflow-y-auto rounded-lg border border-white/5">
-      <table><thead><tr><th>点</th><th>X</th><th>Y</th><th>Z</th></tr></thead><tbody id="rearHpTableBody"></tbody></table>
-    </div>
-  </div>
-
-  <!-- ═══ 车架节点 ═══ -->
-  <div class="px-3 py-2.5 collapsed">
-    <div class="flex items-center justify-between cursor-pointer select-none" onclick="this.parentElement.classList.toggle('collapsed')">
-      <div class="flex items-center gap-1.5 text-muted text-[0.68rem] tracking-wider font-medium">
-        <i data-lucide="box" class="w-3.5 h-3.5 text-dim"></i> 车架节点
-      </div>
-      <i data-lucide="chevron-down" class="w-3 h-3 text-dim transition-transform duration-200 collapsed-rotate"></i>
-    </div>
-    <div class="content mt-1.5 space-y-1">
-      <div class="max-h-[180px] overflow-y-auto rounded-lg border border-white/5">
-        <table><thead><tr><th>点</th><th>X</th><th>Y</th><th>Z</th></tr></thead><tbody id="frameNodeTableBody"></tbody></table>
-      </div>
-      <div class="text-[0.6rem] text-dim">管件: <span id="frameTubeCount" class="text-accent font-medium">0</span> · 左侧 = Y 镜像</div>
-    </div>
-  </div>
-
-  <!-- ═══ 减震器挂点 ═══ -->
-  <div class="px-3 py-2.5 collapsed">
-    <div class="flex items-center justify-between cursor-pointer select-none" onclick="this.parentElement.classList.toggle('collapsed')">
-      <div class="flex items-center gap-1.5 text-muted text-[0.68rem] tracking-wider font-medium">
-        <i data-lucide="disc" class="w-3.5 h-3.5 text-dim"></i> 减震器挂点
-      </div>
-      <i data-lucide="chevron-down" class="w-3 h-3 text-dim transition-transform duration-200 collapsed-rotate"></i>
-    </div>
-    <div class="content mt-1.5 space-y-1">
-      <div class="rounded-lg border border-white/5">
-        <table><thead><tr><th>点</th><th>X</th><th>Y</th><th>Z</th></tr></thead><tbody id="damperMountTableBody"></tbody></table>
-      </div>
-      <div class="text-[0.6rem] text-dim">
-        前: <span id="damperLenFR" class="text-accent font-mono">--</span> mm ·
-        后: <span id="damperLenRR" class="text-accent font-mono">--</span> mm
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ 覆盖面管理 ═══ -->
-  <div class="px-3 py-2.5 collapsed">
-    <div class="flex items-center justify-between cursor-pointer select-none" onclick="this.parentElement.classList.toggle('collapsed')">
-      <div class="flex items-center gap-1.5 text-muted text-[0.68rem] tracking-wider font-medium">
-        <i data-lucide="layers" class="w-3.5 h-3.5 text-dim"></i> 覆盖面管理
-      </div>
-      <i data-lucide="chevron-down" class="w-3 h-3 text-dim transition-transform duration-200 collapsed-rotate"></i>
-    </div>
-    <div class="content mt-1.5 space-y-1">
-      <div id="faceListContainer" class="max-h-[200px] overflow-y-auto rounded-lg border border-white/5">
-        <div id="faceListBody" class="text-[0.6rem] text-dim p-2">无覆盖面</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ 空力套件 ═══ -->
-  <div class="px-3 py-2.5">
-    <div class="flex items-center justify-between cursor-pointer select-none" onclick="this.parentElement.classList.toggle('collapsed')">
-      <div class="flex items-center gap-1.5 text-muted text-[0.68rem] tracking-wider font-medium">
-        <i data-lucide="wind" class="w-3.5 h-3.5 text-dim"></i> 空力套件
-      </div>
-      <i data-lucide="chevron-down" class="w-3 h-3 text-dim transition-transform duration-200 collapsed-rotate"></i>
-    </div>
-    <div class="content mt-1.5 space-y-1">
-      <div class="text-[0.58rem] text-dim tracking-wider font-medium flex items-center gap-1">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400/60"></span> 前翼
-      </div>
-      <div id="frontWingListContainer" class="max-h-[240px] overflow-y-auto rounded-lg border border-white/5">
-        <div id="frontWingListBody" class="text-[0.6rem] text-dim p-2">加载中...</div>
-      </div>
-
-      <div class="text-[0.58rem] text-dim tracking-wider font-medium flex items-center gap-1 mt-2">
-        <span class="w-1.5 h-1.5 rounded-full bg-blue-400/60"></span> 尾翼
-      </div>
-      <div id="rearWingListContainer" class="max-h-[240px] overflow-y-auto rounded-lg border border-white/5">
-        <div id="rearWingListBody" class="text-[0.6rem] text-dim p-2">加载中...</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="pb-5"></div>
-
-</div><!-- /right panel -->
-
-<!-- ═══════════════ THREE.JS ═══════════════ -->
+<link rel="stylesheet" href="style.css">
 <script type="importmap">
 {
   "imports": {
@@ -418,2006 +34,316 @@
   }
 }
 </script>
-
-<script type="module">
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-// ============================================================
-// STATE
-// ============================================================
-let hardpointsFrontRight = {};
-let hardpointsFrontLeft = {};
-let hardpointsRearRight = {};
-let hardpointsRearLeft = {};
-let currentResultFrontRight = {};
-let currentResultFrontLeft = {};
-let currentResultRearRight = {};
-let currentResultRearLeft = {};
-let anglesFrontRight = {};
-let anglesFrontLeft = {};
-let anglesRearRight = {};
-let anglesRearLeft = {};
-let frameNodes = {};
-let frameTubes = [];
-const rockerCache = {};
-const contactPatches = {};  // {frontRight: {...}, frontLeft: {...}, rearRight: {...}, rearLeft: {...}}
-
-const CHASSIS_KEYS = ['CH1','CH2','CH3','CH4','CH5'];
-const UPRIGHT_KEYS = ['UP1','UP2','UP3','UP4','UP5'];
-const FLOAT_KEYS   = ['FL1'];
-const HP_ORDER = [...CHASSIS_KEYS, ...UPRIGHT_KEYS, ...FLOAT_KEYS];
-const REAR_HP_ORDER = HP_ORDER.map(k => 'R_' + k);
-
-const sceneObjects = {
-  frontRight: { spheres: {}, lines: {}, tireGroup: null, uprightLine: null, contactPatchLine: null, patchMesh: null },
-  frontLeft:  { spheres: {}, lines: {}, tireGroup: null, uprightLine: null, contactPatchLine: null, patchMesh: null },
-  rearRight:  { spheres: {}, lines: {}, tireGroup: null, uprightLine: null, contactPatchLine: null, patchMesh: null },
-  rearLeft:   { spheres: {}, lines: {}, tireGroup: null, uprightLine: null, contactPatchLine: null, patchMesh: null },
-  frame: { spheres: {}, tubes: [], rockerFaces: [], damperGroups: {} },
-  bodyworkFaces: [],
-  rearWing: { meshes: [], mountSpheres: [], mountLines: [] },
-  frontWing: { meshes: [], mountSpheres: [], mountLines: [] },
-  groundPlane: null,
-  rearGroundPlane: null,
-  originAxes: null,
-};
-
-// ============================================================
-// THREE.JS SETUP — camera centered between front (X≈0) & rear (X≈-900)
-// ============================================================
-const viewport = document.getElementById('viewport');
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0f0f19);
-scene.fog = new THREE.Fog(0x0f0f19, 3000, 6000);
-
-const camera = new THREE.PerspectiveCamera(50, 2, 10, 10000);
-camera.position.set(350, -1500, 900);
-camera.up.set(0, 0, 1);
-
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.shadowMap.enabled = false;
-viewport.appendChild(renderer.domElement);
-
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(-450, 0, 150);  // centered between front (0) and rear (-900)
-controls.enableDamping = true;
-controls.dampingFactor = 0.08;
-controls.update();
-
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-let selectedSphere = null;
-let selectedLine = null;
-let selectedPointName = '';
-let selectedPointType = '';
-let selectedLineEndpoints = null;
-let selectedLineType = '';
-
-let multiSelectedPoints = new Set();
-let multiHighlightedSpheres = [];
-
-let tubeColors = {};
-let bodyworkFaces = {};
-let rearWingConfig = null;
-let frontWingConfig = null;
-let designParams = {};
-
-let selectedFace = null;
-let selectedFaceName = '';
-let selectedFaceDef = null;
-
-// Chassis pose mode: heave (mm), pitch (deg), roll (deg)
-let chassisMode = false;
-let chassisPose = { heave: 0, pitch: 0, roll: 0 };
-
-// Track half (mm) — from DESIGN_PARAMS defaults
-const CHASSIS_TRACK_FRONT = 375;
-const CHASSIS_TRACK_REAR = 360;
-const CHASSIS_WHEELBASE_HALF = 450; // ~half of 900mm wheelbase
-
-// Unified chassis transform: world = chassis_to_world(chassis_local)
-// Conventions: positive pitch = nose up, positive roll = lean right.
-function chassisTransform(pt) {
-  if (!chassisMode || (!chassisPose.heave && !chassisPose.pitch && !chassisPose.roll)) return pt.slice();
-  const h = chassisPose.heave, pR = chassisPose.pitch * Math.PI / 180, rR = chassisPose.roll * Math.PI / 180;
-  const cp = Math.cos(pR), sp = -Math.sin(pR);  // negated: +pitch = nose up
-  const cr = Math.cos(rR), sr = -Math.sin(rR);  // negated: +roll = lean right
-  let x = pt[0], y = pt[1], z = pt[2];
-  // Pitch around CG (X≈-445)
-  const x0 = x + 445;
-  x = x0 * cp + z * sp - 445;
-  z = -x0 * sp + z * cp;
-  // Roll
-  const y1 = y * cr - z * sr;
-  const z2 = y * sr + z * cr;
-  return [x, y1, z2 + h];
-}
-
-/** Resolve a named node from frameNodes, falling back to solved hardpoints.
- *  @param {boolean} [isRight] - if true, search right-side hardpoints first. */
-function resolveChassisNode(name, isRight) {
-  if (frameNodes[name]) return chassisTransform(frameNodes[name]);
-  const leftPool  = [currentResultFrontLeft,  currentResultRearLeft];
-  const rightPool = [currentResultFrontRight, currentResultRearRight];
-  const first = isRight ? rightPool : leftPool;
-  const second = isRight ? leftPool : rightPool;
-  for (const hp of [...first, ...second]) { if (hp && hp[name]) return chassisTransform(hp[name]); }
-  return null;
-}
-
-raycaster.params.Points.threshold = 0.5;
-raycaster.params.Line = { threshold: 0.5 };
-
-const PALETTE = [
-  {name:'红', hex:'#f43f5e'}, {name:'橙', hex:'#f97316'},
-  {name:'黄', hex:'#f59e0b'}, {name:'绿', hex:'#10b981'},
-  {name:'青', hex:'#06b6d4'}, {name:'蓝', hex:'#3b82f6'},
-  {name:'紫', hex:'#8b5cf6'}, {name:'白', hex:'#ffffff'},
-  {name:'灰', hex:'#94a3b8'}, {name:'粉', hex:'#ec4899'},
-];
-
-const ambient = new THREE.AmbientLight(0x404060, 3);
-scene.add(ambient);
-const dirLight = new THREE.DirectionalLight(0xffffff, 4);
-dirLight.position.set(500, 1000, 800);
-scene.add(dirLight);
-const dirLight2 = new THREE.DirectionalLight(0x8888ff, 2);
-dirLight2.position.set(-500, -500, 200);
-scene.add(dirLight2);
-
-// Ground grids — front axle (X=0) & rear axle (X=-900)
-const gridHelper = new THREE.PolarGridHelper(800, 40, 20, 256, 0x333355, 0x222244);
-gridHelper.rotation.x = -Math.PI / 2;
-scene.add(gridHelper);
-sceneObjects.groundPlane = gridHelper;
-
-const rearGridHelper = new THREE.PolarGridHelper(800, 40, 20, 256, 0x333355, 0x222244);
-rearGridHelper.rotation.x = -Math.PI / 2;
-rearGridHelper.position.x = -900;
-scene.add(rearGridHelper);
-sceneObjects.rearGroundPlane = rearGridHelper;
-
-function makeAxis(dir, color, length=400) {
-  const geo = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(0,0,0), new THREE.Vector3(dir[0]*length, dir[1]*length, dir[2]*length)
-  ]);
-  return new THREE.Line(geo, new THREE.LineBasicMaterial({ color, linewidth: 2 }));
-}
-scene.add(makeAxis([1,0,0], 0xff4444));
-scene.add(makeAxis([0,1,0], 0x44ff44));
-scene.add(makeAxis([0,0,1], 0x4444ff));
-
-const clGeo = new THREE.BufferGeometry().setFromPoints([
-  new THREE.Vector3(-1200, 0, 0), new THREE.Vector3(500, 0, 0)
-]);
-const clLine = new THREE.Line(clGeo, new THREE.LineDashedMaterial({ color: 0x666688, dashSize: 20, gapSize: 20 }));
-scene.add(clLine);
-
-// ============================================================
-// SCENE BUILDERS
-// ============================================================
-
-function sphere(color='#ffaa00', radius=8) {
-  const geo = new THREE.SphereGeometry(radius, 16, 12);
-  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.2 });
-  return new THREE.Mesh(geo, mat);
-}
-
-function lineSegment(a, b, color='#ffffff', dash=false) {
-  const pts = [new THREE.Vector3(...a), new THREE.Vector3(...b)];
-  const geo = new THREE.BufferGeometry().setFromPoints(pts);
-  const mat = dash
-    ? new THREE.LineDashedMaterial({ color, dashSize: 12, gapSize: 8 })
-    : new THREE.LineBasicMaterial({ color, linewidth: 1.5 });
-  const line = new THREE.Line(geo, mat);
-  if (dash) line.computeLineDistances();
-  return line;
-}
-
-function makeTireRing(wheelCenter, tireRadius=230, loadedRadius=null) {
-  const r = loadedRadius || tireRadius;
-  const group = new THREE.Group();
-  const torusGeo = new THREE.TorusGeometry(r, 6, 16, 48);
-  const torusMat = new THREE.MeshStandardMaterial({ color: '#aaaaaa', roughness: 0.6 });
-  const torus = new THREE.Mesh(torusGeo, torusMat);
-  torus.rotation.x = THREE.MathUtils.degToRad(90);
-  group.add(torus);
-  // inner dashed ring showing free radius if loaded is different
-  if (loadedRadius && Math.abs(loadedRadius - tireRadius) > 0.5) {
-    const innerGeo = new THREE.TorusGeometry(loadedRadius, 1.5, 8, 48);
-    const innerMat = new THREE.MeshBasicMaterial({ color: '#fbbf24' });
-    const inner = new THREE.Mesh(innerGeo, innerMat);
-    inner.rotation.x = THREE.MathUtils.degToRad(90);
-    group.add(inner);
-  }
-  group.position.set(...wheelCenter);
-  return group;
-}
-
-function makeContactPatchLine(wheelCenter, cpCenter) {
-  const target = cpCenter || [wheelCenter[0], wheelCenter[1], 0];
-  const pts = [new THREE.Vector3(...wheelCenter), new THREE.Vector3(...target)];
-  const geo = new THREE.BufferGeometry().setFromPoints(pts);
-  return new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#888888' }));
-}
-
-function makeContactPatchMesh(cpCenter, tireWidth, loadedRadius) {
-  const group = new THREE.Group();
-  // small flat rectangle at contact patch position
-  const halfW = (tireWidth || 160) / 2;
-  const halfL = (loadedRadius || 148) * 0.25;  // contact patch length ~25% of radius
-  const geo = new THREE.PlaneGeometry(halfW * 2, halfL * 2);
-  const mat = new THREE.MeshBasicMaterial({
-    color: 0xfbbf24,
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0.35,
-  });
-  const mesh = new THREE.Mesh(geo, mat);
-  // PlaneGeometry is XY-plane (normal=Z up) — flat on ground, no rotation needed
-  // Position the GROUP (not the mesh) so updateContactPatchMesh doesn't double-offset
-  group.add(mesh);
-  group.position.set(cpCenter[0], cpCenter[1], cpCenter[2] + 0.3);
-  return group;
-}
-
-function updateContactPatchMesh(patchGroup, cpCenter) {
-  if (!patchGroup || !cpCenter) return;
-  patchGroup.position.set(cpCenter[0], cpCenter[1], cpCenter[2] + 0.3);
-}
-
-function updateTireFromGeometry(tireGroup, UP1, UP2, UP5) {
-  const up1 = new THREE.Vector3(...UP1);
-  const up2 = new THREE.Vector3(...UP2);
-  const up5 = new THREE.Vector3(...UP5);
-  const z = new THREE.Vector3().subVectors(up2, up1).normalize();
-  const toWheel = new THREE.Vector3().subVectors(up5, up1);
-  const x = new THREE.Vector3().crossVectors(toWheel, z).normalize();
-  const y = new THREE.Vector3().crossVectors(z, x);
-  if (y.length() < 1e-6) return;
-  tireGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), y.normalize());
-  tireGroup.position.copy(up5);
-}
-
-function updateContactPatchLine(cpLine, UP5, cpCenter) {
-  const target = cpCenter || [UP5[0], UP5[1], 0];
-  const pts = [new THREE.Vector3(...UP5), new THREE.Vector3(...target)];
-  cpLine.geometry.setFromPoints(pts);
-}
-
-const FRONT_COLORS = {
-  chassis: '#f43f5e', upright: '#fbbf24', float: '#38bdf8',
-  uca: '#3b82f6', ucaAxis: '#2563eb', lca: '#10b981', lcaAxis: '#059669',
-  kingpin: '#e4e4ec', tieRod: '#f97316', pushRod: '#8b5cf6', uprightLine: '#8888aa',
-};
-const REAR_COLORS = {
-  chassis: '#d97706', upright: '#ca8a04', float: '#0284c7',
-  uca: '#2563eb', ucaAxis: '#1d4ed8', lca: '#059669', lcaAxis: '#047857',
-  kingpin: '#d4d4d8', tieRod: '#ea580c', pushRod: '#7c3aed', uprightLine: '#71718a',
-};
-
-function buildSidePoints(hp, sideKey, colors, keyPrefix = '') {
-  const objs = sceneObjects[sideKey];
-  Object.values(objs.spheres).forEach(s => scene.remove(s));
-  Object.values(objs.lines).forEach(l => scene.remove(l));
-  if (objs.tireGroup) scene.remove(objs.tireGroup);
-  if (objs.uprightLine) scene.remove(objs.uprightLine);
-  if (objs.contactPatchLine) scene.remove(objs.contactPatchLine);
-  objs.spheres = {};
-  objs.lines = {};
-
-  const C = (k) => keyPrefix + k;
-  const allKeys = CHASSIS_KEYS.map(C).concat(UPRIGHT_KEYS.map(C)).concat(FLOAT_KEYS.map(C));
-
-  for (const key of allKeys) {
-    if (!hp[key]) continue;
-    const baseKey = key.replace(keyPrefix, '');
-    const color = CHASSIS_KEYS.includes(baseKey) ? colors.chassis
-                : UPRIGHT_KEYS.includes(baseKey) ? colors.upright : colors.float;
-    const s = sphere(color, CHASSIS_KEYS.includes(baseKey) ? 10 : 7);
-    const pos = chassisTransform(hp[key]);  // chassis mode: chassis→world
-    s.position.set(...pos);
-    const sideIsLeft = sideKey === 'frontLeft' || sideKey === 'rearLeft';
-    s.userData.pointName = key + (sideIsLeft ? '_L' : '');
-    s.userData.pointType = 'hardpoint';
-    scene.add(s);
-    objs.spheres[key] = s;
-  }
-
-  function mkLine(name, a, b, color, dash) {
-    const pa = chassisTransform(hp[a] || [0,0,0]);
-    const pb = chassisTransform(hp[b] || [0,0,0]);
-    const l = lineSegment(pa, pb, color, dash);
-    l.userData = { lineName: name, lineType: 'suspension', endpoints: [a, b], originalColor: color };
-    objs.lines[name] = l;
-  }
-
-  if (hp[C('CH1')] && hp[C('UP1')]) mkLine('uca_front', C('CH1'), C('UP1'), colors.uca);
-  if (hp[C('CH2')] && hp[C('UP1')]) mkLine('uca_rear',  C('CH2'), C('UP1'), colors.uca);
-  if (hp[C('CH1')] && hp[C('CH2')]) mkLine('uca_axis',  C('CH1'), C('CH2'), colors.ucaAxis);
-
-  if (hp[C('CH3')] && hp[C('UP2')]) mkLine('lca_front', C('CH3'), C('UP2'), colors.lca);
-  if (hp[C('CH4')] && hp[C('UP2')]) mkLine('lca_rear',  C('CH4'), C('UP2'), colors.lca);
-  if (hp[C('CH3')] && hp[C('CH4')]) mkLine('lca_axis',  C('CH3'), C('CH4'), colors.lcaAxis);
-
-  if (hp[C('UP1')] && hp[C('UP2')]) mkLine('kingpin', C('UP1'), C('UP2'), colors.kingpin, true);
-  if (hp[C('UP3')] && hp[C('FL1')]) mkLine('tie_rod', C('UP3'), C('FL1'), colors.tieRod);
-  if (hp[C('UP4')] && hp[C('CH5')]) mkLine('push_rod', C('UP4'), C('CH5'), colors.pushRod);
-
-  const order = [C('UP1'), C('UP3'), C('UP2'), C('UP4'), C('UP1')];
-  const pts = order.filter(k => hp[k]).map(k => new THREE.Vector3(...chassisTransform(hp[k])));
-  if (pts.length >= 2) {
-    const polyGeo = new THREE.BufferGeometry().setFromPoints(pts);
-    objs.uprightLine = new THREE.Line(polyGeo, new THREE.LineBasicMaterial({ color: colors.uprightLine }));
-    scene.add(objs.uprightLine);
-  }
-
-  Object.values(objs.lines).forEach(l => scene.add(l));
-
-  // Tire — use loaded radius if available from contact patch data
-  const cp = contactPatches[sideKey];
-  const loadR = cp ? cp.loaded_radius : null;
-  const rawUP5 = hp[C('UP5')] || [0,0,0], rawUP1 = hp[C('UP1')], rawUP2 = hp[C('UP2')];
-  objs.tireGroup = makeTireRing(chassisTransform(rawUP5), hp.tire_radius || 230, loadR);
-  scene.add(objs.tireGroup);
-  if (rawUP1 && rawUP2 && rawUP5) {
-    updateTireFromGeometry(objs.tireGroup, chassisTransform(rawUP1), chassisTransform(rawUP2), chassisTransform(rawUP5));
-  }
-  // Contact patch line and ground patch
-  const cpCtr = cp ? chassisTransform(cp.center) : null;
-  if (objs.contactPatchLine) { scene.remove(objs.contactPatchLine); }
-  objs.contactPatchLine = makeContactPatchLine(chassisTransform(rawUP5), cpCtr);
-  scene.add(objs.contactPatchLine);
-  // Flat ground patch mesh
-  if (objs.patchMesh) { scene.remove(objs.patchMesh); }
-  if (cpCtr) {
-    objs.patchMesh = makeContactPatchMesh(cpCtr, hp.tire_width || 160, cp.loaded_radius || hp.tire_radius || 150);
-    scene.add(objs.patchMesh);
-  }
-}
-
-// ============================================================
-// FRAME RENDERING
-// ============================================================
-
-const FRAME_COLOR = '#94a3b8';
-const FRAME_NODE_COLOR = '#64748b';
-const ROCKER_COLOR = '#f97316';
-const DAMPER_COLOR = '#fbbf24';
-
-function resolveFramePoint(name) {
-  if (rockerCache[name]) return rockerCache[name];
-  if (frameNodes[name]) return frameNodes[name];
-  const isLeft = name.endsWith('_L');
-  const baseName = isLeft ? name.slice(0, -2) : name;
-  let hpDict;
-  if (baseName.startsWith('R_')) hpDict = isLeft ? hardpointsRearLeft : hardpointsRearRight;
-  else hpDict = isLeft ? hardpointsFrontLeft : hardpointsFrontRight;
-  if (hpDict[baseName]) return hpDict[baseName];
-  return null;
-}
-
-function buildFrame() {
-  const fobjs = sceneObjects.frame;
-  Object.values(fobjs.spheres).forEach(s => scene.remove(s));
-  fobjs.tubes.forEach(l => scene.remove(l));
-  fobjs.spheres = {};
-  fobjs.tubes = [];
-
-  for (const [name, pos] of Object.entries(frameNodes)) {
-    const s = sphere(FRAME_NODE_COLOR, 6);
-    const p = chassisTransform(pos);  // chassis mode: chassis→world
-    s.position.set(...p);
-    s.userData.pointName = name;
-    s.userData.pointType = 'frame_node';
-    scene.add(s);
-    fobjs.spheres[name] = s;
-  }
-
-  let tubeIdx = 0;
-  for (const tube of frameTubes) {
-    const pts = tube.map(n => resolveFramePoint(n)).filter(Boolean);
-    if (pts.length < 2) continue;
-    // Determine color
-    const [a, b] = [tube[0], tube[tube.length - 1]];
-    let color = tubeColors[tubeIdx] || FRAME_COLOR;
-    if (!tubeColors[tubeIdx]) {
-      if (a.startsWith('DAMPER') || b.startsWith('DAMPER')) color = DAMPER_COLOR;
-      else if (a.startsWith('RK_') || b.startsWith('RK_') || a.startsWith('R_RK_') || b.startsWith('R_RK_')
-        || a === 'CH5' || b === 'CH5' || a === 'CH5_L' || b === 'CH5_L'
-        || a === 'R_CH5' || b === 'R_CH5' || a === 'R_CH5_L' || b === 'R_CH5_L') color = ROCKER_COLOR;
-    }
-
-    if (tube.length === 2) {
-      // Straight line (existing behavior)
-      const pA = chassisTransform(pts[0]), pB = chassisTransform(pts[1]);
-      const line = lineSegment(pA, pB, color);
-      line.userData = { endpoints: [a, b], lineType: 'frame_tube', tubeIndex: tubeIdx, originalColor: color, isCurve: false };
-      scene.add(line);
-      fobjs.tubes.push(line);
-    } else {
-      // CatmullRom curve (3+ points)
-      const worldPts = pts.map(p => new THREE.Vector3(...chassisTransform(p)));
-      const curve = new THREE.CatmullRomCurve3(worldPts, false, 'catmullrom', 0.5);
-      const curveSamples = curve.getPoints(tube.length * 16);
-      const geo = new THREE.BufferGeometry().setFromPoints(curveSamples);
-      const mat = new THREE.LineBasicMaterial({ color: new THREE.Color(color), linewidth: 1.5 });
-      const line = new THREE.Line(geo, mat);
-      line.userData = { endpoints: tube, lineType: 'frame_tube', tubeIndex: tubeIdx, originalColor: color, isCurve: true };
-      scene.add(line);
-      fobjs.tubes.push(line);
-    }
-    tubeIdx++;
-  }
-
-  fobjs.rockerFaces.forEach(f => scene.remove(f));
-  fobjs.rockerFaces = [];
-  function addRockerFace(keysR, keysL, hexColor) {
-    for (const keys of [keysR, keysL]) {
-      const pts = keys.map(k => resolveFramePoint(k)).filter(Boolean);
-      if (pts.length !== 3) continue;
-      const geo = new THREE.BufferGeometry();
-      const verts = new Float32Array([pts[0][0],pts[0][1],pts[0][2], pts[1][0],pts[1][1],pts[1][2], pts[2][0],pts[2][1],pts[2][2]]);
-      geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
-      geo.setIndex([0, 1, 2]);
-      geo.computeVertexNormals();
-      const mat = new THREE.MeshStandardMaterial({ color: hexColor, roughness: 0.5, metalness: 0.1, transparent: true, opacity: 0.45, side: THREE.DoubleSide });
-      const mesh = new THREE.Mesh(geo, mat);
-      scene.add(mesh);
-      fobjs.rockerFaces.push(mesh);
-    }
-  }
-  addRockerFace(['CH5','RK_PIVOT_R','RK_DAMPER_R'],['CH5_L','RK_PIVOT_L','RK_DAMPER_L'],0xf97316);
-  addRockerFace(['R_CH5','R_RK_PIVOT_R','R_RK_DAMPER_R'],['R_CH5_L','R_RK_PIVOT_L','R_RK_DAMPER_L'],0xd97706);
-}
-
-// ============================================================
-// DAMPER 3D CYLINDERS
-// ============================================================
-
-function disposeGroup(group) {
-  group.traverse(child => {
-    if (child.geometry) child.geometry.dispose();
-    if (child.material) {
-      if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
-      else child.material.dispose();
-    }
-  });
-}
-
-function createDamperCylinder(chassisPt, rockerPt) {
-  const group = new THREE.Group();
-  const dir = new THREE.Vector3().subVectors(rockerPt, chassisPt);
-  const totalLen = dir.length();
-  if (totalLen < 1) return group;
-  dir.normalize();
-  const up = Math.abs(dir.z) < 0.99 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0);
-  const perp1 = new THREE.Vector3().crossVectors(dir, up).normalize();
-  const perp2 = new THREE.Vector3().crossVectors(dir, perp1).normalize();
-  const bodyLen = totalLen * 0.52;
-  const bodyGeo = new THREE.CylinderGeometry(7, 7, bodyLen, 20, 1, true);
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xf472b6, roughness: 0.25, metalness: 0.1, transparent: true, opacity: 0.45, side: THREE.DoubleSide });
-  const body = new THREE.Mesh(bodyGeo, bodyMat);
-  body.position.copy(new THREE.Vector3().copy(chassisPt).addScaledVector(dir, bodyLen / 2));
-  body.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-  group.add(body);
-  const rodStartOffset = bodyLen * 0.85;
-  const rodLen = totalLen - rodStartOffset;
-  if (rodLen > 0) {
-    const rodGeo = new THREE.CylinderGeometry(4, 4, rodLen, 12, 1);
-    const rodMat = new THREE.MeshStandardMaterial({ color: 0xfce7f3, roughness: 0.2, metalness: 0.4 });
-    const rod = new THREE.Mesh(rodGeo, rodMat);
-    rod.position.copy(new THREE.Vector3().copy(chassisPt).addScaledVector(dir, rodStartOffset + rodLen / 2));
-    rod.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-    group.add(rod);
-  }
-  const coils = 7, springRadius = 10, springStart = bodyLen * 0.1, springEnd = bodyLen * 0.9;
-  const springLen = springEnd - springStart, steps = coils * 40;
-  const springPts = [];
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    springPts.push(new THREE.Vector3().copy(chassisPt)
-      .addScaledVector(dir, springStart + t * springLen)
-      .addScaledVector(perp1, Math.cos(t * coils * Math.PI * 2) * springRadius)
-      .addScaledVector(perp2, Math.sin(t * coils * Math.PI * 2) * springRadius));
-  }
-  const springGeo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(springPts), steps, 1.3, 8, false);
-  group.add(new THREE.Mesh(springGeo, new THREE.MeshStandardMaterial({ color: 0xf0aacc, roughness: 0.35, metalness: 0.25 })));
-  for (const [offset, radius] of [[0, 7], [bodyLen, 7]]) {
-    const ringGeo = new THREE.TorusGeometry(radius, 1.8, 8, 16);
-    const ring = new THREE.Mesh(ringGeo, new THREE.MeshStandardMaterial({ color: 0xf8c8d8, roughness: 0.2, metalness: 0.3 }));
-    ring.position.copy(new THREE.Vector3().copy(chassisPt).addScaledVector(dir, offset));
-    ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
-    group.add(ring);
-  }
-  return group;
-}
-
-function buildDamperCylinders() {
-  const fobjs = sceneObjects.frame;
-  for (const g of Object.values(fobjs.damperGroups)) { scene.remove(g); disposeGroup(g); }
-  fobjs.damperGroups = {};
-  const defs = [
-    { rockerKey:'RK_DAMPER_R', chassisKey:'DAMPER_CHASSIS_FR', side:'FR' },
-    { rockerKey:'RK_DAMPER_L', chassisKey:'DAMPER_CHASSIS_FL', side:'FL' },
-    { rockerKey:'R_RK_DAMPER_R', chassisKey:'R_DAMPER_CHASSIS_RR', side:'RR' },
-    { rockerKey:'R_RK_DAMPER_L', chassisKey:'R_DAMPER_CHASSIS_RL', side:'RL' },
-  ];
-  for (const def of defs) {
-    const rp = resolveFramePoint(def.rockerKey), cp = resolveFramePoint(def.chassisKey);
-    if (!rp || !cp) continue;
-    const g = createDamperCylinder(new THREE.Vector3(...chassisTransform(cp)), new THREE.Vector3(...chassisTransform(rp)));
-    scene.add(g); fobjs.damperGroups[def.side] = g;
-  }
-}
-
-function updateDamperCylinders() {
-  const fobjs = sceneObjects.frame;
-  for (const g of Object.values(fobjs.damperGroups)) { scene.remove(g); disposeGroup(g); }
-  fobjs.damperGroups = {};
-  buildDamperCylinders();
-}
-
-// ============================================================
-// ROCKER KINEMATICS
-// ============================================================
-
-function rotatePointAroundX(point, pivot, angleRad) {
-  const ct = Math.cos(angleRad), st = Math.sin(angleRad);
-  const dy = point[1] - pivot[1], dz = point[2] - pivot[2];
-  return [point[0], pivot[1] + dy * ct - dz * st, pivot[2] + dy * st + dz * ct];
-}
-
-function findRockerAngle(ch5Design, pivot, up4Current, pushRodLen) {
-  const targetSq = pushRodLen * pushRodLen;
-  function distSq(theta) { const c = rotatePointAroundX(ch5Design, pivot, theta); return (c[0]-up4Current[0])**2 + (c[1]-up4Current[1])**2 + (c[2]-up4Current[2])**2; }
-  function error(theta) { return distSq(theta) - targetSq; }
-  const e0 = error(0);
-  if (Math.abs(e0) < 1e-6 * targetSq) return 0;
-  const dir = (Math.abs(error(0.001)) < Math.abs(error(-0.001))) ? 1 : -1;
-  let lo = 0, hi = 0, found = false;
-  for (let r = 0.01; r <= Math.PI; r *= 1.5) {
-    const t = dir * r;
-    if (error(0) * error(t) <= 0) { if (dir > 0) { lo = 0; hi = t; } else { lo = t; hi = 0; } found = true; break; }
-  }
-  if (!found) { let best = 0, bestE = Math.abs(e0); for (let t = -Math.PI; t <= Math.PI; t += 0.005) { const e = Math.abs(error(t)); if (e < bestE) { bestE = e; best = t; } } return best; }
-  for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (error(lo) * error(mid) <= 0) hi = mid; else lo = mid; if (hi - lo < 1e-8) break; }
-  return (lo + hi) / 2;
-}
-
-function updateRockerKinematics() {
-  const fobjs = sceneObjects.frame;
-  const rockerDefs = [
-    ['CH5','RK_PIVOT_R','RK_DAMPER_R',hardpointsFrontRight,currentResultFrontRight,'UP4','frontRight',''],
-    ['CH5','RK_PIVOT_L','RK_DAMPER_L',hardpointsFrontLeft,currentResultFrontLeft,'UP4','frontLeft','_L'],
-    ['R_CH5','R_RK_PIVOT_R','R_RK_DAMPER_R',hardpointsRearRight,currentResultRearRight,'R_UP4','rearRight',''],
-    ['R_CH5','R_RK_PIVOT_L','R_RK_DAMPER_L',hardpointsRearLeft,currentResultRearLeft,'R_UP4','rearLeft','_L'],
-  ];
-  for (const [ch5Key,pivKey,dmpKey,hpDesign,hpCurrent,up4Key,sideKey,cacheSuffix] of rockerDefs) {
-    const ch5D = hpDesign[ch5Key], up4D = hpDesign[up4Key], up4C = hpCurrent[up4Key];
-    if (!ch5D || !up4D || !up4C) continue;
-    const pivot = resolveFramePoint(pivKey); if (!pivot) continue;
-    const L = Math.hypot(up4D[0]-ch5D[0], up4D[1]-ch5D[1], up4D[2]-ch5D[2]); if (L < 1) continue;
-    const theta = findRockerAngle(ch5D, pivot, up4C, L);
-    const dmpDesign = frameNodes[dmpKey]; if (!dmpDesign) continue;
-    const newCH5 = rotatePointAroundX(ch5D, pivot, theta);
-    const newDMP = rotatePointAroundX(dmpDesign, pivot, theta);
-    rockerCache[ch5Key + cacheSuffix] = newCH5; rockerCache[dmpKey] = newDMP;
-    const so = sceneObjects[sideKey];
-    const wCH5 = chassisTransform(newCH5), wDMP = chassisTransform(newDMP);
-    if (so && so.spheres[ch5Key]) so.spheres[ch5Key].position.set(...wCH5);
-    if (fobjs.spheres[dmpKey]) fobjs.spheres[dmpKey].position.set(...wDMP);
-    if (so && so.lines['push_rod'] && hpCurrent[up4Key]) {
-      const wUP4 = chassisTransform(hpCurrent[up4Key]);
-      so.lines['push_rod'].geometry.setFromPoints([new THREE.Vector3(...wUP4), new THREE.Vector3(...wCH5)]);
-    }
-  }
-  for (const line of fobjs.tubes) {
-    const ep = line.userData?.endpoints; if (!ep) continue;
-    if (line.userData?.isCurve) {
-      const pts = ep.map(n => resolveFramePoint(n)).filter(Boolean);
-      if (pts.length < 2) continue;
-      const worldPts = pts.map(p => new THREE.Vector3(...chassisTransform(p)));
-      const curve = new THREE.CatmullRomCurve3(worldPts, false, 'catmullrom', 0.5);
-      const samples = curve.getPoints(ep.length * 16);
-      line.geometry.setFromPoints(samples);
-    } else {
-      const a = resolveFramePoint(ep[0]), b = resolveFramePoint(ep[1]);
-      if (a && b) { const wa = chassisTransform(a), wb = chassisTransform(b); line.geometry.setFromPoints([new THREE.Vector3(...wa), new THREE.Vector3(...wb)]); }
-    }
-  }
-  for (let i = 0; i < fobjs.rockerFaces.length; i++) {
-    const mesh = fobjs.rockerFaces[i], isFront = i < 2, sfx = (i % 2 === 0) ? '' : '_L';
-    const pts = [resolveFramePoint((isFront?'CH5':'R_CH5')+sfx), resolveFramePoint((isFront?'RK_PIVOT_':'R_RK_PIVOT_')+(sfx?'L':'R')), resolveFramePoint((isFront?'RK_DAMPER_':'R_RK_DAMPER_')+(sfx?'L':'R'))].filter(Boolean);
-    if (pts.length !== 3) continue;
-    const w = pts.map(p => chassisTransform(p));
-    const v = new Float32Array([w[0][0],w[0][1],w[0][2], w[1][0],w[1][1],w[1][2], w[2][0],w[2][1],w[2][2]]);
-    mesh.geometry.setAttribute('position', new THREE.BufferAttribute(v, 3));
-    mesh.geometry.setIndex([0, 1, 2]); mesh.geometry.computeVertexNormals();
-  }
-  updateDamperCylinders();
-}
-
-// ============================================================
-// UPDATE SCENE FROM SOLVER RESULTS
-// ============================================================
-
-function updateSidePoints(result, sideKey, keyPrefix = '') {
-  const objs = sceneObjects[sideKey], hp = result, K = (k) => keyPrefix + k;
-  const ch5Key = K('CH5');
-  for (const key of Object.keys(objs.spheres)) { if (key !== ch5Key && hp[key]) { const p = chassisTransform(hp[key]); objs.spheres[key].position.set(...p); } }
-  const ul = (n,a,b) => { if (objs.lines[n] && hp[a] && hp[b]) { const pa = chassisTransform(hp[a]), pb = chassisTransform(hp[b]); objs.lines[n].geometry.setFromPoints([new THREE.Vector3(...pa), new THREE.Vector3(...pb)]); } };
-  ul('uca_front',K('CH1'),K('UP1')); ul('uca_rear',K('CH2'),K('UP1')); ul('uca_axis',K('CH1'),K('CH2'));
-  ul('lca_front',K('CH3'),K('UP2')); ul('lca_rear',K('CH4'),K('UP2')); ul('lca_axis',K('CH3'),K('CH4'));
-  ul('kingpin',K('UP1'),K('UP2')); ul('tie_rod',K('UP3'),K('FL1'));
-  if (objs.uprightLine) { const o = [K('UP1'),K('UP3'),K('UP2'),K('UP4'),K('UP1')]; objs.uprightLine.geometry.setFromPoints(o.filter(k=>hp[k]).map(k=>new THREE.Vector3(...chassisTransform(hp[k])))); }
-  if (objs.tireGroup && hp[K('UP1')] && hp[K('UP2')] && hp[K('UP5')]) updateTireFromGeometry(objs.tireGroup, chassisTransform(hp[K('UP1')]), chassisTransform(hp[K('UP2')]), chassisTransform(hp[K('UP5')]));
-  const cp = contactPatches[sideKey];
-  if (objs.contactPatchLine && hp[K('UP5')]) {
-    const cpCtr = cp ? chassisTransform(cp.center) : null;
-    updateContactPatchLine(objs.contactPatchLine, chassisTransform(hp[K('UP5')]), cpCtr);
-  }
-  if (objs.patchMesh && cp) updateContactPatchMesh(objs.patchMesh, chassisTransform(cp.center));
-}
-
-// ============================================================
-// POINT SELECTION
-// ============================================================
-
-function highlightSphere(mesh) { if (mesh?.material) { mesh.material = mesh.material.clone(); mesh.material.emissive = new THREE.Color(0xfbbf24); mesh.material.emissiveIntensity = 0.8; mesh.material.roughness = 0.2; } }
-function unhighlightSphere(mesh) { if (mesh?.material) { mesh.material.emissive = new THREE.Color(0x000000); mesh.material.emissiveIntensity = 0; mesh.material.roughness = 0.4; } }
-function highlightLine(line) { if (line?.material) { line.material = line.material.clone(); line.material.color = new THREE.Color(0xfbbf24); line.material.linewidth = 3; } }
-function unhighlightLine(line) { if (line?.material) { if (line.userData?.originalColor) line.material.color = new THREE.Color(line.userData.originalColor); line.material.linewidth = 1.5; } }
-
-function selectPoint(mesh) {
-  if (selectedSphere) unhighlightSphere(selectedSphere);
-  selectedSphere = null; selectedPointName = ''; selectedPointType = '';
-  if (selectedLine) unhighlightLine(selectedLine);
-  selectedLine = null; selectedLineEndpoints = null; selectedLineType = '';
-  if (selectedFace) { selectedFace.material.opacity = selectedFace.userData?.baseOpacity || 0.3; selectedFace = null; }
-  selectedFaceName = ''; selectedFaceDef = null;
-  if (!mesh) { hideEditPanel(); return; }
-  if (mesh.isMesh && mesh.userData?.faceName) { selectedFace = mesh; selectedFaceName = mesh.userData.faceName; selectedFaceDef = bodyworkFaces[selectedFaceName] || null; mesh.material.opacity = Math.min(0.8, (mesh.userData.baseOpacity || 0.3) + 0.2); showEditPanel(); renderFacesPanel(); return; }
-  if (mesh.isMesh) { selectedSphere = mesh; selectedPointName = mesh.userData.pointName || ''; selectedPointType = mesh.userData.pointType || ''; highlightSphere(mesh); showEditPanel(); }
-  else if (mesh.isLine) { selectedLine = mesh; selectedLineEndpoints = mesh.userData.endpoints || null; selectedLineType = mesh.userData.lineType || ''; highlightLine(mesh); showEditPanel(); }
-}
-
-function getSelectedCoords() { if (!selectedSphere) return null; return [parseFloat(selectedSphere.position.x.toFixed(2)), parseFloat(selectedSphere.position.y.toFixed(2)), parseFloat(selectedSphere.position.z.toFixed(2))]; }
-
-function updatePointPosition(newCoords) {
-  if (selectedSphere) selectedSphere.position.set(...newCoords);
-  const name = selectedPointName; if (!name) return;
-  const isLeftSide = name.endsWith('_L'), baseName = isLeftSide ? name.slice(0, -2) : name;
-  if (selectedPointType === 'hardpoint') {
-    if (baseName.startsWith('R_')) { if (hardpointsRearRight[baseName] !== undefined) { hardpointsRearRight[baseName] = isLeftSide ? [newCoords[0], -newCoords[1], newCoords[2]] : newCoords; hardpointsRearLeft = mirrorHardpoints(hardpointsRearRight); } }
-    else { if (hardpointsFrontRight[baseName] !== undefined) { hardpointsFrontRight[baseName] = isLeftSide ? [newCoords[0], -newCoords[1], newCoords[2]] : newCoords; hardpointsFrontLeft = mirrorHardpoints(hardpointsFrontRight); } }
-  } else if (selectedPointType === 'frame_node') { if (frameNodes[name]) frameNodes[name] = newCoords; }
-}
-
-function renderColorPalette(containerId, currentColor, onClick) {
-  const c = document.getElementById(containerId); if (!c) return; c.innerHTML = '';
-  PALETTE.forEach(p => { const s = document.createElement('div'); s.style.cssText = `width:20px;height:20px;background:${p.hex};border-radius:4px;cursor:pointer;border:2px solid ${p.hex===currentColor?'#fff':'transparent'};box-sizing:border-box;transition:transform .15s`; s.title = p.name; s.onclick = () => onClick(p.hex); s.onmouseenter = () => s.style.transform = 'scale(1.15)'; s.onmouseleave = () => s.style.transform = 'scale(1)'; c.appendChild(s); });
-}
-
-function showEditPanel() {
-  const el = document.getElementById('editSection'), st = document.getElementById('saveStatus'); if (st) st.textContent = '';
-  document.getElementById('editPointMode').style.display = 'none';
-  document.getElementById('editTubeMode').style.display = 'none';
-  document.getElementById('editFaceMode').style.display = 'none';
-  if (selectedPointName) {
-    if (el) el.style.display = '';
-    document.getElementById('editPointMode').style.display = '';
-    document.getElementById('editPointName').textContent = selectedPointName;
-    const coords = getSelectedCoords();
-    if (coords) { document.getElementById('editX').value = coords[0]; document.getElementById('editY').value = coords[1]; document.getElementById('editZ').value = coords[2]; }
-  } else if (selectedLineEndpoints) {
-    if (el) el.style.display = '';
-    document.getElementById('editTubeMode').style.display = '';
-    document.getElementById('editTubeName').textContent = selectedLineEndpoints.length === 2 ? selectedLineEndpoints[0] + ' ↔ ' + selectedLineEndpoints[1] : selectedLineEndpoints.join(' → ');
-    document.getElementById('editTubeType').textContent = selectedLineType === 'frame_tube' ? (selectedLineEndpoints.length > 2 ? '车架曲线' : '车架管件') : '悬架连杆（不可删除）';
-    renderColorPalette('tubeColorPalette', selectedLine?.userData?.originalColor || '#94a3b8', (hex) => {
-      if (selectedLine) { selectedLine.material.color.set(hex); selectedLine.userData.originalColor = hex; if (selectedLineType === 'frame_tube') { const ti = selectedLine.userData.tubeIndex; if (ti !== undefined) tubeColors[ti] = hex; } }
-    });
-  } else if (selectedFace) {
-    if (el) el.style.display = '';
-    document.getElementById('editFaceMode').style.display = '';
-    document.getElementById('editFaceName').textContent = selectedFaceName;
-    const fc = selectedFaceDef?.color || '#94a3b8', fo = selectedFaceDef?.opacity ?? 0.30;
-    document.getElementById('faceOpacitySlider').value = fo; document.getElementById('faceOpacityVal').textContent = fo.toFixed(2);
-    renderColorPalette('faceColorPalette', fc, (hex) => { if (selectedFace) { selectedFace.material.color.set(hex); if (selectedFaceDef) selectedFaceDef.color = hex; } });
-    document.getElementById('faceOpacitySlider').oninput = function() { const v = parseFloat(this.value); document.getElementById('faceOpacityVal').textContent = v.toFixed(2); if (selectedFace) selectedFace.material.opacity = v; if (selectedFaceDef) selectedFaceDef.opacity = v; };
-  }
-}
-
-async function deleteTube(permanent) {
-  if (!selectedLineEndpoints) return;
-  const st = document.getElementById('saveStatus');
-  if (selectedLineType !== 'frame_tube') { if (st) st.textContent = '✗ 悬架连杆不可删除'; return; }
-  if (selectedLine) { scene.remove(selectedLine); if (selectedLine.geometry) selectedLine.geometry.dispose(); if (selectedLine.material) selectedLine.material.dispose(); }
-  const ep = selectedLineEndpoints;
-  // Match multi-point tubes (exact match) or 2-point tubes (order-independent)
-  const idx = frameTubes.findIndex(t => {
-    if (t.length !== ep.length) return false;
-    if (t.length === 2) return (t[0]===ep[0]&&t[1]===ep[1])||(t[0]===ep[1]&&t[1]===ep[0]);
-    return t.every((v, i) => v === ep[i]);
-  });
-  if (idx >= 0) frameTubes.splice(idx, 1);
-  const fobjs = sceneObjects.frame, lineIdx = fobjs.tubes.indexOf(selectedLine);
-  if (lineIdx >= 0) fobjs.tubes.splice(lineIdx, 1);
-  if (permanent) {
-    try { const r = await fetch('/api/delete_tube',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoints:ep,permanent:true})}); const d = await r.json(); if (st) st.textContent = d.ok ? (d.permanent?'✓ 已永久删除（重启生效）':'✓ 已临时删除') : '✗ 删除失败'; }
-    catch(e) { if (st) st.textContent = '✗ 网络错误'; }
-  } else if (st) st.textContent = '✓ 已临时删除（重置后恢复）';
-  document.getElementById('frameTubeCount').textContent = frameTubes.length;
-  selectedLine = null; selectedLineEndpoints = null; selectedLineType = ''; hideEditPanel();
-}
-
-function hideEditPanel() { const el = document.getElementById('editSection'); if (el) el.style.display = 'none'; }
-
-async function savePoint(permanent) {
-  if (!selectedPointName) return;
-  const x = parseFloat(document.getElementById('editX').value), y = parseFloat(document.getElementById('editY').value), z = parseFloat(document.getElementById('editZ').value);
-  if (isNaN(x)||isNaN(y)||isNaN(z)) return;
-  const nc = [x,y,z], st = document.getElementById('saveStatus');
-  updatePointPosition(nc); updateTableInputForPoint(selectedPointName, nc);
-  if (permanent) {
-    try { const r = await fetch('/api/save_point',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:selectedPointName,coords:nc,permanent:true})}); const d = await r.json(); if (d.ok) st.textContent = d.permanent ? '✓ 已写入 main.py（重启后加载）' : '✓ 内存已更新'; else st.textContent = '✗ 保存失败: ' + (d.detail||''); }
-    catch(e) { st.textContent = '✗ 网络错误'; }
-  } else st.textContent = '✓ 已临时更新（重置后失效）';
-  try { await solveAndUpdate(); } catch(e) {}
-}
-
-function updateTableInputForPoint(name, coords) {
-  const ln = name.endsWith('_L') ? name.slice(0, -2) : name;
-  ['hpTableBody','rearHpTableBody','frameNodeTableBody'].forEach(tid => {
-    document.querySelectorAll('#'+tid+' input').forEach(inp => { if (inp.dataset.key === ln) inp.value = coords[parseInt(inp.dataset.axis)]; });
-  });
-}
-
-function onDoubleClick(event) {
-  const rect = renderer.domElement.getBoundingClientRect();
-  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-  raycaster.setFromCamera(mouse, camera);
-  const all = [];
-  for (const sk of ['frontRight','frontLeft','rearRight','rearLeft']) { for (const s of Object.values(sceneObjects[sk].spheres)) all.push(s); for (const l of Object.values(sceneObjects[sk].lines)) all.push(l); if (sceneObjects[sk].uprightLine) all.push(sceneObjects[sk].uprightLine); if (sceneObjects[sk].contactPatchLine) all.push(sceneObjects[sk].contactPatchLine); }
-  for (const s of Object.values(sceneObjects.frame.spheres)) all.push(s);
-  for (const l of sceneObjects.frame.tubes) all.push(l);
-  const hits = raycaster.intersectObjects(all, false);
-  hits.length > 0 ? selectPoint(hits[0].object) : selectPoint(null);
-}
-
-// ============================================================
-// MULTI-SELECT
-// ============================================================
-
-function addMultiSelect(name, mesh) { if (multiSelectedPoints.has(name)) { multiSelectedPoints.delete(name); unhighlightMultiSphere(mesh); } else { multiSelectedPoints.add(name); highlightMultiSphere(mesh); } updateMultiSelectUI(); }
-function highlightMultiSphere(mesh) { if (!mesh) return; mesh.material = mesh.material.clone(); mesh.material.emissive = new THREE.Color(0x3b82f6); mesh.material.emissiveIntensity = 0.8; multiHighlightedSpheres.push(mesh); }
-function unhighlightMultiSphere(mesh) { const i = multiHighlightedSpheres.indexOf(mesh); if (i >= 0) { multiHighlightedSpheres.splice(i, 1); mesh.material.emissive = new THREE.Color(0x000000); mesh.material.emissiveIntensity = 0; } }
-function clearMultiSelect() { multiHighlightedSpheres.forEach(m => { m.material.emissive = new THREE.Color(0x000000); m.material.emissiveIntensity = 0; }); multiHighlightedSpheres = []; multiSelectedPoints.clear(); updateMultiSelectUI(); }
-function updateMultiSelectUI() { const n = multiSelectedPoints.size; document.getElementById('multiSelectCount').textContent = n; document.getElementById('addTubeFromSelectBtn').disabled = n < 2; document.getElementById('createFaceBtn').disabled = n < 3; }
-
-// ============================================================
-// CREATE TUBE / FACE
-// ============================================================
-
-function addTubeFromSelection() {
-  if (multiSelectedPoints.size < 2) return;
-  const pts = Array.from(multiSelectedPoints);
-  if (new Set(pts).size !== pts.length) { alert('存在重复点'); return; }
-  // Check for existing tube (exact match for curves, order-independent for 2-point straights)
-  const exists = frameTubes.some(t => {
-    if (t.length !== pts.length) return false;
-    if (t.length === 2) return (t[0]===pts[0]&&t[1]===pts[1])||(t[0]===pts[1]&&t[1]===pts[0]);
-    return t.every((v, i) => v === pts[i]);
-  });
-  if (exists) { alert('管件/曲线已存在'); return; }
-  const isCurve = pts.length >= 3;
-  frameTubes.push(pts); tubeColors[frameTubes.length-1] = '#94a3b8';
-  clearMultiSelect(); rebuildScene();
-  document.getElementById('frameTubeCount').textContent = frameTubes.length;
-  const label = isCurve ? pts.join(' → ') : pts[0] + ' ↔ ' + pts[1];
-  document.getElementById('saveStatus').textContent = '✓ ' + (isCurve ? '曲线' : '管件') + '已添加 ' + label + '（点击"保存管件"持久化）';
-  setTimeout(() => { const nl = sceneObjects.frame.tubes[sceneObjects.frame.tubes.length-1]; if (nl) { selectPoint(nl); document.getElementById('saveStatus').textContent = '✓ ' + (isCurve ? '曲线' : '管件') + '已添加（点击下方"保存管件"写入源文件）'; } }, 100);
-  try { requestSolve(); } catch(e) {}
-}
-
-async function saveTubePermanent() {
-  if (!selectedLineEndpoints) return; const st = document.getElementById('saveStatus');
-  try { const r = await fetch('/api/add_tube',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoints:selectedLineEndpoints,color:tubeColors[selectedLine?.userData?.tubeIndex]||'#94a3b8',permanent:true})}); const d = await r.json(); st.textContent = d.ok ? (d.permanent?'✓ 管件已永久保存到 main.py':'✓ 已添加但未写入源文件') : ('✗ 错误: ' + (d.detail||'')); }
-  catch(e) { st.textContent = '✗ 网络错误'; }
-}
-
-async function saveTubeColor(permanent) {
-  if (!selectedLineEndpoints || !selectedLine) return;
-  // Use originalColor from userData (updated by palette), not material.color
-  // which is polluted by highlightLine's yellow clone.
-  const color = selectedLine.userData?.originalColor || '#94a3b8';
-  const st = document.getElementById('saveStatus');
-  if (permanent) {
-    try {
-      const r = await fetch('/api/save_tube_color', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({endpoints:selectedLineEndpoints, color, permanent:true})
-      });
-      const d = await r.json();
-      st.textContent = d.ok ? (d.permanent ? '✓ 管件颜色已永久保存到 main.py' : '✓ 颜色已临时更新') : ('✗ 保存失败: ' + (d.detail || ''));
-    } catch(e) {
-      st.textContent = '✗ 网络错误: ' + e.message;
-    }
-  } else {
-    st.textContent = '✓ 管件颜色已临时更改';
-  }
-}
-
-// ============================================================
-// FACE BUILDING
-// ============================================================
-
-function triangulateLoop(pts3D) {
-  // Sort 3D points by angle around their centroid (projected to best-fit plane)
-  // so that any click order produces correct fan triangulation
-  if (pts3D.length < 3) return [];
-  if (pts3D.length === 3) return [[0, 1, 2]];
-  const n = pts3D.length;
-  // Centroid
-  const cx = pts3D.reduce((s,p)=>s+p.x,0)/n, cy = pts3D.reduce((s,p)=>s+p.y,0)/n, cz = pts3D.reduce((s,p)=>s+p.z,0)/n;
-  // Normal via Newell's method
-  let nx=0, ny=0, nz=0;
-  for (let i=0;i<n;i++) { const j=(i+1)%n; nx+=(pts3D[i].y-pts3D[j].y)*(pts3D[i].z+pts3D[j].z); ny+=(pts3D[i].z-pts3D[j].z)*(pts3D[i].x+pts3D[j].x); nz+=(pts3D[i].x-pts3D[j].x)*(pts3D[i].y+pts3D[j].y); }
-  const nLen=Math.sqrt(nx*nx+ny*ny+nz*nz); if (nLen<1e-9) return [[0,1,2]];
-  nx/=nLen; ny/=nLen; nz/=nLen;
-  // Local 2D basis (u,v) orthogonal to normal
-  const up = Math.abs(nz) < 0.9 ? [0,0,1] : [1,0,0];
-  const ux=ny*up[2]-nz*up[1], uy=nz*up[0]-nx*up[2], uz=nx*up[1]-ny*up[0];
-  const uLen=Math.sqrt(ux*ux+uy*uy+uz*uz); const uA = uLen>0?[ux/uLen,uy/uLen,uz/uLen]:[1,0,0];
-  const vA = [ny*uA[2]-nz*uA[1], nz*uA[0]-nx*uA[2], nx*uA[1]-ny*uA[0]];
-  // Angle around centroid in projection plane
-  const angles = pts3D.map(p => { const dx=p.x-cx,dy=p.y-cy,dz=p.z-cz; return Math.atan2(dx*vA[0]+dy*vA[1]+dz*vA[2], dx*uA[0]+dy*uA[1]+dz*uA[2]); });
-  const order = angles.map((a,i)=>i).sort((a,b)=>angles[a]-angles[b]);
-  // Fan from first sorted point
-  const ix = [];
-  for (let i = 1; i < order.length - 1; i++) ix.push([order[0], order[i], order[i+1]]);
-  return ix;
-}
-function buildBodyworkFaces() {
-  sceneObjects.bodyworkFaces.forEach(m => { scene.remove(m); if (m.geometry) m.geometry.dispose(); if (m.material) m.material.dispose(); });
-  sceneObjects.bodyworkFaces = [];
-  for (const [name, def] of Object.entries(bodyworkFaces)) {
-    for (const loop of (def.loops || [])) {
-      const pts3D = loop.map(n => resolveFramePoint(n)).filter(Boolean).map(p => new THREE.Vector3(...chassisTransform(p)));
-      if (pts3D.length < 3) continue;
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pts3D.flatMap(v => [v.x,v.y,v.z])), 3));
-      geo.setIndex(triangulateLoop(pts3D).flat()); geo.computeVertexNormals();
-      const mat = new THREE.MeshStandardMaterial({ color: def.color||'#94a3b8', roughness:0.5, metalness:0.1, transparent:true, opacity:def.opacity??0.30, side:THREE.DoubleSide });
-      const mesh = new THREE.Mesh(geo, mat); mesh.userData = { faceName:name, baseOpacity:def.opacity??0.30 };
-      scene.add(mesh); sceneObjects.bodyworkFaces.push(mesh);
-    }
-  }
-}
-
-// ============================================================
-// REAR WING — parametric multi-element aero surfaces
-// ============================================================
-
-function sampleAirfoil(chord, camberPct, thicknessPct, angleDeg, nPts) {
-  // Returns {upper: [[x,z],...], lower: [[x,z],...]} in element-local coords
-  // LE at (0,0), TE at approximately (chord, 0) before AOA rotation
-  const m = camberPct / 100, t = thicknessPct / 100, p = 0.4;
-  const angleRad = angleDeg * Math.PI / 180;
-  const upper = [], lower = [];
-
-  for (let i = 0; i < nPts; i++) {
-    const xc = i / (nPts - 1);
-    // NACA camber line
-    let zc, dzc;
-    if (xc <= p) {
-      zc = (m / (p * p)) * (2 * p * xc - xc * xc);
-      dzc = (2 * m / (p * p)) * (p - xc);
-    } else {
-      zc = (m / ((1 - p) * (1 - p))) * ((1 - 2 * p) + 2 * p * xc - xc * xc);
-      dzc = (2 * m / ((1 - p) * (1 - p))) * (p - xc);
-    }
-    // NACA 00xx thickness
-    const sx = Math.sqrt(xc), x2 = xc * xc, x3 = x2 * xc, x4 = x3 * xc;
-    const zt = 5 * t * (0.2969 * sx - 0.1260 * xc - 0.3516 * x2 + 0.2843 * x3 - 0.1015 * x4);
-    const th = Math.atan(dzc);
-    const ct = Math.cos(th), st = Math.sin(th);
-    upper.push([(xc - zt * st) * chord, (zc + zt * ct) * chord]);
-    lower.push([(xc + zt * st) * chord, (zc - zt * ct) * chord]);
-  }
-
-  // Rotate by AOA around LE (0,0)
-  const ca = Math.cos(angleRad), sa = Math.sin(angleRad);
-  const rot = pt => [pt[0] * ca - pt[1] * sa, pt[0] * sa + pt[1] * ca];
-  return { upper: upper.map(rot), lower: lower.map(rot) };
-}
-
-function buildWingElementMesh(el, refPt, halfSpan, nPts) {
-  // Generate airfoil profile
-  const { upper, lower } = sampleAirfoil(el.chord, el.camber_pct, el.thickness_pct, el.angle, nPts);
-
-  // Element LE position in chassis-local coords
-  const elX = refPt[0] + el.x_offset;
-  const elZ = refPt[2] + el.z_offset;
-  const spanFrac = el.span_fraction ?? 1.0;
-  const hs = halfSpan * spanFrac;
-
-  // Build vertices: upper(-hs), upper(+hs), lower(-hs), lower(+hs)
-  const verts = [];
-  function addPt(x, z, y) { verts.push(elX + x, y, elZ + z); }
-  for (const [x, z] of upper) addPt(x, z, -hs);
-  for (const [x, z] of upper) addPt(x, z, +hs);
-  for (const [x, z] of lower) addPt(x, z, -hs);
-  for (const [x, z] of lower) addPt(x, z, +hs);
-
-  const N = nPts;
-  const indices = [];
-
-  // Upper surface strip
-  for (let i = 0; i < N - 1; i++) {
-    const a = i, b = i + 1, c = i + N + 1, d = i + N;
-    indices.push(a, b, c, a, c, d);
-  }
-  // Lower surface strip (base offset 2N)
-  const L0 = 2 * N;
-  for (let i = 0; i < N - 1; i++) {
-    const a = L0 + i, b = L0 + i + 1, c = L0 + i + N + 1, d = L0 + i + N;
-    indices.push(a, d, c, a, c, b);
-  }
-  // Leading edge
-  indices.push(0, N, 3 * N,  0, 3 * N, 2 * N);
-  // Trailing edge
-  indices.push(N - 1, 3 * N - 1, 4 * N - 1,  N - 1, 4 * N - 1, 2 * N - 1);
-
-  // End cap at y = -hs: upper[0..N-1] + lower[0..N-1] reversed
-      function capIndices(baseIdx, flip) {
-      const outline = [];
-      for (let i = 0; i < N; i++) outline.push(baseIdx + i);               // upper LE->TE
-      for (let i = N - 1; i >= 0; i--) outline.push(baseIdx + 2 * N + i);   // lower TE->LE
-      // Compute winding (signed area in XZ plane)
-      let area2 = 0;
-      for (let i = 0; i < outline.length; i++) {
-        const j = (i + 1) % outline.length;
-        const xi = verts[outline[i] * 3], zi = verts[outline[i] * 3 + 2];
-        const xj = verts[outline[j] * 3], zj = verts[outline[j] * 3 + 2];
-        area2 += xi * zj - xj * zi;
-      }
-      // Fan triangulation from first vertex; flip winding for far-side cap
-      const ccw = area2 > 0;
-      for (let i = 1; i < outline.length - 1; i++) {
-        if (ccw !== flip) indices.push(outline[0], outline[i], outline[i + 1]);
-        else indices.push(outline[0], outline[i + 1], outline[i]);
-      }
-    }
-  capIndices(0, false);       // y = -hs cap
-  capIndices(N, true);        // y = +hs cap
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
-  geo.setIndex(indices);
-  geo.computeVertexNormals();
-  return geo;
-}
-
-function buildRearWing() {
-  const wobj = sceneObjects.rearWing;
-  wobj.meshes.forEach(m => { scene.remove(m); if (m.geometry) m.geometry.dispose(); if (m.material) m.material.dispose(); });
-  wobj.mountSpheres.forEach(s => { scene.remove(s); if (s.geometry) s.geometry.dispose(); if (s.material) s.material.dispose(); });
-  wobj.mountLines.forEach(l => { scene.remove(l); if (l.geometry) l.geometry.dispose(); if (l.material) l.material.dispose(); });
-  wobj.meshes = []; wobj.mountSpheres = []; wobj.mountLines = [];
-
-  if (!rearWingConfig || !rearWingConfig.enabled) return;
-
-  const ref = rearWingConfig.reference_point || [0, 0, 0];
-  const span = rearWingConfig.span || 900;
-  const halfSpan = span / 2;
-  const elements = rearWingConfig.elements || [];
-  const color = rearWingConfig.color || '#60a5fa';
-  const opacity = rearWingConfig.opacity ?? 0.45;
-  const endplate = rearWingConfig.endplate;
-  const mounts = rearWingConfig.mounts || [];
-
-  // Build each wing element mesh
-  for (const el of elements) {
-    const nPts = Math.max(16, Math.round(el.chord / 15));  // ~1 point per 15mm
-    const geo = buildWingElementMesh(el, ref, halfSpan, nPts);
-    // Apply chassis transform to all vertices
-    const pos = geo.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      const wp = chassisTransform([pos.getX(i), pos.getY(i), pos.getZ(i)]);
-      pos.setXYZ(i, ...wp);
-    }
-    geo.computeVertexNormals();
-    const mat = new THREE.MeshStandardMaterial({
-      color, roughness: 0.4, metalness: 0.15,
-      transparent: true, opacity, side: THREE.DoubleSide,
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.userData = { aeroType: 'wing_element', elementName: el.name };
-    scene.add(mesh);
-    wobj.meshes.push(mesh);
-  }
-
-  // Endplates
-  if (endplate) {
-    // Compute assembly bounding box in XZ
-    const allPts = [];
-    for (const el of elements) {
-      const { upper, lower } = sampleAirfoil(el.chord, el.camber_pct, el.thickness_pct, el.angle, 8);
-      const elX = ref[0] + el.x_offset, elZ = ref[2] + el.z_offset;
-      for (const [x, z] of [...upper, ...lower]) { allPts.push([elX + x, elZ + z]); }
-    }
-    if (allPts.length > 0) {
-      const minX = Math.min(...allPts.map(p => p[0]));
-      const maxX = Math.max(...allPts.map(p => p[0]));
-      const minZ = Math.min(...allPts.map(p => p[1]));
-      const maxZ = Math.max(...allPts.map(p => p[1]));
-      const fwd = endplate.overhang_forward || 0.15;
-      const rear = endplate.overhang_rear || 0.05;
-      const above = endplate.height_above || 150;
-      const below = endplate.height_below || 100;
-      const dx = maxX - minX;
-      const epX0 = minX - dx * fwd;
-      const epX1 = maxX + dx * rear;
-      const epZ0 = minZ - below;
-      const epZ1 = maxZ + above;
-
-      for (const sign of [-1, 1]) {
-        const y = sign * halfSpan;
-        const epVerts = [
-          epX0, y, epZ0,  epX1, y, epZ0,  epX1, y, epZ1,  epX0, y, epZ1,
-        ];
-        // Apply chassis transform
-        const wVerts = [];
-        for (let i = 0; i < 4; i++) {
-          const wp = chassisTransform([epVerts[i * 3], epVerts[i * 3 + 1], epVerts[i * 3 + 2]]);
-          wVerts.push(wp[0], wp[1], wp[2]);
-        }
-        const epGeo = new THREE.BufferGeometry();
-        epGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(wVerts), 3));
-        epGeo.setIndex([0, 1, 2, 0, 2, 3]);
-        epGeo.computeVertexNormals();
-        const epMat = new THREE.MeshStandardMaterial({
-          color: '#a5b4fc', roughness: 0.3, metalness: 0.1,
-          transparent: true, opacity: opacity * 0.8, side: THREE.DoubleSide,
-        });
-        const epMesh = new THREE.Mesh(epGeo, epMat);
-        epMesh.userData = { aeroType: 'endplate', side: sign > 0 ? 'R' : 'L' };
-        scene.add(epMesh);
-        wobj.meshes.push(epMesh);
-      }
-    }
-  }
-
-  // Mount struts
-  for (const m of mounts) {
-    const fn = m.frame_node;
-    const isRight = (m.local_y ?? 0) >= 0;
-    const chassisPt = resolveChassisNode(fn, isRight);
-    if (!chassisPt) continue;
-    const wingLE = chassisTransform([ref[0] + m.local_x, m.local_y ?? 0, ref[2] + m.local_z]);
-    // Sphere at frame attachment
-    const s = sphere('#fbbf24', 8);
-    s.position.set(...chassisPt);
-    s.userData = { aeroType: 'mount', pointName: m.name };
-    scene.add(s);
-    wobj.mountSpheres.push(s);
-    // Line from frame to wing
-    const l = lineSegment(chassisPt, wingLE, '#fbbf24');
-    l.userData = { aeroType: 'mount_line' };
-    scene.add(l);
-    wobj.mountLines.push(l);
-  }
-}
-
-// ============================================================
-// FRONT WING — parametric multi-element aero surfaces
-// ============================================================
-//
-// Front wing geometry is built from the same NACA airfoil helpers
-// (sampleAirfoil / buildWingElementMesh) as the rear wing — only the
-// 3D placement, endplate proportions and mount nodes differ.
-
-function buildFrontWing() {
-  const wobj = sceneObjects.frontWing;
-  wobj.meshes.forEach(m => { scene.remove(m); if (m.geometry) m.geometry.dispose(); if (m.material) m.material.dispose(); });
-  wobj.mountSpheres.forEach(s => { scene.remove(s); if (s.geometry) s.geometry.dispose(); if (s.material) s.material.dispose(); });
-  wobj.mountLines.forEach(l => { scene.remove(l); if (l.geometry) l.geometry.dispose(); if (l.material) l.material.dispose(); });
-  wobj.meshes = []; wobj.mountSpheres = []; wobj.mountLines = [];
-
-  if (!frontWingConfig || !frontWingConfig.enabled) return;
-
-  const ref = frontWingConfig.reference_point || [0, 0, 0];
-  const span = frontWingConfig.span || 1100;
-  const halfSpan = span / 2;
-  const elements = frontWingConfig.elements || [];
-  const color = frontWingConfig.color || '#34d399';
-  const opacity = frontWingConfig.opacity ?? 0.5;
-  const endplate = frontWingConfig.endplate;
-  const mounts = frontWingConfig.mounts || [];
-
-  // Build each wing element mesh
-  for (const el of elements) {
-    const nPts = Math.max(16, Math.round(el.chord / 15));
-    const geo = buildWingElementMesh(el, ref, halfSpan, nPts);
-    const pos = geo.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      const wp = chassisTransform([pos.getX(i), pos.getY(i), pos.getZ(i)]);
-      pos.setXYZ(i, ...wp);
-    }
-    geo.computeVertexNormals();
-    const mat = new THREE.MeshStandardMaterial({
-      color, roughness: 0.4, metalness: 0.15,
-      transparent: true, opacity, side: THREE.DoubleSide,
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.userData = { aeroType: 'wing_element', elementName: el.name };
-    scene.add(mesh);
-    wobj.meshes.push(mesh);
-  }
-
-  // Endplates (slimmer than rear — front wing endplates serve to seal
-  // outwash vortex and align with the front wheels)
-  if (endplate) {
-    const allPts = [];
-    for (const el of elements) {
-      const { upper, lower } = sampleAirfoil(el.chord, el.camber_pct, el.thickness_pct, el.angle, 8);
-      const elX = ref[0] + el.x_offset, elZ = ref[2] + el.z_offset;
-      for (const [x, z] of [...upper, ...lower]) { allPts.push([elX + x, elZ + z]); }
-    }
-    if (allPts.length > 0) {
-      const minX = Math.min(...allPts.map(p => p[0]));
-      const maxX = Math.max(...allPts.map(p => p[0]));
-      const minZ = Math.min(...allPts.map(p => p[1]));
-      const maxZ = Math.max(...allPts.map(p => p[1]));
-      const fwd = endplate.overhang_forward || 0.10;
-      const rear = endplate.overhang_rear || 0.18;
-      const above = endplate.height_above || 35;
-      const below = endplate.height_below || 35;
-      const dx = maxX - minX;
-      const epX0 = minX - dx * fwd;
-      const epX1 = maxX + dx * rear;
-      const epZ0 = minZ - below;
-      const epZ1 = maxZ + above;
-
-      for (const sign of [-1, 1]) {
-        const y = sign * halfSpan;
-        const epVerts = [
-          epX0, y, epZ0,  epX1, y, epZ0,  epX1, y, epZ1,  epX0, y, epZ1,
-        ];
-        const wVerts = [];
-        for (let i = 0; i < 4; i++) {
-          const wp = chassisTransform([epVerts[i * 3], epVerts[i * 3 + 1], epVerts[i * 3 + 2]]);
-          wVerts.push(wp[0], wp[1], wp[2]);
-        }
-        const epGeo = new THREE.BufferGeometry();
-        epGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(wVerts), 3));
-        epGeo.setIndex([0, 1, 2, 0, 2, 3]);
-        epGeo.computeVertexNormals();
-        const epMat = new THREE.MeshStandardMaterial({
-          color: '#a7f3d0', roughness: 0.3, metalness: 0.1,
-          transparent: true, opacity: opacity * 0.8, side: THREE.DoubleSide,
-        });
-        const epMesh = new THREE.Mesh(epGeo, epMat);
-        epMesh.userData = { aeroType: 'endplate', side: sign > 0 ? 'R' : 'L' };
-        scene.add(epMesh);
-        wobj.meshes.push(epMesh);
-      }
-    }
-  }
-
-  // Mount struts (carbon rods back to nose body)
-  for (const m of mounts) {
-    const fn = m.frame_node;
-    const isRight = (m.local_y ?? 0) >= 0;
-    const chassisPt = resolveChassisNode(fn, isRight);
-    if (!chassisPt) continue;
-    const wingLE = chassisTransform([ref[0] + (m.local_x ?? 0), m.local_y ?? 0, ref[2] + (m.local_z ?? 0)]);
-    const s = sphere('#fbbf24', 5);
-    s.position.set(...chassisPt);
-    s.userData = { aeroType: 'mount', pointName: m.name };
-    scene.add(s);
-    wobj.mountSpheres.push(s);
-    const l = lineSegment(chassisPt, wingLE, '#fbbf24');
-    l.userData = { aeroType: 'mount_line' };
-    scene.add(l);
-    wobj.mountLines.push(l);
-  }
-}
-
-// ============================================================
-// SIDE POD — parametric bulging side bodywork + skirt
-// ============================================================
-
-function resampleByX(nodeNames, xMin, xMax, numPts) {
-  // Interpolate curve at uniform X positions, so upper/lower curves align
-  const pts = nodeNames.map(n => resolveFramePoint(n)).filter(Boolean);
-  if (pts.length === 0) return [];
-  if (pts.length === 1) return Array(numPts).fill().map((_, i) => {
-    const x = xMin + (xMax - xMin) * i / (numPts - 1);
-    return [x, pts[0][1], pts[0][2]];
-  });
-  // Sort by X
-  pts.sort((a, b) => a[0] - b[0]);
-  const result = [];
-  for (let i = 0; i < numPts; i++) {
-    const x = xMin + (xMax - xMin) * i / Math.max(1, numPts - 1);
-    // Find segment that spans x
-    let y = pts[0][1], z = pts[0][2];
-    if (x <= pts[0][0]) { y = pts[0][1]; z = pts[0][2]; }
-    else if (x >= pts[pts.length-1][0]) { y = pts[pts.length-1][1]; z = pts[pts.length-1][2]; }
-    else {
-      for (let j = 1; j < pts.length; j++) {
-        if ((pts[j-1][0] <= x && x <= pts[j][0]) || (pts[j][0] <= x && x <= pts[j-1][0])) {
-          const dx = pts[j][0] - pts[j-1][0];
-          const t = dx !== 0 ? (x - pts[j-1][0]) / dx : 0;
-          y = pts[j-1][1] + (pts[j][1] - pts[j-1][1]) * t;
-          z = pts[j-1][2] + (pts[j][2] - pts[j-1][2]) * t;
-          break;
-        }
-      }
-    }
-    result.push([x, y, z]);
-  }
-  return result;
-}
-
-function renderRearWingPanel() {
-  const container = document.getElementById('rearWingListBody');
-  if (!container) return;
-  if (!rearWingConfig || !rearWingConfig.enabled) {
-    container.innerHTML = '<div class="text-[0.6rem] text-dim p-2">尾翼未配置</div>';
-    return;
-  }
-  const cfg = rearWingConfig;
-  const els = cfg.elements || [];
-  const ref = cfg.reference_point || [0, 0, 0];
-  let html = '';
-
-  // Global: reference point + span
-  html += '<div class="grid grid-cols-3 gap-1 mb-2">';
-  html += '<label class="flex flex-col gap-0.5"><span class="text-[0.55rem] text-dim">参考X</span><input class="rw-input bg-input border border-white/5 rounded px-1.5 py-0.5 text-[0.62rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50" data-rw="ref_x" type="number" value="' + ref[0].toFixed(0) + '" step="5"></label>';
-  html += '<label class="flex flex-col gap-0.5"><span class="text-[0.55rem] text-dim">参考Z</span><input class="rw-input bg-input border border-white/5 rounded px-1.5 py-0.5 text-[0.62rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50" data-rw="ref_z" type="number" value="' + ref[2].toFixed(0) + '" step="5"></label>';
-  html += '<label class="flex flex-col gap-0.5"><span class="text-[0.55rem] text-dim">展长</span><input class="rw-input bg-input border border-white/5 rounded px-1.5 py-0.5 text-[0.62rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50" data-rw="span" type="number" value="' + (cfg.span || 660).toFixed(0) + '" step="5"></label>';
-  html += '</div>';
-
-  // Each element: chord, angle, camber, thickness
-  for (let i = 0; i < els.length; i++) {
-    const el = els[i];
-    html += '<div class="mb-1.5 border border-white/5 rounded p-1.5">';
-    html += '<div class="text-[0.6rem] text-accent font-medium mb-1">' + el.name + '</div>';
-    html += '<div class="grid grid-cols-2 gap-x-1.5 gap-y-1">';
-    html += '<label class="flex items-center justify-between gap-1"><span class="text-[0.52rem] text-dim">弦长</span><input class="rw-el-input bg-input border border-white/5 rounded px-1 py-0.5 text-[0.6rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-16 text-right" data-rw-el="' + i + '" data-rw-key="chord" type="number" value="' + el.chord + '" step="5"></label>';
-    html += '<label class="flex items-center justify-between gap-1"><span class="text-[0.52rem] text-dim">攻角°</span><input class="rw-el-input bg-input border border-white/5 rounded px-1 py-0.5 text-[0.6rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-16 text-right" data-rw-el="' + i + '" data-rw-key="angle" type="number" value="' + el.angle + '" step="0.5"></label>';
-    html += '<label class="flex items-center justify-between gap-1"><span class="text-[0.52rem] text-dim">拱度%</span><input class="rw-el-input bg-input border border-white/5 rounded px-1 py-0.5 text-[0.6rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-16 text-right" data-rw-el="' + i + '" data-rw-key="camber_pct" type="number" value="' + el.camber_pct + '" step="1"></label>';
-    html += '<label class="flex items-center justify-between gap-1"><span class="text-[0.52rem] text-dim">厚度%</span><input class="rw-el-input bg-input border border-white/5 rounded px-1 py-0.5 text-[0.6rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-16 text-right" data-rw-el="' + i + '" data-rw-key="thickness_pct" type="number" value="' + el.thickness_pct + '" step="1"></label>';
-    html += '</div></div>';
-  }
-
-  // Endplate controls
-  const ep = cfg.endplate || {};
-  html += '<div class="mb-1.5 border border-white/5 rounded p-1.5">';
-  html += '<div class="text-[0.58rem] text-dim font-medium mb-1">端板</div>';
-  html += '<div class="grid grid-cols-2 gap-x-1.5 gap-y-1">';
-  html += '<label class="flex items-center justify-between gap-1"><span class="text-[0.5rem] text-muted">前悬伸</span><input class="rw-ep-input bg-input border border-white/5 rounded px-1 py-0.5 text-[0.6rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-14 text-right" data-rw-key="overhang_forward" type="number" value="' + (ep.overhang_forward ?? 0.12) + '" step="0.02"></label>';
-  html += '<label class="flex items-center justify-between gap-1"><span class="text-[0.5rem] text-muted">后悬伸</span><input class="rw-ep-input bg-input border border-white/5 rounded px-1 py-0.5 text-[0.6rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-14 text-right" data-rw-key="overhang_rear" type="number" value="' + (ep.overhang_rear ?? 0.06) + '" step="0.02"></label>';
-  html += '<label class="flex items-center justify-between gap-1"><span class="text-[0.5rem] text-muted">上高度</span><input class="rw-ep-input bg-input border border-white/5 rounded px-1 py-0.5 text-[0.6rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-14 text-right" data-rw-key="height_above" type="number" value="' + (ep.height_above ?? 80) + '" step="5"></label>';
-  html += '<label class="flex items-center justify-between gap-1"><span class="text-[0.5rem] text-muted">下高度</span><input class="rw-ep-input bg-input border border-white/5 rounded px-1 py-0.5 text-[0.6rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-14 text-right" data-rw-key="height_below" type="number" value="' + (ep.height_below ?? 140) + '" step="5"></label>';
-  html += '</div></div>';
-
-  // Buttons
-  html += '<div class="flex gap-1.5 mt-2">';
-  html += '<button id="applyRwBtn" class="flex-1 bg-accent2 hover:bg-accent2/85 text-white text-[0.62rem] font-medium py-1 rounded-md transition-colors">应用</button>';
-  html += '<button id="saveRwPermBtn" class="flex-1 bg-accent hover:bg-accent/85 text-white text-[0.62rem] font-medium py-1 rounded-md transition-colors">永久保存</button>';
-  html += '</div>';
-
-  container.innerHTML = html;
-
-  // Wire up events after DOM insertion
-  setTimeout(() => {
-    const applyBtn = document.getElementById('applyRwBtn');
-    if (applyBtn) applyBtn.addEventListener('click', applyRearWingChanges);
-    const saveBtn = document.getElementById('saveRwPermBtn');
-    if (saveBtn) saveBtn.addEventListener('click', saveRearWingPermanent);
-  }, 0);
-}
-
-function applyRearWingChanges() {
-  if (!rearWingConfig) return;
-  const cfg = rearWingConfig;
-  // Read global params
-  const refX = document.querySelector('[data-rw="ref_x"]');
-  const refZ = document.querySelector('[data-rw="ref_z"]');
-  const span = document.querySelector('[data-rw="span"]');
-  if (refX) cfg.reference_point[0] = parseFloat(refX.value) || cfg.reference_point[0];
-  if (refZ) cfg.reference_point[2] = parseFloat(refZ.value) || cfg.reference_point[2];
-  if (span) cfg.span = parseFloat(span.value) || cfg.span;
-
-  // Read element params
-  document.querySelectorAll('.rw-el-input').forEach(inp => {
-    const idx = parseInt(inp.dataset.rwEl);
-    const key = inp.dataset.rwKey;
-    const val = parseFloat(inp.value);
-    if (!isNaN(val) && cfg.elements[idx]) {
-      cfg.elements[idx][key] = val;
-    }
-  });
-
-  // Read endplate params
-  document.querySelectorAll('.rw-ep-input').forEach(inp => {
-    const key = inp.dataset.rwKey;
-    const val = parseFloat(inp.value);
-    if (!isNaN(val) && cfg.endplate) {
-      cfg.endplate[key] = val;
-    }
-  });
-
-  // Rebuild 3D wing and update panel display
-  buildRearWing();
-  // Quick flash feedback
-  const st = document.getElementById('saveStatus');
-  if (st) { st.textContent = '✓ 尾翼已更新'; setTimeout(() => { if (st.textContent === '✓ 尾翼已更新') st.textContent = ''; }, 1500); }
-}
-
-async function saveRearWingPermanent() {
-  applyRearWingChanges();  // sync in-memory first
-  const st = document.getElementById('saveStatus');
-  try {
-    const r = await fetch('/api/save_rear_wing', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(rearWingConfig),
-    });
-    const d = await r.json();
-    if (st) st.textContent = d.ok ? '✓ 尾翼已永久保存到 config.py' : '✗ 保存失败: ' + (d.detail || '');
-  } catch (e) {
-    if (st) st.textContent = '✗ 网络错误';
-  }
-}
-
-function renderFrontWingPanel() {
-  const container = document.getElementById('frontWingListBody');
-  if (!container) return;
-  if (!frontWingConfig || !frontWingConfig.enabled) {
-    container.innerHTML = '<div class="text-[0.6rem] text-dim p-2">前翼未配置</div>';
-    return;
-  }
-  const cfg = frontWingConfig;
-  const els = cfg.elements || [];
-  const ref = cfg.reference_point || [0, 0, 0];
-  let html = '';
-
-  // Global: reference point + span
-  html += '<div class="grid grid-cols-3 gap-1 mb-2">';
-  html += '<label class="flex flex-col gap-0.5"><span class="text-[0.55rem] text-dim">参考X</span><input class="fw-input bg-input border border-white/5 rounded px-1.5 py-0.5 text-[0.62rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50" data-fw="ref_x" type="number" value="' + ref[0].toFixed(0) + '" step="5"></label>';
-  html += '<label class="flex flex-col gap-0.5"><span class="text-[0.55rem] text-dim">参考Z</span><input class="fw-input bg-input border border-white/5 rounded px-1.5 py-0.5 text-[0.62rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50" data-fw="ref_z" type="number" value="' + ref[2].toFixed(0) + '" step="5"></label>';
-  html += '<label class="flex flex-col gap-0.5"><span class="text-[0.55rem] text-dim">展长</span><input class="fw-input bg-input border border-white/5 rounded px-1.5 py-0.5 text-[0.62rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50" data-fw="span" type="number" value="' + (cfg.span || 1100).toFixed(0) + '" step="10"></label>';
-  html += '</div>';
-
-  // Each element: chord, angle, camber, thickness
-  for (let i = 0; i < els.length; i++) {
-    const el = els[i];
-    html += '<div class="mb-1.5 border border-white/5 rounded p-1.5">';
-    html += '<div class="text-[0.6rem] text-accent font-medium mb-1">' + el.name + '</div>';
-    html += '<div class="grid grid-cols-2 gap-x-1.5 gap-y-1">';
-    html += '<label class="flex items-center justify-between gap-1"><span class="text-[0.52rem] text-dim">弦长</span><input class="fw-el-input bg-input border border-white/5 rounded px-1 py-0.5 text-[0.6rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-16 text-right" data-fw-el="' + i + '" data-fw-key="chord" type="number" value="' + el.chord + '" step="5"></label>';
-    html += '<label class="flex items-center justify-between gap-1"><span class="text-[0.52rem] text-dim">攻角°</span><input class="fw-el-input bg-input border border-white/5 rounded px-1 py-0.5 text-[0.6rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-16 text-right" data-fw-el="' + i + '" data-fw-key="angle" type="number" value="' + el.angle + '" step="0.5"></label>';
-    html += '<label class="flex items-center justify-between gap-1"><span class="text-[0.52rem] text-dim">拱度%</span><input class="fw-el-input bg-input border border-white/5 rounded px-1 py-0.5 text-[0.6rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-16 text-right" data-fw-el="' + i + '" data-fw-key="camber_pct" type="number" value="' + el.camber_pct + '" step="1"></label>';
-    html += '<label class="flex items-center justify-between gap-1"><span class="text-[0.52rem] text-dim">厚度%</span><input class="fw-el-input bg-input border border-white/5 rounded px-1 py-0.5 text-[0.6rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-16 text-right" data-fw-el="' + i + '" data-fw-key="thickness_pct" type="number" value="' + el.thickness_pct + '" step="1"></label>';
-    html += '</div></div>';
-  }
-
-  // Endplate controls
-  const ep = cfg.endplate || {};
-  html += '<div class="mb-1.5 border border-white/5 rounded p-1.5">';
-  html += '<div class="text-[0.58rem] text-dim font-medium mb-1">端板</div>';
-  html += '<div class="grid grid-cols-2 gap-x-1.5 gap-y-1">';
-  html += '<label class="flex items-center justify-between gap-1"><span class="text-[0.5rem] text-muted">前悬伸</span><input class="fw-ep-input bg-input border border-white/5 rounded px-1 py-0.5 text-[0.6rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-14 text-right" data-fw-key="overhang_forward" type="number" value="' + (ep.overhang_forward ?? 0.10) + '" step="0.02"></label>';
-  html += '<label class="flex items-center justify-between gap-1"><span class="text-[0.5rem] text-muted">后悬伸</span><input class="fw-ep-input bg-input border border-white/5 rounded px-1 py-0.5 text-[0.6rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-14 text-right" data-fw-key="overhang_rear" type="number" value="' + (ep.overhang_rear ?? 0.18) + '" step="0.02"></label>';
-  html += '<label class="flex items-center justify-between gap-1"><span class="text-[0.5rem] text-muted">上高度</span><input class="fw-ep-input bg-input border border-white/5 rounded px-1 py-0.5 text-[0.6rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-14 text-right" data-fw-key="height_above" type="number" value="' + (ep.height_above ?? 35) + '" step="5"></label>';
-  html += '<label class="flex items-center justify-between gap-1"><span class="text-[0.5rem] text-muted">下高度</span><input class="fw-ep-input bg-input border border-white/5 rounded px-1 py-0.5 text-[0.6rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-14 text-right" data-fw-key="height_below" type="number" value="' + (ep.height_below ?? 35) + '" step="5"></label>';
-  html += '</div></div>';
-
-  // Buttons
-  html += '<div class="flex gap-1.5 mt-2">';
-  html += '<button id="applyFwBtn" class="flex-1 bg-accent2 hover:bg-accent2/85 text-white text-[0.62rem] font-medium py-1 rounded-md transition-colors">应用</button>';
-  html += '<button id="saveFwPermBtn" class="flex-1 bg-accent hover:bg-accent/85 text-white text-[0.62rem] font-medium py-1 rounded-md transition-colors">永久保存</button>';
-  html += '</div>';
-
-  container.innerHTML = html;
-
-  setTimeout(() => {
-    const applyBtn = document.getElementById('applyFwBtn');
-    if (applyBtn) applyBtn.addEventListener('click', applyFrontWingChanges);
-    const saveBtn = document.getElementById('saveFwPermBtn');
-    if (saveBtn) saveBtn.addEventListener('click', saveFrontWingPermanent);
-  }, 0);
-}
-
-function applyFrontWingChanges() {
-  if (!frontWingConfig) return;
-  const cfg = frontWingConfig;
-  const refX = document.querySelector('[data-fw="ref_x"]');
-  const refZ = document.querySelector('[data-fw="ref_z"]');
-  const span = document.querySelector('[data-fw="span"]');
-  if (refX) cfg.reference_point[0] = parseFloat(refX.value) || cfg.reference_point[0];
-  if (refZ) cfg.reference_point[2] = parseFloat(refZ.value) || cfg.reference_point[2];
-  if (span) cfg.span = parseFloat(span.value) || cfg.span;
-
-  document.querySelectorAll('.fw-el-input').forEach(inp => {
-    const idx = parseInt(inp.dataset.fwEl);
-    const key = inp.dataset.fwKey;
-    const val = parseFloat(inp.value);
-    if (!isNaN(val) && cfg.elements[idx]) {
-      cfg.elements[idx][key] = val;
-    }
-  });
-
-  document.querySelectorAll('.fw-ep-input').forEach(inp => {
-    const key = inp.dataset.fwKey;
-    const val = parseFloat(inp.value);
-    if (!isNaN(val) && cfg.endplate) {
-      cfg.endplate[key] = val;
-    }
-  });
-
-  buildFrontWing();
-  const st = document.getElementById('saveStatus');
-  if (st) { st.textContent = '✓ 前翼已更新'; setTimeout(() => { if (st.textContent === '✓ 前翼已更新') st.textContent = ''; }, 1500); }
-}
-
-async function saveFrontWingPermanent() {
-  applyFrontWingChanges();
-  const st = document.getElementById('saveStatus');
-  try {
-    const r = await fetch('/api/save_front_wing', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(frontWingConfig),
-    });
-    const d = await r.json();
-    if (st) st.textContent = d.ok ? '✓ 前翼已永久保存到 config.py' : '✗ 保存失败: ' + (d.detail || '');
-  } catch (e) {
-    if (st) st.textContent = '✗ 网络错误';
-  }
-}
-
-function renderFacesPanel() {
-  const container = document.getElementById('faceListBody');
-  if (!container) return;
-  const entries = Object.entries(bodyworkFaces);
-  if (entries.length === 0) {
-    container.innerHTML = '<div class="text-[0.6rem] text-dim p-2">无覆盖面</div>';
-    return;
-  }
-  container.innerHTML = entries.map(([name, def]) => {
-    const color = def.color || '#94a3b8';
-    const opacity = def.opacity ?? 0.30;
-    const isSelected = name === selectedFaceName;
-    return `<div class="face-row flex items-center justify-between px-2 py-1.5 hover:bg-white/5 cursor-pointer transition-colors ${isSelected ? 'bg-white/10' : ''}" data-face-name="${name}">
-      <div class="flex items-center gap-2 min-w-0">
-        <span class="w-3 h-3 rounded-sm inline-block shrink-0" style="background:${color}; opacity:${opacity}"></span>
-        <span class="text-[#e4e4ec] text-[0.65rem] truncate">${name}</span>
+</head>
+<body class="bg-[#0f0f19] text-[#e4e4ec] h-screen flex overflow-hidden" style="font-family:'Inter','SF Pro Display',system-ui,sans-serif">
+
+<!-- ═══ LEFT PANEL — 操控 ═══ -->
+<div class="flex flex-col w-[240px] min-w-[240px] bg-[#0f0f19] border-r border-white/10 overflow-y-auto" style="scrollbar-width:thin">
+  <div class="p-2.5 flex items-center gap-2 border-b border-white/10">
+    <span class="w-2 h-2 rounded-full bg-accent"></span>
+    <span class="font-semibold text-[0.72rem] tracking-wider text-white/90">FSAE 悬架分析</span>
+  </div>
+
+  <!-- 轮跳控制 -->
+  <div class="p-2 border-b border-white/5">
+    <div class="text-[0.58rem] text-dim tracking-wider font-medium mb-1.5 flex items-center gap-1">
+      <i data-lucide="arrow-up-down" class="w-3 h-3"></i> 轮跳控制
+    </div>
+    <div class="mb-1.5">
+      <div class="flex justify-between text-[0.62rem]"><span class="text-muted">前轴</span><span id="frontTravelVal" class="text-white font-mono">0.0 mm</span></div>
+      <input type="range" id="frontTravelSlider" min="-40" max="40" value="0" step="0.5" class="w-full">
+    </div>
+    <div class="mb-1.5">
+      <div class="flex justify-between text-[0.62rem]"><span class="text-muted">后轴</span><span id="rearTravelVal" class="text-white font-mono">0.0 mm</span></div>
+      <input type="range" id="rearTravelSlider" min="-40" max="40" value="0" step="0.5" class="w-full">
+    </div>
+    <div>
+      <div class="flex justify-between text-[0.62rem]"><span class="text-muted">齿条位移</span><span id="rackVal" class="text-white font-mono">0.0 mm</span></div>
+      <input type="range" id="rackSlider" min="-15" max="15" value="0" step="0.5" class="w-full">
+    </div>
+  </div>
+
+  <!-- 车身姿态 -->
+  <div class="p-2 border-b border-white/5">
+    <label class="flex items-center gap-2 cursor-pointer">
+      <input type="checkbox" id="chassisModeToggle" class="accent-accent w-3 h-3">
+      <span class="text-[0.58rem] text-dim tracking-wider font-medium">车身姿态模式</span>
+    </label>
+    <div id="chassisControls" class="mt-1.5 space-y-1" style="display:none">
+      <div><div class="flex justify-between text-[0.55rem]"><span class="text-muted">垂向位移</span><span id="heaveVal" class="text-white font-mono">0.0 mm</span></div><input type="range" id="heaveSlider" min="-40" max="40" value="0" step="0.5" class="w-full"></div>
+      <div><div class="flex justify-between text-[0.55rem]"><span class="text-muted">俯仰</span><span id="pitchVal" class="text-white font-mono">0.0°</span></div><input type="range" id="pitchSlider" min="-5" max="5" value="0" step="0.1" class="w-full"></div>
+      <div><div class="flex justify-between text-[0.55rem]"><span class="text-muted">侧倾</span><span id="rollVal" class="text-white font-mono">0.0°</span></div><input type="range" id="rollSlider" min="-5" max="5" value="0" step="0.1" class="w-full"></div>
+      <div class="grid grid-cols-2 gap-1 mt-1 text-[0.55rem]">
+        <span class="text-dim">前左/右: <span id="chassisFLTravel" class="text-white font-mono">0.0</span>/<span id="chassisFRTravel" class="text-white font-mono">0.0</span></span>
+        <span class="text-dim">后左/右: <span id="chassisFrontTravel" class="text-white font-mono">0.0</span>/<span id="chassisRearTravel" class="text-white font-mono">0.0</span></span>
       </div>
-      <div class="flex items-center gap-1.5 shrink-0">
-        <span class="text-dim text-[0.55rem]">${opacity.toFixed(2)}</span>
-        <button class="face-delete-btn text-rose-400/70 hover:text-rose-300 transition-colors p-0.5" data-face-name="${name}" title="删除"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+    </div>
+  </div>
+
+  <!-- 定位角度 -->
+  <div class="p-2 border-b border-white/5">
+    <div class="text-[0.58rem] text-dim tracking-wider font-medium mb-1 flex items-center gap-1">
+      <i data-lucide="eye" class="w-3 h-3"></i> 定位角度
+    </div>
+    <table>
+      <tr><th></th><th>FR</th><th>FL</th><th>RR</th><th>RL</th></tr>
+      <tr><td>Camber</td><td id="camberFR">--</td><td id="camberFL">--</td><td id="camberRR">--</td><td id="camberRL">--</td></tr>
+      <tr><td>Toe</td>     <td id="toeFR">--</td><td id="toeFL">--</td><td id="toeRR">--</td><td id="toeRL">--</td></tr>
+      <tr><td>Caster</td>  <td id="casterFR">--</td><td id="casterFL">--</td><td id="casterRR">--</td><td id="casterRL">--</td></tr>
+      <tr><td>KPI</td>     <td id="kpiFR">--</td><td id="kpiFL">--</td><td id="kpiRR">--</td><td id="kpiRL">--</td></tr>
+      <tr><td>Scrub</td>   <td id="scrubFR">--</td><td id="scrubFL">--</td><td id="scrubRR">--</td><td id="scrubRL">--</td></tr>
+      <tr><td>Trail</td>   <td id="trailFR">--</td><td id="trailFL">--</td><td id="trailRR">--</td><td id="trailRL">--</td></tr>
+    </table>
+  </div>
+
+  <!-- 衍生信息 -->
+  <div class="p-2 border-b border-white/5">
+    <div class="text-[0.58rem] text-dim tracking-wider font-medium mb-1 flex items-center gap-1">
+      <i data-lucide="info" class="w-3 h-3"></i> 衍生信息
+    </div>
+    <div id="derivedInfo">
+      <div class="info-row"><span class="label">前推/拉杆 R/L</span><span class="val" id="pushRodLenFR">-- / -- mm</span></div>
+      <div class="info-row"><span class="label">后推/拉杆 R/L</span><span class="val" id="pushRodLenRR">-- / -- mm</span></div>
+      <div class="info-row"><span class="label">减震器长度 FR/FL</span><span class="val" id="damperLenFR">-- / -- mm</span></div>
+      <div class="info-row"><span class="label">减震器长度 RR/RL</span><span class="val" id="damperLenRR">-- / -- mm</span></div>
+    </div>
+  </div>
+
+  <!-- 应用/重置按钮 -->
+  <div class="p-2 border-b border-white/5 flex gap-1.5">
+    <button id="resetBtn" class="flex-1 bg-white/5 hover:bg-white/10 text-white text-[0.62rem] font-medium py-1.5 rounded-md transition-colors">重置</button>
+    <button id="applyBtn" class="flex-1 bg-accent hover:bg-accent/85 text-white text-[0.62rem] font-medium py-1.5 rounded-md transition-colors">应用硬点</button>
+  </div>
+
+  <!-- 保存状态 -->
+  <div id="saveStatus" class="px-2 py-1 text-[0.58rem] text-accent font-medium min-h-[22px]"></div>
+</div>
+
+<!-- ═══ 3D VIEWPORT ═══ -->
+<div id="viewport" class="flex-1 relative overflow-hidden bg-[#0f0f19]"></div>
+
+<!-- ═══ RIGHT PANEL — 数据 ═══ -->
+<div class="flex flex-col w-[300px] min-w-[300px] bg-[#0f0f19] border-l border-white/10 overflow-y-auto" style="scrollbar-width:thin">
+
+  <!-- 硬点编辑 -->
+  <div class="p-2 border-b border-white/5 panel-wrapper collapsed">
+    <div class="flex items-center justify-between collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <span class="text-[0.58rem] text-dim tracking-wider font-medium">硬点编辑</span>
+      <span class="flex items-center gap-1">
+        <span class="text-[0.5rem] text-muted">双击硬点选中 / 编辑</span>
+        <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim"></i>
+      </span>
+    </div>
+    <div class="panel-content">
+      <div id="editSection" class="mt-1 space-y-1" style="display:none">
+        <div id="editPointMode" style="display:none">
+          <div class="text-[0.58rem] text-accent font-medium mb-1"><span id="editPointName">--</span></div>
+          <div class="grid grid-cols-3 gap-1">
+            <label class="flex flex-col gap-0.5"><span class="text-[0.5rem] text-dim">X</span><input id="editX" type="number" step="0.5" class="bg-input border border-white/5 rounded px-1.5 py-0.5 text-[0.62rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-full"></label>
+            <label class="flex flex-col gap-0.5"><span class="text-[0.5rem] text-dim">Y</span><input id="editY" type="number" step="0.5" class="bg-input border border-white/5 rounded px-1.5 py-0.5 text-[0.62rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-full"></label>
+            <label class="flex flex-col gap-0.5"><span class="text-[0.5rem] text-dim">Z</span><input id="editZ" type="number" step="0.5" class="bg-input border border-white/5 rounded px-1.5 py-0.5 text-[0.62rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50 w-full"></label>
+          </div>
+          <div class="flex gap-1 mt-1">
+            <button id="saveTempBtn" class="flex-1 bg-white/5 hover:bg-white/10 text-white text-[0.55rem] py-1 rounded transition-colors">临时</button>
+            <button id="savePermBtn" class="flex-1 bg-accent hover:bg-accent/85 text-white text-[0.55rem] py-1 rounded transition-colors">永久保存</button>
+          </div>
+        </div>
+        <div id="editTubeMode" style="display:none">
+          <div class="text-[0.58rem] text-accent font-medium mb-1"><span id="editTubeName">--</span></div>
+          <div class="text-[0.5rem] text-dim mb-1" id="editTubeType"></div>
+          <div class="mb-1"><span class="text-[0.5rem] text-dim">颜色</span><div id="tubeColorPalette" class="flex flex-wrap gap-1 mt-0.5"></div></div>
+          <div class="flex gap-1 mt-1">
+            <button id="tubeColorTempBtn" class="flex-1 bg-white/5 hover:bg-white/10 text-white text-[0.55rem] py-1 rounded transition-colors">临时色</button>
+            <button id="tubeColorPermBtn" class="flex-1 bg-accent2 hover:bg-accent2/85 text-white text-[0.55rem] py-1 rounded transition-colors">永久色</button>
+          </div>
+          <div class="flex gap-1 mt-1">
+            <button id="saveTubePermBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[0.55rem] py-1 rounded transition-colors">保存管件</button>
+            <button id="deleteTempBtn" class="flex-1 bg-white/5 hover:bg-white/10 text-rose-300 text-[0.55rem] py-1 rounded transition-colors">临时删</button>
+            <button id="deletePermBtn" class="flex-1 bg-rose-600/80 hover:bg-rose-700 text-white text-[0.55rem] py-1 rounded transition-colors">永久删</button>
+          </div>
+        </div>
+        <div id="editFaceMode" style="display:none">
+          <div class="text-[0.58rem] text-accent font-medium mb-1"><span id="editFaceName">--</span></div>
+          <div class="mb-1"><span class="text-[0.5rem] text-dim">颜色</span><div id="faceColorPalette" class="flex flex-wrap gap-1 mt-0.5"></div></div>
+          <div class="mb-1">
+            <div class="flex justify-between text-[0.5rem]"><span class="text-dim">透明度</span><span id="faceOpacityVal" class="text-white font-mono">0.30</span></div>
+            <input type="range" id="faceOpacitySlider" min="0.05" max="0.95" step="0.05" value="0.30" class="w-full">
+          </div>
+          <div class="flex gap-1 mt-1">
+            <button id="faceUpdateTempBtn" class="flex-1 bg-white/5 hover:bg-white/10 text-white text-[0.55rem] py-1 rounded transition-colors">临时更新</button>
+            <button id="faceUpdatePermBtn" class="flex-1 bg-accent2 hover:bg-accent2/85 text-white text-[0.55rem] py-1 rounded transition-colors">永久保存</button>
+          </div>
+          <div class="flex gap-1 mt-1">
+            <button id="faceDeleteTempBtn" class="flex-1 bg-white/5 hover:bg-white/10 text-rose-300 text-[0.55rem] py-1 rounded transition-colors">临时删</button>
+            <button id="faceDeletePermBtn" class="flex-1 bg-rose-600/80 hover:bg-rose-700 text-white text-[0.55rem] py-1 rounded transition-colors">永久删</button>
+          </div>
+        </div>
       </div>
-    </div>`;
-  }).join('');
-  // Attach event listeners (module scope can't use inline onclick)
-  container.querySelectorAll('.face-row').forEach(row => {
-    row.addEventListener('click', (e) => {
-      if (e.target.closest('.face-delete-btn')) return;
-      selectFaceFromPanel(row.dataset.faceName);
-    });
-  });
-  container.querySelectorAll('.face-delete-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      deleteFaceFromPanel(btn.dataset.faceName);
-    });
-  });
-  if (window.lucide) lucide.createIcons();
-}
+    </div>
+  </div>
 
-function selectFaceFromPanel(name) {
-  const mesh = sceneObjects.bodyworkFaces.find(m => m.userData?.faceName === name);
-  if (mesh) {
-    if (selectedFace) { selectedFace.material.opacity = selectedFace.userData?.baseOpacity || 0.3; }
-    selectedFace = mesh; selectedFaceName = name; selectedFaceDef = bodyworkFaces[name] || null;
-    mesh.material.opacity = Math.min(0.8, (mesh.userData.baseOpacity || 0.3) + 0.2);
-    showEditPanel();
-    renderFacesPanel();
-  }
-}
+  <!-- 硬点坐标 -->
+  <div class="p-2 border-b border-white/5 panel-wrapper collapsed">
+    <div class="text-[0.58rem] text-dim tracking-wider font-medium mb-1 flex items-center gap-1 collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <i data-lucide="table" class="w-3 h-3"></i> 硬点坐标
+      <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim ml-auto"></i>
+    </div>
+    <div class="panel-content">
+      <div class="text-[0.58rem] text-dim tracking-wider font-medium mt-1">前轴</div>
+      <div class="max-h-[240px] overflow-y-auto rounded-lg border border-white/5">
+        <table><thead><tr><th></th><th>X</th><th>Y</th><th>Z</th></tr></thead>
+          <tbody id="hpTableBody"></tbody>
+        </table>
+      </div>
+      <div class="mt-1 text-[0.58rem] text-dim tracking-wider font-medium">后轴</div>
+      <div class="max-h-[240px] overflow-y-auto rounded-lg border border-white/5">
+        <table><thead><tr><th></th><th>X</th><th>Y</th><th>Z</th></tr></thead>
+          <tbody id="rearHpTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
-async function deleteFaceFromPanel(name) {
-  if (!confirm('确定删除覆盖面 "' + name + '"？')) return;
-  const st = document.getElementById('saveStatus');
-  delete bodyworkFaces[name];
-  if (selectedFaceName === name) { selectedFace = null; selectedFaceName = ''; selectedFaceDef = null; hideEditPanel(); }
-  rebuildScene(); renderFacesPanel();
-  try {
-    const r = await fetch('/api/delete_face',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,permanent:true})});
-    const d = await r.json();
-    st.textContent = d.ok ? '✓ 覆盖面 "' + name + '" 已删除' : '✗ 删除失败';
-  } catch(e) { st.textContent = '✗ 网络错误'; }
-}
+  <!-- 车架节点表格 -->
+  <div class="p-2 border-b border-white/5 panel-wrapper collapsed">
+    <div class="flex items-center justify-between mb-1 collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <span class="text-[0.58rem] text-dim tracking-wider font-medium">车架节点</span>
+      <span class="flex items-center gap-1">
+        <span class="text-[0.5rem] text-muted">管件数: <span id="frameTubeCount">0</span></span>
+        <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim"></i>
+      </span>
+    </div>
+    <div class="panel-content">
+      <div class="max-h-[200px] overflow-y-auto rounded-lg border border-white/5">
+        <table><thead><tr><th></th><th>X</th><th>Y</th><th>Z</th></tr></thead>
+          <tbody id="frameNodeTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
-async function createFace() {
-  const name = prompt('覆盖面名称：'); if (!name?.trim()) return;
-  const nt = name.trim(); if (bodyworkFaces[nt]) { alert('名称 "' + nt + '" 已存在'); return; }
-  const loop = Array.from(multiSelectedPoints);
-  const permanent = confirm('永久保存到源文件？\n\n确定 = 永久保存，取消 = 临时');
-  bodyworkFaces[nt] = { loops: [loop], color:'#94a3b8', opacity:0.30 };
-  clearMultiSelect(); rebuildScene();
-  if (permanent) {
-    try {
-      const r = await fetch('/api/add_face',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:nt,loop,color:'#94a3b8',opacity:0.30,permanent:true})});
-      const d = await r.json();
-      document.getElementById('saveStatus').textContent = d.ok ? '✓ 覆盖面 "' + nt + '" 已永久保存' : '✗ 保存失败';
-    } catch(e) { document.getElementById('saveStatus').textContent = '✗ 网络错误'; }
-  } else {
-    document.getElementById('saveStatus').textContent = '✓ 覆盖面 "' + nt + '" 已创建（临时）';
-  }
-  renderFacesPanel();
-}
+  <!-- 减震器挂点 -->
+  <div class="p-2 border-b border-white/5 panel-wrapper collapsed">
+    <div class="text-[0.58rem] text-dim tracking-wider font-medium mb-1 flex items-center gap-1 collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <span>减震器挂点</span>
+      <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim ml-auto"></i>
+    </div>
+    <div class="panel-content">
+      <div class="max-h-[140px] overflow-y-auto rounded-lg border border-white/5">
+        <table><thead><tr><th></th><th>X</th><th>Y</th><th>Z</th></tr></thead>
+          <tbody id="damperMountTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
-async function deleteFace(permanent) {
-  if (!selectedFaceName) return; const name = selectedFaceName, st = document.getElementById('saveStatus');
-  delete bodyworkFaces[name]; selectedFace = null; selectedFaceName = ''; selectedFaceDef = null; hideEditPanel(); rebuildScene(); renderFacesPanel();
-  if (permanent) { try { const r = await fetch('/api/delete_face',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,permanent:true})}); const d = await r.json(); st.textContent = d.ok ? '✓ 覆盖面已永久删除' : '✗ 删除失败'; } catch(e) { st.textContent = '✗ 网络错误'; } }
-  else st.textContent = '✓ 覆盖面已临时删除';
-}
+  <!-- 多选工具栏 -->
+  <div class="p-2 border-b border-white/5 panel-wrapper collapsed">
+    <div class="text-[0.58rem] text-dim tracking-wider font-medium mb-1 flex items-center gap-1 collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <i data-lucide="layers" class="w-3 h-3"></i> 多选 (Ctrl+点击) <span id="multiSelectCount" class="text-accent font-bold text-[0.7rem]">0</span>
+      <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim ml-auto"></i>
+    </div>
+    <div class="panel-content">
+      <div class="flex gap-1.5">
+        <button id="addTubeFromSelectBtn" class="flex-1 bg-accent2/80 hover:bg-accent2 text-white text-[0.55rem] py-1 rounded transition-colors disabled:opacity-40" disabled>创建管件</button>
+        <button id="createFaceBtn" class="flex-1 bg-accent/80 hover:bg-accent text-white text-[0.55rem] py-1 rounded transition-colors disabled:opacity-40" disabled>创建覆盖面</button>
+        <button id="clearMultiBtn" class="bg-white/5 hover:bg-white/10 text-white text-[0.55rem] px-2 py-1 rounded transition-colors">清空</button>
+      </div>
+    </div>
+  </div>
 
-async function updateFace(permanent) {
-  if (!selectedFaceName || !selectedFaceDef) return; const name = selectedFaceName;
-  const color = '#' + selectedFace.material.color.getHexString(), opacity = selectedFace.material.opacity;
-  selectedFaceDef.color = color; selectedFaceDef.opacity = opacity; const st = document.getElementById('saveStatus'); renderFacesPanel();
-  if (permanent) { try { const r = await fetch('/api/update_face',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,loop:selectedFaceDef.loops[0],color,opacity,permanent:true})}); const d = await r.json(); st.textContent = d.ok ? (d.permanent?'✓ 覆盖面已永久保存':'✓ 已临时更新') : '✗ 保存失败'; } catch(e) { st.textContent = '✗ 网络错误'; } }
-  else st.textContent = '✓ 覆盖面已临时更新';
-}
+  <!-- 覆盖面管理 -->
+  <div class="p-2 border-b border-white/5 panel-wrapper collapsed">
+    <div class="text-[0.58rem] text-dim tracking-wider font-medium flex items-center gap-1 collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <i data-lucide="shapes" class="w-3 h-3"></i> 覆盖面
+      <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim ml-auto"></i>
+    </div>
+    <div class="panel-content">
+      <div id="faceListContainer" class="max-h-[160px] overflow-y-auto rounded-lg border border-white/5 mt-1">
+        <div id="faceListBody" class="text-[0.6rem] text-dim p-2">加载中...</div>
+      </div>
+    </div>
+  </div>
 
-// ============================================================
-// API CALLS
-// ============================================================
+  <!-- 空气动力学 -->
+  <div class="p-2 border-b border-white/5 panel-wrapper collapsed">
+    <div class="text-[0.58rem] text-dim tracking-wider font-medium flex items-center gap-1 collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <i data-lucide="wind" class="w-3 h-3"></i> 空气动力学
+      <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim ml-auto"></i>
+    </div>
+    <div class="panel-content">
+      <div class="mt-1.5 space-y-1">
+        <div class="text-[0.58rem] text-dim tracking-wider font-medium flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400/60"></span> 前翼
+        </div>
+        <div id="frontWingListContainer" class="max-h-[240px] overflow-y-auto rounded-lg border border-white/5">
+          <div id="frontWingListBody" class="text-[0.6rem] text-dim p-2">加载中...</div>
+        </div>
+        <div class="text-[0.58rem] text-dim tracking-wider font-medium flex items-center gap-1 mt-2">
+          <span class="w-1.5 h-1.5 rounded-full bg-blue-400/60"></span> 尾翼
+        </div>
+        <div id="rearWingListContainer" class="max-h-[240px] overflow-y-auto rounded-lg border border-white/5">
+          <div id="rearWingListBody" class="text-[0.6rem] text-dim p-2">加载中...</div>
+        </div>
+        <div class="text-[0.58rem] text-dim tracking-wider font-medium flex items-center gap-1 mt-2">
+          <span class="w-1.5 h-1.5 rounded-full bg-green-400/60"></span> 底板
+        </div>
+        <div id="undertrayListContainer" class="max-h-[240px] overflow-y-auto rounded-lg border border-white/5">
+          <div id="undertrayListBody" class="text-[0.6rem] text-dim p-2">加载中...</div>
+        </div>
+        <div class="text-[0.58rem] text-dim tracking-wider font-medium flex items-center gap-1 mt-2">
+          <span class="w-1.5 h-1.5 rounded-full bg-rose-400/60"></span> 扩散器
+        </div>
+        <div id="diffuserListContainer" class="max-h-[240px] overflow-y-auto rounded-lg border border-white/5">
+          <div id="diffuserListBody" class="text-[0.6rem] text-dim p-2">加载中...</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-async function loadDefaults() {
-  let data;
-  try { const r = await fetch('/api/defaults'); if (!r.ok) throw new Error('HTTP '+r.status); data = await r.json(); }
-  catch(e) { console.error('Failed to load defaults:', e); alert('无法连接后端服务器，请确认 python main.py 已启动'); return; }
-  hardpointsFrontRight = data.front.right; hardpointsFrontLeft = data.front.left;
-  anglesFrontRight = data.front.angles_right; anglesFrontLeft = data.front.angles_left;
-  currentResultFrontRight = { ...data.front.right }; currentResultFrontLeft = { ...data.front.left };
-  hardpointsRearRight = data.rear.right; hardpointsRearLeft = data.rear.left;
-  anglesRearRight = data.rear.angles_right; anglesRearLeft = data.rear.angles_left;
-  currentResultRearRight = { ...data.rear.right }; currentResultRearLeft = { ...data.rear.left };
-  contactPatches.frontRight = data.front.contact_patch_right || null;
-  contactPatches.frontLeft = data.front.contact_patch_left || null;
-  contactPatches.rearRight = data.rear.contact_patch_right || null;
-  contactPatches.rearLeft = data.rear.contact_patch_left || null;
-  frameNodes = data.frame.nodes || {}; frameTubes = data.frame.tubes || [];
-  tubeColors = data.frame.tube_colors || {}; bodyworkFaces = data.bodywork || {}; renderFacesPanel();
-  rearWingConfig = data.rear_wing || null; renderRearWingPanel();
-  frontWingConfig = data.front_wing || null; renderFrontWingPanel();
-  designParams = data.params || {};
-  applyToUI(); rebuildScene(); loadKinCurves();
-}
+  <!-- 设计参数 -->
+  <div class="p-2 border-b border-white/5 panel-wrapper collapsed">
+    <div class="text-[0.58rem] text-dim tracking-wider font-medium mb-1 flex items-center gap-1 collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <i data-lucide="sliders" class="w-3 h-3"></i> 设计参数
+      <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim ml-auto"></i>
+    </div>
+    <div class="panel-content">
+      <div class="flex gap-1 mb-1">
+        <select id="paramAxle" class="bg-input border border-white/5 rounded px-2 py-0.5 text-[0.6rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50">
+          <option value="front">前轴</option>
+          <option value="rear">后轴</option>
+        </select>
+        <button id="applyParamsBtn" class="bg-accent hover:bg-accent/85 text-white text-[0.55rem] px-3 py-0.5 rounded transition-colors">应用</button>
+      </div>
+      <div id="paramSliders" class="space-y-1 max-h-[300px] overflow-y-auto"></div>
+    </div>
+  </div>
 
-// Slider solve — RAF coalescing + always apply
-let solveScheduled = false;
-let solveRunning = false;
+  <!-- 运动学曲线 -->
+  <div class="p-2 panel-wrapper collapsed">
+    <div class="text-[0.58rem] text-dim tracking-wider font-medium mb-1 flex items-center gap-1 collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <i data-lucide="trending-up" class="w-3 h-3"></i> 运动学曲线
+      <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim ml-auto"></i>
+    </div>
+    <div class="panel-content">
+      <div class="flex items-center gap-1 mb-1">
+        <select id="curveParam" class="bg-input border border-white/5 rounded px-2 py-0.5 text-[0.6rem] text-[#e4e4ec] font-mono outline-none focus:border-accent/50">
+          <option value="camber_deg">外倾角</option>
+          <option value="toe_deg" selected>前束角</option>
+          <option value="caster_deg">后倾角</option>
+          <option value="kpi_deg">内倾角</option>
+          <option value="scrub_radius_mm">偏距</option>
+          <option value="caster_trail_mm">拖距</option>
+        </select>
+      </div>
+      <div class="bg-[#0a0a14] rounded-lg p-1 border border-white/5">
+        <canvas id="kinCurveChart" width="260" height="200"></canvas>
+      </div>
+    </div>
+  </div>
 
-function requestSolve() {
-  if (solveRunning || solveScheduled) return;
-  solveScheduled = true;
-  requestAnimationFrame(() => {
-    solveScheduled = false;
-    solveRunning = true;
-    _doSolve().finally(() => { solveRunning = false; });
-  });
-}
+</div>
 
-let _solveId = 0;
-
-async function _doSolve() {
-  const myId = ++_solveId;
-
-  let ft, rt, fL, rL;
-  const rack = parseFloat(document.getElementById('rackSlider').value);
-  if (chassisMode) {
-    const t = chassisPoseToTravel();
-    ft = t.front_right; rt = t.rear_right;
-    fL = t.front_left;  rL = t.rear_left;
-  } else {
-    ft = parseFloat(document.getElementById('frontTravelSlider').value);
-    rt = parseFloat(document.getElementById('rearTravelSlider').value);
-    fL = ft; rL = rt;
-  }
-  readHardpointsFromTables();
-  let data;
-  try { const r = await fetch('/api/solve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({front_hardpoints:hardpointsFrontRight,rear_hardpoints:hardpointsRearRight,front_travel:ft,rear_travel:rt,front_left_travel:fL,rear_left_travel:rL,rack_displacement:rack,mirror:true})}); if (!r.ok) return; data = await r.json(); }
-  catch(e) { console.error('Solve error:', e); return; }
-  // Always apply result — stale check removed so intermediate drag frames render
-  currentResultFrontRight = data.front.right; currentResultFrontLeft = data.front.left;
-  anglesFrontRight = data.front.angles_right; anglesFrontLeft = data.front.angles_left;
-  contactPatches.frontRight = data.front.contact_patch_right || null;
-  contactPatches.frontLeft = data.front.contact_patch_left || null;
-  updateSidePoints(data.front.right,'frontRight'); updateSidePoints(data.front.left,'frontLeft');
-  currentResultRearRight = data.rear.right; currentResultRearLeft = data.rear.left;
-  anglesRearRight = data.rear.angles_right; anglesRearLeft = data.rear.angles_left;
-  contactPatches.rearRight = data.rear.contact_patch_right || null;
-  contactPatches.rearLeft = data.rear.contact_patch_left || null;
-  updateSidePoints(data.rear.right,'rearRight','R_'); updateSidePoints(data.rear.left,'rearLeft','R_');
-  updateRockerKinematics(); updateAngleDisplay(); updateDerivedInfo();
-  // In chassis mode also update frame/bodywork/wing positions
-  if (chassisMode) {
-    updateFramePositions();
-    updateDamperCylinders();
-    buildBodyworkFaces();
-    buildRearWing();
-    buildFrontWing();
-  }
-}
-
-// Non-throttled solve for "Apply" button / save actions
-async function solveAndUpdate() {
-  solveRunning = true;
-  try { await _doSolve(); } finally { solveRunning = false; }
-}
-
-// ============================================================
-// UI HELPERS
-// ============================================================
-
-function applyToUI() { buildHardpointTable(hardpointsFrontRight,'hpTableBody',HP_ORDER); buildHardpointTable(hardpointsRearRight,'rearHpTableBody',REAR_HP_ORDER); buildFrameNodeTable(); buildDamperMountTable(); updateAngleDisplay(); updateDerivedInfo(); }
-
-function buildHardpointTable(hp, tbodyId, order) {
-  const tbody = document.getElementById(tbodyId); if (!tbody) return; tbody.innerHTML = '';
-  for (const key of order) { if (!hp[key]) continue;
-    const tr = document.createElement('tr'); const lt = document.createElement('td'); lt.textContent = key; tr.appendChild(lt);
-    for (const axis of [0,1,2]) { const td = document.createElement('td'); const inp = document.createElement('input'); inp.type='number'; inp.step='0.5'; inp.value = hp[key][axis]; inp.dataset.key = key; inp.dataset.axis = axis; inp.dataset.table = tbodyId; inp.addEventListener('change', () => readHardpointsFromTables()); td.appendChild(inp); tr.appendChild(td); }
-    tbody.appendChild(tr);
-  }
-}
-
-const FRAME_NODE_ORDER = [
-  'FB_TOP_R','FB_LWR_R','FH_TOP_R','FH_UPR_R','MH_TOP_R','MH_UPR_R','RB_TOP_R','RB_LWR_R',
-  'RK_PIVOT_R','RK_DAMPER_R','R_RK_PIVOT_R','R_RK_DAMPER_R',
-  'DAMPER_CHASSIS_FR','R_DAMPER_CHASSIS_RR',
-  'BODY_NOSE_TOP','BODY_NOSE_MID_R','BODY_NOSE_BOT',
-  'BODY_LWR_MID_R','BODY_UPR_FWD_R',
-  'BODY_ENG_TOP','BODY_ENG_MID_R',
-];
-
-function buildFrameNodeTable() {
-  const tbody = document.getElementById('frameNodeTableBody'); if (!tbody) return; tbody.innerHTML = '';
-  for (const key of FRAME_NODE_ORDER) { if (!frameNodes[key]) continue;
-    const tr = document.createElement('tr'); const lt = document.createElement('td'); lt.textContent = key; tr.appendChild(lt);
-    for (const axis of [0,1,2]) { const td = document.createElement('td'); const inp = document.createElement('input'); inp.type='number'; inp.step='0.5'; inp.value = frameNodes[key][axis]; inp.dataset.key = key; inp.dataset.axis = axis; td.appendChild(inp); tr.appendChild(td); }
-    tbody.appendChild(tr);
-  }
-  document.getElementById('frameTubeCount').textContent = frameTubes.length;
-}
-
-function readFrameNodesFromTable() { document.querySelectorAll('#frameNodeTableBody input').forEach(inp => { const k=inp.dataset.key, a=parseInt(inp.dataset.axis); if (frameNodes[k]) frameNodes[k][a] = parseFloat(inp.value); }); }
-
-const DAMPER_MOUNT_ORDER = ['DAMPER_CHASSIS_FR','DAMPER_CHASSIS_FL','R_DAMPER_CHASSIS_RR','R_DAMPER_CHASSIS_RL'];
-function buildDamperMountTable() {
-  const tbody = document.getElementById('damperMountTableBody'); if (!tbody) return; tbody.innerHTML = '';
-  for (const key of DAMPER_MOUNT_ORDER) { if (!frameNodes[key]) continue;
-    const tr = document.createElement('tr'); const lt = document.createElement('td'); lt.textContent = key; tr.appendChild(lt);
-    for (const axis of [0,1,2]) { const td = document.createElement('td'); const inp = document.createElement('input'); inp.type='number'; inp.step='0.5'; inp.value = frameNodes[key][axis]; inp.dataset.key = key; inp.dataset.axis = axis; inp.dataset.table = 'damperMount'; td.appendChild(inp); tr.appendChild(td); }
-    tbody.appendChild(tr);
-  }
-}
-function readDamperMountsFromTable() { document.querySelectorAll('#damperMountTableBody input').forEach(inp => { const k=inp.dataset.key, a=parseInt(inp.dataset.axis); if (frameNodes[k]) frameNodes[k][a] = parseFloat(inp.value); }); }
-
-function readHardpointsFromTables() {
-  document.querySelectorAll('#hpTableBody input').forEach(inp => { const k=inp.dataset.key, a=parseInt(inp.dataset.axis); if (hardpointsFrontRight[k]) hardpointsFrontRight[k][a] = parseFloat(inp.value); });
-  hardpointsFrontLeft = mirrorHardpoints(hardpointsFrontRight);
-  document.querySelectorAll('#rearHpTableBody input').forEach(inp => { const k=inp.dataset.key, a=parseInt(inp.dataset.axis); if (hardpointsRearRight[k]) hardpointsRearRight[k][a] = parseFloat(inp.value); });
-  hardpointsRearLeft = mirrorHardpoints(hardpointsRearRight);
-}
-
-function mirrorHardpoints(hpR) { const hpL = {}; for (const [k,v] of Object.entries(hpR)) hpL[k] = Array.isArray(v)&&v.length===3 ? [v[0],-v[1],v[2]] : v; return hpL; }
-
-function updateAngleDisplay() {
-  const sv = (id, aFR, aFL, aRR, aRL, s='') => { document.getElementById(id+'FR').textContent = aFR!=null ? aFR+s : '--'; document.getElementById(id+'FL').textContent = aFL!=null ? aFL+s : '--'; document.getElementById(id+'RR').textContent = aRR!=null ? aRR+s : '--'; document.getElementById(id+'RL').textContent = aRL!=null ? aRL+s : '--'; };
-  const a = (o,k) => o!=null ? o[k] : null;
-  sv('camber',a(anglesFrontRight,'camber_deg'),a(anglesFrontLeft,'camber_deg'),a(anglesRearRight,'camber_deg'),a(anglesRearLeft,'camber_deg'),'°');
-  sv('toe',a(anglesFrontRight,'toe_deg'),a(anglesFrontLeft,'toe_deg'),a(anglesRearRight,'toe_deg'),a(anglesRearLeft,'toe_deg'),'°');
-  sv('caster',a(anglesFrontRight,'caster_deg'),a(anglesFrontLeft,'caster_deg'),a(anglesRearRight,'caster_deg'),a(anglesRearLeft,'caster_deg'),'°');
-  sv('kpi',a(anglesFrontRight,'kpi_deg'),a(anglesFrontLeft,'kpi_deg'),a(anglesRearRight,'kpi_deg'),a(anglesRearLeft,'kpi_deg'),'°');
-  sv('scrub',a(anglesFrontRight,'scrub_radius_mm'),a(anglesFrontLeft,'scrub_radius_mm'),a(anglesRearRight,'scrub_radius_mm'),a(anglesRearLeft,'scrub_radius_mm'),'mm');
-  sv('trail',a(anglesFrontRight,'caster_trail_mm'),a(anglesFrontLeft,'caster_trail_mm'),a(anglesRearRight,'caster_trail_mm'),a(anglesRearLeft,'caster_trail_mm'),'mm');
-}
-
-function updateDerivedInfo() {
-  const div = document.getElementById('derivedInfo');
-  const pFR = currentResultFrontRight.push_rod_length?.toFixed(1)||'--', pFL = currentResultFrontLeft.push_rod_length?.toFixed(1)||'--';
-  const pRR = currentResultRearRight.push_rod_length?.toFixed(1)||'--', pRL = currentResultRearLeft.push_rod_length?.toFixed(1)||'--';
-  function dl(rk,ck) { const a=rockerCache[rk], b=frameNodes[ck]; if(!a||!b) return '--'; return Math.sqrt((a[0]-b[0])**2+(a[1]-b[1])**2+(a[2]-b[2])**2).toFixed(1); }
-  const dFR=dl('RK_DAMPER_R','DAMPER_CHASSIS_FR'), dFL=dl('RK_DAMPER_L','DAMPER_CHASSIS_FL'), dRR=dl('R_RK_DAMPER_R','R_DAMPER_CHASSIS_RR'), dRL=dl('R_RK_DAMPER_L','R_DAMPER_CHASSIS_RL');
-  const dfe=document.getElementById('damperLenFR'), dre=document.getElementById('damperLenRR');
-  if (dfe) dfe.textContent = dFR+' / '+dFL; if (dre) dre.textContent = dRR+' / '+dRL;
-  // Tire data
-  const cpFR = contactPatches.frontRight, cpRR = contactPatches.rearRight;
-  const loadRF = cpFR?.loaded_radius?.toFixed(1)||'--', deflF = cpFR?.deflection?.toFixed(1)||'--';
-  const loadRR = cpRR?.loaded_radius?.toFixed(1)||'--', deflR = cpRR?.deflection?.toFixed(1)||'--';
-  div.innerHTML = '<div class="info-row"><span class="label">前推/拉杆 R/L</span><span class="val">'+pFR+' / '+pFL+' mm</span></div><div class="info-row"><span class="label">后推/拉杆 R/L</span><span class="val">'+pRR+' / '+pRL+' mm</span></div><div class="info-row"><span class="label">前减震器长度 R/L</span><span class="val">'+dFR+' / '+dFL+' mm</span></div><div class="info-row"><span class="label">后减震器长度 R/L</span><span class="val">'+dRR+' / '+dRL+' mm</span></div><div class="info-row"><span class="label">轮胎加载半径 前/后</span><span class="val">'+loadRF+' / '+loadRR+' mm</span></div><div class="info-row"><span class="label">轮胎压缩量 前/后</span><span class="val">'+deflF+' / '+deflR+' mm</span></div>';
-}
-
-function rebuildScene() {
-  try { for (const k of Object.keys(rockerCache)) delete rockerCache[k];
-    buildSidePoints(hardpointsFrontRight,'frontRight',FRONT_COLORS); buildSidePoints(hardpointsFrontLeft,'frontLeft',FRONT_COLORS);
-    buildSidePoints(hardpointsRearRight,'rearRight',REAR_COLORS,'R_'); buildSidePoints(hardpointsRearLeft,'rearLeft',REAR_COLORS,'R_');
-    buildFrame();
-    buildBodyworkFaces(); buildRearWing(); buildFrontWing(); buildDamperCylinders(); renderFacesPanel(); renderRearWingPanel(); renderFrontWingPanel(); }
-  catch(e) { console.error('rebuildScene failed:', e); }
-}
-
-// ============================================================
-// KINEMATICS CURVES
-// ============================================================
-
-let kinCurveData = null, kinChart = null;
-async function loadKinCurves() {
-  readHardpointsFromTables();
-  try { const r = await fetch('/api/sweep',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({front_hardpoints:hardpointsFrontRight,rear_hardpoints:hardpointsRearRight,start:-30,end:30,steps:61,rack_displacement:parseFloat(document.getElementById('rackSlider').value)})}); kinCurveData = await r.json(); updateKinChart(); }
-  catch(e) { console.warn('Sweep error:', e); }
-}
-
-function updateKinChart() {
-  if (!kinCurveData) return; const param = document.getElementById('curveParam').value;
-  const ctx = document.getElementById('kinCurveChart').getContext('2d'); if (kinChart) kinChart.destroy();
-  const labels = {camber_deg:'外倾角 (°)',toe_deg:'前束角 (°)',caster_deg:'后倾角 (°)',kpi_deg:'内倾角 (°)',scrub_radius_mm:'偏距 (mm)',caster_trail_mm:'拖距 (mm)',damper_travel:'减震器行程 (mm)',motion_ratio:'传动比'};
-  const fD = kinCurveData.front[param]?.map(v=>v??NaN)||[], rD = kinCurveData.rear[param]?.map(v=>v??NaN)||[];
-  const fData = kinCurveData.front, rData = kinCurveData.rear;
-  // Build legend labels with bump steer range for toe
-  const fLabel = param === 'toe_deg' && fData ? '前轴 toe (Δ' + bumpSteerRangeStr(fData.toe_deg) + ')' : '前轴';
-  const rLabel = param === 'toe_deg' && rData ? '后轴 toe (Δ' + bumpSteerRangeStr(rData.toe_deg) + ')' : '后轴';
-  const datasets = [
-    {label: fLabel, data: fD, borderColor: '#f43f5e', backgroundColor: 'transparent', borderWidth: 2, tension: 0.3, pointRadius: 0, spanGaps: false},
-    {label: rLabel, data: rD, borderColor: '#d97706', backgroundColor: 'transparent', borderWidth: 2, tension: 0.3, pointRadius: 0, spanGaps: false},
-  ];
-  // Add reference lines at ±1° and 0° for toe charts
-  if (param === 'toe_deg' && kinCurveData.travel.length > 0) {
-    const n = kinCurveData.travel.length;
-    const refStyle = {borderColor:'#666688',borderWidth:1,borderDash:[6,4],pointRadius:0,tension:0};
-    datasets.push({label:'+1°',data:Array(n).fill(1),...refStyle,backgroundColor:'transparent'});
-    datasets.push({label:'0°',data:Array(n).fill(0),...refStyle,borderColor:'#444466'});
-    datasets.push({label:'-1°',data:Array(n).fill(-1),...refStyle,backgroundColor:'transparent'});
-  }
-  kinChart = new Chart(ctx, {type:'line',data:{labels:kinCurveData.travel.map(v=>v.toFixed(0)),datasets},options:{responsive:true,maintainAspectRatio:true,animation:false,interaction:{intersect:false,mode:'index'},scales:{x:{title:{display:true,text:'轮跳 (mm)',color:'#8888aa'},ticks:{color:'#5c5c7a'},grid:{color:'#252540'}},y:{title:{display:true,text:labels[param]||param,color:'#8888aa'},ticks:{color:'#5c5c7a'},grid:{color:'#252540'}}},plugins:{legend:{labels:{color:'#8888aa',usePointStyle:true,filter: function(item) { return !item.text.startsWith('+1°') && !item.text.startsWith('-1°') && item.text !== '0°'; }}}}}});
-}
-
-function bumpSteerRangeStr(arr) {
-  const vals = (arr || []).filter(v => v != null && !isNaN(v));
-  if (vals.length < 2) return '--';
-  const mn = Math.min(...vals), mx = Math.max(...vals);
-  return (mx - mn).toFixed(2) + '°';
-}
-
-// ============================================================
-// EVENT HANDLERS
-// ============================================================
-
-document.getElementById('frontTravelSlider').addEventListener('input', () => { document.getElementById('frontTravelVal').textContent = document.getElementById('frontTravelSlider').value + ' mm'; requestSolve(); });
-document.getElementById('rearTravelSlider').addEventListener('input', () => { document.getElementById('rearTravelVal').textContent = document.getElementById('rearTravelSlider').value + ' mm'; requestSolve(); });
-document.getElementById('rackSlider').addEventListener('input', () => { document.getElementById('rackVal').textContent = document.getElementById('rackSlider').value + ' mm'; requestSolve(); loadKinCurves(); });
-document.getElementById('resetBtn').addEventListener('click', () => { document.getElementById('frontTravelSlider').value=0; document.getElementById('rearTravelSlider').value=0; document.getElementById('rackSlider').value=0; document.getElementById('frontTravelVal').textContent='0.0 mm'; document.getElementById('rearTravelVal').textContent='0.0 mm'; document.getElementById('rackVal').textContent='0.0 mm'; if (chassisMode) { document.getElementById('heaveSlider').value=0; document.getElementById('pitchSlider').value=0; document.getElementById('rollSlider').value=0; chassisPose = {heave:0,pitch:0,roll:0}; updateChassisDisplay(); } loadDefaults(); });
-
-// ═══ 车身姿态模式 ═══
-document.getElementById('chassisModeToggle').addEventListener('change', function() {
-  chassisMode = this.checked;
-  document.getElementById('chassisControls').style.display = chassisMode ? '' : 'none';
-  document.getElementById('frontTravelSlider').disabled = chassisMode;
-  document.getElementById('rearTravelSlider').disabled = chassisMode;
-  if (chassisMode) updateChassisMode();
-  else { chassisPose = {heave:0,pitch:0,roll:0}; requestSolve(); }
-});
-
-function chassisPoseToTravel() {
-  const h = chassisPose.heave, p = chassisPose.pitch * Math.PI / 180, r = chassisPose.roll * Math.PI / 180;
-  const pitchFR = CHASSIS_WHEELBASE_HALF * Math.sin(p);
-  const rollF = CHASSIS_TRACK_FRONT * Math.sin(r) / 2;
-  const rollR = CHASSIS_TRACK_REAR * Math.sin(r) / 2;
-  return {
-    // +nose up → front extends (-pitchFR), rear compresses (+pitchFR)
-    front_right:  -h - pitchFR + rollF,
-    front_left:   -h - pitchFR - rollF,
-    // +lean right → right compresses (+rollF/R), left extends (-rollF/R)
-    rear_right:   -h + pitchFR + rollR,
-    rear_left:    -h + pitchFR - rollR,
-  };
-}
-
-function updateChassisDisplay() {
-  document.getElementById('heaveVal').textContent = chassisPose.heave.toFixed(1) + ' mm';
-  document.getElementById('pitchVal').textContent = chassisPose.pitch.toFixed(1) + '°';
-  document.getElementById('rollVal').textContent = chassisPose.roll.toFixed(1) + '°';
-  const t = chassisPoseToTravel();
-  document.getElementById('chassisFrontTravel').textContent = t.front_right.toFixed(1);
-  document.getElementById('chassisRearTravel').textContent = t.rear_right.toFixed(1);
-  document.getElementById('chassisFLTravel').textContent = t.front_left.toFixed(1);
-  document.getElementById('chassisFRTravel').textContent = t.front_right.toFixed(1);
-}
-
-function updateChassisMode() {
-  updateChassisDisplay();
-  requestSolve();
-  buildBodyworkFaces();
-  buildRearWing();
-  buildFrontWing();
-}
-
-// Move existing frame elements — no teardown/rebuild
-function updateFramePositions() {
-  const fobjs = sceneObjects.frame;
-  // Spheres
-  for (const [name, pos] of Object.entries(frameNodes)) {
-    if (fobjs.spheres[name]) {
-      const p = chassisTransform(pos);
-      fobjs.spheres[name].position.set(...p);
-    }
-  }
-  // Tubes
-  for (const line of fobjs.tubes) {
-    const ep = line.userData?.endpoints; if (!ep) continue;
-    if (line.userData?.isCurve) {
-      // Multi-point CatmullRom curve: rebuild with updated chassis transform
-      const pts = ep.map(n => resolveFramePoint(n)).filter(Boolean);
-      if (pts.length < 2) continue;
-      const worldPts = pts.map(p => new THREE.Vector3(...chassisTransform(p)));
-      const curve = new THREE.CatmullRomCurve3(worldPts, false, 'catmullrom', 0.5);
-      const samples = curve.getPoints(ep.length * 16);
-      line.geometry.setFromPoints(samples);
-    } else {
-      const a = resolveFramePoint(ep[0]), b = resolveFramePoint(ep[1]);
-      if (a && b) { const wa = chassisTransform(a), wb = chassisTransform(b); line.geometry.setFromPoints([new THREE.Vector3(...wa), new THREE.Vector3(...wb)]); }
-    }
-  }
-  // Rocker faces
-  for (let i = 0; i < fobjs.rockerFaces.length; i++) {
-    const mesh = fobjs.rockerFaces[i], isFront = i < 2, sfx = (i % 2 === 0) ? '' : '_L';
-    const pts = [resolveFramePoint((isFront?'CH5':'R_CH5')+sfx), resolveFramePoint((isFront?'RK_PIVOT_':'R_RK_PIVOT_')+(sfx?'L':'R')), resolveFramePoint((isFront?'RK_DAMPER_':'R_RK_DAMPER_')+(sfx?'L':'R'))].filter(Boolean);
-    if (pts.length !== 3) continue;
-    const w = pts.map(p => chassisTransform(p));
-    const v = new Float32Array([w[0][0],w[0][1],w[0][2], w[1][0],w[1][1],w[1][2], w[2][0],w[2][1],w[2][2]]);
-    mesh.geometry.setAttribute('position', new THREE.BufferAttribute(v, 3));
-    mesh.geometry.setIndex([0, 1, 2]); mesh.geometry.computeVertexNormals();
-  }
-}
-
-function onChassisSliderInput() {
-  chassisPose.heave = parseFloat(document.getElementById('heaveSlider').value);
-  chassisPose.pitch = parseFloat(document.getElementById('pitchSlider').value);
-  chassisPose.roll = parseFloat(document.getElementById('rollSlider').value);
-  updateChassisMode();
-}
-document.getElementById('pitchSlider').addEventListener('input', onChassisSliderInput);
-document.getElementById('rollSlider').addEventListener('input', onChassisSliderInput);
-document.getElementById('heaveSlider').addEventListener('input', onChassisSliderInput);
-document.getElementById('applyBtn').addEventListener('click', () => { readHardpointsFromTables(); readFrameNodesFromTable(); readDamperMountsFromTable(); hardpointsFrontLeft = mirrorHardpoints(hardpointsFrontRight); hardpointsRearLeft = mirrorHardpoints(hardpointsRearRight); currentResultFrontRight={...hardpointsFrontRight}; currentResultFrontLeft={...hardpointsFrontLeft}; currentResultRearRight={...hardpointsRearRight}; currentResultRearLeft={...hardpointsRearLeft}; rebuildScene(); requestSolve(); loadKinCurves(); });
-document.getElementById('curveParam').addEventListener('change', updateKinChart);
-
-window.addEventListener('resize', () => { const w=viewport.clientWidth, h=viewport.clientHeight; camera.aspect = w/Math.max(h,1); camera.updateProjectionMatrix(); renderer.setSize(w, h); });
-
-renderer.domElement.addEventListener('dblclick', onDoubleClick);
-renderer.domElement.addEventListener('click', (event) => { if (!event.ctrlKey && !event.metaKey) return; const rect = renderer.domElement.getBoundingClientRect(); mouse.x = ((event.clientX-rect.left)/rect.width)*2-1; mouse.y = -((event.clientY-rect.top)/rect.height)*2+1; raycaster.setFromCamera(mouse, camera); const allS = []; for (const sk of ['frontRight','frontLeft','rearRight','rearLeft']) for (const s of Object.values(sceneObjects[sk].spheres)) allS.push(s); for (const s of Object.values(sceneObjects.frame.spheres)) allS.push(s); const hits = raycaster.intersectObjects(allS, false); if (hits.length>0) { const m = hits[0].object; if (m.isMesh && m.userData.pointName) { addMultiSelect(m.userData.pointName, m); event.preventDefault(); } } });
-
-// ============================================================
-// DESIGN PARAMETERS PANEL
-// ============================================================
-
-const PARAM_META = {
-  track:{label:'轮距',unit:'mm',min:500,max:900,step:5},
-  wheel_center_x:{label:'轮心 X',unit:'mm',min:-1200,max:200,step:5},
-  wheel_center_z:{label:'轮心高度',unit:'mm',min:50,max:300,step:2},
-  tire_radius:{label:'轮胎半径',unit:'mm',min:100,max:250,step:2},
-  caster:{label:'后倾角',unit:'°',min:0,max:15,step:0.1},
-  kpi:{label:'内倾角',unit:'°',min:0,max:10,step:0.1},
-  kingpin_length:{label:'主销长度',unit:'mm',min:80,max:160,step:1},
-  wheel_offset_y:{label:'轮心-主销Y偏距',unit:'mm',min:5,max:60,step:1},
-  uca_front_x:{label:'上A臂前X',unit:'mm',min:-150,max:50,step:2},
-  uca_rear_x:{label:'上A臂后X',unit:'mm',min:-50,max:150,step:2},
-  uca_front_y:{label:'上A臂前Y',unit:'mm',min:100,max:320,step:2},
-  uca_rear_y:{label:'上A臂后Y',unit:'mm',min:100,max:320,step:2},
-  uca_front_z:{label:'上A臂前Z',unit:'mm',min:50,max:250,step:2},
-  uca_rear_z:{label:'上A臂后Z',unit:'mm',min:100,max:350,step:2},
-  lca_front_x:{label:'下A臂前X',unit:'mm',min:-150,max:50,step:2},
-  lca_rear_x:{label:'下A臂后X',unit:'mm',min:-50,max:150,step:2},
-  lca_front_y:{label:'下A臂前Y',unit:'mm',min:80,max:280,step:2},
-  lca_rear_y:{label:'下A臂后Y',unit:'mm',min:80,max:280,step:2},
-  lca_front_z:{label:'下A臂前Z',unit:'mm',min:20,max:150,step:2},
-  lca_rear_z:{label:'下A臂后Z',unit:'mm',min:20,max:150,step:2},
-  tierod_inner_y:{label:'转向拉杆内Y',unit:'mm',min:50,max:180,step:2},
-  tierod_inner_z:{label:'转向拉杆内Z',unit:'mm',min:50,max:200,step:2},
-  tierod_inner_x:{label:'转向拉杆内X',unit:'mm',min:-150,max:0,step:2},
-  pushrod_ch5_x:{label:'推杆CH5 X',unit:'mm',min:-50,max:100,step:2},
-  pushrod_ch5_y:{label:'推杆CH5 Y',unit:'mm',min:50,max:200,step:2},
-  pushrod_ch5_z:{label:'推杆CH5 Z',unit:'mm',min:150,max:350,step:2},
-  tire_spring_rate:{label:'轮胎刚度',unit:'N/mm',min:50,max:400,step:5},
-  corner_weight_n:{label:'单轮载荷',unit:'N',min:150,max:800,step:10},
-};
-
-function renderParamSliders() {
-  const axle = document.getElementById('paramAxle').value, params = designParams[axle] || {}, container = document.getElementById('paramSliders');
-  if (!container) return; container.innerHTML = '';
-  for (const [key, val] of Object.entries(params)) { const meta = PARAM_META[key]; if (!meta) continue;
-    const div = document.createElement('div');
-    div.innerHTML = '<div class="flex justify-between text-[0.6rem]"><span class="text-muted">'+meta.label+'</span><span class="text-accent font-mono font-medium">'+Number(val).toFixed(1)+' '+meta.unit+'</span></div><input type="range" min="'+meta.min+'" max="'+meta.max+'" step="'+meta.step+'" value="'+val+'" data-key="'+key+'" oninput="this.parentElement.querySelector(\'span:last-child\').textContent=Number(this.value).toFixed(1)+\' '+meta.unit+'\'">';
-    container.appendChild(div);
-  }
-}
-
-async function applyParams() {
-  const axle = document.getElementById('paramAxle').value, sliders = document.getElementById('paramSliders').querySelectorAll('input[type=range]'), st = document.getElementById('saveStatus');
-  for (const s of sliders) { const k = s.dataset.key, v = parseFloat(s.value); if (designParams[axle]) designParams[axle][k] = v; }
-  try { for (const s of sliders) await fetch('/api/update_params',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({axle,key:s.dataset.key,value:parseFloat(s.value)})});
-    const r = await fetch('/api/defaults'); const d = await r.json();
-    hardpointsFrontRight = d.front.right; hardpointsFrontLeft = d.front.left;
-    hardpointsRearRight = d.rear.right; hardpointsRearLeft = d.rear.left;
-    designParams = d.params || {};
-    rebuildScene(); try { await solveAndUpdate(); } catch(e) {}
-    applyToUI();
-    await loadKinCurves();  // Refresh sweep curves
-    st.textContent = '✓ 参数已应用，硬点重新计算'; }
-  catch(e) { console.error(e); st.textContent = '✗ 参数更新失败'; }
-}
-
-// ============================================================
-// BUTTON LISTENERS
-// ============================================================
-
-document.getElementById('paramAxle').addEventListener('change', renderParamSliders);
-document.getElementById('applyParamsBtn').addEventListener('click', applyParams);
-setTimeout(renderParamSliders, 500);
-
-document.getElementById('addTubeFromSelectBtn').addEventListener('click', addTubeFromSelection);
-document.getElementById('createFaceBtn').addEventListener('click', createFace);
-document.getElementById('clearMultiBtn').addEventListener('click', clearMultiSelect);
-
-const saveTempEl = document.getElementById('saveTempBtn'), savePermEl = document.getElementById('savePermBtn');
-if (saveTempEl) saveTempEl.addEventListener('click', () => savePoint(false));
-if (savePermEl) savePermEl.addEventListener('click', () => savePoint(true));
-
-const delTempEl = document.getElementById('deleteTempBtn'), delPermEl = document.getElementById('deletePermBtn');
-if (delTempEl) delTempEl.addEventListener('click', () => deleteTube(false));
-if (delPermEl) delPermEl.addEventListener('click', () => deleteTube(true));
-
-const stpEl = document.getElementById('saveTubePermBtn'); if (stpEl) stpEl.addEventListener('click', saveTubePermanent);
-const tcTempEl = document.getElementById('tubeColorTempBtn'), tcPermEl = document.getElementById('tubeColorPermBtn');
-if (tcTempEl) tcTempEl.addEventListener('click', () => saveTubeColor(false));
-if (tcPermEl) tcPermEl.addEventListener('click', () => saveTubeColor(true));
-
-const fuTempEl = document.getElementById('faceUpdateTempBtn'), fuPermEl = document.getElementById('faceUpdatePermBtn');
-if (fuTempEl) fuTempEl.addEventListener('click', () => updateFace(false));
-if (fuPermEl) fuPermEl.addEventListener('click', () => updateFace(true));
-
-const fdTempEl = document.getElementById('faceDeleteTempBtn'), fdPermEl = document.getElementById('faceDeletePermBtn');
-if (fdTempEl) fdTempEl.addEventListener('click', () => deleteFace(false));
-if (fdPermEl) fdPermEl.addEventListener('click', () => deleteFace(true));
-
-function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
-
-function init() {
-  const w = viewport.clientWidth, h = viewport.clientHeight;
-  renderer.setSize(w, h); camera.aspect = w / Math.max(h, 1); camera.updateProjectionMatrix();
-  loadDefaults().then(() => {
-    solveAndUpdate();
-  });
-  animate();
-  lucide.createIcons();
-  setTimeout(() => lucide.createIcons(), 600);
-}
-init();
-</script>
+<script type="module" src="js/main.js"></script>
 </body>
 </html>
