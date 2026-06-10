@@ -475,7 +475,7 @@ REAR_WING = {
         }
     ],
     "endplate": {
-        "overhang_forward": 0.10,
+        "overhang_forward": 0.1,
         "overhang_rear": 0.04,
         "height_above": 30,
         "height_below": 40
@@ -541,6 +541,107 @@ FRONT_WING = {
     ],
     "color": "#34d399",
     "opacity": 0.5
+}
+
+# ============================================================
+# UNDERTRAY — parametric floor panel
+# ============================================================
+
+UNDERTRAY_CONFIG = {
+    "enabled": True,
+    "front_x": 250.0,
+    "rear_x": -895.0,
+    "ground_clearance": 28.0,
+    "half_width": 360.0,
+    "venturi_depth": 15.0,
+    "venturi_start_ratio": 0.3,
+    "venturi_end_ratio": 0.6,
+    "edge_flipups": [
+        {
+            "name": "FLIPUP_R",
+            "side": "right",
+            "start_ratio": 0.55,
+            "length": 300.0,
+            "height": 40.0,
+            "angle": 35.0,
+        },
+        {
+            "name": "FLIPUP_L",
+            "side": "left",
+            "start_ratio": 0.55,
+            "length": 300.0,
+            "height": 40.0,
+            "angle": 35.0,
+        },
+    ],
+    "strakes": [
+        {
+            "name": "STRAKE_R1",
+            "side": "right",
+            "y_ratio": 0.85,
+            "start_ratio": 0.35,
+            "length": 400.0,
+            "height": 25.0,
+            "angle": 50.0,
+        },
+        {
+            "name": "STRAKE_R2",
+            "side": "right",
+            "y_ratio": 0.45,
+            "start_ratio": 0.40,
+            "length": 350.0,
+            "height": 20.0,
+            "angle": 45.0,
+        },
+        {
+            "name": "STRAKE_L1",
+            "side": "left",
+            "y_ratio": 0.85,
+            "start_ratio": 0.35,
+            "length": 400.0,
+            "height": 25.0,
+            "angle": 50.0,
+        },
+        {
+            "name": "STRAKE_L2",
+            "side": "left",
+            "y_ratio": 0.45,
+            "start_ratio": 0.40,
+            "length": 350.0,
+            "height": 20.0,
+            "angle": 45.0,
+        },
+    ],
+    "mounts": [
+        {"name": "UT_MOUNT_FR", "frame_node": "FB_LWR_R", "local_y": 80},
+        {"name": "UT_MOUNT_FL", "frame_node": "FB_LWR_L", "local_y": -80},
+        {"name": "UT_MOUNT_RR", "frame_node": "RB_LWR_R", "local_y": 80},
+        {"name": "UT_MOUNT_RL", "frame_node": "RB_LWR_L", "local_y": -80},
+    ],
+    "color": "#22c55e",
+    "opacity": 0.70,
+}
+
+# ============================================================
+# DIFFUSER — parametric rear diffuser
+# ============================================================
+
+DIFFUSER_CONFIG = {
+    "enabled": True,
+    "start_x": -895.0,
+    "length": 200.0,
+    "angle": 10.0,
+    "channels": 3,
+    "strake_height": 35.0,
+    "strake_angle": 75.0,
+    "exit_half_width": 390.0,
+    "exit_overhang": 20.0,
+    "mounts": [
+        {"name": "DIFF_MOUNT_R", "frame_node": "RB_LWR_R", "local_y": 80, "local_x": -20},
+        {"name": "DIFF_MOUNT_L", "frame_node": "RB_LWR_L", "local_y": -80, "local_x": -20},
+    ],
+    "color": "#f43f5e",
+    "opacity": 0.60,
 }
 
 # Chassis points are fixed (don't move during kinematics)
