@@ -31,11 +31,17 @@ app = FastAPI(title="FSAE Suspension Solver")
 from geometry import deg as _deg, rad as _rad
 from config import (REAR_PREFIX, DESIGN_PARAMS, DEFAULT_FRAME_NODES, FRAME_TUBES,
                     FRAME_TUBE_COLORS, BODYWORK_FACES, REAR_WING, FRONT_WING,
+                    UNDERTRAY_CONFIG, DIFFUSER_CONFIG,
                     CHASSIS_KEYS, UPRIGHT_KEYS, FLOAT_KEYS)
 
 
 from geometry import (vec3, dist, distance_point_to_line, closest_point_on_line,
                       closest_point_on_circle, enforce_distance, enforce_distance_fixed_q)
+
+# Sweep curve keys (module-level constants, reused per call)
+SWEEP_ANGLE_KEYS = ["camber_deg", "toe_deg", "caster_deg",
+                    "kpi_deg", "scrub_radius_mm", "caster_trail_mm"]
+SWEEP_ROCKER_KEYS = ["rocker_angle_deg", "damper_travel", "motion_ratio"]
 
 # ============================================================
 # KINEMATICS SOLVER — Pure Bump (1-DOF)
@@ -363,9 +369,10 @@ def compute_rocker_kinematics(hp_right, result_right, frame_nodes, prefix=''):
                 break
 
         if not found:
-            # Wide scan for minimum error
+            # Coarse scan for minimum error (fallback: geometry may be
+            # inconsistent — just find the angle that gets closest)
             best, best_e = 0.0, abs(e0)
-            for t_scan in np.linspace(-math.pi, math.pi, 1257):
+            for t_scan in np.linspace(-math.pi, math.pi, 101):
                 e_scan = abs(error(float(t_scan)))
                 if e_scan < best_e:
                     best_e, best = e_scan, float(t_scan)
@@ -717,10 +724,12 @@ from hardpoints import (derive_hardpoints, DEFAULT_HARDPOINTS, DEFAULT_REAR_HARD
 from persistence import (_update_source_file, _delete_tube_from_source,
                            _update_tube_color_in_source, _add_tube_to_source,
                            _add_face_to_source, _delete_face_from_source,
-                           _save_rear_wing_to_source, _save_front_wing_to_source)
+                           _save_rear_wing_to_source, _save_front_wing_to_source,
+                           _save_undertray_to_source, _save_diffuser_to_source)
 from api_models import (SolveRequest, SweepRequest, SavePointRequest,
                         DeleteTubeRequest, TubeColorRequest, AddTubeRequest,
-                        FaceRequest, DeleteFaceRequest, UpdateParamsRequest)
+                        FaceRequest, DeleteFaceRequest, UpdateParamsRequest,
+                        OptimizeFL1Request)
 
 # ============================================================
 # API ENDPOINTS
@@ -776,6 +785,8 @@ async def get_defaults():
         "bodywork": BODYWORK_FACES,
         "rear_wing": REAR_WING,
         "front_wing": FRONT_WING,
+        "undertray": UNDERTRAY_CONFIG,
+        "diffuser": DIFFUSER_CONFIG,
         "params": DESIGN_PARAMS,
     }
 
@@ -804,10 +815,21 @@ def _fix_left_angles(angles_left_raw, angles_right):
     }
 
 
-def _solve_axle(hp_right, wheel_travel, rack_displacement, mirror, frame_nodes=None, polish=False, theta_guess=0.0):
+def _rear_rocker_frame_nodes():
+    """Build rear-specific frame nodes for rocker kinematics.
+    compute_rocker_kinematics expects front-specific node keys; remap rear R_* values."""
+    return {
+        'RK_PIVOT_R': DEFAULT_FRAME_NODES.get('R_RK_PIVOT_R', [0, 0, 0]),
+        'RK_DAMPER_R': DEFAULT_FRAME_NODES.get('R_RK_DAMPER_R', [0, 0, 0]),
+        'DAMPER_CHASSIS_FR': DEFAULT_FRAME_NODES.get('R_DAMPER_CHASSIS_RR', [0, 0, 0]),
+    }
+
+
+def _solve_axle(hp_right, wheel_travel, rack_displacement, mirror, frame_nodes=None, polish=False, theta_guess=0.0, skip_steering=False):
     """Solve one axle (front or rear). Returns {right, left?, angles_right, angles_left?, rocker?}.
     Set polish=True for LS refinement (slower but higher precision, for sweep curves).
-    theta_guess: initial θ for steering solver (continuation from previous bump step)."""
+    theta_guess: initial θ for steering solver (continuation from previous bump step).
+    skip_steering: if True, skip solve_steering — pure bump only (for diagnostic)."""
     if frame_nodes is None:
         frame_nodes = DEFAULT_FRAME_NODES
 
@@ -824,8 +846,11 @@ def _solve_axle(hp_right, wheel_travel, rack_displacement, mirror, frame_nodes=N
     # Step 3: Steering solver — ALWAYS run, even with zero rack displacement.
     # This rotates the upright about kingpin to satisfy the tie rod constraint,
     # which gives the CORRECT bump steer (not the "free" toe from A-arm geometry alone).
-    result_right = solve_steering(merged_right, rack_displacement,
-                                  tie_rod_length=L_tr_design, theta_guess=theta_guess)
+    if skip_steering:
+        result_right = merged_right  # use pure bump result directly
+    else:
+        result_right = solve_steering(merged_right, rack_displacement,
+                                      tie_rod_length=L_tr_design, theta_guess=theta_guess)
 
     result_right_final = _merge_chassis(result_right, hp_right)
     angles_right = compute_alignment_angles(result_right_final, hp=hp_right)
@@ -912,14 +937,10 @@ async def solve(req: SolveRequest):
     # Rear axle
     rear_hp = strip_prefix(dict(req.rear_hardpoints), REAR_PREFIX)
 
-    # Build rear frame nodes for rocker kinematics: override default front
-    # rocker keys with rear-axle positions (same pattern as sweep endpoint).
-    # compute_rocker_kinematics always looks for 'RK_PIVOT_R' etc., so we
-    # remap the rear R_* values into those keys.
-    rear_frame_nodes = dict(DEFAULT_FRAME_NODES)
-    rear_frame_nodes['RK_PIVOT_R'] = DEFAULT_FRAME_NODES.get('R_RK_PIVOT_R', [0, 0, 0])
-    rear_frame_nodes['RK_DAMPER_R'] = DEFAULT_FRAME_NODES.get('R_RK_DAMPER_R', [0, 0, 0])
-    rear_frame_nodes['DAMPER_CHASSIS_FR'] = DEFAULT_FRAME_NODES.get('R_DAMPER_CHASSIS_RR', [0, 0, 0])
+    # Build rear frame nodes for rocker kinematics.
+    # compute_rocker_kinematics always looks for front-specific keys
+    # (RK_PIVOT_R, RK_DAMPER_R, DAMPER_CHASSIS_FR), so remap rear R_* values.
+    rear_frame_nodes = _rear_rocker_frame_nodes()
 
     rr = _solve_axle(rear_hp, rR, 0.0, mirror=False, frame_nodes=rear_frame_nodes)
     if abs(rL - rR) > 1e-6:
@@ -947,58 +968,62 @@ async def solve(req: SolveRequest):
 
 @app.post("/api/sweep")
 async def sweep(req: SweepRequest):
-    """Sweep wheel travel range and return kinematics curves for both axles."""
+    """Sweep wheel travel range and return kinematics curves for both axles.
+    Returns both 'steered' (with tie-rod coupling) and 'pure_bump' (A-arm only) data."""
     travel_values = np.linspace(req.start, req.end, req.steps).tolist()
 
-    angle_keys = ["camber_deg", "toe_deg", "caster_deg",
-                  "kpi_deg", "scrub_radius_mm", "caster_trail_mm"]
-    rocker_keys = ["rocker_angle_deg", "damper_travel", "motion_ratio"]
-
     def sweep_axle(hp, travel_vals, rack, frame_nodes=None):
-        results = {k: [] for k in angle_keys}
-        rocker_curves = {k: [] for k in rocker_keys}
+        results = {k: [] for k in SWEEP_ANGLE_KEYS}
+        pure_results = {k: [] for k in SWEEP_ANGLE_KEYS}
+        rocker_curves = {k: [] for k in SWEEP_ROCKER_KEYS}
         prev_theta = 0.0  # Continuation: pass steering θ from previous step
-        for t in travel_vals:
+        prev_damper = 0.0  # For motion ratio differential
+        for i, t in enumerate(travel_vals):
+            # Steered solve (with tie-rod coupling)
             axle = _solve_axle(dict(hp), float(t), rack, mirror=False,
-                               frame_nodes=frame_nodes, polish=False,
+                               frame_nodes=frame_nodes, polish=True,
                                theta_guess=prev_theta)
-            prev_theta = axle.get("steering_theta", 0.0)  # for next step
+            prev_theta = axle.get("steering_theta", 0.0)
             angles = axle["angles_right"]
-            for k in angle_keys:
+            for k in SWEEP_ANGLE_KEYS:
                 results[k].append(round(angles.get(k, 0.0), 6))
+
+            # Pure bump solve (no tie-rod coupling) — for diagnostic
+            axle_bump = _solve_axle(dict(hp), float(t), 0.0, mirror=False,
+                                    frame_nodes=frame_nodes, polish=True,
+                                    skip_steering=True)
+            angles_bump = axle_bump["angles_right"]
+            for k in SWEEP_ANGLE_KEYS:
+                pure_results[k].append(round(angles_bump.get(k, 0.0), 6))
+
             # Rocker kinematics
             rocker = axle.get("rocker_right")
             if rocker:
                 rocker_curves["rocker_angle_deg"].append(rocker["rocker_angle_deg"])
                 rocker_curves["damper_travel"].append(rocker["damper_travel"])
-                # Motion ratio = damper_travel / wheel_travel (instantaneous)
-                if abs(t) > 0.1:
-                    rocker_curves["motion_ratio"].append(round(rocker["damper_travel"] / float(t), 4))
+                # Motion ratio via differential (avoid division near t=0)
+                if i > 0:
+                    dt = float(t) - float(travel_vals[i - 1])
+                    dd = rocker["damper_travel"] - prev_damper
+                    if abs(dt) > 1e-6:
+                        rocker_curves["motion_ratio"].append(round(dd / dt, 4))
+                    else:
+                        rocker_curves["motion_ratio"].append(None)
                 else:
-                    rocker_curves["motion_ratio"].append(None)  # near t=0, ratio diverges
+                    rocker_curves["motion_ratio"].append(None)
+                prev_damper = rocker["damper_travel"]
             else:
-                for k in rocker_keys:
+                for k in SWEEP_ROCKER_KEYS:
                     rocker_curves[k].append(None)
+                prev_damper = 0.0
         results.update(rocker_curves)
+        results["pure_bump"] = pure_results
         return results
 
     front_data = sweep_axle(req.front_hardpoints, travel_values, req.rack_displacement,
                             frame_nodes=DEFAULT_FRAME_NODES)
     rear_hp = strip_prefix(dict(req.rear_hardpoints), REAR_PREFIX)
-    # Use prefixed frame nodes for rear rocker kinematics
-    rear_frame_nodes = {}
-    for k, v in DEFAULT_FRAME_NODES.items():
-        if k.startswith('R_'):
-            rear_frame_nodes[k] = v
-        elif not any(k.startswith(p) for p in ['RK_', 'DAMPER_CHASSIS_']):
-            pass
-        else:
-            # Front-specific frame nodes, skip for rear
-            pass
-    # Build rear rocker frame nodes manually
-    rear_frame_nodes['RK_PIVOT_R'] = DEFAULT_FRAME_NODES.get('R_RK_PIVOT_R', [0, 0, 0])
-    rear_frame_nodes['RK_DAMPER_R'] = DEFAULT_FRAME_NODES.get('R_RK_DAMPER_R', [0, 0, 0])
-    rear_frame_nodes['DAMPER_CHASSIS_FR'] = DEFAULT_FRAME_NODES.get('R_DAMPER_CHASSIS_RR', [0, 0, 0])
+    rear_frame_nodes = _rear_rocker_frame_nodes()
     rear_data = sweep_axle(rear_hp, travel_values, 0.0, frame_nodes=rear_frame_nodes)
 
     return {
@@ -1006,6 +1031,137 @@ async def sweep(req: SweepRequest):
         "front": front_data,
         "rear": rear_data,
     }
+
+
+# ============================================================
+# FL1 OPTIMIZER — minimize bump steer by finding optimal tie-rod inner point
+# ============================================================
+
+def _evaluate_bump_steer(hp, fl1_candidate, travel_vals, rack=0.0):
+    """Evaluate total toe change (bump steer) for a given FL1 position.
+    Returns sum of squared toe deviation from zero across all travel steps."""
+    hp_test = dict(hp)
+    hp_test["FL1"] = list(fl1_candidate)
+    # Recompute tie rod length for this FL1
+    L_tr = float(dist(np.array(hp_test["UP3"]), fl1_candidate))
+
+    toe_vals = []
+    prev_theta = 0.0
+    for t in travel_vals:
+        bump_result = solve_bump(hp_test, float(t), polish=False)
+        merged = _merge_chassis(bump_result, hp_test)
+        steer_result = solve_steering(merged, rack, tie_rod_length=L_tr, theta_guess=prev_theta)
+        prev_theta = steer_result.get("steering_theta", 0.0)
+        final = _merge_chassis(steer_result, hp_test)
+        angles = compute_alignment_angles(final, hp=hp_test)
+        toe_vals.append(angles.get("toe_deg", 0.0))
+
+    # Objective: minimize toe variation (sum of squares)
+    toe_arr = np.array(toe_vals)
+    return float(np.sum(toe_arr ** 2)), toe_vals
+
+
+@app.post("/api/optimize_fl1")
+async def optimize_fl1(req: OptimizeFL1Request):
+    """Find optimal FL1 (tie-rod inner point) position to minimize bump steer.
+    Uses scipy minimize with bounded search around current FL1 position."""
+    if not HAS_SCIPY:
+        raise HTTPException(status_code=500, detail="scipy not available")
+
+    # Select axle hardpoints
+    if req.axle == "front":
+        hp = dict(DEFAULT_HARDPOINTS)
+    elif req.axle == "rear":
+        hp = strip_prefix(dict(DEFAULT_REAR_HARDPOINTS), REAR_PREFIX)
+    else:
+        raise HTTPException(status_code=400, detail="axle must be 'front' or 'rear'")
+
+    current_fl1 = np.array(hp["FL1"])
+    travel_vals = np.linspace(req.travel_start, req.travel_end, req.travel_steps).tolist()
+
+    # Search bounds: ±80mm around current FL1 in Y and Z (X stays fixed)
+    y_margin = 80.0
+    z_margin = 80.0
+    bounds = [
+        (current_fl1[0] - 5, current_fl1[0] + 5),   # X: nearly fixed
+        (current_fl1[1] - y_margin, current_fl1[1] + y_margin),  # Y: ±40mm
+        (current_fl1[2] - z_margin, current_fl1[2] + z_margin),  # Z: ±40mm
+    ]
+
+    # Also evaluate current position for comparison
+    current_score, current_toe = _evaluate_bump_steer(hp, current_fl1, travel_vals)
+
+    from scipy.optimize import minimize
+
+    best_result = None
+    best_score = float('inf')
+
+    def objective(x):
+        nonlocal best_result, best_score
+        fl1 = np.array(x)
+        score, _ = _evaluate_bump_steer(hp, fl1, travel_vals)
+        if score < best_score:
+            best_score = score
+            best_result = fl1.copy()
+        return score
+
+    # Multi-start optimization: try from current position + grid of starting points
+    starts = [current_fl1.tolist()]
+    for dy in [-40, -20, 0, 20, 40]:
+        for dz in [-40, -20, 0, 20, 40]:
+            if dy == 0 and dz == 0:
+                continue
+            starts.append([current_fl1[0], current_fl1[1] + dy, current_fl1[2] + dz])
+
+    for x0 in starts:
+        try:
+            result = minimize(objective, x0, method='L-BFGS-B', bounds=bounds,
+                            options={'maxiter': 100, 'ftol': 1e-10})
+        except Exception:
+            continue
+
+    if best_result is None:
+        raise HTTPException(status_code=500, detail="Optimization failed")
+
+    # Evaluate the optimized position
+    opt_score, opt_toe = _evaluate_bump_steer(hp, best_result, travel_vals)
+
+    # Compute improvement
+    current_toe_range = max(current_toe) - min(current_toe)
+    opt_toe_range = max(opt_toe) - min(opt_toe)
+
+    return {
+        "axle": req.axle,
+        "current_fl1": current_fl1.tolist(),
+        "optimized_fl1": best_result.tolist(),
+        "delta_mm": (best_result - current_fl1).tolist(),
+        "current_toe_range_deg": round(current_toe_range, 4),
+        "optimized_toe_range_deg": round(opt_toe_range, 4),
+        "improvement_pct": round((1 - opt_toe_range / max(current_toe_range, 1e-9)) * 100, 1),
+        "current_toe_curve": [round(v, 4) for v in current_toe],
+        "optimized_toe_curve": [round(v, 4) for v in opt_toe],
+        "travel": [round(v, 1) for v in travel_vals],
+    }
+
+
+# ============================================================
+# TUBE MATCHING HELPER
+# ============================================================
+
+def _find_tube_index(endpoints):
+    """Find index of a tube by its endpoint list, or None if not found."""
+    n = len(endpoints)
+    for i, tube in enumerate(FRAME_TUBES):
+        if len(tube) != n:
+            continue
+        if n == 2:
+            if (tube[0] == endpoints[0] and tube[1] == endpoints[1]) or \
+               (tube[0] == endpoints[1] and tube[1] == endpoints[0]):
+                return i
+        else:
+            if all(tube[j] == endpoints[j] for j in range(n)):
+                return i
+    return None
 
 
 # ============================================================
@@ -1085,26 +1241,11 @@ async def save_point(req: SavePointRequest):
 @app.post("/api/delete_tube")
 async def delete_tube(req: DeleteTubeRequest):
     """Remove a tube from FRAME_TUBES. If permanent, also remove from main.py."""
-    pts = req.endpoints
+    tube_idx = _find_tube_index(req.endpoints)
+    if tube_idx is None:
+        raise HTTPException(status_code=404, detail=f"Tube {req.endpoints} not found")
 
-    # Find and remove from in-memory FRAME_TUBES
-    removed = False
-    for i, tube in enumerate(FRAME_TUBES):
-        if len(tube) != len(pts):
-            continue
-        if len(pts) == 2:
-            if (tube[0] == pts[0] and tube[1] == pts[1]) or (tube[0] == pts[1] and tube[1] == pts[0]):
-                FRAME_TUBES.pop(i)
-                removed = True
-                break
-        else:
-            if all(tube[j] == pts[j] for j in range(len(pts))):
-                FRAME_TUBES.pop(i)
-                removed = True
-                break
-
-    if not removed:
-        raise HTTPException(status_code=404, detail=f"Tube {pts} not found")
+    FRAME_TUBES.pop(tube_idx)
 
     permanent = False
     if req.permanent:
@@ -1124,21 +1265,9 @@ async def delete_tube(req: DeleteTubeRequest):
 
 @app.post("/api/save_tube_color")
 async def save_tube_color(req: TubeColorRequest):
-    pts = req.endpoints
-    tube_idx = None
-    for i, tube in enumerate(FRAME_TUBES):
-        if len(tube) != len(pts):
-            continue
-        if len(pts) == 2:
-            if (tube[0] == pts[0] and tube[1] == pts[1]) or (tube[0] == pts[1] and tube[1] == pts[0]):
-                tube_idx = i
-                break
-        else:
-            if all(tube[j] == pts[j] for j in range(len(pts))):
-                tube_idx = i
-                break
+    tube_idx = _find_tube_index(req.endpoints)
     if tube_idx is None:
-        raise HTTPException(status_code=404, detail=f"Tube {pts} not found")
+        raise HTTPException(status_code=404, detail=f"Tube {req.endpoints} not found")
     FRAME_TUBE_COLORS[tube_idx] = req.color
     permanent = _update_tube_color_in_source(req.endpoints, req.color) if req.permanent else False
     return {"ok": True, "tube_index": tube_idx, "color": req.color, "permanent": permanent}
@@ -1149,16 +1278,8 @@ async def add_tube(req: AddTubeRequest):
     pts = req.endpoints
     if len(pts) < 2:
         raise HTTPException(status_code=400, detail="Need at least 2 points")
-    # Check for duplicate
-    for tube in FRAME_TUBES:
-        if len(tube) != len(pts):
-            continue
-        if len(pts) == 2:
-            if (tube[0] == pts[0] and tube[1] == pts[1]) or (tube[0] == pts[1] and tube[1] == pts[0]):
-                raise HTTPException(status_code=400, detail=f"Tube {pts} already exists")
-        else:
-            if all(tube[i] == pts[i] for i in range(len(pts))):
-                raise HTTPException(status_code=400, detail=f"Tube {pts} already exists")
+    if _find_tube_index(pts) is not None:
+        raise HTTPException(status_code=400, detail=f"Tube {pts} already exists")
     FRAME_TUBES.append(pts)
     new_idx = len(FRAME_TUBES) - 1
     if req.color != "#8899cc":
@@ -1234,6 +1355,34 @@ async def save_front_wing(request: Request):
 
 
 # ============================================================
+# SAVE UNDERTRAY
+# ============================================================
+
+@app.post("/api/save_undertray")
+async def save_undertray(request: Request):
+    """Persist UNDERTRAY_CONFIG back to config.py and update in-memory."""
+    config = await request.json()
+    UNDERTRAY_CONFIG.clear()
+    UNDERTRAY_CONFIG.update(config)
+    permanent = _save_undertray_to_source(UNDERTRAY_CONFIG)
+    return {"ok": True, "permanent": permanent}
+
+
+# ============================================================
+# SAVE DIFFUSER
+# ============================================================
+
+@app.post("/api/save_diffuser")
+async def save_diffuser(request: Request):
+    """Persist DIFFUSER_CONFIG back to config.py and update in-memory."""
+    config = await request.json()
+    DIFFUSER_CONFIG.clear()
+    DIFFUSER_CONFIG.update(config)
+    permanent = _save_diffuser_to_source(DIFFUSER_CONFIG)
+    return {"ok": True, "permanent": permanent}
+
+
+# ============================================================
 # UPDATE PARAMS
 # ============================================================
 
@@ -1270,10 +1419,10 @@ async def update_params(req: UpdateParamsRequest):
 # STATIC FILES
 # ============================================================
 
-@app.get("/")
-async def root():
-    static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "web")
-    return FileResponse(os.path.join(static_dir, "index.html"))
+web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "web")
+
+# Mount static files — html=True serves index.html for directory requests
+app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
 
 
 # ============================================================
