@@ -238,6 +238,16 @@ def _save_front_wing_to_source(fw_config):
     return _save_wing_to_source('FRONT_WING', fw_config)
 
 
+def _save_undertray_to_source(ut_config):
+    """Rewrite the entire UNDERTRAY_CONFIG dict in config.py source."""
+    return _save_wing_to_source('UNDERTRAY_CONFIG', ut_config)
+
+
+def _save_diffuser_to_source(df_config):
+    """Rewrite the entire DIFFUSER_CONFIG dict in config.py source."""
+    return _save_wing_to_source('DIFFUSER_CONFIG', df_config)
+
+
 def _format_py_val(v, indent=0):
     """Format a Python value with 4-space indent, double-quoted strings."""
     sp = '    ' * indent
