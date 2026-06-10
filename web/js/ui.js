@@ -149,8 +149,8 @@ export function rebuildScene() {
         buildBodyworkFaces();
         buildRearWing();
         buildFrontWing();
-        buildUndertray();
-        buildDiffuser();
+        try { buildUndertray(); } catch (e) { console.error('buildUndertray failed:', e); }
+        try { buildDiffuser(); } catch (e) { console.error('buildDiffuser failed:', e); }
         buildDamperCylinders();
         renderFacesPanel();
         renderRearWingPanel();
