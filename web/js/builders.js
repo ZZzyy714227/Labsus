@@ -534,63 +534,188 @@ export function buildUndertray() {
     const color = cfg.color || '#22c55e';
     const opacity = cfg.opacity ?? 0.70;
     const totalLen = frontX - rearX;
-
-    // --- 1. Floor panel surface ---
-    const nSamples = 24;
-    const profilePts = [];
-    for (let i = 0; i <= nSamples; i++) {
-        const t = i / nSamples;
-        const x = frontX - t * totalLen;
-        profilePts.push({ x, t });
-    }
-
-    const geo = new THREE.BufferGeometry();
-    const verts = [];
-    const indices = [];
-    const nLateral = 8;
-    for (let i = 0; i < profilePts.length; i++) {
-        const p = profilePts[i];
-        for (let j = 0; j <= nLateral; j++) {
-            const latT = j / nLateral;
-            const y = -hw + latT * 2 * hw;
-            let z = gc;
-            const yRatio = Math.abs(y) / hw;
-            if (p.t >= vStart && p.t <= vEnd) {
-                const centerFactor = 1.0 - yRatio;
-                const localT = (p.t - vStart) / (vEnd - vStart);
-                z = gc - vDepth * Math.sin(localT * Math.PI) * centerFactor;
-            }
-            verts.push(p.x, y, z);
-        }
-    }
-    const stride = nLateral + 1;
-    for (let i = 0; i < profilePts.length - 1; i++) {
-        for (let j = 0; j < nLateral; j++) {
-            const a = i * stride + j;
-            const b = a + 1;
-            const c = (i + 1) * stride + j;
-            const d = c + 1;
-            indices.push(a, c, b, b, c, d);
-        }
-    }
-    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
-    geo.setIndex(indices);
-    geo.computeVertexNormals();
-
-    const pos = geo.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-        const wp = chassisTransform([pos.getX(i), pos.getY(i), pos.getZ(i)]);
-        pos.setXYZ(i, ...wp);
-    }
-    geo.computeVertexNormals();
+    const thick = 3; // panel thickness (mm)
+    const edgeRailH = 10; // edge rail height (mm)
+    const splitterH = 12; // front splitter lip height (mm)
 
     const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.1, transparent: true, opacity, side: THREE.DoubleSide });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.userData = { aeroType: 'undertray_panel' };
-    state.scene.add(mesh);
-    uobj.meshes.push(mesh);
+    const matDetail = new THREE.MeshStandardMaterial({ color: '#16a34a', roughness: 0.4, metalness: 0.2, transparent: true, opacity: opacity * 0.85, side: THREE.DoubleSide });
+    const matDark = new THREE.MeshStandardMaterial({ color: '#0f4c2a', roughness: 0.6, metalness: 0.05, transparent: true, opacity: opacity * 0.9, side: THREE.DoubleSide });
 
-    // --- 2. Edge flip-ups ---
+    // Helper: compute Z for a given position (x ratio, y ratio)
+    function computeZ(t, yRatio) {
+        let z = gc;
+        if (t >= vStart && t <= vEnd) {
+            const centerFactor = 1.0 - yRatio;
+            const localT = (t - vStart) / (vEnd - vStart);
+            z = gc - vDepth * Math.sin(localT * Math.PI) * centerFactor;
+        }
+        return z;
+    }
+
+    // Helper: build and add a mesh from raw verts/indices, applying chassisTransform
+    function addMesh(verts, indices, material, userData) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
+        geo.setIndex(indices);
+        geo.computeVertexNormals();
+        const pos = geo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+            const wp = chassisTransform([pos.getX(i), pos.getY(i), pos.getZ(i)]);
+            pos.setXYZ(i, ...wp);
+        }
+        geo.computeVertexNormals();
+        const mesh = new THREE.Mesh(geo, material);
+        mesh.userData = userData;
+        state.scene.add(mesh);
+        uobj.meshes.push(mesh);
+        return mesh;
+    }
+
+    // --- 1. TOP surface (with venturi dip) ---
+    const nLong = 24, nLat = 10;
+    const topVerts = [], topIdx = [];
+    for (let i = 0; i <= nLong; i++) {
+        const t = i / nLong;
+        const x = frontX - t * totalLen;
+        for (let j = 0; j <= nLat; j++) {
+            const latT = j / nLat;
+            const y = -hw + latT * 2 * hw;
+            const yRatio = Math.abs(y) / hw;
+            const z = computeZ(t, yRatio);
+            topVerts.push(x, y, z);
+        }
+    }
+    const topStride = nLat + 1;
+    for (let i = 0; i < nLong; i++) {
+        for (let j = 0; j < nLat; j++) {
+            const a = i * topStride + j, b = a + 1;
+            const c = (i + 1) * topStride + j, d = c + 1;
+            topIdx.push(a, c, b, b, c, d);
+        }
+    }
+    addMesh(topVerts, topIdx, mat, { aeroType: 'undertray_panel' });
+
+    // --- 2. BOTTOM surface (flat, at gc - thick) ---
+    const botZ = gc - thick - vDepth * 0.3; // bottom has slight venturi echo
+    const botVerts = [], botIdx = [];
+    for (let i = 0; i <= nLong; i++) {
+        const t = i / nLong;
+        const x = frontX - t * totalLen;
+        for (let j = 0; j <= nLat; j++) {
+            const latT = j / nLat;
+            const y = -hw + latT * 2 * hw;
+            // Bottom surface: slight echo of venturi shape but less deep
+            let z = gc - thick;
+            if (t >= vStart && t <= vEnd) {
+                const localT = (t - vStart) / (vEnd - vStart);
+                z = gc - thick - vDepth * 0.15 * Math.sin(localT * Math.PI);
+            }
+            botVerts.push(x, y, z);
+        }
+    }
+    for (let i = 0; i < nLong; i++) {
+        for (let j = 0; j < nLat; j++) {
+            const a = i * topStride + j, b = a + 1;
+            const c = (i + 1) * topStride + j, d = c + 1;
+            // Reverse winding for bottom face
+            botIdx.push(a, b, c, b, d, c);
+        }
+    }
+    addMesh(botVerts, botIdx, matDark, { aeroType: 'undertray_bottom' });
+
+    // --- 3. SIDE EDGE STRIPS (connecting top to bottom, with raised rail) ---
+    const railVerts = [], railIdx = [];
+    for (let side = 0; side < 2; side++) {
+        const baseY = side === 0 ? hw : -hw;
+        const railTopZ = gc + edgeRailH; // raised edge rail above top surface
+        for (let i = 0; i <= nLong; i++) {
+            const t = i / nLong;
+            const x = frontX - t * totalLen;
+            const yRatio = 1.0; // at the edge, venturi effect is zero
+            const topZ = computeZ(t, yRatio);
+            // 4 vertices per cross-section: outer top, inner top, inner bottom, outer bottom
+            railVerts.push(x, baseY, railTopZ);       // outer rail top (above panel)
+            railVerts.push(x, baseY, topZ);            // inner panel top
+            railVerts.push(x, baseY, topZ - thick);   // inner panel bottom
+        }
+    }
+    // Each side: 3 * nLong quads = 6 * nLong triangles
+    const railStride = 3; // 3 verts per longitudinal step per side
+    const sideOffset = (nLong + 1) * railStride; // second side starts here
+    for (let side = 0; side < 2; side++) {
+        const off = side * sideOffset;
+        for (let i = 0; i < nLong; i++) {
+            // Rail strip (outer rail top → inner top)
+            const a = off + i * railStride, b = off + i * railStride + 1;
+            const c = off + (i + 1) * railStride, d = off + (i + 1) * railStride + 1;
+            railIdx.push(a, c, b, b, c, d);
+            // Panel thickness strip (inner top → inner bottom)
+            const e = off + i * railStride + 1, f = off + i * railStride + 2;
+            const g = off + (i + 1) * railStride + 1, h2 = off + (i + 1) * railStride + 2;
+            railIdx.push(e, g, f, f, g, h2);
+        }
+    }
+    addMesh(railVerts, railIdx, matDetail, { aeroType: 'undertray_edge_rail' });
+
+    // --- 4. FRONT SPLITTER LIP ---
+    const lipVerts = [], lipIdx = [];
+    const lipTop = gc + splitterH, lipBot = gc;
+    // Quad strip along front edge
+    lipVerts.push(frontX, -hw, gc + edgeRailH);  // rail top
+    lipVerts.push(frontX, hw, gc + edgeRailH);
+    lipVerts.push(frontX, hw, lipBot);
+    lipVerts.push(frontX, -hw, lipBot);
+    lipIdx.push(0, 1, 3, 1, 2, 3);
+    // Inner splitter wall (angled back)
+    const lipBackX = frontX - 15;
+    lipVerts.push(lipBackX, -hw, lipTop);
+    lipVerts.push(lipBackX, hw, lipTop);
+    lipVerts.push(lipBackX, hw, gc);
+    lipVerts.push(lipBackX, -hw, gc);
+    lipIdx.push(4, 5, 7, 5, 6, 7);
+    // Top splitter surface connecting front to back
+    lipVerts.push(frontX, -hw, lipTop);
+    lipVerts.push(frontX, hw, lipTop);
+    lipIdx.push(8, 4, 9, 9, 4, 5);
+    addMesh(lipVerts, lipIdx, matDetail, { aeroType: 'undertray_splitter' });
+
+    // --- 5. REAR CLOSURE STRIP ---
+    const rearVerts = [], rearIdx = [];
+    rearVerts.push(rearX, -hw, gc + edgeRailH);
+    rearVerts.push(rearX, hw, gc + edgeRailH);
+    rearVerts.push(rearX, hw, gc - thick);
+    rearVerts.push(rearX, -hw, gc - thick);
+    rearIdx.push(0, 1, 3, 1, 2, 3);
+    addMesh(rearVerts, rearIdx, matDetail, { aeroType: 'undertray_rear_closure' });
+
+    // --- 6. VENTURI CHANNEL WALLS ---
+    if (vDepth > 2) {
+        const ventStartX = frontX - vStart * totalLen;
+        const ventEndX = frontX - vEnd * totalLen;
+        for (let side = 0; side < 2; side++) {
+            const wallY = side === 0 ? hw * 0.6 : -hw * 0.6; // channel wall at 60% of half_width
+            const vWallVerts = [], vWallIdx = [];
+            const vWallSamples = 12;
+            for (let i = 0; i <= vWallSamples; i++) {
+                const t = i / vWallSamples;
+                const x = ventStartX + t * (ventEndX - ventStartX);
+                const localT = t;
+                const dip = vDepth * Math.sin(localT * Math.PI) * 0.7;
+                // Top of wall (at panel surface Z, slightly raised)
+                vWallVerts.push(x, wallY, gc + 2);
+                // Bottom of wall (following venturi dip)
+                vWallVerts.push(x, wallY, gc - dip);
+            }
+            for (let i = 0; i < vWallSamples; i++) {
+                const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+                vWallIdx.push(a, c, b, b, c, d);
+            }
+            addMesh(vWallVerts, vWallIdx, matDetail, { aeroType: 'undertray_venturi_wall' });
+        }
+    }
+
+    // --- 7. Edge flip-ups ---
     for (const fu of (cfg.edge_flipups || [])) {
         const isRight = fu.side === 'right';
         const ySign = isRight ? 1 : -1;
@@ -627,14 +752,13 @@ export function buildUndertray() {
             fuPos.setXYZ(i, ...wp);
         }
         fuGeo.computeVertexNormals();
-        const fuMat = new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.15, transparent: true, opacity: opacity * 0.9, side: THREE.DoubleSide });
-        const fuMesh = new THREE.Mesh(fuGeo, fuMat);
+        const fuMesh = new THREE.Mesh(fuGeo, matDetail);
         fuMesh.userData = { aeroType: 'undertray_flipup', name: fu.name };
         state.scene.add(fuMesh);
         uobj.flipups.push(fuMesh);
     }
 
-    // --- 3. Underfloor strakes ---
+    // --- 8. Underfloor strakes ---
     for (const sk of (cfg.strakes || [])) {
         const isRight = sk.side === 'right';
         const ySign = isRight ? 1 : -1;
@@ -652,11 +776,12 @@ export function buildUndertray() {
             const x = startX - t * (startX - endX);
             const taper = Math.sin(t * Math.PI);
             const h = skH * taper;
-            skVerts.push(x, skY, gc);
-            // Strakes hang DOWNWARD from floor surface toward ground
+            // Top edge (attached to floor surface)
+            skVerts.push(x, skY, gc - thick);
+            // Bottom edge (hanging downward toward ground)
             const yOff = ySign * h * Math.cos(skAngle);
             const zOff = h * Math.sin(skAngle);
-            skVerts.push(x, skY + yOff, Math.max(gc - zOff, 5));
+            skVerts.push(x, skY + yOff, Math.max(gc - thick - zOff, 5));
         }
         for (let i = 0; i < skSamples; i++) {
             const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
@@ -672,14 +797,13 @@ export function buildUndertray() {
             skPos.setXYZ(i, ...wp);
         }
         skGeo.computeVertexNormals();
-        const skMat = new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.15, transparent: true, opacity: opacity * 0.85, side: THREE.DoubleSide });
-        const skMesh = new THREE.Mesh(skGeo, skMat);
+        const skMesh = new THREE.Mesh(skGeo, matDetail);
         skMesh.userData = { aeroType: 'undertray_strake', name: sk.name };
         state.scene.add(skMesh);
         uobj.strakes.push(skMesh);
     }
 
-    // --- 4. Mounts ---
+    // --- 9. Mounts ---
     for (const m of (cfg.mounts || [])) {
         const fn = m.frame_node;
         const isRight = (m.local_y ?? 0) >= 0;
