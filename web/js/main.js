@@ -3,7 +3,6 @@ import { solveAndUpdate, requestSolve, loadDefaults, mirrorHardpoints, readHardp
 import { rebuildScene, applyToUI, renderParamSliders, updateChassisMode, updateChassisDisplay, onChassisSliderInput, applyParams } from './ui.js';
 import { onDoubleClick, addMultiSelect, clearMultiSelect, addTubeFromSelection, savePoint, deleteTube, saveTubePermanent, saveTubeColor, createFace, deleteFace, updateFace } from './interactions.js';
 import { loadKinCurves, updateKinChart } from './chart.js';
-import { playbackTick } from './playback.js';
 
 // ============================================================
 // INITIALIZATION
@@ -34,7 +33,6 @@ function init() {
 
 function animate() {
     requestAnimationFrame(animate);
-    playbackTick(performance.now());
     state.controls.update();
     state.renderer.render(state.scene, state.camera);
 }
