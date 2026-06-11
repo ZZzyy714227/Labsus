@@ -218,9 +218,9 @@ document.getElementById('runSimBtn')?.addEventListener('click', async () => {
     const duration = parseFloat(document.getElementById('simDuration').value) || 5;
     if (pathPts.length < 2) { alert('至少需要 2 个路径点'); return; }
 
-    // Store params for sim-view window
+    // Store params for sim-view window (use localStorage — shared across tabs/windows)
     const simParams = { path: pathPts, obstacles, speed, duration };
-    sessionStorage.setItem('simParams', JSON.stringify(simParams));
+    localStorage.setItem('simParams', JSON.stringify(simParams));
 
     // Compute trajectory (for path preview on dev page, and to store for sim-view)
     renderPathLine(pathPts);
@@ -229,7 +229,7 @@ document.getElementById('runSimBtn')?.addEventListener('click', async () => {
     document.getElementById('simStatus').textContent = '⏳ 模拟计算中...';
     await simulate(simParams);
     if (state.trajectory) {
-        sessionStorage.setItem('simTrajectory', JSON.stringify(state.trajectory));
+        localStorage.setItem('simTrajectory', JSON.stringify(state.trajectory));
     }
     document.getElementById('simStatus').textContent = '✅ 已就绪，打开演示窗口';
 
