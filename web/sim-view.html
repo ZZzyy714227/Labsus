@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FSAE 赛道演示</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          accent: '#FC7607', 'accent2':'#D83514',
+          panel: '#1F1612', card: '#2A1F18',
+          border: '#3A2A20', muted: '#8B7355', dim: '#A88B6F',
+        }
+      }
+    }
+  }
+</script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<link rel="stylesheet" href="style.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #1F1612; height: 100vh; overflow: hidden; font-family: 'Inter','SF Pro Display',system-ui,sans-serif; }
+  #simViewport { width: 100vw; height: 100vh; display: block; }
+  #simViewport canvas { display: block; }
+
+  /* HUD overlay */
+  #hud {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(31,22,18,0.95));
+    padding: 20px 24px 16px;
+    pointer-events: none;
+  }
+  #hud > * { pointer-events: auto; }
+  #hudTop {
+    position: fixed; top: 0; left: 0; right: 0;
+    padding: 12px 20px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    background: linear-gradient(rgba(31,22,18,0.85), transparent);
+  }
+  .hud-title { font-size: 1.1rem; font-weight: 600; color: #FDF6E3; letter-spacing: 0.5px; }
+  .hud-sub { font-size: 0.7rem; color: #A88B6F; }
+  .hud-info { font-size: 0.75rem; color: #FDF6E3; font-family: monospace; }
+
+  /* Playback controls */
+  #playbackBar {
+    display: flex; align-items: center; gap: 10px;
+    max-width: 700px; margin: 0 auto;
+  }
+  #playbackBar button {
+    background: rgba(60,42,32,0.7); border: 1px solid #3A2A20; border-radius: 6px;
+    color: #FDF6E3; cursor: pointer; font-size: 0.75rem; padding: 6px 12px;
+    transition: all 0.15s; backdrop-filter: blur(4px);
+  }
+  #playbackBar button:hover { background: #5A4030; }
+  #playbackBar .active { background: #FC7607 !important; border-color: #FC7607; color: #1F1612; }
+  #playbackBar input[type=range] { flex: 1; height: 4px; accent-color: #FC7607; }
+  #statusText { font-size: 0.65rem; color: #8B7355; min-width: 100px; text-align: right; }
+
+  /* Dashboard overlay */
+  #dashOverlay {
+    position: fixed; right: 16px; top: 56px; width: 260px;
+    pointer-events: none;
+  }
+  #dashOverlay > * { pointer-events: auto; }
+  .dash-card {
+    background: rgba(31,22,18,0.85); border: 1px solid #3A2A20; border-radius: 8px;
+    padding: 8px 10px; margin-bottom: 6px; backdrop-filter: blur(4px);
+  }
+  .dash-card h4 { font-size: 0.6rem; color: #A88B6F; margin-bottom: 4px; }
+
+  #dashOverlay canvas { width: 100% !important; height: 80px !important; }
+
+  .badge {
+    display: inline-block; background: #2A1F18; border: 1px solid #3A2A20;
+    border-radius: 4px; padding: 1px 6px; font-size: 0.6rem; color: #FDF6E3; margin: 0 1px;
+  }
+</style>
+</head>
+<body>
+
+<div id="simViewport"></div>
+
+<!-- HUD top -->
+<div id="hudTop">
+  <div>
+    <div class="hud-title">🏎 FSAE 赛道演示</div>
+    <div class="hud-sub">拖拽旋转 · 滚轮缩放 · 右键平移</div>
+  </div>
+  <div class="flex items-center gap-3">
+    <span class="hud-info" id="hudTime">0.00s</span>
+    <span class="hud-info" id="hudSpeed">00 km/h</span>
+  </div>
+</div>
+
+<!-- Dashboard overlay -->
+<div id="dashOverlay">
+  <div class="dash-card">
+    <h4>📐 车体姿态</h4>
+    <canvas id="attitudeMiniChart"></canvas>
+  </div>
+  <div class="dash-card">
+    <h4>⚙ 悬架角度</h4>
+    <canvas id="angleMiniChart"></canvas>
+  </div>
+  <div class="dash-card" id="liveData">
+    <h4>📊 实时数据</h4>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;font-size:0.6rem;">
+      <span class="text-[#8B7355]">Camber FL/FR</span>
+      <span class="text-[#FDF6E3] text-right" id="valCamber"><span style="color:#FC7607">--</span> / <span style="color:#D83514">--</span></span>
+      <span class="text-[#8B7355]">Toe FL/FR</span>
+      <span class="text-[#FDF6E3] text-right" id="valToe">-- / --</span>
+      <span class="text-[#8B7355]">Roll / Pitch</span>
+      <span class="text-[#FDF6E3] text-right" id="valRP">-- / --</span>
+    </div>
+  </div>
+</div>
+
+<!-- HUD bottom -->
+<div id="hud">
+  <div id="playbackBar">
+    <button id="btnPlay" title="播放/暂停">▶</button>
+    <button id="btnReset" title="重置">⟳</button>
+    <input type="range" id="seekSlider" min="0" max="1" value="0" step="0.001">
+    <span id="statusText">就绪</span>
+    <button id="btnSpeed" class="active">1×</button>
+    <button id="btnCam" title="切换视角">🎥</button>
+  </div>
+</div>
+
+<script type="module" src="js/sim-view.js"></script>
+</body>
+</html>

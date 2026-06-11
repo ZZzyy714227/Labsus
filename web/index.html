@@ -349,34 +349,9 @@
                class="dyn-input w-full text-right mt-0.5">
       </div>
       <button id="runSimBtn" class="bg-[#FC7607] hover:bg-[#D83514] text-[#FDF6E3] text-[0.6rem] px-3 py-1 rounded transition-colors w-full">
-        ▶ 开始模拟
+        ▶ 在新窗口跑赛道
       </button>
-
-      <!-- 回放控件 (initially hidden) -->
-      <div id="playbackControls" style="display:none;">
-        <span class="text-[0.55rem] text-dim">⏯ 回放</span>
-        <div class="flex items-center gap-1 mt-0.5">
-          <button id="playPauseBtn" class="dyn-btn text-xs w-7 h-5 flex items-center justify-center">▶</button>
-          <input id="playbackSeek" type="range" min="0" max="1" value="0" step="0.01"
-                 class="flex-1 h-1 accent-[#FC7607]">
-        </div>
-        <div class="flex justify-between text-[0.5rem] mt-0.5">
-          <span id="playbackTime" class="text-dim">0.00s / 0.00s</span>
-          <div class="flex gap-0.5">
-            <button id="speed05Btn" class="dyn-btn-xs">0.5x</button>
-            <button id="speed1Btn" class="dyn-btn-xs dyn-active">1x</button>
-            <button id="speed2Btn" class="dyn-btn-xs">2x</button>
-            <button id="loopToggleBtn" class="dyn-btn-xs dyn-active">🔁</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 仪表盘 (initially hidden) -->
-      <div id="dashboardCharts" style="display:none;">
-        <span class="text-[0.55rem] text-dim">📊 实时数据</span>
-        <div class="mt-0.5" style="height:100px;"><canvas id="attitudeChart"></canvas></div>
-        <div class="mt-0.5" style="height:100px;"><canvas id="angleChart"></canvas></div>
-      </div>
+      <div id="simStatus" class="text-[0.55rem] text-dim mt-1 min-h-[16px]"></div>
 
     </div>
   </div>
