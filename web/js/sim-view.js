@@ -145,17 +145,17 @@ async function initCar() {
 // Load trajectory
 // ============================================================
 async function loadTrajectory() {
-    // Try sessionStorage first (set by main.js)
-    const stored = sessionStorage.getItem('simTrajectory');
+    // Try localStorage first (set by main.js — shared across tabs/windows)
+    const stored = localStorage.getItem('simTrajectory');
     if (stored) {
         try {
             trajectory = JSON.parse(stored);
-            console.log('Loaded trajectory from sessionStorage');
+            console.log('Loaded trajectory from localStorage');
             return;
         } catch (e) { /* fall through */ }
     }
     // Try stored params
-    const paramsStr = sessionStorage.getItem('simParams');
+    const paramsStr = localStorage.getItem('simParams');
     if (paramsStr) {
         const params = JSON.parse(paramsStr);
         const resp = await fetch('/api/simulate', {
@@ -387,35 +387,50 @@ document.addEventListener('keydown', (e) => {
 // ============================================================
 // Init
 // ============================================================
+function setStatus(msg) {
+    const el = document.getElementById('statusText');
+    if (el) el.textContent = msg;
+    console.log('[sim]', msg);
+}
+
 async function init() {
-    document.getElementById('statusText').textContent = '⏳ 加载车辆...';
-    await initCar();
+    try {
+        setStatus('⏳ 加载车辆...');
+        await initCar();
 
-    document.getElementById('statusText').textContent = '⏳ 加载赛道...';
-    await loadTrajectory();
+        setStatus('⏳ 加载赛道...');
+        await loadTrajectory();
 
-    if (trajectory && trajectory.frames.length > 0) {
-        frames = trajectory.frames;
-        totalTime = trajectory.total_time;
-        // Render track
-        const params = sessionStorage.getItem('simParams');
-        if (params) {
-            const p = JSON.parse(params);
-            renderPathLine(p.path || []);
-            renderObstaclePreviews(p.obstacles || []);
+        if (trajectory && trajectory.frames.length > 0) {
+            frames = trajectory.frames;
+            totalTime = trajectory.total_time;
+            // Render track
+            const params = localStorage.getItem('simParams');
+            if (params) {
+                const p = JSON.parse(params);
+                renderPathLine(p.path || []);
+                renderObstaclePreviews(p.obstacles || []);
+            }
+            // Apply first frame
+            applyFrame(frames[0]);
+            const slider = document.getElementById('seekSlider');
+            slider.max = totalTime;
+            slider.value = 0;
+            setStatus(`✅ ${frames.length} 帧 · ${totalTime.toFixed(2)}s 赛道 · 就绪`);
+            // Auto-start
+            isPlaying = true;
+            document.getElementById('btnPlay').textContent = '⏸';
+        } else {
+            setStatus('❌ 无模拟数据');
         }
-        // Apply first frame
-        applyFrame(frames[0]);
-        const slider = document.getElementById('seekSlider');
-        slider.max = totalTime;
-        slider.value = 0;
-        document.getElementById('statusText').textContent =
-            `✅ ${frames.length} 帧 · ${totalTime.toFixed(2)}s 赛道 · 就绪`;
-        // Auto-start
-        isPlaying = true;
-        document.getElementById('btnPlay').textContent = '⏸';
-    } else {
-        document.getElementById('statusText').textContent = '❌ 无模拟数据';
+    } catch (err) {
+        console.error('init error:', err);
+        setStatus('❌ 错误: ' + (err.message || err));
+        // Show error on screen
+        const div = document.createElement('div');
+        div.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#D83514;color:#FDF6E3;padding:20px;font-size:14px;z-index:9999;font-family:monospace;white-space:pre-wrap;';
+        div.textContent = 'ERROR: ' + (err.stack || err.message || err);
+        document.body.appendChild(div);
     }
 }
 
