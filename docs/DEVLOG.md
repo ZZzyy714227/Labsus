@@ -1,5 +1,247 @@
 # 开发日志
 
+## 2026-06-11 — 动态赛道演示 V1：车在自定义赛道上跑起来
+
+### 背景
+
+用户要求在 3D 视口中让赛车沿自定义路径行驶，通过障碍物展示悬架动态效果。设计阶段确定：平面+自定义障碍物、简单动力学（3-DOF 弹簧-质量-阻尼）、Python 离线计算+前端回放架构。
+
+### 新增模块
+
+- `src/dynamics/` — 车辆动力学仿真包
+  - `terrain.py` — 高度场（基准平面 + bump/kerb/ramp 障碍物叠加）
+  - `path.py` — Catmull-Rom 样条路径 + 弧长参数化
+  - `vehicle.py` — 3-DOF 车体模型（heave/roll/pitch + 4 轮弹簧阻尼）
+  - `integrator.py` — RK4 积分器
+  - `simulation.py` — 仿真编排（1000Hz 积分 + 60fps 输出帧 + 调用悬架求解器）
+- `src/routes/dynamics.py` — `POST /api/simulate` 端点
+- `web/js/playback.js` — 前端回放引擎（帧插值 + 播放/暂停/调速/循环）
+- `web/js/dashboard.js` — Chart.js 实时仪表盘（车体姿态 + camber/toe）
+- `tests/test_terrain.py`、`test_path.py`、`test_vehicle.py` — 单元测试
+
+### 修改文件
+
+- `src/main.py` — 注册 dynamics 路由
+- `src/api_models.py` — 新增 `SimulateRequest`
+- `web/js/main.js` — 接入 playback/dashboard + 动态赛道 UI 事件处理
+- `web/js/state.js` — 追加回放状态字段
+- `web/js/scene.js` — 地形网格 + 路径线 + 障碍物色块 + 车身位置标记
+- `web/index.html` — 动态赛道面板（路径编辑表 + 障碍物列表 + 回放控件 + 图表容器）
+- `web/style.css` — 动态面板样式
+
+### 使用方式
+
+1. 右侧面板"动态赛道"区域编辑路径控制点（默认 4 个点）
+2. 添加障碍物（凸块/路肩/斜坡）
+3. 设置车速和时长，点击"开始模拟"
+4. 模拟完成后自动播放，可暂停/调速/循环
+5. 仪表盘实时显示车体姿态和悬架角度曲线
+
+### 技术要点
+
+- 车体状态向量 6 维：[z, ż, roll, roll_dot, pitch, pitch_dot]
+- 水平运动由路径约束，动力学只解算垂向+侧倾+俯仰
+- 每输出帧调用现有 `solve_bump` 解算全部硬点坐标 + `compute_alignment_angles` 获取定位角度
+- 前端 60fps 线性插值回放，无网络延迟
+- 端到端验证：车过 50mm 凸块时压缩量 2.45→14.3mm，camber 2.06°→3.86°，车身弹跳 241mm
+
+### 待完善（V2+）
+
+- 手动 WASD 驾驶模式
+- 3D 场景内点击放置路径点/障碍物（拖拽交互）
+- 轮胎侧向/纵向力模型
+- Anti-dive/anti-squat 几何效应
+- 播放时整车身 Transform 更新（当前用位置标记代替）
+
+## 2026-06-11 — 配色方案二轮：全暗色暖调（解决中间棕色两边淡色不协调）
+
+### 背景
+
+上一版采用"中间深棕 3D 视口 + 两边浅奶色面板"的双层对比。用户反馈"中间是棕色，两边是淡色，很不协调，不够美"——双层配色虽显层次，但左右面板与中央视口色差大、整体断裂感明显。
+
+经用户选择"全暗色暖调（推荐）"：把面板、3D 视口统一为同一深暖棕，仅用卡片/边框/文字明度来区分层级，彻底消除"中间深两边浅"的拼接感。
+
+### 配色定稿（全暗色暖调）
+
+| 区域 | 颜色 | 备注 |
+|------|------|------|
+| Body/左右面板/3D 视口 | `#1F1612` 深暖棕 | 整套统一底色，消除分层断裂 |
+| 卡片/输入框 | `#2A1F18` 略浅棕 | 与底色 #1F1612 拉开 1 档，做区块分层 |
+| 边框 | `#3A2A20` | 输入框/表格行线/分隔线 |
+| 输入框文字 | `#FDF6E3` 浅奶 | 暗背景上需要最亮文字 |
+| 普通文字 | `#A88B6F` 暖灰 | 标签、次要信息 |
+| 弱化文字 | `#8B7355` 棕灰 | 单位、辅助说明 |
+| 滑块轨道 | `#5A4030` 深棕 | 暗背景上仍可见 |
+| 强调（橙） | `#FC7607` | 主按钮、选中、坐标 X 轴 |
+| 强调（红橙） | `#D83514` | hover、危险、坐标 Z 轴 |
+| 高亮 | `#EFCE7D` 金色 | 坐标 Y 轴、参考线、翼片挂点 |
+
+### 修改文件
+
+- `web/style.css` — CSS 变量全暗色版：`--bg: #1F1612`、`--text: #A88B6F`、`--text-bright: #FDF6E3`、`--border: #3A2A20`、`--input-bg: #2A1F18`、滑块 thumb 描边改深色
+- `web/index.html` — 全部三栏（body/左面板/视口/右面板）统一 `bg-[#1F1612]`；左面板遗留的 `bg-[#FDF6E3] border-[#EEECBC]` 也改正
+- `web/js/chart.js` — 文字/标题/刻度由 `#797979/#8B7355` 改为 `#A88B6F`；网格由 `#EEECBC` 改为 `#3A2A20`，适配暗色画布
+- `web/js/ui.js` — 覆盖面/翼片配置面板的所有 input `text-[#2A2A2A]` → `text-[#FDF6E3]`；边框 `border-[#EEECBC]/60` → `border-[#3A2A20]/60`；hover `bg-[#FAF3E0]` → `bg-[#3A2A20]`；选中 `bg-[#EFCE7D]/40` → `bg-[#FC7607]/30`
+
+> 3D 场景内的车架/管件/管件颜色保持暖色不变，立体感和前后轴区分不受影响。
+
+### 视觉一致性自检
+
+- 主体（body + 左/右面板 + 视口） = 同一深暖棕 `#1F1612`，无明度跳变
+- 卡片层 = `#2A1F18`（仅深 1 档），用边框 `#3A2A20` 勾勒
+- 文字层级 = `#FDF6E3` > `#A88B6F` > `#8B7355`，三档明度
+- 按钮 = 主橙 `#FC7607` / 副红橙 `#D83514` / 暗卡 `#2A1F18`，三色互不重叠
+- 3D 场景内车架/管件/翼片仍用暖色，前/后轴通过明度差区分
+
+## 2026-06-11 — 暖色调配色方案全面替换
+
+### 背景
+
+原配色为深色主题（深紫蓝背景 `#0f0f19` + 亮文字 `#e4e4ec` + 红粉强调 `#f43f5e`），视觉偏冷偏硬，与 FSAE 赛车工程场景的"动感+暖意"调性不契合。
+
+新版采用用户提供的 5 色调色板 + 浅色背景 + 灰色文字的暖色方案，整体风格更现代、更清爽、更具工程感。
+
+### 配色定稿（经用户反馈调整）
+
+| 区域 | 颜色 | 备注 |
+|------|------|------|
+| 3D 视口 | `#1F1612` 深暖棕 | 第一次用纯白，3D 模型难看清；改深棕后模型清晰突出 |
+| 面板/Body | `#FDF6E3` 浅奶色 | 不用纯白，更柔和 |
+| 输入框/卡片 | `#FFF8E1` 米色 | 略浅于面板 |
+| 网格 | `#FC7607` 橙 / `#AC8975` 棕（透明度 0.55） | 深色背景上需亮色 + 半透 |
+| 坐标轴 | X 橙 `#FC7607` / Y 金 `#EFCE7D` / Z 红 `#D83514` | 深色背景上重新选色 |
+| 中心线 | `#EFCE7D` 金色虚线 | 浅色便于追踪 |
+| 环境光 | `#ffe8c8` 暖光 | 主光白 + 辅光橙 `#FC7607`（强度 1.4） |
+
+### 角色色（与首版相同）
+
+| 角色 | 颜色 | 用途 |
+|------|------|------|
+| 主色 | `#FC7607` 活力橙 | 主按钮、当前/选中态 |
+| 副色 | `#D83514` 红橙 | 强调/危险/确认 |
+| 金色 | `#EFCE7D` | 高亮、翼片挂点 |
+| 奶白 | `#EEECBC` | 边框、悬空控件 |
+| 棕灰 | `#AC8975` | 中性、车身管件 |
+| 正文 | `#797979` | 普通标签 |
+| 重要值 | `#2A2A2A` | 数值、代码字体 |
+
+### 前后悬架视觉区分
+
+- 前悬架（亮调）：`#FC7607` 主梁、`#EFCE7D` 立柱、`#FFA040` 上 A 臂、`#D83514` 下 A 臂
+- 后悬架（深调）：`#D83514` 主梁、`#C09040` 立柱、`#C25A20` 上 A 臂、`#8B3A10` 下 A 臂
+- 摇臂面前/后：金色 `#EFCE7D` / 深橙 `#C25A20`
+- 车架管：棕色 `#AC8975`，节点 `#8B7355`
+- 减震器：橙色主体 `#FC7607` + 金色活塞杆 `#EFCE7D` + 红色弹簧 `#D83514`
+
+### 运动学曲线
+
+- 前轴曲线：`#FC7607`
+- 后轴曲线：`#D83514`
+- 参考线（±1°/0°）：`#AC8975` / `#8B7355`
+- 网格：`#EEECBC`
+- 标题/标签：`#797979` / `#8B7355`
+
+### 调色板（用户可选管件/覆盖面/机翼颜色）
+
+替换为暖色系 10 色：橙/红橙/金/奶/棕/蓝（保留为对比色）/绿/白/灰/粉
+
+### 修改文件
+
+- `web/style.css` — CSS 变量重写（`--bg/--accent/--text/--border/--input-bg` 等）
+- `web/index.html` — Tailwind `theme.extend.colors` + 全部内联 `bg-white/*` `text-white` `border-white/*` 替换
+- `web/js/state.js` — `FRONT_COLORS/REAR_COLORS/FRAME_COLOR/ROCKER_COLOR/DAMPER_COLOR/PALETTE`
+- `web/js/scene.js` — 场景背景/雾、灯光、网格、坐标轴、轮胎/接触面/减震器材质
+- `web/js/chart.js` — 运动学曲线颜色
+- `web/js/interactions.js` — 高亮色（球体发光 `0xFC7607`、线条高亮 `0xFC7607`）、默认管件/覆盖面色 `#AC8975`
+- `web/js/builders.js` — 前翼/尾翼/底板/扩散器/摇臂面默认色、默认管件颜色
+- `web/js/ui.js` — 全部 `text-[#e4e4ec]` → `text-[#2A2A2A]`、按钮色、内联背景
+
+### 第一次尝试 → 反馈修正
+
+最初 3D 视口用纯白 `#ffffff`，用户反馈"太白了背景，不方便看"——橙色/金色 3D 模型与白色背景对比度不足。
+
+**修正方案**：3D 视口改深暖棕 `#1F1612`（保留暖色调性，与纯白/纯黑都不同），3D 模型立刻突出。面板和 Body 同步从纯白改为浅奶 `#FDF6E3`，整套形成"深视口 + 浅面板"的双层对比，比全白或全黑都更耐看。
+
+## 2026-06-11 — 修复求解锁死锁 + 重置功能
+
+### 问题 1：齿条位移后卡死所有操作
+
+**Bug**：拖动齿条滑块第一次可以移动，之后轮跳和车身操作全部卡死。
+
+**根因**：齿条滑块的 `input` 事件同时调用了 `requestSolve()`（轻量）和 `loadKinCurves()`（重型扫描）。后者触发 `/api/sweep` 做 244 次 scipy `least_squares` 求解，每次拖动堆积多个并发扫描请求阻塞后端事件循环，导致 `/api/solve` 请求排队，`solveRunning` 锁定所有后续操作。
+
+**修复**：`loadKinCurves()` 从 `input` 事件移到 `change` 事件（松开滑块才触发），拖动期间仅跑轻量 `/api/solve`。
+- 文件：`web/js/main.js:52-60`
+
+### 问题 2：_runSolveLoop 死锁导致永久无响应
+
+**Bug**：连续拖动转向后松手，所有操作永久卡死。重置按钮也无法恢复。
+
+**根因**：`_runSolveLoop()` 第 104 行 `if (state.solveRunning) return;` 提前退出时：
+1. `_pendingSolve` 已被设为 `false`
+2. `solveRunning` 保持 `true`（由其他路径设置）
+3. 后续 `requestSolve()` 看到 `solveRunning=true` → 只设 `_pendingSolve=true`
+4. 旧循环已退出，无人能重启 → **永久死锁**
+
+**修复**：
+- 引入内部 `_solveLock`（独立于 `state.solveRunning`）作为真正的并发锁
+- 移除 `if (state.solveRunning) return;` 守卫——`_solveLoop` 总是运行求解
+- `_solveLoop` 退出前有竞态检测：若 `_pendingSolve` 在检查后被设置，立即重启循环
+- 新增 `resetSolveState()` 函数，重置按钮先清除所有锁状态再重新加载
+
+```
+旧守卫模式：                新锁模式：
+_solveLoop() {             _solveLoop() {
+  _pendingSolve = false       do {
+  if (solveRunning) return→✗    _pendingSolve = false
+  ...                            await _doSolveInternal()
+}                             } while (_pendingSolve)
+                              if (_pendingSolve) // 竞态
+                                _solveLoop()      // 重启
+                            }
+```
+
+- 文件：`web/js/solver.js:85-127`
+
+### 问题 3：重置无法回到初始状态
+
+**根因**：重置按钮不清除求解锁，若死锁已发生，`solveAndUpdate()` 被 `solveRunning` 阻挡。
+
+**修复**：重置事件开头调用 `resetSolveState()` 清除所有锁和 pending 标记，确保后续求解能正常启动。
+- 文件：`web/js/main.js:62`
+
+## 2026-06-10 — 简化审核 + 文件结构整理 + index.html 模块化拆分
+
+### 前端单文件拆分为模块化结构
+
+**问题**：`web/index.html` 为单文件 2422 行 / 142KB / 97 个函数，HTML/CSS/JS 全部混杂，难以维护。
+
+**拆分方案**：将前端拆为 10 个文件，按职责分层：
+
+```
+web/
+├── index.html         # HTML 骨架（310行，仅结构）
+├── style.css          # 自定义样式（30行）
+└── js/
+    ├── state.js       # 全局共享状态（state 对象）
+    ├── scene.js       # Three.js 场景 + 3D 工厂函数 + 底盘工具
+    ├── builders.js    # 3D 场景构建函数（悬架、车架、减震器、机翼）
+    ├── interactions.js# 点选/多选/编辑/管件覆盖面 CRUD
+    ├── solver.js      # 求解请求/数据加载流
+    ├── ui.js          # UI 面板渲染（硬点表格、机翼面板、覆盖面面板）
+    ├── chart.js       # 运动学曲线图
+    └── main.js        # 入口：事件绑定 + 初始化 + 动画循环
+```
+
+**关键设计决策**：
+- 所有可变状态集中在 `state.js` 的 `state` 对象中，各模块通过 `import { state }` 共享
+- 纯工具函数（`sphere()`、`chassisTransform()`、`sampleAirfoil()`）放在 `scene.js`
+- ES module 循环依赖通过函数声明提升 + 动态 `import()` 解决
+- 原始代码逻辑零改动，仅添加 `state.` 前缀访问共享状态
+
+**改动文件**：新建 9 个文件，重写 `web/index.html`
+**备份**：旧单文件备份为 `web/index.html.2026-06-10.bak`（后清理）
+
 ## 2026-06-10 — 简化审核（复用统一 + 死代码清理） + 文件结构整理
 
 ### 文件结构整理
@@ -641,3 +883,144 @@ FL1 修改不走 update_params → defaults 慢速循环，而是直接修改内
 | 车架节点 | 42（28 原有 + 14 BODY） |
 | 管件总数 | 99 |
 | 曲线管 | 12（上轨×4 + 下轨×2 + 鼻锥×3 + 引擎盖×2 + 车顶×1）|
+
+## 2026-06-10 — `/simplify` 清理：消除重复逻辑 + 简化低效代码
+
+### 改动清单
+
+**1. `geometry.py:distance_point_to_line` → 复用 `closest_point_on_line`**
+
+之前 `distance_point_to_line` 独立实现了点到线投影（normalize + dot + clamp），与 `closest_point_on_line` 算法完全一致。
+
+修复：直接用 `closest_point_on_line` 获得最近点再算距离，消除投影逻辑重复。
+
+**2. 管件匹配 3x 重复 → `_find_tube_index()` 助手**
+
+`delete_tube`、`save_tube_color`、`add_tube` 三个端点各有 15 行相同的"遍历 FRAME_TUBES 按端点匹配"逻辑（含 2 点顺序无关、3+ 点严格顺序两种模式）。
+
+修复：提取为 `_find_tube_index(endpoints)` 辅助函数，3 处调用点各简化为 1 行。
+
+**3. 后摇臂 frame_nodes 构建 2x → `_rear_rocker_frame_nodes()` 助手**
+
+`/api/solve` 和 `/api/sweep` 两处独立写了后轴摇臂 frame_nodes 的 key 重映射（`RK_PIVOT_R`/`RK_DAMPER_R`/`DAMPER_CHASSIS_FR` ← `R_RK_*` 值）。
+
+修复：提取为 `_rear_rocker_frame_nodes()` 函数。`/api/sweep` 中的整段 `for k,v in DEFAULT_FRAME_NODES` 循环 + 条件跳过实际是死代码（`compute_rocker_kinematics` 只用那 3 个 key），一并移除。
+
+**4. `angle_keys` / `rocker_keys` 常量提升到模块级**
+
+`sweep_axle()` 闭包每次都重新创建这两个列表。提升为模块级 `SWEEP_ANGLE_KEYS` / `SWEEP_ROCKER_KEYS`。
+
+**5. `compute_rocker_kinematics` 回退扫描 1257 → 101 点**
+
+摇臂根定位的兜底路径（括号化失败时）扫描 1257 个点找最小误差，每点含一次 3D 旋转 + 距离计算。改为 101 点，速度 ~12x，覆盖精度 ≈0.03 rad 仍远好于实际需要（此路径仅在几何失效时命中）。
+
+### 净效果
+
+| 指标 | 改动前 | 改动后 |
+|------|--------|--------|
+| `main.py` 行数 | ~1285 | ~1250 |
+| 消重复逻辑块 | — | 5 处 |
+| 移除死代码 | — | 10 行 |
+
+### 跳过的项（不在本次范围）
+- 直立架局部坐标构建 3 处重复：`compute_alignment_angles` / `_compute_upright_local` / `_upright_y_axis` 共享相同算法，但函数签名和返回值差异大，统一需改动 t 函数接口，留给下次架构清理。
+- `persistence.py` regex 源文件操作：虽然脆弱，但 AST 化改造工程量大且非阻塞，保留为已知技术债。
+
+## 2026-06-10 — 右侧面板默认折叠
+
+**问题**：右侧数据面板（车架节点表格、减震器挂点、覆盖面管理、空气动力学）默认展开占空间，用户需要自己手动管理。
+
+**改动**：
+- 为右侧 9 个面板统一添加 collapse/expand 机制：点击标题栏切换展开/折叠
+- 每个面板标题栏添加 `chevron-down` 图标，折叠时箭头旋转 -90°
+- 默认折叠的 5 个信息面板：硬点坐标、车架节点表格、减震器挂点、覆盖面管理、空气动力学
+- 默认展开的 4 个操作面板：硬点编辑、多选工具栏、设计参数、运动学曲线
+- 实现方式：`panel-wrapper` + `panel-content` div 结构，CSS 控制 `display: none`，JS 事件委托通过 `onclick` 属性
+
+**改动文件**：`web/index.html`、`web/style.css`（添加 collapse CSS 规则）
+
+**注意**：在实现过程中意外用 `git checkout` 覆盖了模块化拆分后的 `index.html`（恢复为旧单文件），已重新构建模块化骨架 HTML。
+
+## 2026-06-11 — 工程化转型：测试 + 类型 + lint + 持久化重构 + main.py 拆解
+
+### 改动清单
+
+#### 1. 包结构标准化
+- 添加 `src/__init__.py` — 标记为 Python 包
+- 创建 `pyproject.toml` — 一站式管理 ruff、mypy、pytest 配置
+- 创建 `Makefile` — `make test` / `make lint` / `make typecheck` / `make start`
+- 创建 `requirements-dev.txt` — 开发依赖 (pytest, ruff, mypy)
+
+#### 2. 测试基础设施（65 个测试，0.5s 跑完）
+- `conftest.py` (根目录) — pytest 自动将 `src/` 加入 sys.path
+- `tests/test_geometry.py` — 34 个纯数学单元测试（vec3, dist, 旋转, 约束等）
+- `tests/test_kinematics.py` — 31 个求解器集成测试：
+  - 零位返回输入验证
+  - 全行程收敛性（-25 ~ +25mm）
+  - scipy polish 精度验证
+  - 左右镜像对称性
+  - 物理合理性（camber 负值、KPI 正值、caster 正值）
+  - 转向方向正确性
+  - 摇臂运动学合理性
+  - 后轴求解
+
+#### 3. mypy + ruff 配置
+- ruff: E/F/I/N/W + UP 规则集，line-length=100
+- mypy: 渐进式，geometry/tire/api_models 全量，main/config 宽松
+- 修复 49 个 lint 问题（36 个自动修复，13 个手动）
+- 清理无用导入、单行多条语句、歧义变量名
+
+#### 4. 持久化重写：JSON 配置取代正则改源码
+- **旧方案**：`persistence.py` 用正则表达式改写 `config.py` 源文件 — 极度脆弱，空格/注释/编码变化即可破坏
+- **新方案**：`data/persistent_state.json` 存储所有可变状态（frame nodes, tubes, bodywork, wings, undertray, diffuser）
+- 启动时 `load_persistent_state()` 从 JSON 加载并合并到 config 模块级 dict
+- 保存操作仅写 JSON，永不触碰 Python 源文件
+- 硬点覆盖继续使用已有的 `data/hardpoint_overrides.json`（无变化）
+- 向后兼容：无 `persistent_state.json` 时使用 config.py 默认值
+
+#### 5. main.py 拆解（1435 行 → 40 行）
+| 新模块 | 原 main.py 范围 | 行数 |
+|--------|----------------|------|
+| `src/main.py` | 应用入口 + router 注册 | 40 |
+| `src/solver/bump.py` | bump 求解器 (PBD + scipy) | 210 |
+| `src/solver/steering.py` | 转向求解器 | 155 |
+| `src/solver/angles.py` | 定位角度计算 | 125 |
+| `src/solver/rocker.py` | 摇臂运动学 | 100 |
+| `src/routes/solve.py` | /api/solve, /api/sweep, /api/optimize_fl1 | 240 |
+| `src/routes/hardpoints.py` | /api/defaults, /api/save_point, /api/update_params | 185 |
+| `src/routes/tubes.py` | 车架管 CRUD | 80 |
+| `src/routes/faces.py` | 覆盖面 CRUD | 55 |
+| `src/routes/aero.py` | 空力件保存 | 50 |
+
+每个新模块不超过 250 行，职责单一，IDE 跳转精确。
+
+#### 6. 前端工具化（基础）
+- `web/package.json` — 含 Vite dev/build/preview 命令
+- `web/vite.config.js` — 开发服务器代理 /api → :8000，热重载
+- 运行方式：一个终端 `python run.py`，另一个 `cd web && npx vite`
+
+#### 运行方式更新
+```bash
+# 安装（含开发依赖）
+pip install -r requirements-dev.txt
+cd web && npm install
+
+# 开发：前端热重载 + 后端 API
+# 终端 1:
+python run.py
+# 终端 2:
+cd web && npx vite
+# 浏览器打开 http://localhost:5173
+
+# 运行测试
+make test          # 或: python -m pytest tests/ -v
+make lint          # ruff 检查
+make typecheck     # mypy 类型检查
+make all           # lint + typecheck + test 全部
+```
+
+#### 跳过 / 已知限制
+- `pip install -e .` 未完成适配（当前通过 run.py 的 sys.path 机制运行）
+- 前端 TypeScript 迁移未做（仅加了 Vite 骨架）
+- tube color 持久化在 JSON 方案中标记为 no-op（索引映射在重启后不稳定）
+- `_fix_left_angles` 的符号约定在后续重构中应统一文档化
