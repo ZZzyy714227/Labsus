@@ -5,19 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FSAE 赛道演示</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        colors: {
-          accent: '#FC7607', 'accent2':'#D83514',
-          panel: '#1F1612', card: '#2A1F18',
-          border: '#3A2A20', muted: '#8B7355', dim: '#A88B6F',
-        }
-      }
-    }
-  }
-</script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script type="importmap">
@@ -28,117 +15,380 @@
   }
 }
 </script>
-<link rel="stylesheet" href="style.css">
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #1F1612; height: 100vh; overflow: hidden; font-family: 'Inter','SF Pro Display',system-ui,sans-serif; }
-  #simViewport { width: 100vw; height: 100vh; display: block; }
-  #simViewport canvas { display: block; }
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; height:100%; background:#1F1612; overflow:hidden; font-family:system-ui,sans-serif; }
+#vp { width:100vw; height:100vh; display:block; }
+#vp canvas { display:block; }
 
-  /* HUD overlay */
-  #hud {
-    position: fixed; bottom: 0; left: 0; right: 0;
-    background: linear-gradient(transparent, rgba(31,22,18,0.95));
-    padding: 20px 24px 16px;
-    pointer-events: none;
-  }
-  #hud > * { pointer-events: auto; }
-  #hudTop {
-    position: fixed; top: 0; left: 0; right: 0;
-    padding: 12px 20px;
-    display: flex; justify-content: space-between; align-items: flex-start;
-    background: linear-gradient(rgba(31,22,18,0.85), transparent);
-  }
-  .hud-title { font-size: 1.1rem; font-weight: 600; color: #FDF6E3; letter-spacing: 0.5px; }
-  .hud-sub { font-size: 0.7rem; color: #A88B6F; }
-  .hud-info { font-size: 0.75rem; color: #FDF6E3; font-family: monospace; }
+#hudTop { position:fixed; top:0; left:0; right:0; padding:14px 24px; background:linear-gradient(rgba(31,22,18,0.9),transparent); display:flex; justify-content:space-between; align-items:flex-start; pointer-events:none; z-index:10; }
+#hudTop > * { pointer-events:auto; }
+#hudBot { position:fixed; bottom:0; left:0; right:0; padding:16px 24px 14px; background:linear-gradient(transparent,rgba(31,22,18,0.92)); pointer-events:none; z-index:10; }
+#hudBot > * { pointer-events:auto; }
+.hud-title { color:#FDF6E3; font-size:1.1rem; font-weight:700; letter-spacing:0.3px; }
+.hud-sub { color:#A88B6F; font-size:0.65rem; }
 
-  /* Playback controls */
-  #playbackBar {
-    display: flex; align-items: center; gap: 10px;
-    max-width: 700px; margin: 0 auto;
-  }
-  #playbackBar button {
-    background: rgba(60,42,32,0.7); border: 1px solid #3A2A20; border-radius: 6px;
-    color: #FDF6E3; cursor: pointer; font-size: 0.75rem; padding: 6px 12px;
-    transition: all 0.15s; backdrop-filter: blur(4px);
-  }
-  #playbackBar button:hover { background: #5A4030; }
-  #playbackBar .active { background: #FC7607 !important; border-color: #FC7607; color: #1F1612; }
-  #playbackBar input[type=range] { flex: 1; height: 4px; accent-color: #FC7607; }
-  #statusText { font-size: 0.65rem; color: #8B7355; min-width: 100px; text-align: right; }
+#bar { display:flex; align-items:center; gap:10px; max-width:700px; margin:0 auto; }
+#bar button { background:rgba(42,31,24,0.85); border:1px solid #3A2A20; border-radius:6px; color:#FDF6E3; cursor:pointer; font-size:0.7rem; padding:5px 12px; transition:0.15s; backdrop-filter:blur(8px); }
+#bar button:hover { background:#5A4030; }
+#bar .on { background:#FC7607 !important; border-color:#FC7607; color:#1F1612; }
+#bar input[type=range] { flex:1; height:4px; accent-color:#FC7607; cursor:pointer; }
+#st { color:#8B7355; font-size:0.6rem; min-width:90px; text-align:right; }
 
-  /* Dashboard overlay */
-  #dashOverlay {
-    position: fixed; right: 16px; top: 56px; width: 260px;
-    pointer-events: none;
-  }
-  #dashOverlay > * { pointer-events: auto; }
-  .dash-card {
-    background: rgba(31,22,18,0.85); border: 1px solid #3A2A20; border-radius: 8px;
-    padding: 8px 10px; margin-bottom: 6px; backdrop-filter: blur(4px);
-  }
-  .dash-card h4 { font-size: 0.6rem; color: #A88B6F; margin-bottom: 4px; }
+#dash { position:fixed; right:16px; top:56px; width:240px; z-index:10; pointer-events:none; }
+#dash > * { pointer-events:auto; }
+.dc { background:rgba(31,22,18,0.85); border:1px solid #3A2A20; border-radius:8px; padding:8px 10px; margin-bottom:6px; backdrop-filter:blur(8px); }
+.dc h4 { font-size:0.55rem; color:#A88B6F; margin-bottom:4px; letter-spacing:0.5px; }
+.dc canvas { width:100%!important; height:70px!important; }
+.lv { display:grid; grid-template-columns:1fr 1fr; gap:1px; font-size:0.55rem; }
+.lv .lb { color:#8B7355; } .lv .vl { color:#FDF6E3; text-align:right; }
 
-  #dashOverlay canvas { width: 100% !important; height: 80px !important; }
-
-  .badge {
-    display: inline-block; background: #2A1F18; border: 1px solid #3A2A20;
-    border-radius: 4px; padding: 1px 6px; font-size: 0.6rem; color: #FDF6E3; margin: 0 1px;
-  }
+#err { position:fixed; top:0; left:0; right:0; background:#D83514; color:#FDF6E3; padding:16px 20px; font-size:13px; font-family:monospace; white-space:pre-wrap; z-index:9999; display:none; }
 </style>
 </head>
 <body>
 
-<div id="simViewport"></div>
+<div id="vp"></div>
 
-<!-- HUD top -->
 <div id="hudTop">
-  <div>
-    <div class="hud-title">🏎 FSAE 赛道演示</div>
-    <div class="hud-sub">拖拽旋转 · 滚轮缩放 · 右键平移</div>
-  </div>
-  <div class="flex items-center gap-3">
-    <span class="hud-info" id="hudTime">0.00s</span>
-    <span class="hud-info" id="hudSpeed">00 km/h</span>
-  </div>
+  <div><div class="hud-title">🏎 FSAE 赛道演示</div><div class="hud-sub">拖拽旋转 · 滚轮缩放 · 右键平移</div></div>
+  <div class="flex items-center gap-3"><span id="hudT" class="text-[#FDF6E3] font-mono text-xs">0.00s</span><span id="hudS" class="text-[#A88B6F] text-xs">-- km/h</span></div>
 </div>
 
-<!-- Dashboard overlay -->
-<div id="dashOverlay">
-  <div class="dash-card">
-    <h4>📐 车体姿态</h4>
-    <canvas id="attitudeMiniChart"></canvas>
-  </div>
-  <div class="dash-card">
-    <h4>⚙ 悬架角度</h4>
-    <canvas id="angleMiniChart"></canvas>
-  </div>
-  <div class="dash-card" id="liveData">
+<div id="dash">
+  <div class="dc"><h4>📐 车体姿态</h4><canvas id="attChart"></canvas></div>
+  <div class="dc"><h4>⚙ 悬架角度</h4><canvas id="angChart"></canvas></div>
+  <div class="dc">
     <h4>📊 实时数据</h4>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;font-size:0.6rem;">
-      <span class="text-[#8B7355]">Camber FL/FR</span>
-      <span class="text-[#FDF6E3] text-right" id="valCamber"><span style="color:#FC7607">--</span> / <span style="color:#D83514">--</span></span>
-      <span class="text-[#8B7355]">Toe FL/FR</span>
-      <span class="text-[#FDF6E3] text-right" id="valToe">-- / --</span>
-      <span class="text-[#8B7355]">Roll / Pitch</span>
-      <span class="text-[#FDF6E3] text-right" id="valRP">-- / --</span>
-    </div>
+    <div class="lv"><span class="lb">Camber FL/FR</span><span class="vl" id="vCam">-- / --</span><span class="lb">Toe FL/FR</span><span class="vl" id="vToe">-- / --</span><span class="lb">Roll / Pitch</span><span class="vl" id="vRP">-- / --</span></div>
   </div>
 </div>
 
-<!-- HUD bottom -->
-<div id="hud">
-  <div id="playbackBar">
-    <button id="btnPlay" title="播放/暂停">▶</button>
-    <button id="btnReset" title="重置">⟳</button>
-    <input type="range" id="seekSlider" min="0" max="1" value="0" step="0.001">
-    <span id="statusText">就绪</span>
-    <button id="btnSpeed" class="active">1×</button>
-    <button id="btnCam" title="切换视角">🎥</button>
+<div id="hudBot">
+  <div id="bar">
+    <button id="btnPlay">▶</button>
+    <button id="btnReset">⟳</button>
+    <input type="range" id="seek" min="0" max="1" value="0" step="0.001">
+    <span id="st">就绪</span>
+    <button id="btnSpeed" class="on">1×</button>
+    <button id="btnCam">🎥 自由</button>
   </div>
 </div>
 
-<script type="module" src="js/sim-view.js"></script>
+<div id="err"></div>
+
+<script type="module">
+// ---- Global error catch ----
+window.addEventListener('error', e => {
+    const el = document.getElementById('err');
+    el.style.display = 'block';
+    el.textContent = '⚠ ' + (e.message || e.error?.message || JSON.stringify(e));
+});
+window.addEventListener('unhandledrejection', e => {
+    const el = document.getElementById('err');
+    el.style.display = 'block';
+    el.textContent = '⚠ ' + (e.reason?.message || JSON.stringify(e.reason));
+});
+
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const S = (id) => document.getElementById(id);
+const st = (msg) => { const e = S('st'); if(e) e.textContent = msg; console.log('[sim]', msg); };
+
+try {
+// ---- Scene setup ----
+const vp = S('vp');
+const W = window.innerWidth, H = window.innerHeight;
+const rend = new THREE.WebGLRenderer({ antialias:true });
+rend.setSize(W, H);
+rend.setPixelRatio(Math.min(devicePixelRatio, 2));
+rend.setClearColor(0x1F1612);
+vp.appendChild(rend.domElement);
+
+const sc = new THREE.Scene();
+sc.background = new THREE.Color(0x1F1612);
+
+const cam = new THREE.PerspectiveCamera(40, W/H, 1, 30000);
+cam.position.set(0, 3000, 6000);
+cam.lookAt(0, 0, 500);
+
+const ctrl = new OrbitControls(cam, rend.domElement);
+ctrl.target.set(0, 0, 500);
+ctrl.enableDamping = true;
+ctrl.dampingFactor = 0.1;
+ctrl.minDistance = 200;
+ctrl.maxDistance = 20000;
+ctrl.update();
+
+sc.add(new THREE.AmbientLight(0xffffff, 0.8));
+const dl = new THREE.DirectionalLight(0xffffff, 1.5);
+dl.position.set(3000, 5000, 2000);
+sc.add(dl);
+
+// Ground grid
+const grid = new THREE.GridHelper(12000, 60, 0xFC7607, 0x3A2A20);
+grid.rotation.x = Math.PI/2;
+sc.add(grid);
+// Ground plane
+const gPlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(14000, 14000),
+    new THREE.MeshBasicMaterial({ color:0x2A1F18, transparent:true, opacity:0.15, side:THREE.DoubleSide })
+);
+gPlane.position.z = -2;
+sc.add(gPlane);
+
+st('✅ 基础场景就绪');
+
+// ---- Fetch defaults ----
+const defs = await fetch('/api/defaults').then(r => r.json());
+const hpFR = defs.front?.right || {};
+const hpFL = defs.front?.left || {};
+const hpRR = defs.rear?.right || {};
+const hpRL = defs.rear?.left || {};
+const fNodes = defs.frame?.nodes || {};
+const fTubes = defs.frame?.tubes || [];
+
+// ---- Build car ----
+const car = new THREE.Group();
+sc.add(car);
+
+function pt(v) { return new THREE.Vector3(v[0], v[1], v[2]); }
+
+function sph(pos, col, r=7) {
+    const s = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 12), new THREE.MeshLambertMaterial({color:col}));
+    s.position.copy(pos);
+    car.add(s);
+    return s;
+}
+function seg(a, b, col) {
+    const g = new THREE.BufferGeometry().setFromPoints([a, b]);
+    const l = new THREE.Line(g, new THREE.LineBasicMaterial({color:col}));
+    car.add(l);
+    return l;
+}
+
+// Hardpoint: draw all CH/UP/FL keys
+const C = ['#FC7607','#EFCE7D','#D83514']; // chassis, upright, float
+const allKeys = ['CH1','CH2','CH3','CH4','CH5','UP1','UP2','UP3','UP4','UP5','FL1'];
+const AXLE_COLS = { front: ['#FC7607','#EFCE7D','#D83514'], rear: ['#D83514','#C09040','#9C7860'] };
+const COL_FR = {chassis:0xFC7607,upright:0xEFCE7D,float:0xEEECBC,uca:0xFFA040,ucaAxis:0xE0680A,lca:0xD83514,lcaAxis:0xA02810,kingpin:0x2A2A2A,tieRod:0xD83514,pushRod:0xAC8975,uprightLine:0x8B7355};
+const COL_RE = {chassis:0xD83514,upright:0xC09040,float:0x9C7860,uca:0xC25A20,ucaAxis:0xA04010,lca:0x8B3A10,lcaAxis:0x602010,kingpin:0x1A1A1A,tieRod:0xA02810,pushRod:0x704030,uprightLine:0x5A4030};
+
+function buildSide(hp, col, pref='') {
+    const C = (k) => pref + k;
+    const sps = {}, lns = {};
+    // Spheres
+    for (const k of allKeys) {
+        if (!hp[C(k)]) continue;
+        const col3 = ['CH1','CH2','CH3','CH4','CH5'].includes(k) ? col.chassis
+            : ['UP1','UP2','UP3','UP4','UP5'].includes(k) ? col.upright : col.float;
+        sps[k] = sph(pt(hp[C(k)]), col3, ['CH1','CH2','CH3','CH4','CH5'].includes(k) ? 10 : 7);
+    }
+    // Lines
+    function mkL(a, b, c) { if (hp[C(a)] && hp[C(b)]) lns[a+'-'+b] = seg(pt(hp[C(a)]), pt(hp[C(b)]), c); }
+    mkL('CH1','UP1', col.uca); mkL('CH2','UP1', col.uca); mkL('CH1','CH2', col.ucaAxis);
+    mkL('CH3','UP2', col.lca); mkL('CH4','UP2', col.lca); mkL('CH3','CH4', col.lcaAxis);
+    mkL('UP1','UP2', col.kingpin); mkL('UP3','FL1', col.tieRod); mkL('UP4','CH5', col.pushRod);
+    // Upright loop
+    const op = ['UP1','UP3','UP2','UP4','UP1'].filter(k => hp[C(k)]);
+    if (op.length >= 2) {
+        const g = new THREE.BufferGeometry().setFromPoints(op.map(k => pt(hp[C(k)])));
+        const l = new THREE.Line(g, new THREE.LineBasicMaterial({color:col.uprightLine}));
+        car.add(l); lns.upright = l;
+    }
+    // Tire ring
+    const up5 = hp[C('UP5')];
+    if (up5) {
+        const tg = new THREE.Group(); tg.position.copy(pt(up5));
+        const tireR = hp.tire_radius || 150;
+        const torus = new THREE.Mesh(
+            new THREE.TorusGeometry(tireR*0.9, 18, 12, 24),
+            new THREE.MeshLambertMaterial({color:0x2A2A2A, side:THREE.DoubleSide})
+        );
+        torus.rotation.x = Math.PI/2;
+        tg.add(torus);
+        // Tire surface (contact patch)
+        const disc = new THREE.Mesh(
+            new THREE.CircleGeometry(tireR*0.85, 16),
+            new THREE.MeshLambertMaterial({color:0x1A1A1A, side:THREE.DoubleSide})
+        );
+        disc.rotation.x = Math.PI/2;
+        tg.add(disc);
+        car.add(tg);
+        sps.tire = tg;
+    }
+    return {spheres:sps, lines:lns};
+}
+
+// Build 4 corners
+const sides = {};
+sides.fr = buildSide(hpFR, COL_FR, '');
+sides.fl = buildSide(hpFL, COL_FR, '');
+sides.rr = buildSide(hpRR, COL_RE, 'R_');
+sides.rl = buildSide(hpRL, COL_RE, 'R_');
+
+// Frame tubes (simplified: 2pt tubes only)
+for (const tube of fTubes) {
+    if (tube.length !== 2) continue;
+    const a = tube[0], b = tube[1];
+    // Try frame nodes, then hardpoints
+    let pa = fNodes[a] || hpFR[a] || hpFL[a] || hpRR[a] || hpRL[a];
+    let pb = fNodes[b] || hpFR[b] || hpFL[b] || hpRR[b] || hpRL[b];
+    if (pa && pb) {
+        const l = seg(pt(pa), pt(pb), 0xAC8975);
+        sides._tubes = sides._tubes || []; sides._tubes.push(l);
+    }
+}
+
+st('✅ 车辆构建完成');
+
+// ---- Load trajectory ----
+let traj, frames, totalT = 0;
+let trajData = localStorage.getItem('simTrajectory');
+let paramsData = localStorage.getItem('simParams');
+
+if (trajData) {
+    traj = JSON.parse(trajData);
+    st(`✅ 加载轨迹 (${traj.frames.length} 帧)`);
+} else if (paramsData) {
+    const p = JSON.parse(paramsData);
+    traj = await fetch('/api/simulate', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}).then(r=>r.json());
+    st(`✅ 计算轨迹 (${traj.frames.length} 帧)`);
+} else {
+    // Fallback oval
+    traj = await fetch('/api/simulate', {method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({path:[[-4000,0],[-2000,2000],[0,2500],[2000,2000],[4000,0],[2000,-2000],[0,-2500],[-2000,-2000]],
+        obstacles:[{type:'bump',x:0,y:2600,length:600,width:900,height:30},{type:'kerb',x_start:-2100,y_start:2100,x_end:-1900,y_end:1900,width:200,height:40},{type:'bump',x:0,y:-2600,length:400,width:900,height:25}],
+        speed:20000,duration:6})}).then(r=>r.json());
+    st(`✅ 默认赛道 (${traj.frames.length} 帧)`);
+}
+frames = traj.frames;
+totalT = traj.total_time;
+
+// ---- Draw path + obstacles ----
+if (paramsData) {
+    const p = JSON.parse(paramsData);
+    if (p.path && p.path.length >= 2) {
+        const pts = p.path.map(([x,y]) => new THREE.Vector3(x, y, 0.5));
+        const g = new THREE.BufferGeometry().setFromPoints(pts);
+        sc.add(new THREE.Line(g, new THREE.LineBasicMaterial({color:0xFC7607})));
+    }
+    if (p.obstacles) {
+        for (const o of p.obstacles) {
+            const h = o.height||20;
+            let cx, cy, len, w = o.width||150;
+            if (o.type === 'bump') { cx=o.x; cy=o.y; len=o.length||200; }
+            else { cx=(o.x_start+(o.x_end||0))/2; cy=(o.y_start+(o.y_end||0))/2; len=Math.hypot((o.x_end||0)-o.x_start, (o.y_end||0)-o.y_start)||100; }
+            const box = new THREE.Mesh(new THREE.BoxGeometry(len, w, h),
+                new THREE.MeshBasicMaterial({color:o.type==='bump'?0x8B5CF6:o.type==='kerb'?0xFC7607:0x10B981,transparent:true,opacity:0.3}));
+            box.position.set(cx, cy, h/2);
+            sc.add(box);
+        }
+    }
+}
+
+// ---- Playback ----
+let play = false, curT = 0, speed = 1, lastT = 0;
+const seek = S('seek'); seek.max = totalT;
+
+function lerp(a,b,t) { return a+(b-a)*t; }
+
+function getFrame(t) {
+    const ft = t / traj.dt;
+    const idx = Math.floor(ft), frac = ft-idx;
+    if (idx >= frames.length-1) return frames[frames.length-1];
+    if (idx < 0) return frames[0];
+    const f0 = frames[idx], f1 = frames[idx+1];
+    // Interpolate body
+    const body = {x:lerp(f0.body.x,f1.body.x,frac),y:lerp(f0.body.y,f1.body.y,frac),z:lerp(f0.body.z,f1.body.z,frac),
+        roll:lerp(f0.body.roll,f1.body.roll,frac),pitch:lerp(f0.body.pitch,f1.body.pitch,frac)};
+    return {time:lerp(f0.time,f1.time,frac), body, wheels:f1.wheels, angles:f1.angles, hardpoints:f1.hardpoints};
+}
+
+function applyFrame(fr) {
+    if (!fr || !fr.hardpoints) return;
+    const hp = fr.hardpoints;
+    // Update spheres by hardpoint key
+    for (const [sideKey, side] of Object.entries(sides)) {
+        const pref = sideKey === 'rr' || sideKey === 'rl' ? 'R_' : '';
+        for (const k of allKeys) {
+            const sk = pref + k;
+            const pos = hp[sk];
+            if (pos && side.spheres[k]) side.spheres[k].position.set(pos[0], pos[1], pos[2]);
+        }
+        // Lines
+        function updL(a, b, lnk) {
+            const skA = pref + a, skB = pref + b;
+            if (hp[skA] && hp[skB] && side.lines[lnk]) {
+                side.lines[lnk].geometry.setFromPoints([pt(hp[skA]), pt(hp[skB])]);
+            }
+        }
+        updL('CH1','UP1','CH1-UP1'); updL('CH2','UP1','CH2-UP1'); updL('CH1','CH2','CH1-CH2');
+        updL('CH3','UP2','CH3-UP2'); updL('CH4','UP2','CH4-UP2'); updL('CH3','CH4','CH3-CH4');
+        updL('UP1','UP2','UP1-UP2'); updL('UP3','FL1','UP3-FL1'); updL('UP4','CH5','UP4-CH5');
+        // Upright loop
+        if (side.lines.upright) {
+            const op = ['UP1','UP3','UP2','UP4','UP1'].filter(k => hp[pref+k]);
+            if (op.length >= 2) side.lines.upright.geometry.setFromPoints(op.map(k => pt(hp[pref+k])));
+        }
+        // Tire
+        if (side.spheres.tire && hp[pref+'UP5']) {
+            side.spheres.tire.position.set(hp[pref+'UP5'][0], hp[pref+'UP5'][1], hp[pref+'UP5'][2]);
+        }
+    }
+    // HUD
+    const b = fr.body;
+    S('hudT').textContent = fr.time.toFixed(2)+'s';
+    const ang = fr.angles || {};
+    S('vCam').innerHTML = `<span style="color:#FC7607">${(ang.camber?.[0]||0).toFixed(1)}°</span> / <span style="color:#D83514">${(ang.camber?.[1]||0).toFixed(1)}°</span>`;
+    S('vToe').textContent = `${(ang.toe?.[0]||0).toFixed(1)}° / ${(ang.toe?.[1]||0).toFixed(1)}°`;
+    S('vRP').textContent = `${(b.roll*180/Math.PI).toFixed(1)}° / ${(b.pitch*180/Math.PI).toFixed(1)}°`;
+}
+
+function anim(t) {
+    requestAnimationFrame(anim);
+    if (play && frames && frames.length) {
+        if (lastT === 0) lastT = t;
+        const dt = (t - lastT) / 1000; lastT = t;
+        curT += dt * speed;
+        if (curT >= totalT) { curT = 0; }
+        const fr = getFrame(curT);
+        if (fr) applyFrame(fr);
+        seek.value = curT;
+    }
+    ctrl.update();
+    rend.render(sc, cam);
+}
+
+// ---- Apply first frame ----
+if (frames[0]) applyFrame(frames[0]);
+st(`✅ ${frames.length} 帧 · ${totalT.toFixed(1)}s · 就绪`);
+
+// ---- UI ----
+S('btnPlay').onclick = () => { play = !play; lastT = 0; S('btnPlay').textContent = play?'⏸':'▶'; st(play?'▶ 播放中':'⏸ 已暂停'); };
+S('btnReset').onclick = () => { play=false; curT=0; lastT=0; S('btnPlay').textContent='▶'; const fr = getFrame(0); if(fr) applyFrame(fr); st('⟳ 已重置'); };
+S('seek').oninput = (e) => { curT = parseFloat(e.target.value); if (!play) { const fr = getFrame(curT); if(fr) applyFrame(fr); } };
+S('btnSpeed').onclick = function() { const spd = [0.5,1,2,3]; let i = spd.indexOf(speed); speed = spd[(i+1)%spd.length]; this.textContent = speed+'×'; };
+S('btnCam').onclick = function() {
+    const modes = [{l:'自由',p:[0,3000,6000],t:[0,0,500]},{l:'跟随',p:[0,1500,-3000],t:[0,0,500]},{l:'俯视',p:[0,6000,-100],t:[0,0,500]}];
+    let i = parseInt(this.dataset.m || 0); i = (i+1)%modes.length; this.dataset.m = i;
+    const m = modes[i]; cam.position.set(m.p[0],m.p[1],m.p[2]); ctrl.target.set(m.t[0],m.t[1],m.t[2]); this.textContent = '🎥 '+m.l;
+};
+
+// Auto-start
+play = true; S('btnPlay').textContent = '⏸'; st('▶ 自动播放');
+
+// Resize
+window.onresize = () => { const w=innerWidth, h=innerHeight; cam.aspect=w/h; cam.updateProjectionMatrix(); rend.setSize(w,h); };
+
+console.log('SIM-VIEW INIT DONE');
+} catch(e) {
+    console.error('FATAL', e);
+    const el = S('err');
+    el.style.display = 'block';
+    el.textContent = '❌ FATAL: ' + (e.stack || e.message || JSON.stringify(e));
+}
+</script>
 </body>
 </html>
