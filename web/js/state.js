@@ -90,13 +90,20 @@ export const state = {
     CHASSIS_WHEELBASE_HALF: 450,
 
     // === Solver flow ===
-    solveScheduled: false,
     solveRunning: false,
     _solveId: 0,
 
     // === Chart ===
     kinCurveData: null,
     kinChart: null,
+
+    // === Playback ===
+    trajectory: null,        // {dt, total_time, frames[]} from /api/simulate
+    playbackTime: 0,         // current time in seconds
+    isPlaying: false,
+    playbackSpeed: 1.0,      // 0.5, 1, 2
+    playbackLoop: true,
+    lastFrameTime: 0,        // performance.now() of last tick
 };
 
 // Derived lists
@@ -112,29 +119,29 @@ state.FRAME_NODE_ORDER = [
 ];
 state.DAMPER_MOUNT_ORDER = ['DAMPER_CHASSIS_FR','DAMPER_CHASSIS_FL','R_DAMPER_CHASSIS_RR','R_DAMPER_CHASSIS_RL'];
 
-// Color constants
+// Color constants — warm palette (orange/cream/taupe)
 state.FRONT_COLORS = {
-    chassis: '#f43f5e', upright: '#fbbf24', float: '#38bdf8',
-    uca: '#3b82f6', ucaAxis: '#2563eb', lca: '#10b981', lcaAxis: '#059669',
-    kingpin: '#e4e4ec', tieRod: '#f97316', pushRod: '#8b5cf6', uprightLine: '#8888aa',
+    chassis: '#FC7607', upright: '#EFCE7D', float: '#EEECBC',
+    uca: '#FFA040', ucaAxis: '#E0680A', lca: '#D83514', lcaAxis: '#A02810',
+    kingpin: '#2A2A2A', tieRod: '#D83514', pushRod: '#AC8975', uprightLine: '#8B7355',
 };
 state.REAR_COLORS = {
-    chassis: '#d97706', upright: '#ca8a04', float: '#0284c7',
-    uca: '#2563eb', ucaAxis: '#1d4ed8', lca: '#059669', lcaAxis: '#047857',
-    kingpin: '#d4d4d8', tieRod: '#ea580c', pushRod: '#7c3aed', uprightLine: '#71718a',
+    chassis: '#D83514', upright: '#C09040', float: '#9C7860',
+    uca: '#C25A20', ucaAxis: '#A04010', lca: '#8B3A10', lcaAxis: '#602010',
+    kingpin: '#1A1A1A', tieRod: '#A02810', pushRod: '#704030', uprightLine: '#5A4030',
 };
-state.FRAME_COLOR = '#94a3b8';
-state.FRAME_NODE_COLOR = '#64748b';
-state.ROCKER_COLOR = '#f97316';
-state.DAMPER_COLOR = '#fbbf24';
+state.FRAME_COLOR = '#AC8975';
+state.FRAME_NODE_COLOR = '#8B7355';
+state.ROCKER_COLOR = '#EFCE7D';
+state.DAMPER_COLOR = '#D83514';
 
 // Palette
 state.PALETTE = [
-    {name:'红', hex:'#f43f5e'}, {name:'橙', hex:'#f97316'},
-    {name:'黄', hex:'#f59e0b'}, {name:'绿', hex:'#10b981'},
-    {name:'青', hex:'#06b6d4'}, {name:'蓝', hex:'#3b82f6'},
-    {name:'紫', hex:'#8b5cf6'}, {name:'白', hex:'#ffffff'},
-    {name:'灰', hex:'#94a3b8'}, {name:'粉', hex:'#ec4899'},
+    {name:'橙', hex:'#FC7607'}, {name:'红橙', hex:'#D83514'},
+    {name:'金', hex:'#EFCE7D'}, {name:'奶', hex:'#EEECBC'},
+    {name:'棕', hex:'#AC8975'}, {name:'蓝', hex:'#3b82f6'},
+    {name:'绿', hex:'#10b981'}, {name:'白', hex:'#ffffff'},
+    {name:'灰', hex:'#797979'}, {name:'粉', hex:'#ec4899'},
 ];
 
 // Parameter metadata
