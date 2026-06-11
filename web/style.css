@@ -1,0 +1,65 @@
+:root {
+  --bg: #1F1612;
+  --panel: #1F1612;
+  --accent: #FC7607;
+  --accent-hover: #D83514;
+  --text: #A88B6F;
+  --text-bright: #FDF6E3;
+  --text-dim: #8B7355;
+  --border: #3A2A20;
+  --input-bg: #2A1F18;
+  --slider-track: #5A4030;
+  --highlight: #2A1F18;
+  --hover: #2A1F18;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter','SF Pro Display',system-ui,sans-serif; }
+#viewport canvas { display: block; }
+
+/* Scrollable panels */
+.panel-scroll { scrollbar-width: thin; }
+
+/* Dynamic visibility — toggled by JS */
+.js-hide { display: none; }
+
+table { width: 100%; border-collapse: collapse; font-size: 0.7rem; }
+th, td { padding: 3px 4px; text-align: right; border-bottom: 1px solid var(--border); }
+th { color: var(--text-dim); font-weight: 500; position: sticky; top: 0; background: var(--bg); }
+td:first-child, th:first-child { text-align: left; color: var(--accent); font-weight: 600; }
+
+/* Compact 5-column angles table — fits in narrow left panel */
+.angles-table { table-layout: fixed; font-size: 0.62rem; }
+.angles-table th, .angles-table td { padding: 2px 2px; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+.angles-table th:first-child, .angles-table td:first-child { width: 56px; }
+.angles-table th:not(:first-child), .angles-table td:not(:first-child) { width: calc((100% - 56px) / 4); }
+td input { width: 62px; background: var(--input-bg); color: var(--text-bright); border: 1px solid var(--border);
+           padding: 2px 4px; border-radius: 4px; font-size: 0.78rem; font-family: 'SF Mono','Consolas',monospace; text-align: right; }
+td input:focus { border-color: var(--accent); outline: none; }
+
+.info-row { display: flex; justify-content: space-between; font-size: 0.7rem; padding: 2px 0; }
+.info-row .label { color: var(--text-dim); }
+.info-row .val  { font-family: 'SF Mono','Consolas',monospace; color: var(--text-bright); }
+
+input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 4px;
+  background: var(--slider-track); border-radius: 4px; outline: none; cursor: pointer; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px;
+  border-radius: 50%; background: var(--accent); border: 2px solid #1F1612; cursor: pointer; }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #5A4030; border-radius: 8px; }
+
+.panel-wrapper.collapsed > .panel-content { display: none; }
+.panel-wrapper.collapsed .collapse-arrow { transform: rotate(-90deg); }
+.collapse-arrow { transition: transform 0.2s; }
+
+/* Dynamic track panel */
+.dyn-btn { background: #3A2A20; color: #FDF6E3; border: 1px solid #3A2A20; border-radius: 3px; padding: 1px 6px; cursor: pointer; font-size: 0.55rem; }
+.dyn-btn:hover { background: #5A4030; }
+.dyn-btn-ghost { background: transparent; border: 0; color: #8B7355; cursor: pointer; font-size: 0.55rem; padding: 1px 4px; }
+.dyn-btn-ghost:hover { color: #FC7607; }
+.dyn-btn-xs { background: #3A2A20; color: #FDF6E3; border: 1px solid #3A2A20; border-radius: 2px; padding: 0 3px; cursor: pointer; font-size: 0.48rem; }
+.dyn-btn-xs:hover { background: #5A4030; }
+.dyn-active { background: #FC7607 !important; border-color: #FC7607 !important; color: #1F1612 !important; }
+.dyn-input { background: #1F1612; color: #FDF6E3; border: 1px solid #3A2A20; border-radius: 3px; padding: 1px 4px; font-size: 0.6rem; }
+.dyn-input:focus { outline: none; border-color: #FC7607; }
