@@ -206,8 +206,7 @@ if (fdPermEl) fdPermEl.addEventListener('click', () => deleteFace(true));
 // ============================================================
 // DYNAMIC TRACK PANEL
 // ============================================================
-import { simulate, togglePlay, seekTo, setSpeed } from './playback.js';
-import { initDashboard, clearDashboard } from './dashboard.js';
+import { simulate } from './playback.js';
 import { renderPathLine, renderObstaclePreviews } from './scene.js';
 
 window._obstacles = [];
@@ -218,32 +217,29 @@ document.getElementById('runSimBtn')?.addEventListener('click', async () => {
     const speed = parseFloat(document.getElementById('simSpeed').value) || 12000;
     const duration = parseFloat(document.getElementById('simDuration').value) || 5;
     if (pathPts.length < 2) { alert('至少需要 2 个路径点'); return; }
-    clearDashboard();
+
+    // Store params for sim-view window
+    const simParams = { path: pathPts, obstacles, speed, duration };
+    sessionStorage.setItem('simParams', JSON.stringify(simParams));
+
+    // Compute trajectory (for path preview on dev page, and to store for sim-view)
     renderPathLine(pathPts);
     renderObstaclePreviews(obstacles);
-    await simulate({ path: pathPts, obstacles, speed, duration });
-    document.getElementById('playbackControls').style.display = '';
-    document.getElementById('dashboardCharts').style.display = '';
-    initDashboard();
-    state.isPlaying = true;
-    state.lastFrameTime = 0;
-    document.getElementById('playPauseBtn').textContent = '⏸';
-});
 
-document.getElementById('playPauseBtn')?.addEventListener('click', togglePlay);
-document.getElementById('playbackSeek')?.addEventListener('input', (e) => seekTo(parseFloat(e.target.value)));
-document.getElementById('speed05Btn')?.addEventListener('click', () => { setSpeed(0.5);
-    ['speed05Btn','speed1Btn','speed2Btn'].forEach(id => document.getElementById(id)?.classList.remove('dyn-active'));
-    document.getElementById('speed05Btn')?.classList.add('dyn-active'); });
-document.getElementById('speed1Btn')?.addEventListener('click', () => { setSpeed(1.0);
-    ['speed05Btn','speed1Btn','speed2Btn'].forEach(id => document.getElementById(id)?.classList.remove('dyn-active'));
-    document.getElementById('speed1Btn')?.classList.add('dyn-active'); });
-document.getElementById('speed2Btn')?.addEventListener('click', () => { setSpeed(2.0);
-    ['speed05Btn','speed1Btn','speed2Btn'].forEach(id => document.getElementById(id)?.classList.remove('dyn-active'));
-    document.getElementById('speed2Btn')?.classList.add('dyn-active'); });
-document.getElementById('loopToggleBtn')?.addEventListener('click', function() {
-    state.playbackLoop = !state.playbackLoop;
-    this.classList.toggle('dyn-active', state.playbackLoop);
+    document.getElementById('simStatus').textContent = '⏳ 模拟计算中...';
+    await simulate(simParams);
+    if (state.trajectory) {
+        sessionStorage.setItem('simTrajectory', JSON.stringify(state.trajectory));
+    }
+    document.getElementById('simStatus').textContent = '✅ 已就绪，打开演示窗口';
+
+    // Open sim-view in new window
+    const simWin = window.open('/sim-view.html', '_blank');
+
+    // Fallback: if popup blocked, show a direct link
+    if (!simWin || simWin.closed || typeof simWin.closed === 'undefined') {
+        document.getElementById('simStatus').innerHTML = '⚠️ 请允许弹窗，或 <a href="/sim-view.html" target="_blank" class="text-[#FC7607] underline">点此打开</a>';
+    }
 });
 
 // Path table buttons
