@@ -204,6 +204,93 @@ if (fdTempEl) fdTempEl.addEventListener('click', () => deleteFace(false));
 if (fdPermEl) fdPermEl.addEventListener('click', () => deleteFace(true));
 
 // ============================================================
+// DYNAMIC TRACK PANEL
+// ============================================================
+import { simulate, togglePlay, seekTo, setSpeed } from './playback.js';
+import { initDashboard, clearDashboard } from './dashboard.js';
+
+window._obstacles = [];
+
+document.getElementById('runSimBtn')?.addEventListener('click', async () => {
+    const pathPts = readPathTable();
+    const obstacles = [...(window._obstacles || [])];
+    const speed = parseFloat(document.getElementById('simSpeed').value) || 12000;
+    const duration = parseFloat(document.getElementById('simDuration').value) || 5;
+    if (pathPts.length < 2) { alert('至少需要 2 个路径点'); return; }
+    clearDashboard();
+    await simulate({ path: pathPts, obstacles, speed, duration });
+    document.getElementById('playbackControls').style.display = '';
+    document.getElementById('dashboardCharts').style.display = '';
+    initDashboard();
+    state.isPlaying = true;
+    state.lastFrameTime = 0;
+    document.getElementById('playPauseBtn').textContent = '⏸';
+});
+
+document.getElementById('playPauseBtn')?.addEventListener('click', togglePlay);
+document.getElementById('playbackSeek')?.addEventListener('input', (e) => seekTo(parseFloat(e.target.value)));
+document.getElementById('speed05Btn')?.addEventListener('click', () => { setSpeed(0.5);
+    ['speed05Btn','speed1Btn','speed2Btn'].forEach(id => document.getElementById(id)?.classList.remove('dyn-active'));
+    document.getElementById('speed05Btn')?.classList.add('dyn-active'); });
+document.getElementById('speed1Btn')?.addEventListener('click', () => { setSpeed(1.0);
+    ['speed05Btn','speed1Btn','speed2Btn'].forEach(id => document.getElementById(id)?.classList.remove('dyn-active'));
+    document.getElementById('speed1Btn')?.classList.add('dyn-active'); });
+document.getElementById('speed2Btn')?.addEventListener('click', () => { setSpeed(2.0);
+    ['speed05Btn','speed1Btn','speed2Btn'].forEach(id => document.getElementById(id)?.classList.remove('dyn-active'));
+    document.getElementById('speed2Btn')?.classList.add('dyn-active'); });
+document.getElementById('loopToggleBtn')?.addEventListener('click', function() {
+    state.playbackLoop = !state.playbackLoop;
+    this.classList.toggle('dyn-active', state.playbackLoop);
+});
+
+// Path table buttons
+document.getElementById('addPathPtBtn')?.addEventListener('click', () => {
+    const tbody = document.querySelector('#pathTable tbody');
+    const row = tbody.insertRow();
+    const n = tbody.rows.length;
+    row.innerHTML = `<td class="text-[#8B7355]">${n}</td>
+        <td><input class="dyn-input w-full" type="number" value="0" step="100"></td>
+        <td><input class="dyn-input w-full" type="number" value="0" step="100"></td>
+        <td><button class="dyn-btn-ghost" onclick="this.closest('tr').remove()">✕</button></td>`;
+});
+document.getElementById('clearPathBtn')?.addEventListener('click', () => {
+    document.querySelector('#pathTable tbody').innerHTML = '';
+});
+// Seed 4 default points
+setTimeout(() => { for (let i = 0; i < 4; i++) document.getElementById('addPathPtBtn')?.click(); }, 300);
+
+// Obstacle buttons
+document.getElementById('addBumpBtn')?.addEventListener('click', () => addObstacle('bump'));
+document.getElementById('addKerbBtn')?.addEventListener('click', () => addObstacle('kerb'));
+document.getElementById('addRampBtn')?.addEventListener('click', () => addObstacle('ramp'));
+
+function readPathTable() {
+    const rows = document.querySelectorAll('#pathTable tbody tr');
+    const pts = [];
+    rows.forEach(r => {
+        const ins = r.querySelectorAll('input');
+        if (ins.length >= 2) pts.push([parseFloat(ins[0].value)||0, parseFloat(ins[1].value)||0]);
+    });
+    return pts;
+}
+
+function addObstacle(type) {
+    const obs = { type };
+    if (type === 'bump') { obs.x = 1000; obs.y = 0; obs.length = 300; obs.width = 150; obs.height = 30; }
+    if (type === 'kerb') { obs.x_start = -500; obs.y_start = 380; obs.x_end = 500; obs.y_end = 380; obs.width = 200; obs.height = 50; }
+    if (type === 'ramp') { obs.x_start = -500; obs.y_start = -380; obs.x_end = 500; obs.y_end = -380; obs.width = 200; obs.h_start = 0; obs.height = 40; }
+    window._obstacles.push(obs);
+    renderObstacleList();
+}
+
+function renderObstacleList() {
+    const el = document.getElementById('obstacleList');
+    if (!el) return;
+    el.innerHTML = (window._obstacles||[]).map((o,i) =>
+        `<div class="flex justify-between items-center"><span>${o.type}#${i+1} ${o.type==='bump'?`@(${o.x},${o.y})`:''}</span> <button class="dyn-btn-ghost text-xs" onclick="window._obstacles.splice(${i},1);renderObstacleList()">✕</button></div>`).join('');
+}
+
+// ============================================================
 // START
 // ============================================================
 
