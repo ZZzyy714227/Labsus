@@ -208,7 +208,7 @@ if (fdPermEl) fdPermEl.addEventListener('click', () => deleteFace(true));
 // ============================================================
 import { simulate, togglePlay, seekTo, setSpeed } from './playback.js';
 import { initDashboard, clearDashboard } from './dashboard.js';
-import { ensureGroundGrid, renderPathLine, renderObstaclePreviews } from './scene.js';
+import { renderPathLine, renderObstaclePreviews } from './scene.js';
 
 window._obstacles = [];
 
@@ -219,7 +219,6 @@ document.getElementById('runSimBtn')?.addEventListener('click', async () => {
     const duration = parseFloat(document.getElementById('simDuration').value) || 5;
     if (pathPts.length < 2) { alert('至少需要 2 个路径点'); return; }
     clearDashboard();
-    ensureGroundGrid();
     renderPathLine(pathPts);
     renderObstaclePreviews(obstacles);
     await simulate({ path: pathPts, obstacles, speed, duration });
@@ -262,8 +261,32 @@ document.getElementById('clearPathBtn')?.addEventListener('click', () => {
     document.querySelector('#pathTable tbody').innerHTML = '';
     renderPathLine([]);
 });
-// Seed 4 default points
-setTimeout(() => { for (let i = 0; i < 4; i++) document.getElementById('addPathPtBtn')?.click(); }, 300);
+// Seed default oval track path
+const DEFAULT_PATH = [[-4000,0],[-2000,2000],[0,2500],[2000,2000],[4000,0],[2000,-2000],[0,-2500],[-2000,-2000]];
+setTimeout(() => {
+    const tbody = document.querySelector('#pathTable tbody');
+    if (!tbody || tbody.rows.length > 0) return;
+    DEFAULT_PATH.forEach(([x,y], i) => {
+        const row = tbody.insertRow();
+        row.innerHTML = `<td class="text-[#8B7355]">${i+1}</td>
+            <td><input class="dyn-input w-full" type="number" value="${x}" step="100"></td>
+            <td><input class="dyn-input w-full" type="number" value="${y}" step="100"></td>
+            <td><button class="dyn-btn-ghost" onclick="this.closest('tr').remove();renderPathLine(readPathTable())">✕</button></td>`;
+    });
+    renderPathLine(DEFAULT_PATH);
+
+    // Seed default obstacles along the track
+    window._obstacles = [
+        { type: 'kerb', x_start: -2100, y_start: 2100, x_end: -1900, y_end: 1900, width: 200, height: 40 },
+        { type: 'bump', x: 0, y: 2600, length: 600, width: 800, height: 30 },
+        { type: 'kerb', x_start: 1900, y_start: 1900, x_end: 2100, y_end: 2100, width: 200, height: 40 },
+        { type: 'ramp', x_start: 3900, y_start: -200, x_end: 4100, y_end: 200, width: 800, h_start: 0, height: 35 },
+        { type: 'bump', x: 0, y: -2600, length: 400, width: 800, height: 25 },
+        { type: 'kerb', x_start: -2100, y_start: -1900, x_end: -1900, y_end: -2100, width: 200, height: 40 },
+    ];
+    renderObstacleList();
+    renderObstaclePreviews(window._obstacles);
+}, 400);
 
 // Obstacle buttons
 document.getElementById('addBumpBtn')?.addEventListener('click', () => addObstacle('bump'));

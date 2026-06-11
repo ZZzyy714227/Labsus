@@ -372,70 +372,77 @@ export function triangulateLoop(pts3D) {
 // ============================================================
 // DYNAMIC TRACK — terrain, path, obstacle preview rendering
 // ============================================================
+// World → Three.js mapping: (wx, wy, wz) → (wx, wy, wz) direct.
+// Ground grid is horizontal XY-plane at Z=0 (PolarGridHelper rotated π/2 around X).
+// Obstacles / path sit at Three.js Z=0 (world Z=0 = ground).
 
-/** Draw a visible ground grid (larger than existing helpers). */
-export function ensureGroundGrid() {
-    if (state.sceneObjects._trackGround) return;
-    const geom = new THREE.PlaneGeometry(8000, 8000);
-    const mat = new THREE.MeshBasicMaterial({
-        color: 0x3A2A20, side: THREE.DoubleSide, transparent: true, opacity: 0.25,
-    });
-    const mesh = new THREE.Mesh(geom, mat);
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.y = 0;
-    state.scene.add(mesh);
-    state.sceneObjects._trackGround = mesh;
+/** Build a Catmull-Rom curve in world XY for smooth path preview. */
+function catmullRomPoints(pts, nPerSeg) {
+    if (pts.length < 2) return pts;
+    const p = pts;
+    const padded = [ [2*p[0][0]-p[1][0], 2*p[0][1]-p[1][1]], ...p, [2*p[p.length-1][0]-p[p.length-2][0], 2*p[p.length-1][1]-p[p.length-2][1]] ];
+    const result = [];
+    for (let s = 0; s < p.length - 1; s++) {
+        for (let j = 0; j < nPerSeg; j++) {
+            const t = j / nPerSeg, t2 = t * t, t3 = t2 * t;
+            const p0 = padded[s], p1 = padded[s+1], p2 = padded[s+2], p3 = padded[s+3];
+            const x = 0.5 * ((2*p1[0]) + (-p0[0]+p2[0])*t + (2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*t2 + (-p0[0]+3*p1[0]-3*p2[0]+p3[0])*t3);
+            const y = 0.5 * ((2*p1[1]) + (-p0[1]+p2[1])*t + (2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2 + (-p0[1]+3*p1[1]-3*p2[1]+p3[1])*t3);
+            result.push([x, y]);
+        }
+    }
+    return result;
 }
 
-/** Draw path preview line from control points. */
+/** Draw path preview line on the ground plane. */
 export function renderPathLine(pathPoints) {
     clearTrackElements();
     if (!pathPoints || pathPoints.length < 2) return;
-    // Simple linear preview (Catmull-Rom would need the JS lib; use line segments)
-    const pts3 = pathPoints.map(([x, y]) => new THREE.Vector3(x, 1, -y));
+    const smooth = catmullRomPoints(pathPoints, 30);
+    const pts3 = smooth.map(([x, y]) => new THREE.Vector3(x, y, 0.5));
     const geom = new THREE.BufferGeometry().setFromPoints(pts3);
-    const mat = new THREE.LineBasicMaterial({ color: 0xFC7607, linewidth: 1 });
+    const mat = new THREE.LineBasicMaterial({ color: 0xFC7607 });
     const line = new THREE.Line(geom, mat);
     state.scene.add(line);
     state.sceneObjects._trackLines = [line];
 }
 
-/** Draw obstacle previews as colored semi-transparent boxes. */
+/** Draw obstacle previews as colored semi-transparent boxes on the ground plane. */
 export function renderObstaclePreviews(obstacles) {
     clearObstaclePreviews();
-    if (!obstacles) return;
+    if (!obstacles || !obstacles.length) return;
     const meshes = [];
     for (const o of obstacles) {
-        let geom;
         const color = o.type === 'bump' ? 0x8B5CF6 : o.type === 'kerb' ? 0xFC7607 : 0x10B981;
+        const h = o.height || 10;
+        let cx, cy, len;
+
         if (o.type === 'bump') {
-            geom = new THREE.BoxGeometry(o.length, o.height, o.width);
-        } else if (o.type === 'kerb') {
-            const dx = o.x_end - o.x_start, dy = o.y_end - o.y_start;
-            const len = Math.sqrt(dx*dx + dy*dy);
-            geom = new THREE.BoxGeometry(len, o.height, o.width);
-        } else {
-            const dx = o.x_end - o.x_start, dy = o.y_end - o.y_start;
-            const len = Math.sqrt(dx*dx + dy*dy);
-            geom = new THREE.BoxGeometry(len, Math.max(o.height, 5), o.width);
+            cx = o.x; cy = o.y;
+            len = o.length || 200;
+            // Bump: box along X, width along Y, height along Z
+            const geom = new THREE.BoxGeometry(len, o.width || 150, h);
+            const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.4 });
+            const mesh = new THREE.Mesh(geom, mat);
+            mesh.position.set(cx, cy, h / 2);
+            meshes.push(mesh);
+        } else if (o.type === 'kerb' || o.type === 'ramp') {
+            const xs = o.x_start || 0, ys = o.y_start || 0;
+            const xe = o.x_end || 100, ye = o.y_end || 0;
+            cx = (xs + xe) / 2; cy = (ys + ye) / 2;
+            const dx = xe - xs, dy = ye - ys;
+            len = Math.sqrt(dx * dx + dy * dy) || 100;
+            const w = o.width || 100;
+            // Box along the kerb direction, width lateral, height vertical
+            const geom = new THREE.BoxGeometry(len, w, h);
+            const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.4 });
+            const mesh = new THREE.Mesh(geom, mat);
+            mesh.position.set(cx, cy, h / 2);
+            mesh.rotation.z = Math.atan2(dy, dx);
+            meshes.push(mesh);
         }
-        const mat = new THREE.MeshBasicMaterial({
-            color, transparent: true, opacity: 0.4, side: THREE.DoubleSide,
-        });
-        const mesh = new THREE.Mesh(geom, mat);
-        mesh.position.set(
-            o.type === 'bump' ? o.x : (o.x_start + (o.x_end||0)) / 2,
-            (o.height || 0) / 2,
-            -(o.type === 'bump' ? o.y : (o.y_start + (o.y_end||0)) / 2)
-        );
-        // Rotate kerb/ramp to align with direction
-        if (o.type !== 'bump' && o.x_end !== undefined) {
-            const ang = Math.atan2(o.y_end - o.y_start, o.x_end - o.x_start);
-            mesh.rotation.z = -ang;
-        }
-        state.scene.add(mesh);
-        meshes.push(mesh);
     }
+    meshes.forEach(m => state.scene.add(m));
     state.sceneObjects._obstacleMeshes = meshes;
 }
 
@@ -460,28 +467,26 @@ function clearObstaclePreviews() {
 }
 
 /**
- * Apply trajectory frame to 3D scene. Called by playback engine.
- * In V1: displays a moving reference point at the car body position.
+ * Apply trajectory frame to 3D scene. Moves a marker at the car body position.
  */
 export function applyFrameToScene(frame) {
     if (!frame || !frame.body) return;
     const b = frame.body;
-    // Update or create car-body position marker
     let marker = state.sceneObjects._bodyMarker;
     if (!marker) {
-        const geom = new THREE.SphereGeometry(30, 16, 16);
+        const geom = new THREE.SphereGeometry(40, 16, 16);
         const mat = new THREE.MeshBasicMaterial({ color: 0xFC7607, transparent: true, opacity: 0.7 });
         marker = new THREE.Mesh(geom, mat);
         state.scene.add(marker);
         state.sceneObjects._bodyMarker = marker;
     }
-    marker.position.set(b.x, b.z, -b.y);
+    // World (bx, by, bz) → Three.js (bx, by, bz) — ground is Z=0
+    marker.position.set(b.x, b.y, b.z);
 }
 
-// Expose for playback.js
+// Expose for playback.js + main.js
 window.applyFrameToScene = applyFrameToScene;
 window.renderPathLine = renderPathLine;
 window.renderObstaclePreviews = renderObstaclePreviews;
-window.ensureGroundGrid = ensureGroundGrid;
 
 export { THREE };
