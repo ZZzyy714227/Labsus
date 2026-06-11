@@ -208,6 +208,7 @@ if (fdPermEl) fdPermEl.addEventListener('click', () => deleteFace(true));
 // ============================================================
 import { simulate, togglePlay, seekTo, setSpeed } from './playback.js';
 import { initDashboard, clearDashboard } from './dashboard.js';
+import { ensureGroundGrid, renderPathLine, renderObstaclePreviews } from './scene.js';
 
 window._obstacles = [];
 
@@ -218,6 +219,9 @@ document.getElementById('runSimBtn')?.addEventListener('click', async () => {
     const duration = parseFloat(document.getElementById('simDuration').value) || 5;
     if (pathPts.length < 2) { alert('至少需要 2 个路径点'); return; }
     clearDashboard();
+    ensureGroundGrid();
+    renderPathLine(pathPts);
+    renderObstaclePreviews(obstacles);
     await simulate({ path: pathPts, obstacles, speed, duration });
     document.getElementById('playbackControls').style.display = '';
     document.getElementById('dashboardCharts').style.display = '';
@@ -251,10 +255,12 @@ document.getElementById('addPathPtBtn')?.addEventListener('click', () => {
     row.innerHTML = `<td class="text-[#8B7355]">${n}</td>
         <td><input class="dyn-input w-full" type="number" value="0" step="100"></td>
         <td><input class="dyn-input w-full" type="number" value="0" step="100"></td>
-        <td><button class="dyn-btn-ghost" onclick="this.closest('tr').remove()">✕</button></td>`;
+        <td><button class="dyn-btn-ghost" onclick="this.closest('tr').remove();renderPathLine(readPathTable())">✕</button></td>`;
+    renderPathLine(readPathTable());
 });
 document.getElementById('clearPathBtn')?.addEventListener('click', () => {
     document.querySelector('#pathTable tbody').innerHTML = '';
+    renderPathLine([]);
 });
 // Seed 4 default points
 setTimeout(() => { for (let i = 0; i < 4; i++) document.getElementById('addPathPtBtn')?.click(); }, 300);
@@ -281,13 +287,16 @@ function addObstacle(type) {
     if (type === 'ramp') { obs.x_start = -500; obs.y_start = -380; obs.x_end = 500; obs.y_end = -380; obs.width = 200; obs.h_start = 0; obs.height = 40; }
     window._obstacles.push(obs);
     renderObstacleList();
+    renderObstaclePreviews(window._obstacles);
 }
 
 function renderObstacleList() {
     const el = document.getElementById('obstacleList');
     if (!el) return;
-    el.innerHTML = (window._obstacles||[]).map((o,i) =>
+    const obs = window._obstacles || [];
+    el.innerHTML = obs.map((o,i) =>
         `<div class="flex justify-between items-center"><span>${o.type}#${i+1} ${o.type==='bump'?`@(${o.x},${o.y})`:''}</span> <button class="dyn-btn-ghost text-xs" onclick="window._obstacles.splice(${i},1);renderObstacleList()">✕</button></div>`).join('');
+    renderObstaclePreviews(obs);
 }
 
 // ============================================================
