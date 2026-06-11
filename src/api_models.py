@@ -1,7 +1,9 @@
 """
 Pydantic request/response models for the FSAE suspension API.
 """
-from typing import Optional
+
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel
 
 
@@ -10,8 +12,8 @@ class SolveRequest(BaseModel):
     rear_hardpoints: dict
     front_travel: float = 0.0
     rear_travel: float = 0.0
-    front_left_travel: Optional[float] = None
-    rear_left_travel: Optional[float] = None
+    front_left_travel: float | None = None
+    rear_left_travel: float | None = None
     rack_displacement: float = 0.0
     mirror: bool = True
 
@@ -65,3 +67,18 @@ class UpdateParamsRequest(BaseModel):
     axle: str
     key: str
     value: float
+
+
+class OptimizeFL1Request(BaseModel):
+    axle: str = "front"  # "front" or "rear"
+    travel_start: float = -25.0
+    travel_end: float = 25.0
+    travel_steps: int = 51
+
+
+class SimulateRequest(BaseModel):
+    path: List[List[float]]              # [[x, y], ...] control points
+    obstacles: List[Dict[str, Any]] = []  # obstacle definitions
+    speed: float = 12000.0               # mm/s
+    duration: float = 5.0                # seconds
+    params: Optional[Dict[str, float]] = None  # vehicle param overrides
