@@ -56,15 +56,31 @@ def _build_frame(t, bx, by, yaw, state, vehicle, terrain):
         comps.append(comp)
         travels.append(comp - static_comp)
 
-    # Start with chassis points from design hardpoints
+    # Start with chassis points from design hardpoints — store under ALL corner prefixes
     all_hardpoints = {}
+    CORNER_PREFIXES = {1: "FR_", 0: "FL_", 3: "RR_", 2: "RL_"}
+    front_chassis = {}
     for k, v in DEFAULT_HARDPOINTS.items():
         if k in {"CH1", "CH2", "CH3", "CH4", "CH5"}:
-            all_hardpoints[k] = list(v)
+            front_chassis[k] = list(v)
     rear_base = strip_prefix(dict(DEFAULT_REAR_HARDPOINTS), REAR_PREFIX)
+    rear_chassis = {}
     for k, v in rear_base.items():
         if k in {"CH1", "CH2", "CH3", "CH4", "CH5"}:
-            all_hardpoints["R_" + k] = list(v)
+            rear_chassis[k] = list(v)
+
+    # Pre-populate all corner prefixes with chassis points
+    for pref in ["FR_", "FL_"]:
+        for k, v in front_chassis.items():
+            all_hardpoints[pref + k] = v
+    for pref in ["RR_", "RL_"]:
+        for k, v in rear_chassis.items():
+            all_hardpoints[pref + k] = v
+    # Legacy keys (backward compat)
+    for k, v in front_chassis.items():
+        all_hardpoints[k] = v
+    for k, v in rear_chassis.items():
+        all_hardpoints["R_" + k] = v
 
     cambers = [0.0, 0.0, 0.0, 0.0]
     toes = [0.0, 0.0, 0.0, 0.0]
@@ -79,7 +95,7 @@ def _build_frame(t, bx, by, yaw, state, vehicle, terrain):
     for idx, is_left in solve_order:
         axle, side, _ = _WHEEL_MAP[idx]
         dz = travels[idx]
-        key_prefix = "R_" if axle == "rear" else ""
+        corner_pref = CORNER_PREFIXES[idx]
 
         if axle == "front":
             hp_base = dict(DEFAULT_HARDPOINTS)
@@ -93,17 +109,27 @@ def _build_frame(t, bx, by, yaw, state, vehicle, terrain):
         if is_left:
             ref = right_angles.get(axle, angles)
             angles = fix_left_angles(angles, ref)
-            # Mirror result coords back
-            for k, v in list(result.items()):
+            # Corner-specific: store in LEFT coordinates (Y mirrored — for FL/RL use)
+            corner_result = dict(result)
+            # Legacy: mirror coords back to right-side (for backward compat with FR/FL sharing CH1)
+            legacy_result = dict(result)
+            for k, v in list(legacy_result.items()):
                 if isinstance(v, list) and len(v) == 3:
-                    result[k] = [v[0], -v[1], v[2]]
+                    legacy_result[k] = [v[0], -v[1], v[2]]
         else:
             right_angles[axle] = angles
+            corner_result = result
+            legacy_result = result
 
-        # Store hardpoints with correct prefix
-        for k, v in result.items():
+        # Store with corner-specific prefix (never overwritten)
+        for k, v in corner_result.items():
             if isinstance(v, (list, float, int)):
-                all_hardpoints[key_prefix + k] = v
+                all_hardpoints[corner_pref + k] = v
+        # Also store under legacy key (backward compat, last solver wins)
+        legacy_pref = "R_" if axle == "rear" else ""
+        for k, v in legacy_result.items():
+            if isinstance(v, (list, float, int)):
+                all_hardpoints[legacy_pref + k] = v
 
         cambers[idx] = round(angles.get("camber_deg", 0), 3)
         toes[idx] = round(angles.get("toe_deg", 0), 3)

@@ -309,13 +309,17 @@ function getFrame(t) {
 function applyFrame(fr) {
     if (!fr || !fr.hardpoints) return;
     const hp = fr.hardpoints;
+    // Corner prefix map: sideKey → trajectory key prefix
+    const SIDE_PREF = {fr:'FR_', fl:'FL_', rr:'RR_', rl:'RL_'};
     // Update spheres by hardpoint key
     for (const [sideKey, side] of Object.entries(sides)) {
-        const pref = sideKey === 'rr' || sideKey === 'rl' ? 'R_' : '';
+        const pref = SIDE_PREF[sideKey] || '';
         for (const k of allKeys) {
             const sk = pref + k;
             const pos = hp[sk];
-            if (pos && side.spheres[k]) side.spheres[k].position.set(pos[0], pos[1], pos[2]);
+            if (pos && pos.length === 3 && side.spheres[k]) {
+                side.spheres[k].position.set(pos[0], pos[1], pos[2]);
+            }
         }
         // Lines
         function updL(a, b, lnk) {
