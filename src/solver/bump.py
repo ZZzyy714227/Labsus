@@ -16,6 +16,7 @@ from geometry import (
     distance_point_to_line,
     enforce_distance,
     enforce_distance_fixed_q,
+    normalize_or_default,
     vec3,
 )
 
@@ -23,13 +24,8 @@ from geometry import (
 # PBD solver (legacy fallback / fast path)
 # ============================================================
 
-def _solve_bump_pbd(hp_right, dz, max_iter=80, tol=0.01, damping=0.35,
-                   init_up1=None, init_up2=None):
-    """PBD solver. Use solve_bump() in production.
-
-    init_up1, init_up2: optional warm-start positions (currently unused;
-    kept for future branch-aware solver work).
-    """
+def _solve_bump_pbd(hp_right, dz, max_iter=80, tol=0.01, damping=0.35):
+    """PBD solver. Use solve_bump() in production."""
     CH1 = np.array(hp_right["CH1"])
     CH2 = np.array(hp_right["CH2"])
     CH3 = np.array(hp_right["CH3"])
@@ -111,17 +107,10 @@ def _solve_bump_pbd(hp_right, dz, max_iter=80, tol=0.01, damping=0.35,
 def _compute_upright_local(UP1, UP2, UP3, UP4, UP5):
     """Compute local coordinates of upright points relative to UP1-UP2-UP5 frame."""
     origin = UP1
-    z_axis = vec3(UP1, UP2)
-    z_axis = z_axis / np.linalg.norm(z_axis)
+    z_axis = normalize_or_default(vec3(UP1, UP2), [0.0, 0.0, -1.0])
 
     up15 = vec3(UP1, UP5)
-    x_axis = np.cross(up15, z_axis)
-    x_norm = np.linalg.norm(x_axis)
-    if x_norm < 1e-12:
-        x_axis = np.array([1.0, 0.0, 0.0])
-    else:
-        x_axis = x_axis / x_norm
-
+    x_axis = normalize_or_default(np.cross(up15, z_axis))
     y_axis = np.cross(z_axis, x_axis)
 
     def to_local(p):
@@ -140,17 +129,10 @@ def _compute_upright_local(UP1, UP2, UP3, UP4, UP5):
 def _reconstruct_upright(UP1_new, UP2_new, UP5_new, upright_local):
     """Reconstruct upright points from new UP1, UP2, UP5 positions and local coordinates."""
     origin = UP1_new
-    z_axis = vec3(UP1_new, UP2_new)
-    z_axis = z_axis / np.linalg.norm(z_axis)
+    z_axis = normalize_or_default(vec3(UP1_new, UP2_new), [0.0, 0.0, -1.0])
 
     up15 = vec3(UP1_new, UP5_new)
-    x_axis = np.cross(up15, z_axis)
-    x_norm = np.linalg.norm(x_axis)
-    if x_norm < 1e-12:
-        x_axis = np.array([1.0, 0.0, 0.0])
-    else:
-        x_axis = x_axis / x_norm
-
+    x_axis = normalize_or_default(np.cross(up15, z_axis))
     y_axis = np.cross(z_axis, x_axis)
 
     def from_local(local):
@@ -175,9 +157,19 @@ def solve_bump(hp_right, dz, polish=False, prev_up=None):
     Suitable for interactive slider drags where visual accuracy at the
     0.1mm level is sufficient.
 
-    With polish=True: PBD + scipy least_squares refinement in normal range
-    (|dz| <= 15mm), drives residual to machine zero. ~300ms per solve.
-    Use for sweep/analysis where precision matters.
+    With polish=True: PBD + scipy least_squares refinement, drives residual
+    to machine zero. ~300ms per solve. Use for sweep/analysis where
+    precision matters.
+
+    prev_up: optional (UP1, UP2) tuple from the previous sweep step's bump
+    solution. Accepted for API compatibility with the sweep's continuation
+    loop, but the LS polish is anchored to the PBD result (design branch)
+    instead: with the bidirectional sweep order, consecutive steps come from
+    OPPOSITE sides of the travel range, so a prev_up warm start lands on the
+    wrong sheet of the (under-determined) constraint system and the LS drifts
+    onto a wrong physical branch. The PBD still runs first for branch
+    identification; the LS polishes within a tight margin of the PBD result,
+    with a soft anchor pull toward it so it cannot escape onto another branch.
     """
     if not polish or not HAS_SCIPY:
         return _solve_bump_pbd(hp_right, dz)
@@ -207,31 +199,59 @@ def solve_bump(hp_right, dz, polish=False, prev_up=None):
     UP5_new = np.array(UP5_0)
     UP5_new[2] += dz
 
-    # Stage 1: PBD (always — robust branch selection)
+    # Stage 1: PBD (always — robust branch identification)
     pbd_result = _solve_bump_pbd(hp_right, dz)
 
     UP1_new = np.array(pbd_result["UP1"])
     UP2_new = np.array(pbd_result["UP2"])
     max_res = pbd_result["max_residual"]
 
-    # Stage 2: LS polish — only within normal range
+    # Stage 2: LS polish
     nfev = pbd_result["iterations"]
-    if abs(dz) <= 15.5 and max_res > 1e-6:
+
+    # Decide whether to run LS.
+    # The UP5-rigid-translation constraint system (UP1/UP2 on their A-arm
+    # circles + kingpin/UP5 distance constraints) is NOT exactly solvable
+    # for most travel values — the least_squares cost decreases by sliding
+    # along an unbounded residual valley, so with a wide trust region the
+    # solution drifts off the design branch (the 5-15° caster/toe branch
+    # jumps seen at ~-5mm sweep travel). The PBD result (cold-started from
+    # the design position) reliably identifies the design branch, so we
+    # anchor the LS warm start to it with a tight margin: enough to polish
+    # the residual, too small to escape onto another branch.
+    #
+    # (prev_up from the previous sweep step was previously used as the LS
+    # warm start for branch continuation, but it breaks the bidirectional
+    # sweep: consecutive steps are solved on OPPOSITE sides of the travel
+    # range, so the warm start lands on the wrong sheet of the constraint
+    # manifold and the drift compounds step by step.)
+    has_continuation = prev_up is not None
+    run_ls = (has_continuation or abs(dz) <= 15.5) and max_res > 1e-6
+
+    if run_ls:
+        # Warm-start from the PBD result (design branch) with a tight margin
         x0 = np.concatenate([UP1_new, UP2_new])
-        margin = 5.0
+        margin = 2.0
+
         lb = x0 - margin
         ub = x0 + margin
 
         def residuals(x):
             UP1 = x[0:3]
             UP2 = x[3:6]
-            return np.array([
+            r = np.array([
                 distance_point_to_line(UP1, CH1, CH2) - R_uca,
                 distance_point_to_line(UP2, CH3, CH4) - R_lca,
                 dist(UP1, UP2) - L_kp,
                 dist(UP1, UP5_new) - L_u15,
                 dist(UP2, UP5_new) - L_u25,
             ])
+            # Branch anchor: the constraint system is under-determined
+            # (5 constraints / 6 unknowns) and the raw constraint residual
+            # decreases by sliding along an unbounded valley away from the
+            # design branch. A weak pull toward the PBD result keeps the
+            # polish on the design branch while still improving residuals.
+            return np.concatenate([r, 2.0 * (x - x0)])
 
         result = least_squares(
             residuals, x0, method='trf',
@@ -240,7 +260,9 @@ def solve_bump(hp_right, dz, polish=False, prev_up=None):
             max_nfev=2000,
         )
 
-        ls_max_res = float(np.max(np.abs(result.fun)))
+        # Acceptance is based on the constraint residuals only (the anchor
+        # terms are artificial and must not gate the result).
+        ls_max_res = float(np.max(np.abs(result.fun[:5])))
         if ls_max_res < max_res:
             UP1_new = result.x[0:3]
             UP2_new = result.x[3:6]
