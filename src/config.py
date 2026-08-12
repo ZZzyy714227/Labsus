@@ -4,6 +4,7 @@ Pure data constants — no logic, no computation.
 """
 
 REAR_PREFIX = "R_"
+DEFAULT_TUBE_COLOR = "#8899cc"  # fallback color for frame tubes and bodywork faces
 
 # ============================================================
 # DESIGN PARAMETERS — drive all hardpoints parametrically
@@ -133,11 +134,11 @@ DEFAULT_FRAME_NODES = {
     "MH_UPR_R":         [-650.0, 204.8, 185.0],   # Junction on upper rail (Z interpolated)
     "MH_UPR_L":         [-650.0, -204.8, 185.0],
 
-    # === Rear Bulkhead (X=-1100) ===
-    "RB_TOP_R": [-1050.0, 194.7, 220.0],  # Top right (Z lowered 260→220)
-    "RB_TOP_L": [-1050.0, -194.7, 220.0],
-    "RB_LWR_R": [-1100.0, 115.9, 65.0],  # Bottom right (Z lowered 100→65)
-    "RB_LWR_L": [-1100.0, -115.9, 65.0],
+    # === Rear Bulkhead (X=-1195) — at 1/3 of wheelbase (300mm) behind rear wheel ===
+    "RB_TOP_R": [-1145.0, 194.7, 220.0],  # Top right (Z lowered 260→220)
+    "RB_TOP_L": [-1145.0, -194.7, 220.0],
+    "RB_LWR_R": [-1195.0, 115.9, 65.0],  # Bottom right (Z lowered 100→65)
+    "RB_LWR_L": [-1195.0, -115.9, 65.0],
 
     # === Damper Chassis Mounts (separately adjustable) ===
     "DAMPER_CHASSIS_FR": [0.0, 108.2, 120.0],
@@ -161,13 +162,25 @@ DEFAULT_FRAME_NODES = {
     "BODY_UPR_FWD_R":    [-350.0, 198.0, 185.0],
     "BODY_UPR_FWD_L":    [-350.0, -198.0, 185.0],
 
-    # Engine cover / rear body (X ~ -1000, behind main hoop at -650)
-    "BODY_ENG_TOP":      [-1000.0, 0.0, 260.0],
-    "BODY_ENG_MID_R":    [-1000.0, 80.0, 200.0],
-    "BODY_ENG_MID_L":    [-1000.0, -80.0, 200.0],
+    # Engine cover / rear body (X ~ -1100, behind main hoop at -650)
+    "BODY_ENG_TOP":      [-1100.0, 0.0, 260.0],
+    "BODY_ENG_MID_R":    [-1100.0, 80.0, 200.0],
+    "BODY_ENG_MID_L":    [-1100.0, -80.0, 200.0],
 
     # Roof / cowl (above main hoop, X ~ -500, Z elevated)
     # (removed BODY_COWL_TOP)
+
+    # === SIDEPOD (侧箱) — Trapezoidal: narrow in front, wide in back ===
+    # Top edge (Y=320 front → 380 rear, parallel to ground)
+    "BODY_SIDE_FR_TR":   [-50.0,  320.0, 200.0],   # Front top right (narrow)
+    "BODY_SIDE_FR_TL":   [-50.0, -320.0, 200.0],   # Front top left
+    "BODY_SIDE_RR_TR":   [-850.0,  380.0, 200.0],  # Rear top right (wide)
+    "BODY_SIDE_RR_TL":   [-850.0, -380.0, 200.0],  # Rear top left
+    # Bottom edge (Y=300 front → 360 rear, parallel to ground)
+    "BODY_SIDE_FR_BR":   [-50.0,  300.0, 60.0],    # Front bottom right
+    "BODY_SIDE_FR_BL":   [-50.0, -300.0, 60.0],    # Front bottom left
+    "BODY_SIDE_RR_BR":   [-850.0,  360.0, 60.0],   # Rear bottom right
+    "BODY_SIDE_RR_BL":   [-850.0, -360.0, 60.0],   # Rear bottom left
 }
 
 FRAME_TUBES = [
@@ -310,6 +323,16 @@ FRAME_TUBES = [
     ["BODY_ENG_MID_R", "BODY_ENG_TOP"],
     ["BODY_ENG_MID_R", "BODY_ENG_MID_L"],
     ["BODY_ENG_TOP", "BODY_ENG_MID_L"],
+
+    # === SIDEPOD OUTLINE TUBES (trapezoidal: narrow front, wide rear) ===
+    ["BODY_SIDE_FR_TR", "BODY_SIDE_RR_TR"],   # Top right edge
+    ["BODY_SIDE_FR_TL", "BODY_SIDE_RR_TL"],   # Top left edge
+    ["BODY_SIDE_FR_BR", "BODY_SIDE_RR_BR"],   # Bottom right edge
+    ["BODY_SIDE_FR_BL", "BODY_SIDE_RR_BL"],   # Bottom left edge
+    ["BODY_SIDE_FR_TR", "BODY_SIDE_FR_TL"],   # Front cross (narrow)
+    ["BODY_SIDE_RR_TR", "BODY_SIDE_RR_TL"],   # Rear cross (wide)
+    ["BODY_SIDE_FR_BR", "BODY_SIDE_FR_BL"],   # Front bottom cross
+    ["BODY_SIDE_RR_BR", "BODY_SIDE_RR_BL"],   # Rear bottom cross
 ]
 
 # Custom tube colors: {tube_index: "#hexcolor"}
@@ -432,6 +455,33 @@ BODYWORK_FACES = {
         "color": "#ec4899",
         "opacity": 0.95
     },
+
+    # === SIDEPOD (侧箱) — Trapezoidal outer panels, narrow front (Y=320) → wide rear (Y=380) ===
+    "12": {
+        "loops": [["BODY_SIDE_FR_TR", "BODY_SIDE_RR_TR", "BODY_SIDE_RR_BR", "BODY_SIDE_FR_BR"]],
+        "color": "#fc7607",
+        "opacity": 0.55
+    },
+
+    "13": {
+        "loops": [["BODY_SIDE_FR_TL", "BODY_SIDE_FR_BL", "BODY_SIDE_RR_BL", "BODY_SIDE_RR_TL"]],
+        "color": "#fc7607",
+        "opacity": 0.55
+    },
+
+    # Sidepod top deck
+    "14": {
+        "loops": [["BODY_SIDE_FR_TR", "BODY_SIDE_FR_TL", "BODY_SIDE_RR_TL", "BODY_SIDE_RR_TR"]],
+        "color": "#efce7d",
+        "opacity": 0.40
+    },
+
+    # Sidepod bottom (floor-side)
+    "15": {
+        "loops": [["BODY_SIDE_FR_BR", "BODY_SIDE_RR_BR", "BODY_SIDE_RR_BL", "BODY_SIDE_FR_BL"]],
+        "color": "#d83514",
+        "opacity": 0.35
+    },
 }
 
 # ============================================================
@@ -440,8 +490,8 @@ BODYWORK_FACES = {
 
 REAR_WING = {
     "enabled": True,
-    "reference_point": [-950, 0, 480],
-    "span": 600,
+    "reference_point": [-1080, 0, 510],
+    "span": 800,
     "elements": [
         {
             "name": "主翼面",
@@ -475,24 +525,24 @@ REAR_WING = {
         }
     ],
     "endplate": {
-        "overhang_forward": 0.1,
-        "overhang_rear": 0.04,
-        "height_above": 30,
-        "height_below": 40
+        "overhang_forward": 0.12,
+        "overhang_rear": 0.08,
+        "height_above": 70,
+        "height_below": 90
     },
     "mounts": [
         {
             "name": "RW_MOUNT_R",
             "frame_node": "RB_TOP_R",
             "local_x": 0,
-            "local_y": 180,
+            "local_y": 220,
             "local_z": 0
         },
         {
             "name": "RW_MOUNT_L",
             "frame_node": "RB_TOP_L",
             "local_x": 0,
-            "local_y": -180,
+            "local_y": -220,
             "local_z": 0
         }
     ],
@@ -549,11 +599,11 @@ FRONT_WING = {
 
 UNDERTRAY_CONFIG = {
     "enabled": True,
-    "front_x": 250.0,
-    "rear_x": -895.0,
-    "ground_clearance": 28.0,
-    "half_width": 360.0,
-    "venturi_depth": 15.0,
+    "front_x": 10,
+    "rear_x": -1195,
+    "ground_clearance": 28,
+    "half_width": 300,
+    "venturi_depth": 15,
     "venturi_start_ratio": 0.3,
     "venturi_end_ratio": 0.6,
     "edge_flipups": [
@@ -561,18 +611,18 @@ UNDERTRAY_CONFIG = {
             "name": "FLIPUP_R",
             "side": "right",
             "start_ratio": 0.55,
-            "length": 300.0,
-            "height": 40.0,
-            "angle": 35.0,
+            "length": 300,
+            "height": 40,
+            "angle": 35
         },
         {
             "name": "FLIPUP_L",
             "side": "left",
             "start_ratio": 0.55,
-            "length": 300.0,
-            "height": 40.0,
-            "angle": 35.0,
-        },
+            "length": 300,
+            "height": 40,
+            "angle": 35
+        }
     ],
     "strakes": [
         {
@@ -580,46 +630,62 @@ UNDERTRAY_CONFIG = {
             "side": "right",
             "y_ratio": 0.85,
             "start_ratio": 0.35,
-            "length": 400.0,
-            "height": 25.0,
-            "angle": 50.0,
+            "length": 400,
+            "height": 25,
+            "angle": 50
         },
         {
             "name": "STRAKE_R2",
             "side": "right",
             "y_ratio": 0.45,
-            "start_ratio": 0.40,
-            "length": 350.0,
-            "height": 20.0,
-            "angle": 45.0,
+            "start_ratio": 0.4,
+            "length": 350,
+            "height": 20,
+            "angle": 45
         },
         {
             "name": "STRAKE_L1",
             "side": "left",
             "y_ratio": 0.85,
             "start_ratio": 0.35,
-            "length": 400.0,
-            "height": 25.0,
-            "angle": 50.0,
+            "length": 400,
+            "height": 25,
+            "angle": 50
         },
         {
             "name": "STRAKE_L2",
             "side": "left",
             "y_ratio": 0.45,
-            "start_ratio": 0.40,
-            "length": 350.0,
-            "height": 20.0,
-            "angle": 45.0,
-        },
+            "start_ratio": 0.4,
+            "length": 350,
+            "height": 20,
+            "angle": 45
+        }
     ],
     "mounts": [
-        {"name": "UT_MOUNT_FR", "frame_node": "FB_LWR_R", "local_y": 80},
-        {"name": "UT_MOUNT_FL", "frame_node": "FB_LWR_L", "local_y": -80},
-        {"name": "UT_MOUNT_RR", "frame_node": "RB_LWR_R", "local_y": 80},
-        {"name": "UT_MOUNT_RL", "frame_node": "RB_LWR_L", "local_y": -80},
+        {
+            "name": "UT_MOUNT_FR",
+            "frame_node": "FB_LWR_R",
+            "local_y": 80
+        },
+        {
+            "name": "UT_MOUNT_FL",
+            "frame_node": "FB_LWR_L",
+            "local_y": -80
+        },
+        {
+            "name": "UT_MOUNT_RR",
+            "frame_node": "RB_LWR_R",
+            "local_y": 80
+        },
+        {
+            "name": "UT_MOUNT_RL",
+            "frame_node": "RB_LWR_L",
+            "local_y": -80
+        }
     ],
     "color": "#22c55e",
-    "opacity": 0.70,
+    "opacity": 0.7
 }
 
 # ============================================================
@@ -628,20 +694,30 @@ UNDERTRAY_CONFIG = {
 
 DIFFUSER_CONFIG = {
     "enabled": True,
-    "start_x": -895.0,
-    "length": 200.0,
-    "angle": 10.0,
-    "channels": 3,
-    "strake_height": 35.0,
-    "strake_angle": 75.0,
-    "exit_half_width": 390.0,
-    "exit_overhang": 20.0,
+    "start_x": -1195,
+    "length": 200,
+    "angle": 10,
+    "channels": 4,
+    "strake_height": 35,
+    "strake_angle": 75,
+    "exit_half_width": 350,
+    "exit_overhang": 20,
     "mounts": [
-        {"name": "DIFF_MOUNT_R", "frame_node": "RB_LWR_R", "local_y": 80, "local_x": -20},
-        {"name": "DIFF_MOUNT_L", "frame_node": "RB_LWR_L", "local_y": -80, "local_x": -20},
+        {
+            "name": "DIFF_MOUNT_R",
+            "frame_node": "RB_LWR_R",
+            "local_y": 80,
+            "local_x": -20
+        },
+        {
+            "name": "DIFF_MOUNT_L",
+            "frame_node": "RB_LWR_L",
+            "local_y": -80,
+            "local_x": -20
+        }
     ],
     "color": "#f43f5e",
-    "opacity": 0.60,
+    "opacity": 0.6
 }
 
 # Chassis points are fixed (don't move during kinematics)
@@ -652,3 +728,26 @@ UPRIGHT_KEYS = {"UP1", "UP2", "UP3", "UP4", "UP5"}
 
 # Float points have their own constraints
 FLOAT_KEYS = {"FL1"}
+
+# ============================================================
+# Vehicle parameters (inputs to attitude/dynamics/load metrics)
+# ============================================================
+VEHICLE_PARAMS = {
+    "mass_kg": 280.0,
+    "front_axle_frac": 0.50,
+    "rear_axle_frac": 0.50,
+    "cg_height_mm": 300.0,
+    "wheelbase_mm": 900.0,
+    "front_track_mm": 840.0,
+    "rear_track_mm": 690.0,
+    "k_spring_f": 30.0,          # N/mm
+    "k_spring_r": 40.0,          # N/mm
+    "c_damper_f": 1500.0,        # N·s/m
+    "c_damper_r": 1800.0,        # N·s/m
+    "k_arb_f": 5.0e5,            # N·mm/rad
+    "k_arb_r": 7.0e5,            # N·mm/rad
+    "ax_brake": 1.2,             # g
+    "ax_accel": 1.0,             # g
+    "ay_corner": 1.3,            # g
+    "unsprung_kg": 20.0,
+}
