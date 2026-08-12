@@ -21,8 +21,9 @@ export function initScene(container) {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0xffffff);
   camera = new THREE.PerspectiveCamera(50, 1, 1, 8000);
-  // car-frame camera (500 forward, 650 right, 700 up) → world
-  camera.position.copy(toWorld(500, 650, 700));
+  // car-frame camera (600 forward, 800 right, 850 up) → world; pulls back
+  // enough to frame the whole car (front X=0 … rear X=-895)
+  camera.position.copy(toWorld(600, 800, 850));
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(window.devicePixelRatio);
   container.appendChild(renderer.domElement);
@@ -93,7 +94,16 @@ function link(a, b, color) {
 export function rebuildCar(hpFront, hpRear) {
   group.clear();
   buildAxle(hpFront, 'front', FRONT_COLOR);
-  buildAxle(hpRear, 'rear', REAR_COLOR);
+  buildAxle(hpRear ? stripRearPrefix(hpRear) : hpRear, 'rear', REAR_COLOR);
+}
+
+/** Rear hardpoints use R_ prefixed keys (R_CH1 …) — normalize to plain keys. */
+function stripRearPrefix(hp) {
+  const out = {};
+  for (const [k, v] of Object.entries(hp)) {
+    out[k.replace(/^R_/, '')] = v;
+  }
+  return out;
 }
 
 function buildAxle(hp, axle, color) {
