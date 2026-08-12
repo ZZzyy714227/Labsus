@@ -2,22 +2,43 @@
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info/
 
-# Data (user-specific)
+# Test / lint caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Data (user-specific, runtime state)
 data/hardpoint_overrides.json
 data/defaults_pipe.json
+data/persistent_state.json
 
 # Logs
 logs/
+*.log
+
+# Frontend build artifacts
+web/node_modules/
+web/dist/
+web/package-lock.json
 
 # Backups
 *.bak
 *.bak.*
+config_backup_*.py
 
 # IDE
 .vscode/
 .idea/
 
+# Agent / tool state
+.superpowers/
+
 # OS
 .DS_Store
 Thumbs.db
+nul
+
+# Git worktrees
+.worktrees/
