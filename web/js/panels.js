@@ -1,7 +1,7 @@
 // Left column panels: geometry / vehicle / targets
 import { state } from './state.js';
 import { api } from './api.js';
-import { runSolve, runAnalyze } from './main.js';
+import { finishDesignChange } from './main.js';
 
 const GEOM_FIELDS = {
   front: ['track', 'wheel_center_z', 'caster', 'kpi', 'kingpin_length',
@@ -32,7 +32,21 @@ export function renderGeometryPanel(el) {
       state.designParams[inp.dataset.axle][inp.dataset.field] = parseFloat(inp.value);
     });
   });
-  el.querySelector('#btnApplyGeom').addEventListener('click', runSolve);
+  el.querySelector('#btnApplyGeom').addEventListener('click', applyGeometry);
+}
+
+/** Apply edited geometry params → re-derive hardpoints → solve + analyze + snapshot. */
+async function applyGeometry() {
+  document.querySelectorAll('#panel-geometry input[data-field]').forEach(inp => {
+    state.designParams[inp.dataset.axle][inp.dataset.field] = parseFloat(inp.value);
+  });
+  for (const axle of ['front', 'rear']) {
+    const params = {};
+    GEOM_FIELDS[axle].forEach(f => { params[f] = state.designParams[axle][f]; });
+    const resp = await api.applyParams(axle, params);
+    state.hardpoints[axle] = resp.hardpoints;   // fresh derived hardpoints
+  }
+  finishDesignChange();
 }
 
 export function renderVehiclePanel(el) {

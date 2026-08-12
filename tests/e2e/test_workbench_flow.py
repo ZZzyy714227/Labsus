@@ -10,12 +10,10 @@ class TestWorkbenchFlow:
         # snapshot 1: change geometry param (left col visible now)
         page.fill("#panel-geometry input[data-field='caster'][data-axle='front']", "6.0")
         page.click("#btnApplyGeom")
-        page.wait_for_timeout(1000)
-        page.dispatch_event("#frontTravel", "change")
         page.wait_for_timeout(3000)
-        # snapshot 2: change travel
-        page.fill("#frontTravel", "12")
-        page.dispatch_event("#frontTravel", "change")
+        # snapshot 2: change another param
+        page.fill("#panel-geometry input[data-field='kpi'][data-axle='front']", "2.5")
+        page.click("#btnApplyGeom")
         page.wait_for_timeout(3000)
         rows = page.locator("#snapshotList .snap-row").count()
         assert rows >= 2, f"2 snapshots expected, got {rows}"
@@ -28,6 +26,18 @@ class TestWorkbenchFlow:
         page.locator("#snapshotList .snap-row").nth(1).click()
         page.wait_for_timeout(2500)
         assert page.locator("#dashboard .old").count() >= 1, "compare mode should show old values"
+
+    def test_slider_no_snapshot_spam(self, page):
+        """拖动滑块只改变姿态，不产生设计快照（历史不疯长）。"""
+        page.evaluate("localStorage.clear()")           # isolate from prior tests
+        page.reload(wait_until="load")
+        page.wait_for_timeout(2500)
+        for _ in range(3):
+            page.fill("#frontTravel", "10")
+            page.dispatch_event("#frontTravel", "change")
+            page.wait_for_timeout(1200)
+        rows = page.locator("#snapshotList .snap-row").count()
+        assert rows == 0, f"slider drags must not create snapshots, got {rows}"
 
     def test_dashboard_no_overlap(self, page):
         """推挤式布局：指标盘展开时 3D 与指标盘都可见（无遮挡）。"""

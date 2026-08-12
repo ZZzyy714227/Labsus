@@ -12,6 +12,7 @@ export const api = {
   defaults: () => req('/api/defaults'),
   solve: (body) => req('/api/solve', { method: 'POST', body: JSON.stringify(body) }),
   analyze: (body) => req('/api/analyze', { method: 'POST', body: JSON.stringify(body) }),
+  applyParams: (axle, params) => req('/api/apply_params', { method: 'POST', body: JSON.stringify({ axle, params }) }),
   getVehicle: () => req('/api/vehicle'),
   saveVehicle: (params) => req('/api/vehicle', { method: 'POST', body: JSON.stringify({ params }) }),
   getTargets: () => req('/api/targets'),

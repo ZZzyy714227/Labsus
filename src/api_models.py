@@ -86,6 +86,11 @@ class UpdateParamsRequest(BaseModel):
     value: float
 
 
+class ApplyParamsRequest(BaseModel):
+    axle: str
+    params: dict          # {key: value, ...} — batch apply + re-derive
+
+
 class OptimizeFL1Request(BaseModel):
     axle: str = "front"  # "front" or "rear"
     travel_start: float = -25.0
