@@ -3,7 +3,9 @@ Tire model — contact patch computation for FSAE suspension analysis.
 """
 
 import math
+
 import numpy as np
+
 from geometry import vec3
 
 
@@ -74,11 +76,12 @@ def compute_contact_patch(UP5, upright_y_axis, hp):
 
     # Contact patch position: bottom of loaded tire, shifted by camber.
     # Coordinate system: X=forward, Y=right, Z=up.
-    # Vertical (Z) component: wheel_center_z - loaded_radius * cos(camber)
+    # Z pinned to the ground plane (suspension analysis assumes a fixed
+    # road surface; wheel travel moves the wheel, not the road).
     # Lateral (Y) shift due to camber: negative camber → bottom outward
     x_cp = float(UP5_np[0])                     # no longitudinal shift
     y_cp = float(UP5_np[1]) - R_load * math.sin(camber_rad)
-    z_cp = float(UP5_np[2]) - R_load * math.cos(camber_rad)
+    z_cp = 0.0                                  # ground plane (fixed)
 
     return {
         "center": [round(x_cp, 2), round(y_cp, 2), round(z_cp, 2)],
