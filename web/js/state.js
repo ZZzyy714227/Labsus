@@ -31,10 +31,13 @@ export function pushSnapshot(meta = {}) {
     analyze: state.analyzeResult,            // full result for compare mode
     ...meta,
   };
+  // dedup against the previous snapshot — or the initial design for the
+  // very first snapshot (so a pure slider drag never records one)
   const last = state.snapshots[state.snapshots.length - 1];
-  if (last && JSON.stringify(last.hardpoints) === JSON.stringify(snap.hardpoints)
-      && JSON.stringify(last.vehicle) === JSON.stringify(snap.vehicle)) {
-    return null;                              // no change → skip
+  const ref = last ?? state.initial;
+  if (ref && JSON.stringify(ref.hardpoints) === JSON.stringify(snap.hardpoints)
+      && JSON.stringify(ref.vehicle) === JSON.stringify(snap.vehicle)) {
+    return null;                              // no design change → skip
   }
   state.snapshots.push(snap);
   if (state.snapshots.length > MAX_SNAPSHOTS) state.snapshots.shift();

@@ -15,6 +15,11 @@ async function init() {
   state.hardpoints = { front: d.front.right, rear: d.rear.right };
   state.vehicle = (await api.getVehicle()).params;
   state.targets = (await api.getTargets()).bands;
+  // initial design reference — snapshots dedup against this
+  state.initial = {
+    hardpoints: JSON.parse(JSON.stringify(state.hardpoints)),
+    vehicle: JSON.parse(JSON.stringify(state.vehicle)),
+  };
 
   initScene(document.getElementById('scene3d'));
   rebuildCar(state.hardpoints.front, state.hardpoints.rear);
@@ -78,9 +83,26 @@ function onSliderRelease() {
   clearTimeout(snapTimer);
   snapTimer = setTimeout(async () => {
     await runAnalyze();                             // heavy metrics first
-    const snap = pushSnapshot({});                  // then snapshot with fresh analyze
+    const snap = pushSnapshot({ meta: diffMeta() }); // snapshot only design changes
     if (snap) renderHistory(document.getElementById('snapshotList'));
   }, 800);
+}
+
+/** Describe design-parameter changes vs the previous snapshot ('' if none). */
+function diffMeta() {
+  const prev = state.snapshots[state.snapshots.length - 1];
+  if (!prev) return '';
+  const changes = [];
+  for (const axle of ['front', 'rear']) {
+    const cur = state.designParams[axle] || {};
+    const old = prev.params?.[axle] || {};
+    for (const [k, v] of Object.entries(cur)) {
+      if (typeof v === 'number' && old[k] !== undefined && old[k] !== v) {
+        changes.push(`${k} ${old[k]}→${v}`);
+      }
+    }
+  }
+  return changes.slice(0, 3).join(' · ');
 }
 
 /** Re-render left panels (after snapshot restore). */
@@ -103,20 +125,25 @@ export async function runSolve() {
     state.solveResult = await api.solve(body);
     const dt = Math.round(performance.now() - t0);
     document.getElementById('solveStatus').textContent = `求解 ${dt}ms`;
-    // merge solved uprights back into hardpoints so the 3D view shows bump
-    for (const axleKey of ['front', 'rear']) {
-      const side = state.solveResult[axleKey]?.right;
-      if (side) {
-        for (const k of ['UP1', 'UP2', 'UP3', 'UP4', 'UP5']) {
-          if (side[k]) state.hardpoints[axleKey][k] = side[k];
-        }
-      }
-    }
-    rebuildCar(state.hardpoints.front, state.hardpoints.rear);
+    // hardpoints stay at DESIGN positions (snapshot dedup relies on this);
+    // the 3D view shows the solved travel pose instead
+    rebuildCar(displayHp('front'), displayHp('rear'));
   } catch (e) {
     document.getElementById('solveStatus').textContent = '求解失败';
     console.error('solve failed', e);
   }
+}
+
+/** Design hardpoints with UP1-5 overlaid from the latest solve (travel pose). */
+function displayHp(axleKey) {
+  const base = state.hardpoints[axleKey];
+  const solved = state.solveResult?.[axleKey]?.right;
+  if (!solved) return base;
+  const out = { ...base };
+  for (const k of ['UP1', 'UP2', 'UP3', 'UP4', 'UP5']) {
+    if (solved[k]) out[k] = solved[k];
+  }
+  return out;
 }
 
 export async function runAnalyze() {
@@ -146,6 +173,14 @@ export async function runAnalyze() {
   } catch (e) {
     console.error('analyze failed', e);
   }
+}
+
+/** Solve + analyze + snapshot after a design change (apply button). */
+export async function finishDesignChange() {
+  runSolve();
+  await runAnalyze();
+  const snap = pushSnapshot({ meta: diffMeta() });
+  if (snap) renderHistory(document.getElementById('snapshotList'));
 }
 
 init();
