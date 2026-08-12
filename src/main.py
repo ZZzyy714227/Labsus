@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from persistence import load_persistent_state
 from routes.aero import router as aero_router
-from routes.dynamics import router as dynamics_router
+from routes.analyze import router as analyze_router
 from routes.faces import router as face_router
 from routes.hardpoints import router as hp_router
 
@@ -24,11 +24,11 @@ app = FastAPI(title="FSAE Suspension Solver")
 
 # ── Register route prefix-less routers ─────────────────────────
 app.include_router(solve_router)
-app.include_router(dynamics_router)
 app.include_router(hp_router)
 app.include_router(tube_router)
 app.include_router(face_router)
 app.include_router(aero_router)
+app.include_router(analyze_router)
 
 # Load saved state from JSON into config module-level dicts
 load_persistent_state()

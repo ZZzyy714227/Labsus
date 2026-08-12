@@ -2,9 +2,9 @@
 Pydantic request/response models for the FSAE suspension API.
 """
 
-from typing import Any, Dict, List, Optional
-
 from pydantic import BaseModel
+
+from config import DEFAULT_TUBE_COLOR
 
 
 class SolveRequest(BaseModel):
@@ -16,6 +16,23 @@ class SolveRequest(BaseModel):
     rear_left_travel: float | None = None
     rack_displacement: float = 0.0
     mirror: bool = True
+
+
+class AnalyzeRequest(BaseModel):
+    front_hardpoints: dict
+    rear_hardpoints: dict
+    vehicle: dict | None = None
+    travel_start: float = -25.0
+    travel_end: float = 25.0
+    travel_steps: int = 25
+
+
+class VehicleRequest(BaseModel):
+    params: dict
+
+
+class TargetsRequest(BaseModel):
+    bands: dict          # {key: [green_lo, green_hi, warn_lo, warn_hi]}
 
 
 class SweepRequest(BaseModel):
@@ -46,14 +63,14 @@ class TubeColorRequest(BaseModel):
 
 class AddTubeRequest(BaseModel):
     endpoints: list
-    color: str = "#8899cc"
+    color: str = DEFAULT_TUBE_COLOR
     permanent: bool = False
 
 
 class FaceRequest(BaseModel):
     name: str
     loop: list
-    color: str = "#8899cc"
+    color: str = DEFAULT_TUBE_COLOR
     opacity: float = 0.30
     permanent: bool = False
 
@@ -74,11 +91,3 @@ class OptimizeFL1Request(BaseModel):
     travel_start: float = -25.0
     travel_end: float = 25.0
     travel_steps: int = 51
-
-
-class SimulateRequest(BaseModel):
-    path: List[List[float]]              # [[x, y], ...] control points
-    obstacles: List[Dict[str, Any]] = []  # obstacle definitions
-    speed: float = 12000.0               # mm/s
-    duration: float = 5.0                # seconds
-    params: Optional[Dict[str, float]] = None  # vehicle param overrides
