@@ -1,82 +1,138 @@
 # 开发日志
 
-## 2026-06-11 — 独立赛道演示窗口 + 默认椭圆赛道
-
-### 变更
-
-独立出完整的赛道演示窗口 `/sim-view.html`，不嵌入开发工具界面。
-
-- **新增 `web/sim-view.html`** — 全屏独立页面，纯 3D 视口 + HUD 叠加层
-  - 顶部：标题、时间/速度显示
-  - 底部：播放栏（播放/暂停/重置/进度条/调速/视角切换）
-  - 右侧：数据面板（姿态小图 + 角度小图 + 实时读数）
-  - 键盘快捷键：Space 播放/暂停，R 重置
-- **新增 `web/js/sim-view.js`** — 独立应用逻辑
-  - 从 `/api/defaults` 加载整车配置
-  - 复用现有 `builders.js` 构建整车（悬挂/车轮/车架/翼片/底板）
-  - 从 sessionStorage 读取轨迹数据，全帧插值回放
-  - OrbitControls 自由视角，3 种快速视角（自由/跟随/俯视）
-  - 每帧更新全部硬点球体 + 连杆 + 轮胎 + 数据面板
-- **修改 `web/js/main.js`** — "开始模拟"按钮改为存储参数并弹出新窗口
-  - 移除内联回放仪表盘依赖
-- **修改 `web/index.html`** — 移除内联回放控件和仪表盘，替换为状态栏 + 弹窗链接
-
-### 使用方式
-
-1. 开发界面编辑路径点 + 添加障碍物
-2. 点击"▶ 在新窗口跑赛道"
-3. 弹出独立全屏窗口，车在赛道上自动跑，可拖拽/滚轮自由查看
+## 2026-08-12 — 快速迭代悬架设计工作台（V10 重构）
 
 ### 背景
 
-用户要求在 3D 视口中让赛车沿自定义路径行驶，通过障碍物展示悬架动态效果。设计阶段确定：平面+自定义障碍物、简单动力学（3-DOF 弹簧-质量-阻尼）、Python 离线计算+前端回放架构。
+搁置 2 个月后重启。核心目的重新定义为**快速迭代开发**：自由设计悬架 → 快速性能指标 → 快速调整 → 再看指标。方案：前端全重写（Neo-Brutalist 工作台），后端新增 4 维指标层。
 
-### 新增模块
+### P0 求解器健康（3 个失败测试 → 全绿）
 
-- `src/dynamics/` — 车辆动力学仿真包
-  - `terrain.py` — 高度场（基准平面 + bump/kerb/ramp 障碍物叠加）
-  - `path.py` — Catmull-Rom 样条路径 + 弧长参数化
-  - `vehicle.py` — 3-DOF 车体模型（heave/roll/pitch + 4 轮弹簧阻尼）
-  - `integrator.py` — RK4 积分器
-  - `simulation.py` — 仿真编排（1000Hz 积分 + 60fps 输出帧 + 调用悬架求解器）
-- `src/routes/dynamics.py` — `POST /api/simulate` 端点
-- `web/js/playback.js` — 前端回放引擎（帧插值 + 播放/暂停/调速/循环）
-- `web/js/dashboard.js` — Chart.js 实时仪表盘（车体姿态 + camber/toe）
-- `tests/test_terrain.py`、`test_path.py`、`test_vehicle.py` — 单元测试
+1. **双向 continuation**（`src/routes/solve.py` sweep_axle）— sweep 从距 dz=0 最近的点向两端展开，LS warm-start 链保持正确物理分支，消灭冷启动漂移
+2. **锚定 LS polish**（`src/solver/bump.py`）— LS 从 PBD 结果 warm-start + 2mm 紧边界 + 软锚拉（residual 追加 `2.0*(x-x0)`），无法滑向错误分支。`prev_up` 保留为 API 参数但不再做 LS 初值
+3. **转向求解器稳健性**（`src/solver/steering.py`）— Newton 步长 ±0.4rad 限制；fallback 全局扫描触发条件加 `|θ-θ_guess|>0.30`（原仅 |θ|>45° 漏检小角错误分支）；扫描选离 theta_guess 最近的根
+4. **后处理窗口扩展**（`_remove_branch_jumps`）— [1,2] → [4,1,2]，捕获 3 连点斜坡跳变
+5. **F4 接地点**（`src/tire.py`）— z_cp 固定地面 Z=0
+6. **F5 管件颜色索引**（`src/routes/tubes.py`）— 删除管件后重建索引
 
-### 修改文件
+验证：camber 最大相邻差 0.046°（原 1.3°），caster 0.185°，全范围无跳变。
 
-- `src/main.py` — 注册 dynamics 路由
-- `src/api_models.py` — 新增 `SimulateRequest`
-- `web/js/main.js` — 接入 playback/dashboard + 动态赛道 UI 事件处理
-- `web/js/state.js` — 追加回放状态字段
-- `web/js/scene.js` — 地形网格 + 路径线 + 障碍物色块 + 车身位置标记
-- `web/index.html` — 动态赛道面板（路径编辑表 + 障碍物列表 + 回放控件 + 图表容器）
-- `web/style.css` — 动态面板样式
+### P1 指标层（`src/metrics/`）
 
-### 使用方式
+| 模块 | 职责 |
+|---|---|
+| `targets.py` | 27 项目标带定义（绿/黄/红）+ 用户覆盖，`evaluate_all` |
+| `roll.py` | 瞬时中心 IC → RC（YZ 平面两线交点）、roll gradient（弹簧+防倾杆）、anti-dive/squat、jacking |
+| `dynamics.py` | ride freq、阻尼比、载荷转移、侧倾刚度分配 |
+| `loads.py` | 3 工况（1.3g 侧向/1.2g 制动/1.0g 加速）静态力平衡逐杆求解 |
 
-1. 右侧面板"动态赛道"区域编辑路径控制点（默认 4 个点）
-2. 添加障碍物（凸块/路肩/斜坡）
-3. 设置车速和时长，点击"开始模拟"
-4. 模拟完成后自动播放，可暂停/调速/循环
-5. 仪表盘实时显示车体姿态和悬架角度曲线
+- `POST /api/analyze`：全维度指标 + 红绿灯 + 曲线，**290ms**（预算 <2s）
+- `GET/POST /api/vehicle`、`GET/POST /api/targets`：整车参数与目标带持久化（persistent_state.json 扩展）
+- 预置整车参数：280kg / 50:50 轴荷 / CG 300mm / k_spring 30/40 N·mm / 防倾杆 5e5/7e5
 
-### 技术要点
+### P2 前端重写（Neo-Brutalist 工作台）
 
-- 车体状态向量 6 维：[z, ż, roll, roll_dot, pitch, pitch_dot]
-- 水平运动由路径约束，动力学只解算垂向+侧倾+俯仰
-- 每输出帧调用现有 `solve_bump` 解算全部硬点坐标 + `compute_alignment_angles` 获取定位角度
-- 前端 60fps 线性插值回放，无网络延迟
-- 端到端验证：车过 50mm 凸块时压缩量 2.45→14.3mm，camber 2.06°→3.86°，车身弹跳 241mm
+- **设计系统**：黑粗边框、硬边缘阴影、无圆角；强调色 4 维映射（青=运动学/橙=姿态/粉=动力学/荧光绿=结构）
+- **推挤式布局**：默认 3D 最大化 + 底部快照时间线；指标盘展开时左栏折叠为图标条、3D 让位 38%，零遮挡
+- **指标盘**：4 维分组 + 每项红绿灯 + 对比模式（旧值划线 → 新值 + Δ + 双灯）
+- **快照引擎**：松手后 800ms 防抖自动快照（几何/整车参数任一变化才记录），localStorage 上限 100；时间线按最差指标着色；单击选中对比、双击回退
+- **轻量实时**：拖动滑块 80ms 节流 → /api/solve（实测 42ms），松手 → analyze + 快照
+- 新结构：`web/js/{state,api,scene3d,panels,dashboard,history,main}.js`，Vite 代理修正 :8000
+- 首版不迁移：管件 CRUD / 覆盖面 / 空力面板（核心优先，后续加回）
 
-### 待完善（V2+）
+### 测试
 
-- 手动 WASD 驾驶模式
-- 3D 场景内点击放置路径点/障碍物（拖拽交互）
-- 轮胎侧向/纵向力模型
-- Anti-dive/anti-squat 几何效应
-- 播放时整车身 Transform 更新（当前用位置标记代替）
+- 新增 33 个测试（targets/roll/dynamics/loads/analyze + e2e 工作台流程）
+- 后端全量回归：见提交记录
+
+# 开发日志
+
+## 2026-06-11 — E99 几何大修（从 RWTH Aachen E99 参考图重建整车几何）
+
+### 背景
+
+用户提供 RWTH Aachen E99 Formula Student 电动赛车四视图（轴侧/侧视/俯视/前视），要求将现有模型的整车几何对齐参考图。
+
+### 备份
+
+`src/config_backup_20260611.py` — 大修前完整备份。
+
+### 改动文件
+
+`src/config.py` — 全量重写 5 个 section：
+
+1. **`DESIGN_PARAMS`** — 悬架硬点参数
+   - 前 track: 750→**840mm**（+90，外扩匹配 E99）
+   - 后 track: 720→**690mm**（-30，收窄匹配 E99）
+   - 前 wheel_center_z: 150→**120mm**（降低，更贴地）
+   - 后 wheel_center_z: 153→**125mm**（降低）
+   - caster 前: 5.18→**4.5°**，KPI 前: 2.07→**1.6°**
+   - caster 后: 6.0→**5.5°**，KPI 后: 1.80→**1.6°**
+   - 前 A 臂 Y 坐标整体 +43mm（uca）+44mm（lca）
+   - 后 A 臂 Y 坐标整体 -15mm（uca）-14mm（lca）
+
+2. **`DEFAULT_FRAME_NODES`** — 车架节点（42个→60个）
+   - FH_TOP_R: Z 350→**370**，MH_TOP_R: Z 530→**550**
+   - FH_UPR_R: Y 202.6→**245**，MH_UPR_R: Y 204.8→**240**（跟随 A 臂外扩）
+   - RB_TOP_R: X -1050→**-1100**，Z 220→**210**
+   - **新增 25+ 车身控制点**：鼻锥加密（9点）、前翼过渡（4点）、沙漏形侧箱（10点）、引擎盖（6点）、尾翼过渡（3点）
+
+3. **`FRAME_TUBES`** — 车身管路（约130根）
+   - 更新管路引用新节点名
+   - 追加新 BODY_* 节点之间的管路
+
+4. **`BODYWORK_FACES`** — 车身面板（11个→18个命名面板）
+   - 用新 BODY_* 节点重建鼻锥、侧箱、引擎盖、尾翼过渡等面板
+
+5. **空力四件套**
+   - **前翼**: span 600→**950mm**，chord 240→**320**，mount 改到 FH_UPR
+   - **后翼**: span 600→**750mm**，X -950→**-1100**，端板包覆加大 height_above 30→**70**
+   - **底板**: ground_clearance 28→**22mm**，half_width 300→**340**，strakes 2+2→**3+3**
+   - **扩散器**: length 200→**280mm**，channels 4→**5**，angle 10→**12°**
+
+### Bug 修复
+
+- `src/routes/solve.py:89` — `solve_bump()` 多余 `prev_up=` 参数导致 TypeError，已移除
+
+### 设计文档
+
+`docs/superpowers/specs/2026-06-11-e99-geometry-redesign-design.md`
+
+## 2026-06-11 — 修复 persistence merge 逻辑导致车架丢失
+
+### 问题
+
+`persistent_state.json` 中仅存储了 2 个减震器吊耳节点（`R_DAMPER_CHASSIS_RR/RL`），但 `load_persistent_state()` 使用 `clear(); update()` 方式加载，把全量 39 个车架节点替换为这 2 个节点——其他 37 个节点全部消失，导致车架线框和覆盖面消失。
+
+### 根因
+
+持久化层的 **Delta 保存 vs Snapshot 加载** 不匹配：
+- `_save_frame_node()` 以 delta 方式每次写 1 个节点到 JSON 文件
+- `load_persistent_state()` 却用 `clear(); update()` 全量替换，把文件中的部分数据视为完整快照
+
+### 修复
+
+1. **`src/persistence.py` `load_persistent_state()`** — 对以下以 delta 保存的 section 改用 `update()` 合并而非全量替换：
+   - `frame_nodes` → `DEFAULT_FRAME_NODES.update(state["frame_nodes"])`
+   - `bodywork_faces` → `BODYWORK_FACES.update(state["bodywork_faces"])`
+   - `frame_tube_colors` → 逐项更新
+   - `frame_tubes` → 按 end-point match 防重复合并（有删除限制，已加注释）
+2. 空/损坏的 `persistent_state.json` 已清理
+
+## 2026-06-11 — simplify 清理：消除冗余 I/O + 脆弱索引
+
+### 变更
+
+`/simplify` 代码质量清理，4 路并行审查（复用、简化、效率、深度），修复 2 处：
+
+1. **`src/routes/faces.py` `update_face`** — 移除 `update_face` 中 `_delete_bodywork_face` + `_save_bodywork_face` 的冗余删除-保存序列。`_save_bodywork_face` 已会全量覆写，无需先删再写。每请求节省一次完整的读-改-写 I/O 周期。
+2. **`src/persistence.py` `_add_frame_tube`** — 修复颜色索引对 append 时序的依赖：在 append 前计算 `idx`，避免 append 和索引取 `len()-1` 之间被插入操作的隐患。
+
+### 检视结论
+
+- **无复用问题** — 旧 `distance_point_to_line` 的内联重复已在本 diff 修复为委托 `closest_point_on_line`
+- **两个独立 JSON 持久化机制**（`hardpoint_overrides.json` vs `persistent_state.json`）——已知设计决策，暂不合并
+- **`_with_state` / `_mutate` 闭包模式**——风格可接受，维持现状
 
 ## 2026-06-11 — 配色方案二轮：全暗色暖调（解决中间棕色两边淡色不协调）
 

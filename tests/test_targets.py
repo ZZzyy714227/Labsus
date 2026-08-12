@@ -1,8 +1,17 @@
 """Target band evaluation tests."""
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+import pytest
 from metrics.targets import (TARGET_BANDS, TARGET_BANDS_OVERRIDES,
                              evaluate_metric, evaluate_all, set_band)
+
+
+@pytest.fixture(autouse=True)
+def _clean_overrides():
+    """Every test starts with a clean override table (other tests may set it)."""
+    TARGET_BANDS_OVERRIDES.clear()
+    yield
+    TARGET_BANDS_OVERRIDES.clear()
 
 
 def test_green_in_band():
