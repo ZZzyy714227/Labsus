@@ -3,28 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FSAE 悬架运动学分析</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        colors: {
-          accent:   '#FC7607',
-          'accent2':'#D83514',
-          panel:    '#1F1612',
-          card:     '#2A1F18',
-          input:    '#2A1F18',
-          border:   '#3A2A20',
-          muted:    '#8B7355',
-          dim:      '#A88B6F',
-        }
-      }
-    }
-  }
-</script>
-<script src="https://unpkg.com/lucide@latest"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<title>FSAE 悬架工作台</title>
 <link rel="stylesheet" href="style.css">
 <script type="importmap">
 {
@@ -35,370 +14,53 @@
 }
 </script>
 </head>
-<body class="bg-[#1F1612] text-[#A88B6F] h-screen flex overflow-hidden">
+<body>
+  <header id="topbar">
+    <div class="brand">■ FSAE SUSPENSION WORKBENCH</div>
+    <div class="topbar-actions">
+      <span id="summaryLight" class="badge">● --/--</span>
+      <button id="btnDash" class="btn btn-cyan">▣ 指标盘</button>
+      <button id="btnRevert" class="btn" disabled>⮌ 回退</button>
+      <button id="btnCompare" class="btn btn-orange" disabled>⇄ 对比</button>
+    </div>
+  </header>
 
-<!-- ═══ LEFT PANEL — 操控 ═══ -->
-<div class="flex flex-col w-[288px] min-w-[288px] bg-[#1F1612] border-r border-[#3A2A20] overflow-y-auto panel-scroll">
-  <div class="p-2.5 flex items-center gap-2 border-b border-[#3A2A20]">
-    <span class="w-2 h-2 rounded-full bg-accent"></span>
-    <span class="font-semibold text-[0.72rem] tracking-wider text-[#FDF6E3]">FSAE 悬架分析</span>
-  </div>
-
-  <!-- 轮跳控制 -->
-  <div class="p-2 border-b border-[#3A2A20]/60">
-    <div class="text-[0.58rem] text-dim tracking-wider font-medium mb-1.5 flex items-center gap-1">
-      <i data-lucide="arrow-up-down" class="w-3 h-3"></i> 轮跳控制
-    </div>
-    <div class="mb-1.5">
-      <div class="flex justify-between text-[0.62rem]"><span class="text-muted">前轴</span><span id="frontTravelVal" class="text-[#FDF6E3] font-mono">0.0 mm</span></div>
-      <input type="range" id="frontTravelSlider" min="-40" max="40" value="0" step="0.5" class="w-full" title="前轴轮跳">
-    </div>
-    <div class="mb-1.5">
-      <div class="flex justify-between text-[0.62rem]"><span class="text-muted">后轴</span><span id="rearTravelVal" class="text-[#FDF6E3] font-mono">0.0 mm</span></div>
-      <input type="range" id="rearTravelSlider" min="-40" max="40" value="0" step="0.5" class="w-full" title="后轴轮跳">
-    </div>
-    <div>
-      <div class="flex justify-between text-[0.62rem]"><span class="text-muted">齿条位移</span><span id="rackVal" class="text-[#FDF6E3] font-mono">0.0 mm</span></div>
-      <input type="range" id="rackSlider" min="-15" max="15" value="0" step="0.5" class="w-full" title="齿条位移">
-    </div>
-  </div>
-
-  <!-- 车身姿态 -->
-  <div class="p-2 border-b border-[#3A2A20]/60">
-    <label class="flex items-center gap-2 cursor-pointer">
-      <input type="checkbox" id="chassisModeToggle" class="accent-accent w-3 h-3">
-      <span class="text-[0.58rem] text-dim tracking-wider font-medium">车身姿态模式</span>
-    </label>
-    <div id="chassisControls" class="mt-1.5 space-y-1 js-hide">
-      <div><div class="flex justify-between text-[0.55rem]"><span class="text-muted">垂向位移</span><span id="heaveVal" class="text-[#FDF6E3] font-mono">0.0 mm</span></div><input type="range" id="heaveSlider" min="-40" max="40" value="0" step="0.5" class="w-full" title="垂向位移"></div>
-      <div><div class="flex justify-between text-[0.55rem]"><span class="text-muted">俯仰</span><span id="pitchVal" class="text-[#FDF6E3] font-mono">0.0°</span></div><input type="range" id="pitchSlider" min="-5" max="5" value="0" step="0.1" class="w-full" title="俯仰"></div>
-      <div><div class="flex justify-between text-[0.55rem]"><span class="text-muted">侧倾</span><span id="rollVal" class="text-[#FDF6E3] font-mono">0.0°</span></div><input type="range" id="rollSlider" min="-5" max="5" value="0" step="0.1" class="w-full" title="侧倾"></div>
-      <div class="grid grid-cols-2 gap-1 mt-1 text-[0.55rem]">
-        <span class="text-dim">前左/右: <span id="chassisFLTravel" class="text-[#FDF6E3] font-mono">0.0</span>/<span id="chassisFRTravel" class="text-[#FDF6E3] font-mono">0.0</span></span>
-        <span class="text-dim">后左/右: <span id="chassisFrontTravel" class="text-[#FDF6E3] font-mono">0.0</span>/<span id="chassisRearTravel" class="text-[#FDF6E3] font-mono">0.0</span></span>
+  <main id="workbench">
+    <aside id="leftCol">
+      <div class="col-head">参数</div>
+      <div id="paramTabs" class="tabs">
+        <button class="tab active" data-tab="geometry">几何</button>
+        <button class="tab" data-tab="vehicle">整车</button>
+        <button class="tab" data-tab="targets">目标带</button>
       </div>
-    </div>
-  </div>
-
-  <!-- 定位角度 -->
-  <div class="p-2 border-b border-[#3A2A20]/60">
-    <div class="text-[0.58rem] text-dim tracking-wider font-medium mb-1 flex items-center gap-1">
-      <i data-lucide="eye" class="w-3 h-3"></i> 定位角度
-    </div>
-    <table class="angles-table">
-      <tr><th></th><th>FR</th><th>FL</th><th>RR</th><th>RL</th></tr>
-      <tr><td>Camber</td><td id="camberFR">--</td><td id="camberFL">--</td><td id="camberRR">--</td><td id="camberRL">--</td></tr>
-      <tr><td>Toe</td>     <td id="toeFR">--</td><td id="toeFL">--</td><td id="toeRR">--</td><td id="toeRL">--</td></tr>
-      <tr><td>Caster</td>  <td id="casterFR">--</td><td id="casterFL">--</td><td id="casterRR">--</td><td id="casterRL">--</td></tr>
-      <tr><td>KPI</td>     <td id="kpiFR">--</td><td id="kpiFL">--</td><td id="kpiRR">--</td><td id="kpiRL">--</td></tr>
-      <tr><td>Scrub</td>   <td id="scrubFR">--</td><td id="scrubFL">--</td><td id="scrubRR">--</td><td id="scrubRL">--</td></tr>
-      <tr><td>Trail</td>   <td id="trailFR">--</td><td id="trailFL">--</td><td id="trailRR">--</td><td id="trailRL">--</td></tr>
-    </table>
-  </div>
-
-  <!-- 衍生信息 -->
-  <div class="p-2 border-b border-[#3A2A20]/60">
-    <div class="text-[0.58rem] text-dim tracking-wider font-medium mb-1 flex items-center gap-1">
-      <i data-lucide="info" class="w-3 h-3"></i> 衍生信息
-    </div>
-    <div id="derivedInfo">
-      <div class="info-row"><span class="label">前推/拉杆 R/L</span><span class="val" id="pushRodLenFR">-- / -- mm</span></div>
-      <div class="info-row"><span class="label">后推/拉杆 R/L</span><span class="val" id="pushRodLenRR">-- / -- mm</span></div>
-      <div class="info-row"><span class="label">减震器长度 FR/FL</span><span class="val" id="damperLenFR">-- / -- mm</span></div>
-      <div class="info-row"><span class="label">减震器长度 RR/RL</span><span class="val" id="damperLenRR">-- / -- mm</span></div>
-    </div>
-  </div>
-
-  <!-- 应用/重置按钮 -->
-  <div class="p-2 border-b border-[#3A2A20]/60 flex gap-1.5">
-    <button id="resetBtn" class="flex-1 bg-[#2A1F18] hover:bg-[#3A2A20] text-[#FDF6E3] text-[0.62rem] font-medium py-1.5 rounded-md transition-colors">重置</button>
-    <button id="applyBtn" class="flex-1 bg-[#FC7607] hover:bg-[#D83514] text-[#FDF6E3] text-[0.62rem] font-medium py-1.5 rounded-md transition-colors">应用硬点</button>
-  </div>
-
-  <!-- 保存状态 -->
-  <div id="saveStatus" class="px-2 py-1 text-[0.58rem] text-accent font-medium min-h-[22px]"></div>
-</div>
-
-<!-- ═══ 3D VIEWPORT ═══ -->
-<div id="viewport" class="flex-1 relative overflow-hidden bg-[#1F1612]"></div>
-
-<!-- ═══ RIGHT PANEL — 数据 ═══ -->
-<div class="flex flex-col w-[360px] min-w-[360px] bg-[#1F1612] border-l border-[#3A2A20] overflow-y-auto panel-scroll">
-
-  <!-- 硬点编辑 -->
-  <div class="p-2 border-b border-[#3A2A20]/60 panel-wrapper collapsed">
-    <div class="flex items-center justify-between collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
-      <span class="text-[0.58rem] text-dim tracking-wider font-medium">硬点编辑</span>
-      <span class="flex items-center gap-1">
-        <span class="text-[0.5rem] text-muted">双击硬点选中 / 编辑</span>
-        <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim"></i>
-      </span>
-    </div>
-    <div class="panel-content">
-      <div id="editSection" class="mt-1 space-y-1 js-hide">
-        <div id="editPointMode" class="js-hide">
-          <div class="text-[0.58rem] text-accent font-medium mb-1"><span id="editPointName">--</span></div>
-          <div class="grid grid-cols-3 gap-1">
-            <label class="flex flex-col gap-0.5"><span class="text-[0.5rem] text-dim">X</span><input id="editX" type="number" step="0.5" class="bg-input border border-[#3A2A20]/60 rounded px-1.5 py-0.5 text-[0.62rem] text-[#FDF6E3] font-mono outline-none focus:border-accent/50 w-full"></label>
-            <label class="flex flex-col gap-0.5"><span class="text-[0.5rem] text-dim">Y</span><input id="editY" type="number" step="0.5" class="bg-input border border-[#3A2A20]/60 rounded px-1.5 py-0.5 text-[0.62rem] text-[#FDF6E3] font-mono outline-none focus:border-accent/50 w-full"></label>
-            <label class="flex flex-col gap-0.5"><span class="text-[0.5rem] text-dim">Z</span><input id="editZ" type="number" step="0.5" class="bg-input border border-[#3A2A20]/60 rounded px-1.5 py-0.5 text-[0.62rem] text-[#FDF6E3] font-mono outline-none focus:border-accent/50 w-full"></label>
-          </div>
-          <div class="flex gap-1 mt-1">
-            <button id="saveTempBtn" class="flex-1 bg-[#2A1F18] hover:bg-[#3A2A20] text-[#FDF6E3] text-[0.55rem] py-1 rounded transition-colors">临时</button>
-            <button id="savePermBtn" class="flex-1 bg-[#FC7607] hover:bg-[#D83514] text-[#FDF6E3] text-[0.55rem] py-1 rounded transition-colors">永久保存</button>
-          </div>
-        </div>
-        <div id="editTubeMode" class="js-hide">
-          <div class="text-[0.58rem] text-accent font-medium mb-1"><span id="editTubeName">--</span></div>
-          <div class="text-[0.5rem] text-dim mb-1" id="editTubeType"></div>
-          <div class="mb-1"><span class="text-[0.5rem] text-dim">颜色</span><div id="tubeColorPalette" class="flex flex-wrap gap-1 mt-0.5"></div></div>
-          <div class="flex gap-1 mt-1">
-            <button id="tubeColorTempBtn" class="flex-1 bg-[#2A1F18] hover:bg-[#3A2A20] text-[#FDF6E3] text-[0.55rem] py-1 rounded transition-colors">临时色</button>
-            <button id="tubeColorPermBtn" class="flex-1 bg-[#D83514] hover:bg-[#D83514]/85 text-[#FDF6E3] text-[0.55rem] py-1 rounded transition-colors">永久色</button>
-          </div>
-          <div class="flex gap-1 mt-1">
-            <button id="saveTubePermBtn" class="flex-1 bg-[#FC7607] hover:bg-[#D83514] text-[#FDF6E3] text-[0.55rem] py-1 rounded transition-colors">保存管件</button>
-            <button id="deleteTempBtn" class="flex-1 bg-[#2A1F18] hover:bg-[#3A2A20] text-[#D83514] text-[0.55rem] py-1 rounded transition-colors">临时删</button>
-            <button id="deletePermBtn" class="flex-1 bg-[#D83514]/80 hover:bg-[#D83514] text-[#FDF6E3] text-[0.55rem] py-1 rounded transition-colors">永久删</button>
-          </div>
-        </div>
-        <div id="editFaceMode" class="js-hide">
-          <div class="text-[0.58rem] text-accent font-medium mb-1"><span id="editFaceName">--</span></div>
-          <div class="mb-1"><span class="text-[0.5rem] text-dim">颜色</span><div id="faceColorPalette" class="flex flex-wrap gap-1 mt-0.5"></div></div>
-          <div class="mb-1">
-            <div class="flex justify-between text-[0.5rem]"><span class="text-dim">透明度</span><span id="faceOpacityVal" class="text-[#FDF6E3] font-mono">0.30</span></div>
-            <input type="range" id="faceOpacitySlider" min="0.05" max="0.95" step="0.05" value="0.30" class="w-full" title="覆盖面透明度">
-          </div>
-          <div class="flex gap-1 mt-1">
-            <button id="faceUpdateTempBtn" class="flex-1 bg-[#2A1F18] hover:bg-[#3A2A20] text-[#FDF6E3] text-[0.55rem] py-1 rounded transition-colors">临时更新</button>
-            <button id="faceUpdatePermBtn" class="flex-1 bg-[#D83514] hover:bg-[#D83514]/85 text-[#FDF6E3] text-[0.55rem] py-1 rounded transition-colors">永久保存</button>
-          </div>
-          <div class="flex gap-1 mt-1">
-            <button id="faceDeleteTempBtn" class="flex-1 bg-[#2A1F18] hover:bg-[#3A2A20] text-[#D83514] text-[0.55rem] py-1 rounded transition-colors">临时删</button>
-            <button id="faceDeletePermBtn" class="flex-1 bg-[#D83514]/80 hover:bg-[#D83514] text-[#FDF6E3] text-[0.55rem] py-1 rounded transition-colors">永久删</button>
-          </div>
-        </div>
+      <div id="panel-geometry" class="panel-body"></div>
+      <div id="panel-vehicle" class="panel-body hidden"></div>
+      <div id="panel-targets" class="panel-body hidden"></div>
+    </aside>
+    <section id="centerCol">
+      <div id="scene3d"></div>
+      <div id="sliderBar">
+        <label>前轮跳
+          <input type="range" id="frontTravel" min="-40" max="40" step="0.5" value="0">
+        </label>
+        <span id="frontTravelVal" class="mono">0.0 mm</span>
+        <label>转向
+          <input type="range" id="rackTravel" min="-15" max="15" step="0.5" value="0">
+        </label>
+        <span id="rackVal" class="mono">0.0 mm</span>
+        <span id="solveStatus" class="muted">就绪</span>
       </div>
-    </div>
-  </div>
+    </section>
+    <aside id="rightCol" class="collapsed">
+      <div class="col-head">性能指标盘 <button id="btnDashClose" class="btn">✕ 收起</button></div>
+      <div id="dashboard"></div>
+    </aside>
+  </main>
 
-  <!-- 硬点坐标 -->
-  <div class="p-2 border-b border-[#3A2A20]/60 panel-wrapper collapsed">
-    <div class="text-[0.58rem] text-dim tracking-wider font-medium mb-1 flex items-center gap-1 collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
-      <i data-lucide="table" class="w-3 h-3"></i> 硬点坐标
-      <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim ml-auto"></i>
-    </div>
-    <div class="panel-content">
-      <div class="text-[0.58rem] text-dim tracking-wider font-medium mt-1">前轴</div>
-      <div class="max-h-[240px] overflow-y-auto rounded-lg border border-[#3A2A20]/60">
-        <table><thead><tr><th></th><th>X</th><th>Y</th><th>Z</th></tr></thead>
-          <tbody id="hpTableBody"></tbody>
-        </table>
-      </div>
-      <div class="mt-1 text-[0.58rem] text-dim tracking-wider font-medium">后轴</div>
-      <div class="max-h-[240px] overflow-y-auto rounded-lg border border-[#3A2A20]/60">
-        <table><thead><tr><th></th><th>X</th><th>Y</th><th>Z</th></tr></thead>
-          <tbody id="rearHpTableBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
+  <footer id="historyBar">
+    <div id="snapshotList"></div>
+  </footer>
 
-  <!-- 车架节点表格 -->
-  <div class="p-2 border-b border-[#3A2A20]/60 panel-wrapper collapsed">
-    <div class="flex items-center justify-between mb-1 collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
-      <span class="text-[0.58rem] text-dim tracking-wider font-medium">车架节点</span>
-      <span class="flex items-center gap-1">
-        <span class="text-[0.5rem] text-muted">管件数: <span id="frameTubeCount">0</span></span>
-        <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim"></i>
-      </span>
-    </div>
-    <div class="panel-content">
-      <div class="max-h-[200px] overflow-y-auto rounded-lg border border-[#3A2A20]/60">
-        <table><thead><tr><th></th><th>X</th><th>Y</th><th>Z</th></tr></thead>
-          <tbody id="frameNodeTableBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- 减震器挂点 -->
-  <div class="p-2 border-b border-[#3A2A20]/60 panel-wrapper collapsed">
-    <div class="text-[0.58rem] text-dim tracking-wider font-medium mb-1 flex items-center gap-1 collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
-      <span>减震器挂点</span>
-      <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim ml-auto"></i>
-    </div>
-    <div class="panel-content">
-      <div class="max-h-[140px] overflow-y-auto rounded-lg border border-[#3A2A20]/60">
-        <table><thead><tr><th></th><th>X</th><th>Y</th><th>Z</th></tr></thead>
-          <tbody id="damperMountTableBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- 多选工具栏 -->
-  <div class="p-2 border-b border-[#3A2A20]/60 panel-wrapper collapsed">
-    <div class="text-[0.58rem] text-dim tracking-wider font-medium mb-1 flex items-center gap-1 collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
-      <i data-lucide="layers" class="w-3 h-3"></i> 多选 (Ctrl+点击) <span id="multiSelectCount" class="text-accent font-bold text-[0.7rem]">0</span>
-      <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim ml-auto"></i>
-    </div>
-    <div class="panel-content">
-      <div class="flex gap-1.5">
-        <button id="addTubeFromSelectBtn" class="flex-1 bg-[#D83514]/80 hover:bg-[#D83514] text-[#FDF6E3] text-[0.55rem] py-1 rounded transition-colors disabled:opacity-40" disabled>创建管件</button>
-        <button id="createFaceBtn" class="flex-1 bg-[#FC7607]/80 hover:bg-[#FC7607] text-[#FDF6E3] text-[0.55rem] py-1 rounded transition-colors disabled:opacity-40" disabled>创建覆盖面</button>
-        <button id="clearMultiBtn" class="bg-[#2A1F18] hover:bg-[#3A2A20] text-[#FDF6E3] text-[0.55rem] px-2 py-1 rounded transition-colors">清空</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 覆盖面管理 -->
-  <div class="p-2 border-b border-[#3A2A20]/60 panel-wrapper collapsed">
-    <div class="text-[0.58rem] text-dim tracking-wider font-medium flex items-center gap-1 collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
-      <i data-lucide="shapes" class="w-3 h-3"></i> 覆盖面
-      <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim ml-auto"></i>
-    </div>
-    <div class="panel-content">
-      <div id="faceListContainer" class="max-h-[160px] overflow-y-auto rounded-lg border border-[#3A2A20]/60 mt-1">
-        <div id="faceListBody" class="text-[0.6rem] text-dim p-2">加载中...</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 空气动力学 -->
-  <div class="p-2 border-b border-[#3A2A20]/60 panel-wrapper collapsed">
-    <div class="text-[0.58rem] text-dim tracking-wider font-medium flex items-center gap-1 collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
-      <i data-lucide="wind" class="w-3 h-3"></i> 空气动力学
-      <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim ml-auto"></i>
-    </div>
-    <div class="panel-content">
-      <div class="mt-1.5 space-y-1">
-        <div class="text-[0.58rem] text-dim tracking-wider font-medium flex items-center gap-1">
-          <span class="w-1.5 h-1.5 rounded-full bg-[#EFCE7D]"></span> 前翼
-        </div>
-        <div id="frontWingListContainer" class="max-h-[240px] overflow-y-auto rounded-lg border border-[#3A2A20]/60">
-          <div id="frontWingListBody" class="text-[0.6rem] text-dim p-2">加载中...</div>
-        </div>
-        <div class="text-[0.58rem] text-dim tracking-wider font-medium flex items-center gap-1 mt-2">
-          <span class="w-1.5 h-1.5 rounded-full bg-[#D83514]"></span> 尾翼
-        </div>
-        <div id="rearWingListContainer" class="max-h-[240px] overflow-y-auto rounded-lg border border-[#3A2A20]/60">
-          <div id="rearWingListBody" class="text-[0.6rem] text-dim p-2">加载中...</div>
-        </div>
-        <div class="text-[0.58rem] text-dim tracking-wider font-medium flex items-center gap-1 mt-2">
-          <span class="w-1.5 h-1.5 rounded-full bg-[#AC8975]"></span> 底板
-        </div>
-        <div id="undertrayListContainer" class="max-h-[240px] overflow-y-auto rounded-lg border border-[#3A2A20]/60">
-          <div id="undertrayListBody" class="text-[0.6rem] text-dim p-2">加载中...</div>
-        </div>
-        <div class="text-[0.58rem] text-dim tracking-wider font-medium flex items-center gap-1 mt-2">
-          <span class="w-1.5 h-1.5 rounded-full bg-[#FC7607]"></span> 扩散器
-        </div>
-        <div id="diffuserListContainer" class="max-h-[240px] overflow-y-auto rounded-lg border border-[#3A2A20]/60">
-          <div id="diffuserListBody" class="text-[0.6rem] text-dim p-2">加载中...</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ 动态赛道 ═══ -->
-  <div class="p-2 border-b border-[#3A2A20]/60 panel-wrapper">
-    <div class="text-[0.58rem] text-dim tracking-wider font-medium mb-1 flex items-center gap-1 collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
-      <i data-lucide="car" class="w-3 h-3"></i> 动态赛道
-      <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim ml-auto"></i>
-    </div>
-    <div class="panel-content space-y-1.5">
-
-      <!-- 路径编辑 -->
-      <div>
-        <span class="text-[0.55rem] text-dim">📍 路径控制点</span>
-        <table id="pathTable" class="hp-table w-full text-[0.55rem] mt-0.5">
-          <thead><tr><th class="text-dim">#</th><th class="text-dim">X mm</th><th class="text-dim">Y mm</th><th></th></tr></thead>
-          <tbody></tbody>
-        </table>
-        <div class="flex gap-1 mt-0.5">
-          <button id="addPathPtBtn" class="dyn-btn">+点</button>
-          <button id="clearPathBtn" class="dyn-btn-ghost">清空</button>
-        </div>
-      </div>
-
-      <!-- 障碍物 -->
-      <div>
-        <span class="text-[0.55rem] text-dim">🚧 障碍物</span>
-        <div id="obstacleList" class="text-[0.55rem] text-dim my-0.5 space-y-0.5"></div>
-        <div class="flex gap-1">
-          <button id="addBumpBtn" class="dyn-btn">+凸块</button>
-          <button id="addKerbBtn" class="dyn-btn">+路肩</button>
-          <button id="addRampBtn" class="dyn-btn">+斜坡</button>
-        </div>
-      </div>
-
-      <!-- 模拟参数 -->
-      <div>
-        <div class="flex justify-between text-[0.55rem]">
-          <span class="text-dim">车速</span><span class="text-muted">mm/s</span>
-        </div>
-        <input id="simSpeed" type="number" value="12000" step="1000"
-               class="dyn-input w-full text-right mt-0.5">
-      </div>
-      <div>
-        <div class="flex justify-between text-[0.55rem]">
-          <span class="text-dim">时长</span><span class="text-muted">s</span>
-        </div>
-        <input id="simDuration" type="number" value="5" step="0.5" min="0.5"
-               class="dyn-input w-full text-right mt-0.5">
-      </div>
-      <button id="runSimBtn" class="bg-[#FC7607] hover:bg-[#D83514] text-[#FDF6E3] text-[0.6rem] px-3 py-1 rounded transition-colors w-full">
-        ▶ 在新窗口跑赛道
-      </button>
-      <div id="simStatus" class="text-[0.55rem] text-dim mt-1 min-h-[16px]"></div>
-
-    </div>
-  </div>
-
-  <!-- 设计参数 -->
-  <div class="p-2 border-b border-[#3A2A20]/60 panel-wrapper collapsed">
-    <div class="text-[0.58rem] text-dim tracking-wider font-medium mb-1 flex items-center gap-1 collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
-      <i data-lucide="sliders" class="w-3 h-3"></i> 设计参数
-      <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim ml-auto"></i>
-    </div>
-    <div class="panel-content">
-      <div class="flex gap-1 mb-1">
-        <select id="paramAxle" class="bg-input border border-[#3A2A20]/60 rounded px-2 py-0.5 text-[0.6rem] text-[#FDF6E3] font-mono outline-none focus:border-accent/50" title="选择车轴">
-          <option value="front">前轴</option>
-          <option value="rear">后轴</option>
-        </select>
-        <button id="applyParamsBtn" class="bg-[#FC7607] hover:bg-[#D83514] text-[#FDF6E3] text-[0.55rem] px-3 py-0.5 rounded transition-colors">应用</button>
-      </div>
-      <div id="paramSliders" class="space-y-1 max-h-[300px] overflow-y-auto"></div>
-    </div>
-  </div>
-
-  <!-- 运动学曲线 -->
-  <div class="p-2 panel-wrapper collapsed">
-    <div class="text-[0.58rem] text-dim tracking-wider font-medium mb-1 flex items-center gap-1 collapse-header" onclick="this.parentElement.classList.toggle('collapsed')">
-      <i data-lucide="trending-up" class="w-3 h-3"></i> 运动学曲线
-      <i data-lucide="chevron-down" class="w-2.5 h-2.5 collapse-arrow text-dim ml-auto"></i>
-    </div>
-    <div class="panel-content">
-      <div class="flex items-center gap-1 mb-1">
-        <select id="curveParam" class="bg-input border border-[#3A2A20]/60 rounded px-2 py-0.5 text-[0.6rem] text-[#FDF6E3] font-mono outline-none focus:border-accent/50" title="选择曲线参数">
-          <option value="camber_deg">外倾角</option>
-          <option value="toe_deg" selected>前束角</option>
-          <option value="caster_deg">后倾角</option>
-          <option value="kpi_deg">内倾角</option>
-          <option value="scrub_radius_mm">偏距</option>
-          <option value="caster_trail_mm">拖距</option>
-        </select>
-      </div>
-      <div class="bg-[#2A1F18] rounded-lg p-1 border border-[#3A2A20]/60">
-        <canvas id="kinCurveChart" width="260" height="200"></canvas>
-      </div>
-    </div>
-  </div>
-
-</div>
-
-<script type="module" src="js/main.js"></script>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
