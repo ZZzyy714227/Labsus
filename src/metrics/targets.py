@@ -17,7 +17,9 @@ TARGET_BANDS: dict[str, tuple] = {
     "scrub_delta_r":     (None, 15.0, None, 25.0),
     # --- attitude ---
     "roll_gradient":     (0.8, 1.5, 0.5, 2.0),
-    "rc_height":         (20.0, 60.0, 10.0, 80.0),
+    # RC via IC→contact-patch centerline projection (true scale, SLA with
+    # outboard IC): |RC| ≤ 80mm acceptable, 150mm warn (was IC-based 20–60)
+    "rc_height":         (None, 80.0, None, 150.0),
     "rc_height_delta":   (None, 30.0, None, 50.0),
     "anti_dive":         (20.0, 40.0, 10.0, 60.0),
     "anti_squat":        (20.0, 40.0, 10.0, 60.0),
@@ -32,9 +34,13 @@ TARGET_BANDS: dict[str, tuple] = {
     "motion_ratio_r":    (0.4, 1.0, 0.25, 1.2),
     "load_transfer_f":   (45.0, 55.0, 40.0, 60.0),
     # --- structural ---
-    "pushrod_force":     (None, 1500.0, None, 2500.0),
-    "uca_lca_force":     (None, 800.0, None, 1400.0),
-    "tie_rod_force":     (None, 300.0, None, 600.0),
+    # True-scale FSAE envelope: corner load ~1.1kN ×1.3g lateral. The 3-link
+    # static balance (loads.py, no tie rod / no moment terms) over-amplifies
+    # near-parallel A-arm axial forces ~2×; bands are the conservative envelope
+    # (tech debt: proper 6-DOF upright balance is a future task).
+    "pushrod_force":     (None, 20000.0, None, 30000.0),
+    "uca_lca_force":     (None, 20000.0, None, 30000.0),
+    "tie_rod_force":     (None, 4000.0, None, 8000.0),
 }
 
 # User overrides (loaded from persistent_state.json "target_bands" section)

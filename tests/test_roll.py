@@ -22,11 +22,25 @@ def test_ic_intersection_known():
     assert abs(ic[0] - 500.0) < 1e-6 and abs(ic[1] - 100.0) < 1e-6
 
 
-def test_roll_center_symmetric():
+def test_roll_center_projection_to_centerline():
+    """RC = IC→contact-patch line crossing the centerline y=0.
+    IC (500, 100), contact patch (375, 0):
+    z(y=0) = 100 × (0-375)/(500-375) = -300."""
     hp = {"CH1": [0, 0.0, 200.0], "CH3": [0, 0.0, 50.0]}
-    result = {"UP1": [0, 100.0, 180.0], "UP2": [0, 100.0, 60.0]}
+    result = {"UP1": [0, 100.0, 180.0], "UP2": [0, 100.0, 60.0],
+              "UP5": [0, 375.0, 0.0]}
     rc = compute_roll_center(hp, result)
-    assert rc["y"] == 500.0 and rc["z"] == 100.0
+    assert rc["y"] == 0.0
+    assert abs(rc["z"] - (-300.0)) < 1e-6
+
+
+def test_roll_center_zero_when_ic_at_ground():
+    """IC at ground level → RC at ground level regardless of lateral position."""
+    hp = {"CH1": [0, 0.0, 200.0], "CH3": [0, 0.0, 50.0]}
+    result = {"UP1": [0, 100.0, 0.0], "UP2": [0, 100.0, 0.0],
+              "UP5": [0, 375.0, 0.0]}
+    rc = compute_roll_center(hp, result)
+    assert abs(rc["z"]) < 1e-9
 
 
 def test_roll_gradient_known():

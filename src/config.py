@@ -170,6 +170,27 @@ DEFAULT_FRAME_NODES = {
     # === Lower side rail midpoint (3-point curve CH3→LWR_MID→R_CH3) ===
     "LWR_MID_R": [-775.0, 160.0, 115.0],
     "LWR_MID_L": [-775.0, -160.0, 115.0],
+
+    # === BODY CONTOUR NODES (panel definition only — not structural) ===
+    # Nose cone tip (X=+560)
+    "BODY_NOSE_TOP": [560.0, 0.0, 300.0],
+    "BODY_NOSE_BOT": [560.0, 0.0, 150.0],
+    # Floor panel corners (planar, Z=45)
+    "BODY_FLR_FR_R":  [380.0, 170.0, 45.0],
+    "BODY_FLR_FR_L":  [380.0, -170.0, 45.0],
+    "BODY_FLR_MID_R": [-775.0, 160.0, 45.0],
+    "BODY_FLR_MID_L": [-775.0, -160.0, 45.0],
+    "BODY_FLR_RR_R":  [-1400.0, 150.0, 45.0],
+    "BODY_FLR_RR_L":  [-1400.0, -150.0, 45.0],
+    # Sidepod outline (front narrow, rear wide; clear of tires Y≤520)
+    "BODY_SP_FR_TR": [-620.0, 330.0, 350.0],
+    "BODY_SP_FR_TL": [-620.0, -330.0, 350.0],
+    "BODY_SP_FR_BR": [-620.0, 300.0, 120.0],
+    "BODY_SP_FR_BL": [-620.0, -300.0, 120.0],
+    "BODY_SP_RR_TR": [-1330.0, 370.0, 380.0],
+    "BODY_SP_RR_TL": [-1330.0, -370.0, 380.0],
+    "BODY_SP_RR_BR": [-1330.0, 340.0, 140.0],
+    "BODY_SP_RR_BL": [-1330.0, -340.0, 140.0],
 }
 
 FRAME_TUBES = [
@@ -307,147 +328,51 @@ FRAME_TUBE_COLORS = {
 }
 
 # Bodywork faces: {face_name: {"loops": [[nodeA, ...]], "color": "#hex", "opacity": 0.3}}
+# Bodywork faces: {face_name: {"loops": [[nodeA, ...]], "color": "#hex", "opacity": 1.0}}
+# True-scale rebuild 2026-08-14: semantic names, planar loops, real paint colors.
 BODYWORK_FACES = {
+    # Nose cone (front bulkhead -> nose tip)
+    "nose_top":    {"loops": [["FB_TOP_R", "BODY_NOSE_TOP", "FB_TOP_L"]],
+                    "color": "#e8e6e1", "opacity": 1.0},
+    "nose_right":  {"loops": [["FB_TOP_R", "BODY_NOSE_TOP", "BODY_NOSE_BOT", "FB_LWR_R"]],
+                    "color": "#e8e6e1", "opacity": 1.0},
+    "nose_left":   {"loops": [["FB_TOP_L", "FB_LWR_L", "BODY_NOSE_BOT", "BODY_NOSE_TOP"]],
+                    "color": "#e8e6e1", "opacity": 1.0},
+    "nose_bottom": {"loops": [["FB_LWR_R", "BODY_NOSE_BOT", "FB_LWR_L"]],
+                    "color": "#1a1a1a", "opacity": 1.0},
 
+    # Cockpit side panels (front hoop -> main hoop)
+    "side_right": {"loops": [["FH_UPPER_R", "MH_UPPER_R", "MH_LEG_R", "FH_LEG_R"]],
+                   "color": "#d83514", "opacity": 1.0},
+    "side_left":  {"loops": [["FH_UPPER_L", "FH_LEG_L", "MH_LEG_L", "MH_UPPER_L"]],
+                   "color": "#d83514", "opacity": 1.0},
 
+    # Sidepods (outboard radiator covers)
+    "sidepod_outer_r": {"loops": [["BODY_SP_FR_TR", "BODY_SP_RR_TR", "BODY_SP_RR_BR", "BODY_SP_FR_BR"]],
+                        "color": "#e8e6e1", "opacity": 1.0},
+    "sidepod_outer_l": {"loops": [["BODY_SP_FR_TL", "BODY_SP_FR_BL", "BODY_SP_RR_BL", "BODY_SP_RR_TL"]],
+                        "color": "#e8e6e1", "opacity": 1.0},
+    "sidepod_deck":   {"loops": [["BODY_SP_FR_TR", "BODY_SP_FR_TL", "BODY_SP_RR_TL", "BODY_SP_RR_TR"]],
+                       "color": "#c8c4bd", "opacity": 1.0},
+    "sidepod_floor":  {"loops": [["BODY_SP_FR_BR", "BODY_SP_RR_BR", "BODY_SP_RR_BL", "BODY_SP_FR_BL"]],
+                       "color": "#1a1a1a", "opacity": 1.0},
+    "sidepod_connect_r": {"loops": [["BODY_SP_FR_TR", "BODY_SP_FR_BR", "FH_UPPER_R"]],
+                          "color": "#c8c4bd", "opacity": 1.0},
+    "sidepod_connect_l": {"loops": [["BODY_SP_FR_TL", "FH_UPPER_L", "BODY_SP_FR_BL"]],
+                          "color": "#c8c4bd", "opacity": 1.0},
 
+    # Floor (planar, Z=45)
+    "floor": {"loops": [["BODY_FLR_FR_R", "BODY_FLR_MID_R", "BODY_FLR_RR_R",
+                         "BODY_FLR_RR_L", "BODY_FLR_MID_L", "BODY_FLR_FR_L"]],
+              "color": "#1a1a1a", "opacity": 1.0},
 
+    # Engine cover (main hoop top -> rear bulkhead top)
+    "engine_cover": {"loops": [["MH_TOP_R", "RB_TOP_R", "RB_TOP_L", "MH_TOP_L"]],
+                     "color": "#e8e6e1", "opacity": 1.0},
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    "01": {
-        "loops": [["R_CH4_L", "MH_UPR_L", "BODY_UPR_FWD_L", "FH_UPR_L", "CH3_L", "BODY_LWR_MID_L"]],
-        "color": "#94a3b8",
-        "opacity": 0.95
-    },
-
-
-    "02": {
-        "loops": [["FH_UPR_R", "CH3", "BODY_LWR_MID_R", "R_CH4", "MH_UPR_R", "BODY_UPR_FWD_R"]],
-        "color": "#94a3b8",
-        "opacity": 0.95
-    },
-
-
-
-    "04": {
-        "loops": [["BODY_NOSE_BOT", "FB_LWR_L", "FB_TOP_L", "BODY_NOSE_TOP"]],
-        "color": "#8b5cf6",
-        "opacity": 0.95
-    },
-
-
-    "03": {
-        "loops": [["BODY_NOSE_BOT", "FB_LWR_R", "FB_TOP_R", "BODY_NOSE_TOP"]],
-        "color": "#8b5cf6",
-        "opacity": 0.95
-    },
-
-
-    "05": {
-        "loops": [["BODY_NOSE_TOP", "FB_TOP_L", "FH_TOP_L", "FH_TOP_R", "FB_TOP_R"]],
-        "color": "#8b5cf6",
-        "opacity": 0.95
-    },
-
-
-
-
-    "06": {
-        "loops": [["FB_LWR_L", "FB_TOP_L", "CH2_L", "CH4_L"]],
-        "color": "#8b5cf6",
-        "opacity": 0.95
-    },
-
-
-    "07": {
-        "loops": [["FB_LWR_R", "CH4", "CH2", "FB_TOP_R"]],
-        "color": "#8b5cf6",
-        "opacity": 0.95
-    },
-
-
-
-
-    "09": {
-        "loops": [["FB_TOP_L", "FH_TOP_L", "FH_UPR_L", "CH1_L", "CH2_L"]],
-        "color": "#8b5cf6",
-        "opacity": 0.65
-    },
-
-    "08": {
-        "loops": [["FB_TOP_R", "FH_TOP_R", "FH_UPR_R", "CH1", "CH2"]],
-        "color": "#8b5cf6",
-        "opacity": 0.65
-    },
-
-
-
-    "10": {
-        "loops": [["CH4_L", "CH3_L", "FH_UPR_L", "CH1_L", "CH2_L"]],
-        "color": "#f43f5e",
-        "opacity": 0.95
-    },
-
-
-    "11": {
-        "loops": [["CH4", "CH2", "CH1", "FH_UPR_R", "CH3"]],
-        "color": "#ec4899",
-        "opacity": 0.95
-    },
-
-    # === SIDEPOD (侧箱) — Trapezoidal outer panels, narrow front (Y=320) → wide rear (Y=380) ===
-    "12": {
-        "loops": [["BODY_SIDE_FR_TR", "BODY_SIDE_RR_TR", "BODY_SIDE_RR_BR", "BODY_SIDE_FR_BR"]],
-        "color": "#fc7607",
-        "opacity": 0.55
-    },
-
-    "13": {
-        "loops": [["BODY_SIDE_FR_TL", "BODY_SIDE_FR_BL", "BODY_SIDE_RR_BL", "BODY_SIDE_RR_TL"]],
-        "color": "#fc7607",
-        "opacity": 0.55
-    },
-
-    # Sidepod top deck
-    "14": {
-        "loops": [["BODY_SIDE_FR_TR", "BODY_SIDE_FR_TL", "BODY_SIDE_RR_TL", "BODY_SIDE_RR_TR"]],
-        "color": "#efce7d",
-        "opacity": 0.40
-    },
-
-    # Sidepod bottom (floor-side)
-    "15": {
-        "loops": [["BODY_SIDE_FR_BR", "BODY_SIDE_RR_BR", "BODY_SIDE_RR_BL", "BODY_SIDE_FR_BL"]],
-        "color": "#d83514",
-        "opacity": 0.35
-    },
+    # Firewall (cockpit <-> engine bay, X=-750 plane)
+    "firewall": {"loops": [["MH_LEG_R", "MH_UPPER_R", "MH_UPPER_L", "MH_LEG_L"]],
+                 "color": "#9aa3ab", "opacity": 1.0},
 }
 
 # ============================================================
@@ -456,107 +381,53 @@ BODYWORK_FACES = {
 
 REAR_WING = {
     "enabled": True,
-    "reference_point": [-1080, 0, 510],
-    "span": 800,
+    "reference_point": [-1630.0, 0.0, 1050.0],
+    "span": 900.0,
     "elements": [
-        {
-            "name": "主翼面",
-            "chord": 240,
-            "angle": 4,
-            "x_offset": 0,
-            "z_offset": 0,
-            "camber_pct": -2,
-            "thickness_pct": 4,
-            "span_fraction": 1
-        },
-        {
-            "name": "襟翼一",
-            "chord": 220,
-            "angle": 8,
-            "x_offset": 0,
-            "z_offset": -50,
-            "camber_pct": 8,
-            "thickness_pct": 6,
-            "span_fraction": 1
-        },
-        {
-            "name": "襟翼二",
-            "chord": 150,
-            "angle": 18,
-            "x_offset": 0,
-            "z_offset": -95,
-            "camber_pct": 10,
-            "thickness_pct": 5,
-            "span_fraction": 1
-        }
+        {"name": "主翼面", "chord": 300, "angle": 5, "x_offset": 0, "z_offset": 0,
+         "camber_pct": 4, "thickness_pct": 6, "span_fraction": 1},
+        {"name": "襟翼一", "chord": 220, "angle": 15, "x_offset": 0, "z_offset": -60,
+         "camber_pct": 8, "thickness_pct": 5, "span_fraction": 1},
+        {"name": "襟翼二", "chord": 140, "angle": 30, "x_offset": 0, "z_offset": -115,
+         "camber_pct": 10, "thickness_pct": 4, "span_fraction": 1},
     ],
     "endplate": {
-        "overhang_forward": 0.12,
-        "overhang_rear": 0.08,
-        "height_above": 70,
-        "height_below": 90
+        "overhang_forward": 0.10,
+        "overhang_rear": 0.10,
+        "height_above": 80,
+        "height_below": 120
     },
     "mounts": [
-        {
-            "name": "RW_MOUNT_R",
-            "frame_node": "RB_TOP_R",
-            "local_x": 0,
-            "local_y": 220,
-            "local_z": 0
-        },
-        {
-            "name": "RW_MOUNT_L",
-            "frame_node": "RB_TOP_L",
-            "local_x": 0,
-            "local_y": -220,
-            "local_z": 0
-        }
+        {"name": "RW_MOUNT_R", "frame_node": "RB_TOP_R", "local_x": 0, "local_y": 120, "local_z": 650},
+        {"name": "RW_MOUNT_L", "frame_node": "RB_TOP_L", "local_x": 0, "local_y": -120, "local_z": 650},
     ],
-    "color": "#60a5fa",
-    "opacity": 0.45
+    "color": "#20242a",
+    "opacity": 1.0
 }
 
 # Front wing — single element, positive camber (sky-facing)
 FRONT_WING = {
     "enabled": True,
-    "reference_point": [200, 0, 40],
-    "span": 600,
+    "reference_point": [480.0, 0.0, 120.0],
+    "span": 1000.0,
     "elements": [
-        {
-            "name": "主翼面",
-            "chord": 240,
-            "angle": 3,
-            "x_offset": 0,
-            "z_offset": 0,
-            "camber_pct": 3,
-            "thickness_pct": 5,
-            "span_fraction": 1
-        }
+        {"name": "主翼面", "chord": 320, "angle": 3, "x_offset": 0, "z_offset": 0,
+         "camber_pct": 4, "thickness_pct": 5, "span_fraction": 1},
+        {"name": "襟翼", "chord": 160, "angle": 15, "x_offset": 0, "z_offset": -50,
+         "camber_pct": 6, "thickness_pct": 5, "span_fraction": 1},
     ],
     "endplate": {
-        "overhang_forward": 0.12,
+        "overhang_forward": 0.08,
         "overhang_rear": 0.08,
-        "height_above": 50,
-        "height_below": 40
+        "height_above": 60,
+        "height_below": 80
     },
     "mounts": [
-        {
-            "name": "FW_MOUNT_R",
-            "frame_node": "CH2",
-            "local_x": 240,
-            "local_y": 200,
-            "local_z": -5
-        },
-        {
-            "name": "FW_MOUNT_L",
-            "frame_node": "CH2",
-            "local_x": 240,
-            "local_y": -200,
-            "local_z": -5
-        }
+        {"name": "FW_MOUNT_R", "frame_node": "FB_LWR_R", "local_x": 60, "local_y": 150, "local_z": -10},
+        {"name": "FW_MOUNT_L", "frame_node": "FB_LWR_L", "local_x": 60, "local_y": -150, "local_z": -10},
     ],
-    "color": "#34d399",
-    "opacity": 0.5
+    "color": "#20242a",
+    "opacity": 1.0
 }
 
 # ============================================================
@@ -565,93 +436,31 @@ FRONT_WING = {
 
 UNDERTRAY_CONFIG = {
     "enabled": True,
-    "front_x": 10,
-    "rear_x": -1195,
-    "ground_clearance": 28,
-    "half_width": 300,
-    "venturi_depth": 15,
+    "front_x": 400.0,
+    "rear_x": -1400.0,
+    "ground_clearance": 30.0,
+    "half_width": 380.0,
+    "venturi_depth": 25.0,
     "venturi_start_ratio": 0.3,
     "venturi_end_ratio": 0.6,
     "edge_flipups": [
-        {
-            "name": "FLIPUP_R",
-            "side": "right",
-            "start_ratio": 0.55,
-            "length": 300,
-            "height": 40,
-            "angle": 35
-        },
-        {
-            "name": "FLIPUP_L",
-            "side": "left",
-            "start_ratio": 0.55,
-            "length": 300,
-            "height": 40,
-            "angle": 35
-        }
+        {"name": "FLIPUP_R", "side": "right", "start_ratio": 0.55, "length": 500, "height": 60, "angle": 35},
+        {"name": "FLIPUP_L", "side": "left", "start_ratio": 0.55, "length": 500, "height": 60, "angle": 35},
     ],
     "strakes": [
-        {
-            "name": "STRAKE_R1",
-            "side": "right",
-            "y_ratio": 0.85,
-            "start_ratio": 0.35,
-            "length": 400,
-            "height": 25,
-            "angle": 50
-        },
-        {
-            "name": "STRAKE_R2",
-            "side": "right",
-            "y_ratio": 0.45,
-            "start_ratio": 0.4,
-            "length": 350,
-            "height": 20,
-            "angle": 45
-        },
-        {
-            "name": "STRAKE_L1",
-            "side": "left",
-            "y_ratio": 0.85,
-            "start_ratio": 0.35,
-            "length": 400,
-            "height": 25,
-            "angle": 50
-        },
-        {
-            "name": "STRAKE_L2",
-            "side": "left",
-            "y_ratio": 0.45,
-            "start_ratio": 0.4,
-            "length": 350,
-            "height": 20,
-            "angle": 45
-        }
+        {"name": "STRAKE_R1", "side": "right", "y_ratio": 0.85, "start_ratio": 0.35, "length": 600, "height": 30, "angle": 50},
+        {"name": "STRAKE_R2", "side": "right", "y_ratio": 0.45, "start_ratio": 0.4, "length": 550, "height": 25, "angle": 45},
+        {"name": "STRAKE_L1", "side": "left", "y_ratio": 0.85, "start_ratio": 0.35, "length": 600, "height": 30, "angle": 50},
+        {"name": "STRAKE_L2", "side": "left", "y_ratio": 0.45, "start_ratio": 0.4, "length": 550, "height": 25, "angle": 45},
     ],
     "mounts": [
-        {
-            "name": "UT_MOUNT_FR",
-            "frame_node": "FB_LWR_R",
-            "local_y": 80
-        },
-        {
-            "name": "UT_MOUNT_FL",
-            "frame_node": "FB_LWR_L",
-            "local_y": -80
-        },
-        {
-            "name": "UT_MOUNT_RR",
-            "frame_node": "RB_LWR_R",
-            "local_y": 80
-        },
-        {
-            "name": "UT_MOUNT_RL",
-            "frame_node": "RB_LWR_L",
-            "local_y": -80
-        }
+        {"name": "UT_MOUNT_FR", "frame_node": "FB_LWR_R", "local_y": 80},
+        {"name": "UT_MOUNT_FL", "frame_node": "FB_LWR_L", "local_y": -80},
+        {"name": "UT_MOUNT_RR", "frame_node": "RB_LWR_R", "local_y": 80},
+        {"name": "UT_MOUNT_RL", "frame_node": "RB_LWR_L", "local_y": -80},
     ],
-    "color": "#22c55e",
-    "opacity": 0.7
+    "color": "#20242a",
+    "opacity": 1.0
 }
 
 # ============================================================
@@ -660,30 +469,34 @@ UNDERTRAY_CONFIG = {
 
 DIFFUSER_CONFIG = {
     "enabled": True,
-    "start_x": -1195,
-    "length": 200,
-    "angle": 10,
-    "channels": 4,
-    "strake_height": 35,
+    "start_x": -1400.0,
+    "length": 320.0,
+    "angle": 12.0,
+    "channels": 5,
+    "strake_height": 60,
     "strake_angle": 75,
-    "exit_half_width": 350,
-    "exit_overhang": 20,
+    "exit_half_width": 380.0,
+    "exit_overhang": 30,
     "mounts": [
-        {
-            "name": "DIFF_MOUNT_R",
-            "frame_node": "RB_LWR_R",
-            "local_y": 80,
-            "local_x": -20
-        },
-        {
-            "name": "DIFF_MOUNT_L",
-            "frame_node": "RB_LWR_L",
-            "local_y": -80,
-            "local_x": -20
-        }
+        {"name": "DIFF_MOUNT_R", "frame_node": "RB_LWR_R", "local_y": 80, "local_x": -20},
+        {"name": "DIFF_MOUNT_L", "frame_node": "RB_LWR_L", "local_y": -80, "local_x": -20},
     ],
-    "color": "#f43f5e",
-    "opacity": 0.6
+    "color": "#20242a",
+    "opacity": 1.0
+}
+
+# ============================================================
+# CABIN / FURNITURE — schematic part placement (non-kinematic)
+# ============================================================
+
+CABIN = {
+    "steering_wheel": {"center": [-430.0, 0.0, 560.0], "radius": 140.0, "rim_thickness": 25.0},
+    "seat": {"base": [-620.0, 0.0, 45.0], "width": 380.0, "back_height": 500.0, "back_angle_deg": 30.0},
+    "headrest": {"center": [-730.0, 0.0, 950.0], "width": 260.0, "height": 220.0},
+    "engine": {"center": [-1150.0, 0.0, 330.0], "size": [500.0, 380.0, 320.0]},
+    "restrictor": {"center": [-1280.0, 0.0, 560.0], "diameter": 20.0, "throat_length": 60.0},
+    "exhaust": {"port_center": [-1240.0, 150.0, 380.0], "pipe_diameter": 45.0},
+    "firewall": {"x": -750.0},
 }
 
 # Chassis points are fixed (don't move during kinematics)
@@ -703,17 +516,21 @@ VEHICLE_PARAMS = {
     "front_axle_frac": 0.50,
     "rear_axle_frac": 0.50,
     "cg_height_mm": 300.0,
-    "wheelbase_mm": 900.0,
-    "front_track_mm": 840.0,
-    "rear_track_mm": 690.0,
-    "k_spring_f": 30.0,          # N/mm
-    "k_spring_r": 40.0,          # N/mm
-    "c_damper_f": 1500.0,        # N·s/m
-    "c_damper_r": 1800.0,        # N·s/m
-    "k_arb_f": 5.0e5,            # N·mm/rad
-    "k_arb_r": 7.0e5,            # N·mm/rad
-    "ax_brake": 1.2,             # g
-    "ax_accel": 1.0,             # g
-    "ay_corner": 1.3,            # g
+    "wheelbase_mm": 1550.0,        # true scale (was 900.0)
+    "front_track_mm": 1220.0,      # true scale (was 840.0)
+    "rear_track_mm": 1180.0,       # true scale (was 690.0)
+    # Springs chosen for ride freq ~2.3/2.7 Hz at mr_f/mr_r = 0.7/0.6 (analyze defaults),
+    # 60kg sprung mass per corner: k_wheel = k × mr² ≈ 12.7/16.9 N/mm
+    "k_spring_f": 26.0,            # N/mm
+    "k_spring_r": 47.0,            # N/mm
+    # c = ζ × 2√(k_wheel·m) / mr² at ζ=0.7 per corner
+    "c_damper_f": 2500.0,          # N·s/m
+    "c_damper_r": 3900.0,          # N·s/m
+    # ARB sized for roll gradient ~1.0 deg/g with true track (≈350-380 N·m/deg)
+    "k_arb_f": 2.0e7,              # N·mm/rad
+    "k_arb_r": 2.2e7,              # N·mm/rad
+    "ax_brake": 1.2,               # g
+    "ax_accel": 1.0,               # g
+    "ay_corner": 1.3,              # g
     "unsprung_kg": 20.0,
 }
