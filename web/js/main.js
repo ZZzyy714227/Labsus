@@ -1,7 +1,9 @@
 // Workbench entry — wiring + solve/analyze flows + snapshot engine
 import { state, loadSnapshots, pushSnapshot } from './state.js';
 import { api } from './api.js';
-import { initScene, rebuildCar } from './scene3d.js';
+import {
+  initScene, setCarStatic, setCarDynamic, setView, exportPointSet, getPointSetSummary,
+} from './scene3d.js';
 import { renderGeometryPanel, renderVehiclePanel, renderTargetsPanel } from './panels.js';
 import { renderDashboard } from './dashboard.js';
 import { renderHistory, revertToPrevious } from './history.js';
@@ -13,6 +15,7 @@ async function init() {
   const d = await api.defaults();
   state.designParams = { front: d.params.front, rear: d.params.rear };
   state.hardpoints = { front: d.front.right, rear: d.rear.right };
+  state.defaultsData = d;
   state.vehicle = (await api.getVehicle()).params;
   state.targets = (await api.getTargets()).bands;
   // initial design reference — snapshots dedup against this
@@ -22,7 +25,9 @@ async function init() {
   };
 
   initScene(document.getElementById('scene3d'));
-  rebuildCar(state.hardpoints.front, state.hardpoints.rear);
+  setCarStatic(d);
+  setCarDynamic(d.front, d.rear, null, 0);
+  wireViewToolbar();
   renderGeometryPanel(document.getElementById('panel-geometry'));
   renderVehiclePanel(document.getElementById('panel-vehicle'));
   renderTargetsPanel(document.getElementById('panel-targets'));
@@ -66,7 +71,33 @@ async function init() {
   });
   document.getElementById('btnRevert').addEventListener('click', revertToPrevious);
 
-  window.__workbench = { state, runAnalyze, runSolve };   // test hook
+  window.__workbench = { state, runAnalyze, runSolve, setCarDynamic, getPointSetSummary, setView };   // test hook
+}
+
+/** 3D viewport toolbar: view presets + point-set export panel. */
+function wireViewToolbar() {
+  document.querySelectorAll('#viewToolbar [data-view]').forEach((b) => {
+    b.addEventListener('click', () => setView(b.dataset.view));
+  });
+  document.getElementById('btnPointsetJson').addEventListener('click', () => exportPointSet('json'));
+  document.getElementById('btnPointsetCsv').addEventListener('click', () => exportPointSet('csv'));
+
+  const panel = document.getElementById('pointsetPanel');
+  const renderPanel = () => {
+    const s = getPointSetSummary();
+    document.getElementById('pointsetList').innerHTML =
+      `<div class="ps-total mono">总点数 ${s.total.toLocaleString()}（整车系坐标 mm，X前 Y右 Z上）</div>` +
+      s.items.map((i) =>
+        `<div class="ps-row"><span>${i.part}</span><span class="mono">${i.points.toLocaleString()}</span></div>`
+      ).join('');
+  };
+  document.getElementById('btnPointsetPanel').addEventListener('click', () => {
+    panel.classList.toggle('hidden');
+    if (!panel.classList.contains('hidden')) renderPanel();
+  });
+  document.getElementById('btnPointsetClose').addEventListener('click', () => {
+    panel.classList.add('hidden');
+  });
 }
 
 function onSliderInput() {
@@ -127,23 +158,12 @@ export async function runSolve() {
     document.getElementById('solveStatus').textContent = `求解 ${dt}ms`;
     // hardpoints stay at DESIGN positions (snapshot dedup relies on this);
     // the 3D view shows the solved travel pose instead
-    rebuildCar(displayHp('front'), displayHp('rear'));
+    setCarDynamic(state.hardpoints.front, state.hardpoints.rear,
+                  state.solveResult, state.travel.rack);
   } catch (e) {
     document.getElementById('solveStatus').textContent = '求解失败';
     console.error('solve failed', e);
   }
-}
-
-/** Design hardpoints with UP1-5 overlaid from the latest solve (travel pose). */
-function displayHp(axleKey) {
-  const base = state.hardpoints[axleKey];
-  const solved = state.solveResult?.[axleKey]?.right;
-  if (!solved) return base;
-  const out = { ...base };
-  for (const k of ['UP1', 'UP2', 'UP3', 'UP4', 'UP5']) {
-    if (solved[k]) out[k] = solved[k];
-  }
-  return out;
 }
 
 export async function runAnalyze() {
