@@ -746,9 +746,8 @@ class TestSweep:
         assert "rear" in data
         assert len(data["travel"]) == 51
 
-    @pytest.mark.xfail(reason="已知故障 F2: LS 精化门槛导致扫描曲线不连续")
     def test_sweep_camber_curve_continuous(self, client, front_hp, rear_hp):
-        """外倾角曲线应连续，无突变。"""
+        """外倾角曲线应连续，无突变。（F2 已由 V10 双向 continuation 修复）"""
         resp = client.post("/api/sweep", json={
             "front_hardpoints": front_hp,
             "rear_hardpoints": rear_hp,
@@ -920,11 +919,8 @@ class TestEdgeCases:
         # 可能求解质量下降，但不应崩溃
         assert resp.status_code == 200
 
-    @pytest.mark.xfail(reason="已知故障 F3: 零长度主销导致 NaN 崩溃（ValueError: Out of range float values are not JSON compliant）",
-                       raises=ValueError)
     def test_solve_zero_dimension_kingpin(self, client):
-        """零长度主销 → 目前会产生 NaN 导致崩溃（已知故障 F3）。
-        标记为预期失败，待修复后改为 200。"""
+        """零长度主销 → 求解器应优雅返回 200（F3 已修复：不再 NaN 崩溃）。"""
         hp = {
             "CH1": [0, 100, 200],
             "CH2": [100, 100, 200],
@@ -948,9 +944,8 @@ class TestEdgeCases:
             "rear_hardpoints": hp,
             "front_travel": 0.0,
         })
-        # 当前行为：NaN → 500。理想行为：200 + 优雅降级
-        # 标记为已知故障（F3），期望修复后变成 200
-        assert resp.status_code in (200, 500), \
+        # F3 已修复：返回 200 + 优雅降级
+        assert resp.status_code == 200, \
             f"零长度主销返回意外状态码: {resp.status_code}"
 
     def test_sweep_extreme_range(self, client, front_hp, rear_hp):
@@ -1041,7 +1036,6 @@ class TestPhysicalPlausibility:
             assert abs(L_u25_new - L_u25) < 0.5, \
                 f"UP2-UP5 距离变化: design={L_u25}, bump={dz}mm: {L_u25_new}"
 
-    @pytest.mark.xfail(reason="已知故障 F1: PBD 求解器 UCA 约束半径偏差过大")
     def test_uca_ball_joint_on_axis(self, client, front_hp, rear_hp):
         """上A臂球头 (UP1) 应始终在上A臂枢轴轴线上（距轴线 = 设计半径）。"""
         from geometry import distance_point_to_line
@@ -1103,9 +1097,8 @@ class TestPhysicalPlausibility:
         assert abs(cp_z) < 10, \
             f"接地点 Z={cp_z}, 远离地面"
 
-    @pytest.mark.xfail(reason="已知故障 F4: 接地点 Z 坐标计算错误，脱离地面")
     def test_contact_patch_z_decreases_with_bump(self, client, front_hp, rear_hp):
-        """正轮跳 → 接地点 Z 不应上升太多（轮胎在地面）。"""
+        """正轮跳 → 接地点 Z 不应上升太多（轮胎在地面）。（F4 已修复）"""
         r0 = client.post("/api/solve", json={
             "front_hardpoints": front_hp, "rear_hardpoints": rear_hp,
             "front_travel": 0.0,

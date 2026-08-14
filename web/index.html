@@ -38,7 +38,26 @@
       <div id="panel-targets" class="panel-body hidden"></div>
     </aside>
     <section id="centerCol">
-      <div id="scene3d"></div>
+      <div id="scene3d">
+        <div id="viewToolbar">
+          <span class="vt-group">
+            <button class="btn vt" data-view="default">默认</button>
+            <button class="btn vt" data-view="top">俯视</button>
+            <button class="btn vt" data-view="side">侧视</button>
+            <button class="btn vt" data-view="front">前视</button>
+            <button class="btn vt" data-view="driver">车手</button>
+          </span>
+          <span class="vt-group">
+            <button class="btn vt" id="btnPointsetPanel">▦ 点阵统计</button>
+            <button class="btn vt" id="btnPointsetJson">⬇ 点阵 JSON</button>
+            <button class="btn vt" id="btnPointsetCsv">⬇ 点阵 CSV</button>
+          </span>
+        </div>
+        <div id="pointsetPanel" class="hidden">
+          <div class="col-head">三维点阵坐标集合 <button id="btnPointsetClose" class="btn">✕</button></div>
+          <div id="pointsetList"></div>
+        </div>
+      </div>
       <div id="sliderBar">
         <label>前轮跳
           <input type="range" id="frontTravel" min="-40" max="40" step="0.5" value="0">

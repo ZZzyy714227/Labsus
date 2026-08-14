@@ -494,7 +494,7 @@ CABIN = {
     "seat": {"base": [-620.0, 0.0, 45.0], "width": 380.0, "back_height": 500.0, "back_angle_deg": 30.0},
     "headrest": {"center": [-730.0, 0.0, 950.0], "width": 260.0, "height": 220.0},
     "engine": {"center": [-1150.0, 0.0, 330.0], "size": [500.0, 380.0, 320.0]},
-    "restrictor": {"center": [-1280.0, 0.0, 560.0], "diameter": 20.0, "throat_length": 60.0},
+    "restrictor": {"center": [-1280.0, 0.0, 580.0], "diameter": 20.0, "throat_length": 60.0},
     "exhaust": {"port_center": [-1240.0, 150.0, 380.0], "pipe_diameter": 45.0},
     "firewall": {"x": -750.0},
 }

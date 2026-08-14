@@ -2,6 +2,7 @@
 export const state = {
   hardpoints: { front: null, rear: null },   // {CH1: [x,y,z], ...} + scalars
   designParams: { front: null, rear: null },
+  defaultsData: null,                        // raw /api/defaults payload (frame/body/aero/cabin)
   vehicle: null,                             // vehicle params dict
   targets: null,                             // band dict
   travel: { front: 0, rear: 0, rack: 0 },

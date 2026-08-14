@@ -6,8 +6,35 @@ export function v(x, y, z) {
   return new THREE.Vector3(x, y, z);
 }
 
+// ---- plain-array vector helpers (car-frame [x, y, z]) ----
+export const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+export const cross = (a, b) => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+];
+export const norm = (a) => {
+  const l = Math.hypot(a[0], a[1], a[2]);
+  return l > 1e-12 ? [a[0] / l, a[1] / l, a[2] / l] : [0, 0, 1];
+};
+export const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+export const mirrorY = (p) => [p[0], -p[1], p[2]];
+
+/** Rotate point p about a car-frame X-axis line through `pivot` by theta. */
+export function rotateAroundX(p, pivot, theta) {
+  const c = Math.cos(theta);
+  const s = Math.sin(theta);
+  const dy = p[1] - pivot[1];
+  const dz = p[2] - pivot[2];
+  return [p[0], pivot[1] + dy * c - dz * s, pivot[2] + dy * s + dz * c];
+}
+
 function tag(mesh, part) {
-  if (mesh) mesh.userData.part = part;
+  if (mesh) {
+    mesh.userData.part = part;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+  }
   return mesh;
 }
 
@@ -41,7 +68,7 @@ export function box3(c, sizes, material, part) {
 
 /** Sphere ball. */
 export function ball(c, radius, material, part) {
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 16, 12), material);
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 12, 8), material);
   mesh.position.set(c[0], c[1], c[2]);
   return tag(mesh, part);
 }
