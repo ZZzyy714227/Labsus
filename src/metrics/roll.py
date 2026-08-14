@@ -29,11 +29,23 @@ def compute_instant_center(hp, result):
 
 
 def compute_roll_center(hp, result):
-    """RC ≈ IC (left-right symmetric). Returns {'y','z'} or None if parallel."""
+    """RC = intersection of the IC→contact-patch line with the vehicle
+    centerline (y=0). Previously the raw IC point was returned, which
+    overstated RC height for outboard ICs (and broke roll_gradient).
+
+    Line through IC (y_ic, z_ic) and contact patch (y_cp, 0):
+        z(y=0) = z_ic * (0 - y_cp) / (y_ic - y_cp)
+    """
     ic = compute_instant_center(hp, result)
     if ic is None:
         return None
-    return {"y": float(ic[0]), "z": float(ic[1])}
+    y_ic, z_ic = float(ic[0]), float(ic[1])
+    y_cp = float(result["UP5"][1])
+    denom = y_ic - y_cp
+    if abs(denom) < 1e-9:
+        return {"y": 0.0, "z": z_ic}
+    z_rc = z_ic * (0.0 - y_cp) / denom
+    return {"y": 0.0, "z": round(z_rc, 3)}
 
 
 def compute_roll_gradient(vehicle, roll_stiffness_f, roll_stiffness_r, rc_z):

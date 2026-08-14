@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from api_models import ApplyParamsRequest, SavePointRequest, UpdateParamsRequest
 from config import (
     BODYWORK_FACES,
+    CABIN,
     DEFAULT_FRAME_NODES,
     DESIGN_PARAMS,
     DIFFUSER_CONFIG,
@@ -81,6 +82,7 @@ async def get_defaults():
         "front_wing": FRONT_WING,
         "undertray": UNDERTRAY_CONFIG,
         "diffuser": DIFFUSER_CONFIG,
+        "cabin": CABIN,
         "params": DESIGN_PARAMS,
     }
 
