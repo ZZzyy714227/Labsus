@@ -104,242 +104,201 @@ DESIGN_PARAMS = {
 }
 
 # ============================================================
-# FRAME — rocker mechanism nodes + connecting tubes
+# FRAME — rules-compliant true-scale steel spaceframe nodes
+# (2026-08-14 rebuild; rules refs: ref/chassis_rules.txt 3.11–3.21)
 # ============================================================
 
 DEFAULT_FRAME_NODES = {
-    # Front rocker — right side (all X=10 → YZ plane, normal // X)
-    # CH5 at (135,245), pivot at (200,260) → arm ~67mm
-    "RK_PIVOT_R": [10.0, 144.2, 260.0],  # Pivot
-    "RK_DAMPER_R":      [10.0, 108.2, 200.0],  # Damper (~78mm arm)
-    # Front rocker — left side (mirrored Y)
-    "RK_PIVOT_L":       [10.0, -144.2, 260.0],
-    "RK_DAMPER_L":      [10.0, -108.2, 200.0],
+    # === Suspension rocker mechanisms ===
+    # Front pushrod rocker (X=0, YZ plane): pivot/rocker arms from Task 1 kinematics
+    "RK_PIVOT_R":        [0.0, 95.0, 270.0],
+    "RK_DAMPER_R":       [0.0, 55.0, 205.0],
+    "DAMPER_CHASSIS_FR": [0.0, 45.0, 110.0],
+    "RK_PIVOT_L":        [0.0, -95.0, 270.0],
+    "RK_DAMPER_L":       [0.0, -55.0, 205.0],
+    "DAMPER_CHASSIS_FL": [0.0, -45.0, 110.0],
+    # Rear pullrod rocker (X=-1550, YZ plane)
+    "R_RK_PIVOT_R":        [-1550.0, 95.0, 155.0],
+    "R_RK_DAMPER_R":       [-1550.0, 60.0, 200.0],
+    "R_DAMPER_CHASSIS_RR": [-1550.0, 40.0, 95.0],
+    "R_RK_PIVOT_L":        [-1550.0, -95.0, 155.0],
+    "R_RK_DAMPER_L":       [-1550.0, -60.0, 200.0],
+    "R_DAMPER_CHASSIS_RL": [-1550.0, -40.0, 95.0],
 
-    # Rear pull-rod rocker — right side (all X=-900 → YZ plane)
-    "R_RK_PIVOT_R":     [-900.0, 126.0, 160.0],  # Pivot
-    "R_RK_DAMPER_R":    [-900.0, 90.0, 190.0],  # Damper (~67mm arm)
-    # Rear pull-rod rocker — left side (mirrored Y)
-    "R_RK_PIVOT_L":     [-900.0, -126.0, 160.0],
-    "R_RK_DAMPER_L":    [-900.0, -90.0, 190.0],
+    # === Front bulkhead (X=+420; rules 3.21: ≥3 members/side back to front hoop) ===
+    "FB_TOP_R": [420.0, 200.0, 380.0],
+    "FB_TOP_L": [420.0, -200.0, 380.0],
+    "FB_MID_R": [420.0, 170.0, 260.0],
+    "FB_MID_L": [420.0, -170.0, 260.0],
+    "FB_LWR_R": [420.0, 160.0, 130.0],
+    "FB_LWR_L": [420.0, -160.0, 130.0],
 
-    # === Front Bulkhead (X=300) ===
-    "FB_TOP_R": [250.0, 108.2, 200.0],  # Top right (Z lowered 260→220)
-    "FB_TOP_L": [250.0, -108.2, 200.0],
-    "FB_LWR_R": [280.0, 85.0, 70.0],  # Bottom right (Z lowered 100→70)
-    "FB_LWR_L": [280.0, -85.0, 70.0],
+    # === Front hoop (X=-500, vertical ⇒ rake 0° ≤ 20° per 3.12.6; top Z=800) ===
+    "FH_TOP_R":   [-500.0, 170.0, 800.0],
+    "FH_TOP_L":   [-500.0, -170.0, 800.0],
+    "FH_MID_R":   [-500.0, 215.0, 500.0],
+    "FH_MID_L":   [-500.0, -215.0, 500.0],
+    "FH_LEG_R":   [-500.0, 235.0, 140.0],
+    "FH_LEG_L":   [-500.0, -235.0, 140.0],
+    "FH_UPPER_R": [-500.0, 220.0, 310.0],   # junction: hoop × upper SIS member
+    "FH_UPPER_L": [-500.0, -220.0, 310.0],
+    "FH_BRACE_R": [-500.0, 182.0, 720.0],   # on-hoop brace attach (80mm below top ≤160)
+    "FH_BRACE_L": [-500.0, -182.0, 720.0],
 
-    # === Front Hoop (X=-150) ===
-    "FH_TOP_R": [-180.0, 93.8, 350.0],  # Top right (Z lowered 450→400)
-    "FH_TOP_L": [-180.0, -93.8, 350.0],
-    "FH_UPR_R":         [-150.0, 202.6, 177.0],   # Junction on upper rail (Z interpolated)
-    "FH_UPR_L":         [-150.0, -202.6, 177.0],
+    # === Main hoop (X=-750, top Z=1150; legs Y=±235 ⇒ inner 470 ≥ 380 per 3.11.6) ===
+    "MH_TOP_R":        [-750.0, 110.0, 1150.0],
+    "MH_TOP_L":        [-750.0, -110.0, 1150.0],
+    "MH_BEND_R":       [-750.0, 215.0, 700.0],
+    "MH_BEND_L":       [-750.0, -215.0, 700.0],
+    "MH_LEG_R":        [-750.0, 235.0, 120.0],
+    "MH_LEG_L":        [-750.0, -235.0, 120.0],
+    "MH_UPPER_R":      [-750.0, 220.0, 310.0],   # junction: hoop × upper SIS member
+    "MH_UPPER_L":      [-750.0, -220.0, 310.0],
+    "MH_BRACE_R":      [-750.0, 145.0, 1000.0],  # on-hoop brace attach (150 ≤160 below top)
+    "MH_BRACE_L":      [-750.0, -145.0, 1000.0],
+    "MH_BRACE_END_R":  [-1150.0, 145.0, 320.0],  # brace base on rear upper rail
+    "MH_BRACE_END_L":  [-1150.0, -145.0, 320.0],
 
-    # === Main Hoop (X=-650) ===
-    "MH_TOP_R":         [-650.0, 86.5, 530.0],   # Top right (Z lowered 600→530)
-    "MH_TOP_L":         [-650.0, -86.5, 530.0],
-    "MH_UPR_R":         [-650.0, 204.8, 185.0],   # Junction on upper rail (Z interpolated)
-    "MH_UPR_L":         [-650.0, -204.8, 185.0],
+    # === Rear bulkhead (X=-1580, engine bay closure + wing mount) ===
+    "RB_TOP_R": [-1580.0, 170.0, 400.0],
+    "RB_TOP_L": [-1580.0, -170.0, 400.0],
+    "RB_MID_R": [-1580.0, 160.0, 270.0],
+    "RB_MID_L": [-1580.0, -160.0, 270.0],
+    "RB_LWR_R": [-1580.0, 150.0, 140.0],
+    "RB_LWR_L": [-1580.0, -150.0, 140.0],
 
-    # === Rear Bulkhead (X=-1195) — at 1/3 of wheelbase (300mm) behind rear wheel ===
-    "RB_TOP_R": [-1145.0, 194.7, 220.0],  # Top right (Z lowered 260→220)
-    "RB_TOP_L": [-1145.0, -194.7, 220.0],
-    "RB_LWR_R": [-1195.0, 115.9, 65.0],  # Bottom right (Z lowered 100→65)
-    "RB_LWR_L": [-1195.0, -115.9, 65.0],
-
-    # === Damper Chassis Mounts (separately adjustable) ===
-    "DAMPER_CHASSIS_FR": [0.0, 108.2, 120.0],
-    "DAMPER_CHASSIS_FL":   [0.0, -108.2, 120.0],
-    "R_DAMPER_CHASSIS_RR": [-900.0, 80.0, 80.0],
-    "R_DAMPER_CHASSIS_RL": [-900.0, -80.0, 80.0],
-
-    # === BODY CONTOUR NODES — intermediate control points for curved bodywork ===
-
-    # Front nose cone (X ~ 350, ahead of front bulkhead FB at X=250-300)
-    "BODY_NOSE_TOP": [350.0, 0.0, 130.0],
-    "BODY_NOSE_MID_R": [350.0, 40.0, 120.0],
-    "BODY_NOSE_MID_L": [350.0, -40.0, 120.0],
-    "BODY_NOSE_BOT": [350.0, 0.0, 80.0],
-
-    # Lower rail midpoint (X=-450, between CH3/CH4 ~0 and R_CH3/R_CH4 ~-900)
-    "BODY_LWR_MID_R":    [-450.0, 130.0, 50.0],
-    "BODY_LWR_MID_L":    [-450.0, -130.0, 50.0],
-
-    # Upper rail intermediates (between FH_UPR at -150 and MH_UPR at -650)
-    "BODY_UPR_FWD_R":    [-350.0, 198.0, 185.0],
-    "BODY_UPR_FWD_L":    [-350.0, -198.0, 185.0],
-
-    # Engine cover / rear body (X ~ -1100, behind main hoop at -650)
-    "BODY_ENG_TOP":      [-1100.0, 0.0, 260.0],
-    "BODY_ENG_MID_R":    [-1100.0, 80.0, 200.0],
-    "BODY_ENG_MID_L":    [-1100.0, -80.0, 200.0],
-
-    # Roof / cowl (above main hoop, X ~ -500, Z elevated)
-    # (removed BODY_COWL_TOP)
-
-    # === SIDEPOD (侧箱) — Trapezoidal: narrow in front, wide in back ===
-    # Top edge (Y=320 front → 380 rear, parallel to ground)
-    "BODY_SIDE_FR_TR":   [-50.0,  320.0, 200.0],   # Front top right (narrow)
-    "BODY_SIDE_FR_TL":   [-50.0, -320.0, 200.0],   # Front top left
-    "BODY_SIDE_RR_TR":   [-850.0,  380.0, 200.0],  # Rear top right (wide)
-    "BODY_SIDE_RR_TL":   [-850.0, -380.0, 200.0],  # Rear top left
-    # Bottom edge (Y=300 front → 360 rear, parallel to ground)
-    "BODY_SIDE_FR_BR":   [-50.0,  300.0, 60.0],    # Front bottom right
-    "BODY_SIDE_FR_BL":   [-50.0, -300.0, 60.0],    # Front bottom left
-    "BODY_SIDE_RR_BR":   [-850.0,  360.0, 60.0],   # Rear bottom right
-    "BODY_SIDE_RR_BL":   [-850.0, -360.0, 60.0],   # Rear bottom left
+    # === Lower side rail midpoint (3-point curve CH3→LWR_MID→R_CH3) ===
+    "LWR_MID_R": [-775.0, 160.0, 115.0],
+    "LWR_MID_L": [-775.0, -160.0, 115.0],
 }
 
 FRAME_TUBES = [
-    # === A-ARM PIVOT AXES (frame rail segments at each A-arm pair) ===
-    ["CH2", "CH1"],                    # Front upper right
-    ["CH2_L", "CH1_L"],                # Front upper left
-    ["CH4", "CH3"],                    # Front lower right
-    ["CH4_L", "CH3_L"],                # Front lower left
-    ["R_CH2", "R_CH1"],                # Rear upper right
-    ["R_CH2_L", "R_CH1_L"],            # Rear upper left
-    ["R_CH4", "R_CH3"],                # Rear lower right
-    ["R_CH4_L", "R_CH3_L"],            # Rear lower left
+    # === FRONT BULKHEAD (X=+420; rules 3.21) ===
+    ["FB_TOP_R", "FB_TOP_L"],
+    ["FB_MID_R", "FB_MID_L"],
+    ["FB_LWR_R", "FB_LWR_L"],
+    ["FB_TOP_R", "FB_MID_R"],
+    ["FB_MID_R", "FB_LWR_R"],
+    ["FB_TOP_L", "FB_MID_L"],
+    ["FB_MID_L", "FB_LWR_L"],
+    ["FB_TOP_R", "FB_LWR_R"],
+    ["FB_TOP_L", "FB_LWR_L"],
 
-    # === UPPER SIDE RAILS (2pt straight for short front segment, 3pt curves for mid/rear) ===
-    ["CH1", "FH_UPR_R"],                             # Right upper rail: front (straight, short)
-    ["FH_UPR_R", "BODY_UPR_FWD_R", "MH_UPR_R"],      # Right upper rail: mid (curved)
-    ["CH1_L", "FH_UPR_L"],                           # Left upper rail: front (straight, short)
-    ["FH_UPR_L", "BODY_UPR_FWD_L", "MH_UPR_L"],      # Left upper rail: mid (curved)
+    # === FRONT BAY RAILS (bulkhead → UCA/LCA mounts) ===
+    ["FB_TOP_R", "CH1"],
+    ["FB_TOP_L", "CH1_L"],
+    ["FB_LWR_R", "CH3"],
+    ["FB_LWR_L", "CH3_L"],
+    ["CH1", "CH2"],
+    ["CH1_L", "CH2_L"],
+    ["CH3", "CH4"],
+    ["CH3_L", "CH4_L"],
 
-    # === LOWER SIDE RAILS (3-point CatmullRom curves) ===
-    ["CH3", "BODY_LWR_MID_R", "R_CH4"],            # Right lower rail (curved)
-    ["CH3_L", "BODY_LWR_MID_L", "R_CH4_L"],        # Left lower rail (curved)
+    # === FRONT HOOP — one continuous 5-point curve (rules 3.12) ===
+    ["FH_LEG_R", "FH_MID_R", "FH_TOP_R", "FH_MID_L", "FH_LEG_L"],
+    ["FH_TOP_R", "FH_TOP_L"],
+    ["FH_LEG_R", "FH_LEG_L"],
+    ["FH_UPPER_R", "FH_UPPER_L"],
+    ["FH_MID_R", "FH_UPPER_R"],       # hoop × upper SIS junction bracket
+    ["FH_MID_L", "FH_UPPER_L"],
 
-    # === FRONT BULKHEAD ===
-    ["FB_TOP_R", "FB_TOP_L"],          # Bulkhead top cross
-    ["FB_LWR_R", "FB_LWR_L"],          # Bulkhead bottom cross
-    ["FB_TOP_R", "FB_LWR_R"],          # Bulkhead right vertical
-    ["FB_TOP_L", "FB_LWR_L"],          # Bulkhead left vertical
-    ["FB_TOP_R", "CH2"],               # Upper rail: bulkhead→UCA rear mount (right)
-    ["FB_TOP_L", "CH2_L"],             # Upper rail: bulkhead→UCA rear mount (left)
-    ["FB_LWR_R", "CH4"],               # Lower rail: bulkhead→LCA rear mount (right)
-    ["FB_LWR_L", "CH4_L"],             # Lower rail: bulkhead→LCA rear mount (left)
+    # === FRONT HOOP BRACES (3.14) + BULKHEAD SUPPORTS (3.21.2: 3 members/side) ===
+    ["FB_TOP_R", "FH_BRACE_R"],
+    ["FB_TOP_L", "FH_BRACE_L"],
+    ["FB_MID_R", "FH_MID_R"],
+    ["FB_MID_L", "FH_MID_L"],
+    ["FB_LWR_R", "FH_LEG_R"],
+    ["FB_LWR_L", "FH_LEG_L"],
 
-    # === FRONT CROSS TUBES (lateral: right↔left) ===
-    ["CH2", "CH2_L"],                  # Front upper cross
-    ["CH4", "CH4_L"],                  # Front lower cross
+    # === SIDE IMPACT STRUCTURE (3.19): upper/lower + X-diagonals, hoop↔hoop ===
+    ["FH_UPPER_R", "MH_UPPER_R"],
+    ["FH_UPPER_L", "MH_UPPER_L"],
+    ["FH_LEG_R", "MH_LEG_R"],
+    ["FH_LEG_L", "MH_LEG_L"],
+    ["FH_LEG_R", "MH_UPPER_R"],
+    ["FH_LEG_L", "MH_UPPER_L"],
+    ["FH_UPPER_R", "MH_LEG_R"],
+    ["FH_UPPER_L", "MH_LEG_L"],
 
-    # === REAR CROSS TUBES (lateral: right↔left) ===
-    ["R_CH2", "R_CH2_L"],              # Rear upper cross
-    ["R_CH4", "R_CH4_L"],              # Rear lower cross
+    # === MAIN HOOP — one continuous 5-point curve (rules 3.11) ===
+    ["MH_LEG_R", "MH_BEND_R", "MH_TOP_R", "MH_BEND_L", "MH_LEG_L"],
+    ["MH_TOP_R", "MH_TOP_L"],
+    ["MH_LEG_R", "MH_LEG_L"],
+    ["MH_UPPER_R", "MH_UPPER_L"],
+    ["MH_BEND_R", "MH_UPPER_R"],      # hoop × upper SIS junction bracket
+    ["MH_BEND_L", "MH_UPPER_L"],
 
-    # === REAR BULKHEAD ===
-    ["RB_TOP_R", "RB_TOP_L"],          # Bulkhead top cross
-    ["RB_LWR_R", "RB_LWR_L"],          # Bulkhead bottom cross
-    ["RB_TOP_R", "RB_LWR_R"],          # Bulkhead right vertical
-    ["RB_TOP_L", "RB_LWR_L"],          # Bulkhead left vertical
-    ["R_CH1", "RB_TOP_R"],             # Upper rail: UCA front→rear bulkhead (right)
-    ["R_CH1_L", "RB_TOP_L"],           # Upper rail: UCA front→rear bulkhead (left)
-    ["R_CH3", "RB_LWR_R"],             # Lower rail: LCA front→rear bulkhead (right)
-    ["R_CH3_L", "RB_LWR_L"],           # Lower rail: LCA front→rear bulkhead (left)
+    # === MAIN HOOP BRACES (3.13) + support pairs back to hoop (3.13.7) ===
+    ["MH_BRACE_R", "MH_BRACE_END_R"],
+    ["MH_BRACE_L", "MH_BRACE_END_L"],
+    ["MH_UPPER_R", "MH_BRACE_END_R"],
+    ["MH_UPPER_L", "MH_BRACE_END_L"],
+    ["MH_LEG_R", "MH_BRACE_END_R"],
+    ["MH_LEG_L", "MH_BRACE_END_L"],
 
-    # === FRONT HOOP ===
-    ["FH_TOP_R", "FH_TOP_L"],          # Front hoop top cross tube
-    ["FH_TOP_R", "FH_UPR_R"],          # Front hoop right arm
-    ["FH_TOP_L", "FH_UPR_L"],          # Front hoop left arm
-    ["FH_UPR_R", "FH_UPR_L"],          # Front hoop base cross tube
+    # === UPPER SIDE RAILS ===
+    ["CH2", "FH_UPPER_R"],
+    ["CH2_L", "FH_UPPER_L"],
+    ["MH_UPPER_R", "R_CH1"],
+    ["MH_UPPER_L", "R_CH1_L"],
+    ["R_CH1", "R_CH2"],
+    ["R_CH1_L", "R_CH2_L"],
 
-    # === MAIN HOOP ===
-    ["MH_TOP_R", "MH_TOP_L"],          # Main hoop top cross tube
-    ["MH_TOP_R", "MH_UPR_R"],          # Main hoop right arm
-    ["MH_TOP_L", "MH_UPR_L"],          # Main hoop left arm
-    ["MH_UPR_R", "MH_UPR_L"],          # Main hoop base cross tube
+    # === LOWER SIDE RAILS (3-point curves CH3→LWR_MID→R_CH3) ===
+    ["CH3", "LWR_MID_R", "R_CH3"],
+    ["CH3_L", "LWR_MID_L", "R_CH3_L"],
+    ["R_CH3", "R_CH4"],
+    ["R_CH3_L", "R_CH4_L"],
 
-    # === FRONT BAY CLOSURE ===
-    ["FH_TOP_R", "FB_TOP_R"],          # Top rail: front hoop→front bulkhead (right)
-    ["FH_TOP_L", "FB_TOP_L"],          # Top rail: front hoop→front bulkhead (left)
+    # === MAIN HOOP LEGS → LOWER RAILS ===
+    ["MH_LEG_R", "LWR_MID_R"],
+    ["MH_LEG_L", "LWR_MID_L"],
 
-    # === REAR BAY CLOSURE ===
-    ["MH_TOP_R", "RB_TOP_R"],          # Top rail: main hoop→rear bulkhead (right)
-    ["MH_TOP_L", "RB_TOP_L"],          # Top rail: main hoop→rear bulkhead (left)
-    ["MH_UPR_R", "R_CH4"],             # Diagonal: hoop base→rear LCA (right)
-    ["MH_UPR_L", "R_CH4_L"],           # Diagonal: hoop base→rear LCA (left)
+    # === AXLE CROSS TUBES (UCA/LCA pairs) ===
+    ["CH2", "CH2_L"],
+    ["CH4", "CH4_L"],
+    ["R_CH2", "R_CH2_L"],
+    ["R_CH4", "R_CH4_L"],
 
-    # === ROCKER TRIANGLES (right) ===
-    ["CH5", "RK_PIVOT_R"],             # Push-rod → rocker pivot arm
-    ["RK_PIVOT_R", "RK_DAMPER_R"],     # Rocker pivot → damper arm
-    ["RK_DAMPER_R", "CH5"],            # Rocker closing edge
-    # Rocker triangles (left)
-    ["CH5_L", "RK_PIVOT_L"],
-    ["RK_PIVOT_L", "RK_DAMPER_L"],
-    ["RK_DAMPER_L", "CH5_L"],
+    # === REAR BULKHEAD (engine bay closure) ===
+    ["R_CH2", "RB_TOP_R"],
+    ["R_CH2_L", "RB_TOP_L"],
+    ["R_CH3", "RB_LWR_R"],
+    ["R_CH3_L", "RB_LWR_L"],
+    ["RB_TOP_R", "RB_TOP_L"],
+    ["RB_MID_R", "RB_MID_L"],
+    ["RB_LWR_R", "RB_LWR_L"],
+    ["RB_TOP_R", "RB_MID_R"],
+    ["RB_MID_R", "RB_LWR_R"],
+    ["RB_TOP_L", "RB_MID_L"],
+    ["RB_MID_L", "RB_LWR_L"],
+    ["RB_TOP_R", "RB_LWR_R"],
+    ["RB_TOP_L", "RB_LWR_L"],
 
-    # === FRONT ROCKER PIVOT BRACKETS (pivot → upper frame rail CH1/CH2) ===
-    ["RK_PIVOT_R", "CH1"],               # Pivot to front upper rail (right)
-    ["RK_PIVOT_R", "CH2"],               # Pivot to rear upper rail (right)
-    ["RK_PIVOT_L", "CH1_L"],             # Pivot to front upper rail (left)
-    ["RK_PIVOT_L", "CH2_L"],             # Pivot to rear upper rail (left)
+    # === ROCKER PIVOT BRACKETS ===
+    ["RK_PIVOT_R", "CH1"],
+    ["RK_PIVOT_R", "CH2"],
+    ["RK_PIVOT_L", "CH1_L"],
+    ["RK_PIVOT_L", "CH2_L"],
+    ["R_RK_PIVOT_R", "R_CH3"],
+    ["R_RK_PIVOT_R", "R_CH4"],
+    ["R_RK_PIVOT_L", "R_CH3_L"],
+    ["R_RK_PIVOT_L", "R_CH4_L"],
 
-    # === REAR ROCKER TRIANGLES (right) ===
-    ["R_CH5", "R_RK_PIVOT_R"],           # Pull-rod → rocker pivot arm
-    ["R_RK_PIVOT_R", "R_RK_DAMPER_R"],   # Rocker pivot → damper arm
-    ["R_RK_DAMPER_R", "R_CH5"],          # Rocker closing edge
-    # Rear rocker triangles (left)
-    ["R_CH5_L", "R_RK_PIVOT_L"],
-    ["R_RK_PIVOT_L", "R_RK_DAMPER_L"],
-    ["R_RK_DAMPER_L", "R_CH5_L"],
+    # === DAMPER CHASSIS BRACKETS ===
+    ["DAMPER_CHASSIS_FR", "CH3"],
+    ["DAMPER_CHASSIS_FR", "CH4"],
+    ["DAMPER_CHASSIS_FL", "CH3_L"],
+    ["DAMPER_CHASSIS_FL", "CH4_L"],
+    ["R_DAMPER_CHASSIS_RR", "R_CH3"],
+    ["R_DAMPER_CHASSIS_RR", "R_CH4"],
+    ["R_DAMPER_CHASSIS_RL", "R_CH3_L"],
+    ["R_DAMPER_CHASSIS_RL", "R_CH4_L"],
 
-    # === REAR ROCKER PIVOT BRACKETS (pivot → lower frame rail R_CH3/R_CH4) ===
-    ["R_RK_PIVOT_R", "R_CH3"],           # Pivot to rear lower rail (right)
-    ["R_RK_PIVOT_R", "R_CH4"],           # Pivot to rear lower rail (right)
-    ["R_RK_PIVOT_L", "R_CH3_L"],         # Pivot to rear lower rail (left)
-    ["R_RK_PIVOT_L", "R_CH4_L"],         # Pivot to rear lower rail (left)
-
-    # === DAMPER CHASSIS BRACKETS (mount → nearby frame rails) ===
-    ["DAMPER_CHASSIS_FR", "CH3"],           # Front right bracket
-    ["DAMPER_CHASSIS_FR", "CH4"],           # Front right bracket
-    ["DAMPER_CHASSIS_FL", "CH3_L"],         # Front left bracket
-    ["DAMPER_CHASSIS_FL", "CH4_L"],         # Front left bracket
-    ["R_DAMPER_CHASSIS_RR", "R_CH3"],       # Rear right bracket
-    ["R_DAMPER_CHASSIS_RR", "R_CH4"],       # Rear right bracket
-    ["R_DAMPER_CHASSIS_RL", "R_CH3_L"],     # Rear left bracket
-    ["R_DAMPER_CHASSIS_RL", "R_CH4_L"],     # Rear left bracket
-
-    ["FB_TOP_L", "CH4_L"],
-    ["CH2_L", "CH4_L"],
-    ["CH3", "FH_UPR_R"],
-    ["CH2", "CH4"],
-    ["FH_UPR_L", "CH3_L"],
-
-    # === BODY CONTOUR CURVES (3+ point CatmullRom splines for bodywork definition) ===
-
-    # Front nose cone longitudinal
-    ["BODY_NOSE_TOP", "FB_TOP_R"],
-    ["BODY_NOSE_TOP", "FB_TOP_L"],
-    ["BODY_NOSE_BOT", "FB_LWR_R"],
-    ["BODY_NOSE_BOT", "FB_LWR_L"],
-    ["BODY_NOSE_MID_R", "FB_TOP_R"],
-    ["BODY_NOSE_MID_L", "FB_TOP_L"],
-
-    # Nose cone profile curves
-    ["BODY_NOSE_TOP", "BODY_NOSE_MID_R", "BODY_NOSE_BOT"],   # Right nose profile
-    ["BODY_NOSE_TOP", "BODY_NOSE_MID_L", "BODY_NOSE_BOT"],   # Left nose profile
-    ["BODY_NOSE_MID_R", "BODY_NOSE_MID_L"],                   # Nose mid cross
-
-    # Engine cover / rear body
-
-    # Cowl / roof (removed BODY_COWL_TOP tubes)
-    ["MH_UPR_R", "R_CH2"],
-    ["R_CH2_L", "MH_UPR_L"],
-    ["BODY_ENG_MID_R", "BODY_ENG_TOP"],
-    ["BODY_ENG_MID_R", "BODY_ENG_MID_L"],
-    ["BODY_ENG_TOP", "BODY_ENG_MID_L"],
-
-    # === SIDEPOD OUTLINE TUBES (trapezoidal: narrow front, wide rear) ===
-    ["BODY_SIDE_FR_TR", "BODY_SIDE_RR_TR"],   # Top right edge
-    ["BODY_SIDE_FR_TL", "BODY_SIDE_RR_TL"],   # Top left edge
-    ["BODY_SIDE_FR_BR", "BODY_SIDE_RR_BR"],   # Bottom right edge
-    ["BODY_SIDE_FR_BL", "BODY_SIDE_RR_BL"],   # Bottom left edge
-    ["BODY_SIDE_FR_TR", "BODY_SIDE_FR_TL"],   # Front cross (narrow)
-    ["BODY_SIDE_RR_TR", "BODY_SIDE_RR_TL"],   # Rear cross (wide)
-    ["BODY_SIDE_FR_BR", "BODY_SIDE_FR_BL"],   # Front bottom cross
-    ["BODY_SIDE_RR_BR", "BODY_SIDE_RR_BL"],   # Rear bottom cross
+    # === STEERING RACK SUPPORT ===
+    ["FL1", "CH3"],
+    ["FL1", "CH4"],
+    ["FL1", "FL1_L"],
 ]
 
 # Custom tube colors: {tube_index: "#hexcolor"}
