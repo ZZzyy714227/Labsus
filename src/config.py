@@ -8,91 +8,98 @@ DEFAULT_TUBE_COLOR = "#8899cc"  # fallback color for frame tubes and bodywork fa
 
 # ============================================================
 # DESIGN PARAMETERS — drive all hardpoints parametrically
+# TRUE-SCALE baseline (2026-08-14 rebuild):
+#   wheelbase 1550mm, track 1220/1180mm, 13" tires (OD ~520mm),
+#   reference: audit report docs/superpowers/specs/2026-08-14-geometry-audit-report.md §5
 # ============================================================
 
 DESIGN_PARAMS = {
     "front": {
         # Wheel position
-        "track": 750.0,              # mm, full track width
-        "wheel_center_x": 5.0,       # mm, X position of wheel center
-        "wheel_center_z": 150.0,     # mm, Z position (ride height)
-        "tire_radius": 150.0,
+        "track": 1220.0,             # mm, full track width
+        "wheel_center_x": 0.0,       # mm, X position of wheel center (front axle = origin)
+        "wheel_center_z": 255.3,     # mm, Z = loaded radius (260 - 700/150)
+        "tire_radius": 260.0,        # mm, 13" rim + race tire (OD ~520)
+        "tire_width": 180.0,         # mm
 
         # Kingpin / upright orientation (camber is OUTPUT, not input)
-        "caster": 5.18,              # deg (from kingpin X/Y ratio: atan2(-10,-110))
-        "kpi": 2.07,                 # deg (from kingpin Y/Z ratio: atan2(4,110))
-        "kingpin_length": 112.0,     # mm, UP1-UP2 distance
-        "wheel_offset_y": 21.4,      # mm, UP5.Y offset from kingpin at wheel center Z
+        "caster": 5.0,               # deg
+        "kpi": 2.5,                  # deg
+        "kingpin_length": 150.0,     # mm, UP1-UP2 distance (ball-joint spacing)
+        "wheel_offset_y": 30.0,      # mm, UP5.Y offset from kingpin at wheel center Z
 
         # UCA chassis points (fixed to frame)
-        "uca_front_x": -60.0,        # X of CH1
-        "uca_rear_x": 60.0,          # X of CH2
-        "uca_front_y": 202.0,        # Y of CH1 (absolute)
-        "uca_rear_y": 165.9,         # Y of CH2 (absolute)
-        "uca_front_z": 215.0,        # Z of CH1
-        "uca_rear_z": 228.0,         # Z of CH2
+        "uca_front_x": -90.0,        # X of CH1
+        "uca_rear_x": 90.0,          # X of CH2
+        "uca_front_y": 160.0,        # Y of CH1 (absolute)
+        "uca_rear_y": 152.0,         # Y of CH2 (absolute)
+        "uca_front_z": 285.0,        # Z of CH1
+        "uca_rear_z": 295.0,         # Z of CH2 (rear higher = anti-dive)
 
         # LCA chassis points
-        "lca_front_x": -80.0,
-        "lca_rear_x": 80.0,
-        "lca_front_y": 191.1,        # Y of CH3
-        "lca_rear_y": 151.4,         # Y of CH4
-        "lca_front_z": 55.0,
-        "lca_rear_z": 60.0,
+        "lca_front_x": -110.0,
+        "lca_rear_x": 110.0,
+        "lca_front_y": 128.0,        # Y of CH3
+        "lca_rear_y": 122.0,         # Y of CH4
+        "lca_front_z": 110.0,
+        "lca_rear_z": 115.0,         # rear higher = anti-dive
 
-        # Tie rod
-        "tierod_inner_y": 93.8,
-        "tierod_inner_z": 116.0,
-        "tierod_inner_x": -63.0,
+        # Tie rod (rack behind front axle)
+        "tierod_inner_y": 115.0,
+        "tierod_inner_z": 200.0,
+        "tierod_inner_x": -100.0,
 
-        # Push-rod / rocker
+        # Push-rod / rocker (front: pushrod from lower upright up to high rocker)
         "pushrod_upright_ratio": 0.65, # UP4 position along kingpin: 0=upper BJ, 1=lower BJ
-        "pushrod_ch5_x": 10.0,
-        "pushrod_ch5_y": 97.4,
-        "pushrod_ch5_z": 245.0,
+        "pushrod_ch5_x": 0.0,
+        "pushrod_ch5_y": 135.0,
+        "pushrod_ch5_z": 305.0,
 
         # Tire model
         "tire_spring_rate": 150.0,      # N/mm, vertical stiffness
-        "corner_weight_n": 350.0,       # N, static load per wheel
+        "corner_weight_n": 700.0,       # N, static load per wheel (280kg / 4)
     },
     "rear": {
-        "track": 720.0,
-        "wheel_center_x": -895.0,
-        "wheel_center_z": 153.0,
-        "tire_radius": 150.0,
+        # Wheel position (rear axle at X = -1550)
+        "track": 1180.0,
+        "wheel_center_x": -1550.0,
+        "wheel_center_z": 255.3,
+        "tire_radius": 260.0,
+        "tire_width": 180.0,
 
-        "caster": 6.00,
-        "kpi": 1.80,
-        "kingpin_length": 112.0,
-        "wheel_offset_y": 22.0,
+        "caster": 5.0,
+        "kpi": 2.5,
+        "kingpin_length": 150.0,
+        "wheel_offset_y": 30.0,
 
-        "uca_front_x": -960.0,
-        "uca_rear_x": -840.0,
-        "uca_front_y": 204.8,
-        "uca_rear_y": 204.8,
-        "uca_front_z": 235.0,
-        "uca_rear_z": 238.0,
+        "uca_front_x": -1640.0,
+        "uca_rear_x": -1460.0,
+        "uca_front_y": 155.0,
+        "uca_rear_y": 150.0,
+        "uca_front_z": 285.0,
+        "uca_rear_z": 295.0,
 
-        "lca_front_x": -980.0,
-        "lca_rear_x": -820.0,
-        "lca_front_y": 144.0,
-        "lca_rear_y": 144.0,
-        "lca_front_z": 50.0,
-        "lca_rear_z": 55.0,
+        "lca_front_x": -1660.0,
+        "lca_rear_x": -1440.0,
+        "lca_front_y": 125.0,
+        "lca_rear_y": 120.0,
+        "lca_front_z": 110.0,
+        "lca_rear_z": 115.0,
 
-        "tierod_inner_y": 90.0,
-        "tierod_inner_z": 116.0,
-        "tierod_inner_x": -963.0,
+        # Rear toe link (inner point fixed to chassis — no rear steering)
+        "tierod_inner_y": 105.0,
+        "tierod_inner_z": 200.0,
+        "tierod_inner_x": -1560.0,
 
-        # Pull-rod / rocker
-        "pushrod_upright_ratio": 0.65, # UP4 position along kingpin: 0=upper BJ, 1=lower BJ
-        "pushrod_ch5_x": -900.0,
-        "pushrod_ch5_y": 120.0,
-        "pushrod_ch5_z": 110.0,
+        # Pull-rod / rocker (rear: pullrod from upper upright down to low rocker)
+        "pushrod_upright_ratio": 0.20, # upper upright → rod goes DOWN to low chassis
+        "pushrod_ch5_x": -1550.0,
+        "pushrod_ch5_y": 125.0,
+        "pushrod_ch5_z": 105.0,
 
         # Tire model
-        "tire_spring_rate": 150.0,      # N/mm, vertical stiffness
-        "corner_weight_n": 350.0,       # N, static load per wheel
+        "tire_spring_rate": 150.0,
+        "corner_weight_n": 700.0,
     },
 }
 
