@@ -2,12 +2,15 @@
 Hardpoint derivation + overrides + mirroring utilities.
 """
 
-import math
 import json
+import math
 import os
+
 import numpy as np
-from geometry import deg as _deg, rad as _rad
-from config import REAR_PREFIX, DESIGN_PARAMS, CHASSIS_KEYS, UPRIGHT_KEYS, FLOAT_KEYS
+
+from config import CHASSIS_KEYS, DESIGN_PARAMS, FLOAT_KEYS, UPRIGHT_KEYS
+from geometry import normalize_or_default, rad as _rad
+
 
 def derive_hardpoints(axle_params, prefix=""):
     """
@@ -31,7 +34,6 @@ def derive_hardpoints(axle_params, prefix=""):
 
     # Wheel center Y offset from kingpin axis. Positive = wheel center outboard of kingpin
     # This controls camber (larger offset = more negative camber)
-    UP5_adjusted = np.array([UP5[0], UP5[1], UP5[2]])
 
     # Upright local X ≈ fore-aft (perpendicular to Z and UP1→UP5)
     # We'll compute after placing UP1/UP2
@@ -62,24 +64,18 @@ def derive_hardpoints(axle_params, prefix=""):
     # ---- Upright points UP3, UP4 in upright local frame ----
     # Build upright local frame matching the solver's convention:
     #   z = kingpin (UP1→UP2), x = cross(UP5→UP1, z), y = cross(z, x)
-    z_axis = UP2 - UP1
-    z_norm = np.linalg.norm(z_axis)
-    if z_norm < 1e-12: z_axis = np.array([0.0, 0.0, -1.0])
-    else: z_axis = z_axis / z_norm
-    to_wheel = UP5 - UP1
-    x_axis = np.cross(to_wheel, z_axis)
-    norm_x = np.linalg.norm(x_axis)
-    if norm_x < 1e-12: x_axis = np.array([1.0, 0.0, 0.0])
-    else: x_axis = x_axis / norm_x
+    z_axis = normalize_or_default(UP2 - UP1, [0.0, 0.0, -1.0])
+    x_axis = normalize_or_default(np.cross(UP5 - UP1, z_axis))
     y_axis = np.cross(z_axis, x_axis)
 
     # UP3: tie-rod attachment (mid kingpin, offset forward)
     # UP4: push/pull-rod attachment (ratio configurable per axle)
     #    ratio=0.65 (front push-rod): lower upright → rod goes UP to high chassis
     #    ratio=0.20 (rear pull-rod):  upper upright → rod goes DOWN to low chassis
+    # Offsets scale with kingpin length (true-scale: kp 150mm → arm ~87mm forward).
     pushrod_ratio = p.get("pushrod_upright_ratio", 0.65)
-    UP3 = UP1 + x_axis * 64.74 + y_axis * (-23.88) + z_axis * (kp_len * 0.50)
-    UP4 = UP1 + x_axis * (-5.01) + y_axis * (-5.11) + z_axis * (kp_len * pushrod_ratio)
+    UP3 = UP1 + x_axis * (kp_len * 0.578) + y_axis * (kp_len * -0.213) + z_axis * (kp_len * 0.50)
+    UP4 = UP1 + x_axis * (kp_len * -0.045) + y_axis * (kp_len * -0.046) + z_axis * (kp_len * pushrod_ratio)
 
     result = {
         str(prefix + "CH1"): CH1.tolist(),
@@ -95,7 +91,7 @@ def derive_hardpoints(axle_params, prefix=""):
         str(prefix + "FL1"): FL1.tolist(),
         "track_width": p["track"],
         "tire_radius": p["tire_radius"],
-        "tire_width": 160.0,
+        "tire_width": p.get("tire_width", 180.0),
         "tire_spring_rate": p.get("tire_spring_rate", 150.0),
         "corner_weight_n": p.get("corner_weight_n", 350.0),
     }
@@ -114,9 +110,9 @@ def _load_overrides():
     """Load user-saved hardpoint overrides from JSON."""
     if os.path.exists(HP_OVERRIDES_FILE):
         try:
-            with open(HP_OVERRIDES_FILE, 'r', encoding='utf-8') as f:
+            with open(HP_OVERRIDES_FILE, encoding='utf-8') as f:
                 return json.load(f)
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             pass
     return {}
 
@@ -133,8 +129,6 @@ for _name, _coords in _hp_overrides.items():
     elif _name in DEFAULT_REAR_HARDPOINTS:
         DEFAULT_REAR_HARDPOINTS[_name] = _coords
 
-
-# ============================================================
 
 # ============================================================
 

@@ -17,6 +17,21 @@ if _src not in sys.path:
     sys.path.insert(0, _src)
 
 
+def pytest_collection_modifyitems(config, items):
+    """Skip browser e2e tests unless FSAE_E2E=1.
+
+    The e2e selectors target the pre-V10 UI and the tests need a headless
+    browser + CDN access; they hang otherwise. Re-enable after the Phase 2
+    PBR UI rewrite lands (selectors must be updated to the new DOM first).
+    """
+    if os.environ.get("FSAE_E2E") == "1":
+        return
+    skip = pytest.mark.skip(reason="browser e2e disabled: set FSAE_E2E=1 to run")
+    for item in items:
+        if "e2e" in item.nodeid:
+            item.add_marker(skip)
+
+
 SERVER_READY_TIMEOUT = 15  # seconds
 
 
