@@ -98,6 +98,15 @@ def _sequential_baseline(hp: dict[str, object], travel: int, rack: int) -> PathR
         tie_rod_length = float(np.linalg.norm(
             np.asarray(hp["UP3"]) - np.asarray(hp["FL1"])))
         steered = solve_steering(merged, rack, tie_rod_length=tie_rod_length)
+        if (not steered.get("_newton_converged", True)
+                and (not steered.get("_used_fallback", False)
+                     or not steered.get("_fallback_root_found", False))):
+            return {
+                "status": "SOLVER_FAILED", "angles": None, "contact_patch": None,
+                "steering_axis": None, "geometry_residual_mm": None,
+                "iterations": int(bump.get("iterations", 0)) + int(steered.get("iterations", 0)),
+                "timing_ms": (time.perf_counter() - started) * 1000.0,
+            }
         final = dict(steered)
         for key in ("CH1", "CH2", "CH3", "CH4", "CH5", "track_width", "tire_radius",
                     "tire_width", "tire_spring_rate", "corner_weight_n"):
