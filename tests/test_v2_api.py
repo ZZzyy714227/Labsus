@@ -250,6 +250,100 @@ class TestP23StateMachineContract:
                 assert m["value"] is not None, f"{key}: value-state without value"
 
 
+class TestP4:
+    """P4 工程迭代工作流：A/B 对比 / 敏感性 / 导出 / 版本回退。"""
+
+    def _make_b_design(self, client):
+        store = DataStore()
+        store.create_design(store.get_design("legacy-import", 1), design_id="b1")
+        dv = store.get_design("b1", 1)
+        pts = dict(dv.front_right.points)
+        pts["UP1"] = [pts["UP1"][0] + 5.0, pts["UP1"][1], pts["UP1"][2]]
+        new = dv.model_copy(deep=True)
+        new.front_right = new.front_right.model_copy(update={"points": pts})
+        store.add_design_version("b1", new)
+        return store
+
+    def test_compare_hardpoint_and_metric_diffs(self, client):
+        self._make_b_design(client)
+        body = client.post("/api/v2/compare", json={
+            "design_a_id": "legacy-import", "design_b_id": "b1",
+            "case_id": "static", "axle": "front"}).json()
+        assert body["design_b"]["version"] == 2
+        assert body["hardpoint_diffs"]["front_right"]["UP1"] == [5.0, 0.0, 0.0]
+        assert body["metric_diffs"]["front_right"]["caster_deg"] < 0
+        assert "curve_overlay" in body
+        for side_curve in ("design_a", "design_b"):
+            assert "right_camber_deg" in body["curve_overlay"][side_curve]
+        assert set(body["status_a"]) == {"front_right", "front_left",
+                                         "rear_right", "rear_left"}
+
+    def test_compare_version_rollback_same_design(self, client):
+        self._make_b_design(client)
+        body = client.post("/api/v2/compare", json={
+            "design_a_id": "b1", "design_a_version": 1, "design_b_version": 2,
+            "case_id": "static"}).json()
+        assert body["hardpoint_diffs"]["front_right"]["UP1"] == [5.0, 0.0, 0.0]
+
+    def test_compare_404(self, client):
+        r = client.post("/api/v2/compare", json={
+            "design_a_id": "nope", "design_b_id": "b1", "case_id": "static"})
+        assert r.status_code == 404
+
+    def test_sensitivity_matrix(self, client):
+        body = client.post("/api/v2/sensitivity", json={
+            "design_id": "legacy-import", "case_id": "static",
+            "corner": "front_right", "hardpoints": ["UP1", "CH1"],
+            "metrics": ["camber_deg", "toe_deg", "caster_deg"]}).json()
+        assert body["baseline"]["camber_deg"] == pytest.approx(-2.49, abs=0.01)
+        assert body["baseline_status"] == "VALID"
+        assert "UP1" in body["sensitivity"] and "CH1" in body["sensitivity"]
+        assert "x" in body["summary_per_mm"]["UP1"]
+        assert "per_mm" in next(iter(body["sensitivity"]["UP1"].values()))
+
+    def test_sensitivity_bad_delta(self, client):
+        r = client.post("/api/v2/sensitivity", json={
+            "design_id": "legacy-import", "case_id": "static",
+            "hardpoints": ["UP1"], "delta_mm": 0.0})
+        assert r.status_code == 422
+
+    def test_export_sweep_csv(self, client):
+        body = client.post("/api/v2/export", json={
+            "design_id": "legacy-import", "case_id": "static",
+            "kind": "sweep", "format": "csv", "axle": "front", "points": 5}).json()
+        assert body["filename"].endswith(".csv")
+        lines = body["data"].strip().splitlines()
+        assert len(lines) == 6
+        assert lines[0].startswith("value,right_camber_deg")
+
+    def test_export_solve_csv(self, client):
+        body = client.post("/api/v2/export", json={
+            "design_id": "legacy-import", "case_id": "static",
+            "kind": "solve", "format": "csv"}).json()
+        assert body["filename"].endswith(".csv")
+        lines = body["data"].strip().splitlines()
+        assert len(lines) == 5
+        assert "corner" in lines[0]
+
+    def test_export_solve_json(self, client):
+        body = client.post("/api/v2/export", json={
+            "design_id": "legacy-import", "case_id": "static",
+            "kind": "solve", "format": "json"}).json()
+        assert body["solver"] == "sequential-bump-steer-v1"
+        assert "loads" in body
+
+    def test_sweep_performance_budget(self, client):
+        import time
+        t0 = time.perf_counter()
+        r = client.post("/api/v2/sweep", json={
+            "design_id": "legacy-import", "case_id": "static",
+            "axle": "front", "axis": "travel", "min": -25, "max": 25,
+            "points": 25})
+        elapsed = time.perf_counter() - t0
+        assert r.status_code == 200
+        assert elapsed < 1.0, f"sweep too slow: {elapsed:.2f}s"
+
+
 class TestSweep:
     """P2-2 曲线端点：轮跳/转向扫掠 + 派生指标（七状态）。"""
 

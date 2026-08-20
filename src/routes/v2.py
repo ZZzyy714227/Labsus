@@ -392,49 +392,30 @@ def _axle_pair(dv, axle: str):
             "front_track_mm", DEFAULT_FRAME_NODES)
 
 
-@router.post("/sweep")
-def sweep_v2(req: SweepV2Request):
-    """P2-2 曲线：选定轴在轮跳/转向上的扫掠曲线与派生指标。
+def _sweep_curves(dv, cv, axle: str, axis: str, _min: float, _max: float,
+                  points: int) -> dict:
+    """轴级扫掠曲线（sweep 端点与 compare 共用）。
 
-    axis=travel：轴双轮同向轮跳（heave），rack 保持工况值；
-    axis=rack：rack 扫掠，行程保持工况值。
-    返回逐轮角度/几何曲线 + 轴级曲线（RC 高、Motion Ratio、Track Change、
-    Ackermann 随转向）+ 静态点派生指标（含七状态）。
+    返回 {values, curves, warnings}；不抛 HTTP 异常（参数校验由调用方完成）。
     """
-    store = get_store()
-    _ensure_seeded(store)
-    try:
-        dv = store.get_design(req.design_id, req.design_version)
-        cv = store.get_case(req.case_id, req.case_version)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    if req.axle not in ("front", "rear"):
-        raise HTTPException(status_code=422, detail="axle must be front|rear")
-    if req.points < 3 or req.points > 101:
-        raise HTTPException(status_code=422, detail="points must be in [3, 101]")
-    if req.max <= req.min:
-        raise HTTPException(status_code=422, detail="max must be > min")
-
-    r_name, r_hp, l_name, l_hp, track_key, frame_nodes = _axle_pair(dv, req.axle)
+    r_name, r_hp, l_name, l_hp, track_key, frame_nodes = _axle_pair(dv, axle)
     track = float(dv.vehicle.get(track_key, 0.0))
     veh = dv.vehicle
     t = cv.travel
-    axis_vals = [req.min + (req.max - req.min) * i / (req.points - 1)
-                 for i in range(req.points)]
+    axis_vals = [_min + (_max - _min) * i / (points - 1) for i in range(points)]
 
     def solve_axle(axis_val):
-        """axis=travel → 双轮同向轮跳；axis=rack → 双轮同 rack。"""
-        if req.axis == "rack":
-            travel_r = t.fr if req.axle == "front" else t.rr
-            travel_l = t.fl if req.axle == "front" else t.rl
+        if axis == "rack":
+            travel_r = t.fr if axle == "front" else t.rr
+            travel_l = t.fl if axle == "front" else t.rl
             rack = axis_val
         else:
-            travel_r = (t.fr if req.axle == "front" else t.rr) + axis_val
-            travel_l = (t.fl if req.axle == "front" else t.rl) + axis_val
+            travel_r = (t.fr if axle == "front" else t.rr) + axis_val
+            travel_l = (t.fl if axle == "front" else t.rl) + axis_val
             rack = cv.rack_displacement
         sol_r = _solve_corner(r_hp, travel_r, rack, track)
         sol_l = _solve_corner(l_hp, travel_l, rack, track)
-        return sol_r, sol_l, travel_r, travel_l, rack
+        return sol_r, sol_l
 
     curves: dict[str, list] = {k: [] for k in (
         "right_camber_deg", "right_toe_deg", "right_scrub_radius_mm",
@@ -446,9 +427,14 @@ def sweep_v2(req: SweepV2Request):
     warnings: list[str] = []
     ack_pts: list[float | None] = []
 
+    hp_r = r_hp.flat()
+    hp_r.setdefault("track_width", track)
+    hp_l = l_hp.flat()
+    hp_l.setdefault("track_width", track)
+
     for av in axis_vals:
         try:
-            sol_r, sol_l, tr, tl, rack = solve_axle(av)
+            sol_r, sol_l = solve_axle(av)
         except Exception as exc:  # noqa: BLE001
             warnings.append(f"扫掠点 {av:.1f}: {type(exc).__name__}")
             for k in curves:
@@ -468,10 +454,6 @@ def sweep_v2(req: SweepV2Request):
                         ("left_kpi_deg", "kpi_deg")):
             curves[ck].append(a_r.get(key) if ck.startswith("right") else a_l.get(key))
         # RC 高（正视 IC + 接地点）
-        hp_r = r_hp.flat()
-        hp_r.setdefault("track_width", track)
-        hp_l = l_hp.flat()
-        hp_l.setdefault("track_width", track)
         ic_r = compute_instant_center(hp_r, sol_r["result"])
         ic_l = compute_instant_center(hp_l, sol_l["result"])
         cp_r = sol_r["cp"]["center"] if sol_r["cp"] else None
@@ -496,12 +478,60 @@ def sweep_v2(req: SweepV2Request):
         # Ackermann（rack 扫掠时有效）
         ack_pts.append(ackermann_pct(a_l["toe_deg"], a_r["toe_deg"],
                                      track, float(veh.get("wheelbase_mm", 1550.0)))
-                       .value if req.axis == "rack" else None)
+                       .value if axis == "rack" else None)
     curves["ackermann_pct"] = ack_pts
+    return {"values": [round(float(v), 3) for v in axis_vals],
+            "curves": curves, "warnings": warnings}
+
+
+@router.post("/sweep")
+def sweep_v2(req: SweepV2Request):
+    """P2-2 曲线：选定轴在轮跳/转向上的扫掠曲线与派生指标。
+
+    axis=travel：轴双轮同向轮跳（heave），rack 保持工况值；
+    axis=rack：rack 扫掠，行程保持工况值。
+    返回逐轮角度/几何曲线 + 轴级曲线（RC 高、Motion Ratio、Track Change、
+    Ackermann 随转向）+ 静态点派生指标（含七状态）。
+    """
+    store = get_store()
+    _ensure_seeded(store)
+    try:
+        dv = store.get_design(req.design_id, req.design_version)
+        cv = store.get_case(req.case_id, req.case_version)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    if req.axle not in ("front", "rear"):
+        raise HTTPException(status_code=422, detail="axle must be front|rear")
+    if req.points < 3 or req.points > 101:
+        raise HTTPException(status_code=422, detail="points must be in [3, 101]")
+    if req.max <= req.min:
+        raise HTTPException(status_code=422, detail="max must be > min")
+
+    sw = _sweep_curves(dv, cv, req.axle, req.axis, req.min, req.max, req.points)
+    axis_vals = sw["values"]
+    curves = sw["curves"]
+    warnings = list(sw["warnings"])
+    veh = dv.vehicle
+    t = cv.travel
+    r_name, r_hp, l_name, l_hp, track_key, frame_nodes = _axle_pair(dv, req.axle)
+    track = float(dv.vehicle.get(track_key, 0.0))
+
+    def solve_axle(axis_val):
+        if req.axis == "rack":
+            travel_r = t.fr if req.axle == "front" else t.rr
+            travel_l = t.fl if req.axle == "front" else t.rl
+            rack = axis_val
+        else:
+            travel_r = (t.fr if req.axle == "front" else t.rr) + axis_val
+            travel_l = (t.fl if req.axle == "front" else t.rl) + axis_val
+            rack = cv.rack_displacement
+        sol_r = _solve_corner(r_hp, travel_r, rack, track)
+        sol_l = _solve_corner(l_hp, travel_l, rack, track)
+        return sol_r, sol_l
 
     # 静态点派生指标（axis_val=0 或 rack=0）
     try:
-        sol_r0, sol_l0, _, _, _ = solve_axle(0.0)
+        sol_r0, sol_l0 = solve_axle(0.0)
         a_r0, a_l0 = sol_r0["angles"], sol_l0["angles"]
     except Exception as exc:  # noqa: BLE001
         sol_r0 = sol_l0 = None
@@ -611,6 +641,330 @@ def sweep_v2(req: SweepV2Request):
         "metrics": metrics,
         "warnings": warnings,
     }
+
+
+# ---------- P4：A/B 对比 / 敏感性 / 导出 ----------
+
+class CompareRequest(BaseModel):
+    design_a_id: str
+    design_a_version: int | None = None
+    design_b_id: str | None = None      # 缺省 = 同方案另一版本（版本回退对比）
+    design_b_version: int | None = None
+    case_id: str
+    case_version: int | None = None
+    axle: str = "front"
+    sweep_points: int = 21
+    sweep_min: float = -25.0
+    sweep_max: float = 25.0
+
+
+def _corner_metrics(body: dict) -> dict:
+    out = {}
+    for section in ("front", "rear"):
+        for side in ("left", "right"):
+            rep = body[section][side]
+            name = f"{section}_{side}"
+            out[name] = {
+                "status": rep["status"],
+                "angles": rep.get("angles") or {},
+                "residual": body["residuals"].get(name),
+            }
+            if body.get("loads", {}).get(name):
+                out[name]["loads"] = body["loads"][name]
+    return out
+
+
+def _hardpoint_diffs(dv_a, dv_b) -> dict:
+    diffs = {}
+    for corner in ("front_right", "front_left", "rear_right", "rear_left"):
+        ha = getattr(dv_a, corner).points
+        hb = getattr(dv_b, corner).points
+        cd = {}
+        for key in ha:
+            if key in hb:
+                d = [round(b - a, 4) for a, b in zip(ha[key], hb[key])]
+                if any(abs(v) > 1e-9 for v in d):
+                    cd[key] = d
+        diffs[corner] = cd
+    return diffs
+
+
+@router.post("/compare")
+def compare_v2(req: CompareRequest):
+    """P4 方案 A/B 对比（同方案版本回退或跨方案）。
+
+    输出：硬点差异（网格级）、指标差异（逐轮定位角）、杆件力差异（载荷层）、
+    曲线叠加（travel 扫掠双侧）、双侧残差/状态（P4 残差/假设/状态展示）。
+    """
+    store = get_store()
+    _ensure_seeded(store)
+    try:
+        dv_a = store.get_design(req.design_a_id, req.design_a_version)
+        cv = store.get_case(req.case_id, req.case_version)
+        if req.design_b_id and req.design_b_id != req.design_a_id:
+            dv_b = store.get_design(req.design_b_id, req.design_b_version)
+        else:
+            dv_b = store.get_design(req.design_a_id, req.design_b_version or dv_a.version)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    if req.axle not in ("front", "rear"):
+        raise HTTPException(status_code=422, detail="axle must be front|rear")
+
+    ba = solve_v2(SolveV2Request(design_id=req.design_a_id,
+                                 design_version=dv_a.version,
+                                 case_id=req.case_id,
+                                 case_version=cv.version))
+    bb = solve_v2(SolveV2Request(design_id=(req.design_b_id or req.design_a_id),
+                                 design_version=dv_b.version,
+                                 case_id=req.case_id,
+                                 case_version=cv.version))
+
+    ma, mb = _corner_metrics(ba), _corner_metrics(bb)
+    metric_diffs: dict[str, dict] = {}
+    force_diffs: dict[str, dict] = {}
+    for name in ma:
+        da, db = ma[name], mb[name]
+        if da["angles"] and db["angles"]:
+            ad = {k: (round(db["angles"][k] - da["angles"][k], 4)
+                      if da["angles"].get(k) is not None
+                      and db["angles"].get(k) is not None else None)
+                  for k in da["angles"]}
+            metric_diffs[name] = ad
+        if da.get("loads") and db.get("loads") and da["loads"].get("wheel_end") and db["loads"].get("wheel_end"):
+            mfa = da["loads"]["wheel_end"].get("member_forces") or {}
+            mfb = db["loads"]["wheel_end"].get("member_forces") or {}
+            if mfa and mfb:
+                force_diffs[name] = {k: round(mfb[k] - mfa[k], 3) for k in mfa if k in mfb}
+
+    sw_a = _sweep_curves(dv_a, cv, req.axle, "travel", req.sweep_min, req.sweep_max,
+                         req.sweep_points)
+    sw_b = _sweep_curves(dv_b, cv, req.axle, "travel", req.sweep_min, req.sweep_max,
+                         req.sweep_points)
+
+    return {
+        "design_a": {"id": req.design_a_id, "version": dv_a.version},
+        "design_b": {"id": req.design_b_id or req.design_a_id, "version": dv_b.version},
+        "case_id": req.case_id,
+        "status_a": {k: v["status"] for k, v in ma.items()},
+        "status_b": {k: v["status"] for k, v in mb.items()},
+        "vehicle_status": {"a": ba["status"], "b": bb["status"]},
+        "hardpoint_diffs": {corner: diffs for corner, diffs in
+                            _hardpoint_diffs(dv_a, dv_b).items() if diffs},
+        "metric_diffs": metric_diffs,
+        "force_diffs": force_diffs,
+        "curve_overlay": {
+            "values": sw_a["values"],
+            "design_a": {k: v for k, v in sw_a["curves"].items()
+                         if k not in ("motion_ratio",)},
+            "design_b": {k: v for k, v in sw_b["curves"].items()
+                         if k not in ("motion_ratio",)},
+        },
+        "residuals_a": ba["residuals"],
+        "residuals_b": bb["residuals"],
+        "warnings_a": ba["warnings"],
+        "warnings_b": bb["warnings"],
+    }
+
+
+class SensitivityRequest(BaseModel):
+    design_id: str
+    design_version: int | None = None
+    case_id: str
+    case_version: int | None = None
+    corner: str = "front_right"
+    hardpoints: list[str] = ["UP1", "UP2", "CH1", "CH3"]
+    metrics: list[str] = ["camber_deg", "toe_deg", "caster_deg", "kpi_deg",
+                          "scrub_radius_mm", "caster_trail_mm"]
+    delta_mm: float = 1.0
+
+
+@router.post("/sensitivity")
+def sensitivity_v2(req: SensitivityRequest):
+    """P4 敏感性分析第一版：硬点 ±1mm → 重算 → 指标变化矩阵。
+
+    对每个选定硬点的 x/y/z 各做 +delta 与 −delta 两次求解，
+    输出 per_mm 灵敏度（Δmetric/Δhp），方向与强度，以及副作用
+    （几何残差变化、状态变化）。不做黑盒自动优化。
+    """
+    store = get_store()
+    _ensure_seeded(store)
+    try:
+        dv = store.get_design(req.design_id, req.design_version)
+        cv = store.get_case(req.case_id, req.case_version)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    if req.corner not in ("front_right", "front_left", "rear_right", "rear_left"):
+        raise HTTPException(status_code=422, detail="bad corner")
+    if not 0.0 < abs(req.delta_mm) <= 5.0:
+        raise HTTPException(status_code=422, detail="delta_mm must be in (0, 5]")
+
+    axle_hp = getattr(dv, req.corner)
+    track = float(dv.vehicle.get("front_track_mm" if req.corner.startswith("front")
+                                  else "rear_track_mm", 0.0))
+    _tmap = {"front_right": "fr", "front_left": "fl",
+             "rear_right": "rr", "rear_left": "rl"}
+    travel = getattr(cv.travel, _tmap[req.corner])
+
+    def solve_metric(hp_points):
+        flat: dict[str, object] = {k: list(v) for k, v in hp_points.items()}
+        flat.update(axle_hp.tire)
+        flat["track_width"] = track
+        return _solve_corner_flat(flat, travel, cv.rack_displacement, track, dv)
+
+    # 基线
+    base_pts = {k: list(v) for k, v in axle_hp.points.items()}
+    base_sol = solve_metric(base_pts)
+    if base_sol is None:
+        raise HTTPException(status_code=500, detail="基线求解失败")
+    base_angles = base_sol["angles"]
+    base_residual = base_sol["residual"]
+
+    sens: dict[str, dict] = {}
+    for hpk in req.hardpoints:
+        if hpk not in axle_hp.points:
+            continue
+        axes = ("x", "y", "z")
+        entry: dict[str, dict] = {}
+        for ai, axname in enumerate(axes):
+            for dm in (req.delta_mm, -req.delta_mm):
+                pts = {k: list(v) for k, v in axle_hp.points.items()}
+                pts[hpk][ai] += dm
+                sol = solve_metric(pts)
+                if sol is None:
+                    continue
+                delta = {}
+                for mk in req.metrics:
+                    b = base_angles.get(mk)
+                    v = sol["angles"].get(mk)
+                    if b is not None and v is not None:
+                        delta[mk] = round(v - b, 6)
+                if delta:
+                    per_mm = {mk: round(d / dm, 6) for mk, d in delta.items()}
+                    entry[f"{axname}{'+' if dm > 0 else '-'}"] = {
+                        "delta": {mk: round(d, 4) for mk, d in delta.items()},
+                        "per_mm": per_mm,
+                        "residual_delta_mm": round(sol["residual"] - base_residual, 6)
+                        if sol["residual"] is not None and base_residual is not None else None,
+                        "status": sol["status"].value,
+                    }
+            # 该轴 ± 平均灵敏度（正向强度）
+        sens[hpk] = entry
+
+    summary = {}
+    for hpk, axes_entry in sens.items():
+        per_axis = {}
+        for axname in axes:
+            pos = axes_entry.get(f"{axname}+")
+            neg = axes_entry.get(f"{axname}-")
+            if pos and neg:
+                per_axis[axname] = {
+                    mk: round((pos["per_mm"][mk] - neg["per_mm"][mk]) / 2.0, 6)
+                    for mk in pos["per_mm"]
+                }
+        summary[hpk] = per_axis
+
+    return {
+        "design_id": req.design_id, "design_version": dv.version,
+        "case_id": req.case_id, "corner": req.corner, "delta_mm": req.delta_mm,
+        "baseline": {k: base_angles.get(k) for k in req.metrics},
+        "baseline_residual_mm": base_residual,
+        "sensitivity": sens,
+        "summary_per_mm": summary,
+        # 副作用：基线状态
+        "baseline_status": base_sol["status"].value,
+    }
+
+
+def _solve_corner_flat(flat_hp: dict, travel: float, rack: float, track: float,
+                       dv) -> dict | None:
+    """用扁平 hp 求解一个角（sensitivity 用；含角级异常隔离）。"""
+    try:
+        ax = _solve_axle(flat_hp, travel, rack, mirror=False, polish=True)
+        angles = {k: ax["angles_right"].get(k) for k in _ANGLE_KEYS}
+        residual = float(ax.get("geometry_residual_mm", 0.0))
+        return {"angles": angles, "residual": residual,
+                "status": _status_for_residual(residual)}
+    except Exception:  # noqa: BLE001
+        return None
+
+
+class ExportRequest(BaseModel):
+    design_id: str
+    design_version: int | None = None
+    case_id: str
+    case_version: int | None = None
+    kind: str = "solve"        # solve | sweep
+    format: str = "json"       # json | csv
+    axle: str = "front"
+    axis: str = "travel"
+    min: float = -25.0
+    max: float = 25.0
+    points: int = 21
+
+
+@router.post("/export")
+def export_v2(req: ExportRequest):
+    """P4 基础导出：solve 结果或 sweep 曲线转 JSON/CSV。"""
+    import csv
+    import io
+
+    store = get_store()
+    _ensure_seeded(store)
+    try:
+        dv = store.get_design(req.design_id, req.design_version)
+        cv = store.get_case(req.case_id, req.case_version)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    if req.format not in ("json", "csv"):
+        raise HTTPException(status_code=422, detail="format must be json|csv")
+
+    if req.kind == "solve":
+        body = solve_v2(SolveV2Request(design_id=req.design_id,
+                                       design_version=dv.version,
+                                       case_id=req.case_id,
+                                       case_version=cv.version))
+        if req.format == "json":
+            return body
+        # CSV：每轮一行，列 = 角度/载荷字段
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        header = ["corner", "status"]
+        angle_keys = ["camber_deg", "toe_deg", "caster_deg", "kpi_deg",
+                      "scrub_radius_mm", "caster_trail_mm"]
+        load_keys = ["fx_n", "fy_n", "fz_n", "friction_util", "off_ground"]
+        header += angle_keys + load_keys
+        w.writerow(header)
+        for section in ("front", "rear"):
+            for side in ("left", "right"):
+                name = f"{section}_{side}"
+                rep = body[section][side]
+                angles = rep.get("angles") or {}
+                ld = body.get("loads", {}).get(name, {})
+                w.writerow([name, rep["status"]]
+                           + [angles.get(k, "") for k in angle_keys]
+                           + [ld.get(k, "") for k in load_keys])
+        return {"content_type": "text/csv",
+                "filename": f"solve_{req.design_id}_v{dv.version}_{req.case_id}.csv",
+                "data": buf.getvalue()}
+
+    # sweep
+    if req.axle not in ("front", "rear"):
+        raise HTTPException(status_code=422, detail="axle must be front|rear")
+    sw = _sweep_curves(dv, cv, req.axle, req.axis, req.min, req.max, req.points)
+    if req.format == "json":
+        return {"design_id": req.design_id, "case_id": req.case_id,
+                "axle": req.axle, "axis": req.axis,
+                "values": sw["values"], "curves": sw["curves"],
+                "warnings": sw["warnings"]}
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["value"] + list(sw["curves"].keys()))
+    for i, v in enumerate(sw["values"]):
+        w.writerow([v] + [sw["curves"][k][i] if i < len(sw["curves"][k]) else ""
+                          for k in sw["curves"]])
+    return {"content_type": "text/csv",
+            "filename": f"sweep_{req.design_id}_{req.case_id}_{req.axle}_{req.axis}.csv",
+            "data": buf.getvalue()}
 
 
 @router.post("/solve")
