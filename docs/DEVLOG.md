@@ -1,5 +1,22 @@
 # 开发日志
 
+## 2026-08-20 — P2-1 统一四轮结果结构（VehicleResult）
+
+- 新增 `src/core/results.py`：`VehicleResult`（front/rear × left/right + per_wheel_geometry +
+  residuals + solver_status + pose_labels + warnings）、`WheelReport`（角度+残差+状态）、
+  `WheelPose`（姿态/接地点/主销轴/球头/轨迹）、`SteeringAxis`（单位方向+地面交点）等模型。
+- `/api/v2/solve` 重构为统一结构：每轮独立求解（方案独立存储的左右硬点），逐轮输出定位角、
+  残差、状态与几何；单轮求解异常隔离为 `SOLVER_FAILED`，不再使整请求失败。
+- **修复 v2 残差伪造 0 的缺陷**：`_solve_axle` 此前在 steering 结果上读 `max_residual`（字段不存在，
+  恒为 0），v2 残差全为假 0。现于 solve_bump 后立即捕获残差，并计算横拉杆长度残差，
+  `geometry_residual_mm = max(bump, tie)`（与 P1 基准语义一致），所有调用方受益。
+- 状态机前置（P2-3）：残差 ≤0.02 → VALID；0.02< ≤0.5 → APPROXIMATE；>0.5 → OUT_OF_RANGE；
+  整车状态 = 四轮最差。静态工况 VALID（原固定 APPROXIMATE），fr-comp(+20) 0.053mm → APPROXIMATE，
+  -30mm 0.748mm → OUT_OF_RANGE（与 P1 报告 K-4 数值一致），K-4 经 v2 如实暴露。
+- v2 求解改用 `polish=True`（分析路径 LS 精修几何，与 P1 基准残差语义一致）。
+- 验证：v2 结构/镜像/状态机测试 13 项；全量非 e2e 287 passed / 3 xfailed（F1 既有）；
+  ruff/mypy 干净。下一步 P2-2 指标补齐。
+
 ## 2026-08-20 — P2-0 坐标与符号规范冻结（K-1/K-2/K-3 修复）
 
 - **冻结八项定义**（写入 `src/core/convention.py`，`spec_revision → v1-p2-0`，`tests/test_convention.py` 锁定）：

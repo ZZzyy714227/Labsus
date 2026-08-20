@@ -332,7 +332,12 @@ Mechanical Trail 定义
 Ackermann 定义
 ```
 
-### P2-1：扩展统一结果结构
+### P2-1：扩展统一结果结构（已完成）
+
+> **状态（2026-08-20 更新）**：v2 solve 已输出统一 `VehicleResult`（见
+> `src/core/results.py`），每轮含姿态/定位角/接地点/主销轴/轨迹/残差/状态；
+> 顺带修复 v2 残差恒为 0 的伪造缺陷（`_solve_axle` 现于 bump 后捕获残差并与
+> 横拉杆残差取 max），并前置残差→状态映射（VALID/APPROXIMATE/OUT_OF_RANGE）。
 
 将 v2 solve 结果扩展为：
 

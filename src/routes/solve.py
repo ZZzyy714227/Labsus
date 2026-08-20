@@ -87,6 +87,8 @@ def _solve_axle(hp_right, wheel_travel, rack_displacement, mirror,
 
     # Step 1: Pure bump (pass prev_up for branch continuation in sweeps)
     result_right = solve_bump(hp_right, wheel_travel, polish=polish, prev_up=prev_up)
+    # 在转向求解前捕获 bump 几何残差（steering 结果不携带该字段）
+    bump_res = float(result_right.get("max_residual", 0.0))
 
     # Step 2: Merge chassis points
     merged_right = _merge_chassis(result_right, hp_right)
@@ -109,11 +111,17 @@ def _solve_axle(hp_right, wheel_travel, rack_displacement, mirror,
 
     rocker_right = compute_rocker_kinematics(hp_right, result_right_final, frame_nodes)
 
+    # P2-1 诚实几何残差：bump 残差与横拉杆长度残差的最大值（不伪造 0）。
+    tie_res = abs(float(dist(np.asarray(result_right_final["UP3"], dtype=float),
+                             np.asarray(result_right_final["FL1"], dtype=float)))
+                  - L_tr_design)
+
     resp = {
         "right": result_right_final,
         "angles_right": angles_right,
         "contact_patch_right": cp_right,
         "steering_theta": result_right.get("steering_theta", 0.0),
+        "geometry_residual_mm": round(max(bump_res, tie_res), 6),
     }
     if rocker_right:
         resp["rocker_right"] = rocker_right
@@ -122,6 +130,7 @@ def _solve_axle(hp_right, wheel_travel, rack_displacement, mirror,
         hp_left = mirror_left(hp_right)
         L_tr_design_left = float(dist(np.array(hp_left["UP3"]), np.array(hp_left["FL1"])))
         result_left = solve_bump(hp_left, wheel_travel, polish=polish)
+        bump_res_left = float(result_left.get("max_residual", 0.0))
         merged_left = _merge_chassis(result_left, hp_left)
         result_left = solve_steering(merged_left, rack_displacement,
                                      tie_rod_length=L_tr_design_left, theta_guess=theta_guess)
@@ -134,9 +143,13 @@ def _solve_axle(hp_right, wheel_travel, rack_displacement, mirror,
             _upright_y_axis(result_left_final),
             hp_left,
         )
+        tie_res_left = abs(float(dist(np.asarray(result_left_final["UP3"], dtype=float),
+                                      np.asarray(result_left_final["FL1"], dtype=float)))
+                           - L_tr_design_left)
         resp["left"] = result_left_final
         resp["angles_left"] = angles_left
         resp["contact_patch_left"] = cp_left
+        resp["geometry_residual_left_mm"] = round(max(bump_res_left, tie_res_left), 6)
 
         frame_nodes_left = mirror_left(frame_nodes)
         rocker_left = compute_rocker_kinematics(hp_left, result_left_final, frame_nodes_left)
