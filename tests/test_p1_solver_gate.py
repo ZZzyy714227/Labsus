@@ -2,6 +2,9 @@
 
 import json
 import math
+import subprocess
+import sys
+from pathlib import Path
 
 import numpy as np
 
@@ -44,6 +47,18 @@ RESIDUAL_KEYS = {
 }
 
 
+def test_cli_writes_report_from_repository_root():
+    report_path = Path("data/reports/_p1_cli_test.json")
+    try:
+        result = subprocess.run([sys.executable, "-m", "src.solver.p1_benchmark", "--write-report", str(report_path)], capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        assert report["cases"]
+        assert "timing_note" in report
+    finally:
+        report_path.unlink(missing_ok=True)
+
+
 def test_compare_solver_paths_returns_required_fields():
     report = compare_solver_paths()
 
@@ -53,6 +68,7 @@ def test_compare_solver_paths_returns_required_fields():
         "travel_grid_mm",
         "rack_grid_mm",
         "smoothing",
+        "timing_note",
         "k4_diagnosis",
         "cases",
     } <= report.keys()
@@ -82,6 +98,8 @@ def test_compare_is_deterministic_and_strictly_json_serializable():
         for row in report["cases"]:
             copy = dict(row)
             copy.pop("timing_ms")
+            copy["delta"] = dict(copy["delta"])
+            copy["delta"].pop("timing_ms")
             copy["sequential"] = dict(copy["sequential"])
             copy["sequential"].pop("timing_ms")
             copy["coupled"] = dict(copy["coupled"])
@@ -277,6 +295,14 @@ def test_comparison_reports_all_requested_deltas_without_smoothing():
     for row in report["cases"]:
         assert expected <= set(row["delta"])
     assert report["smoothing"] == "none"
+    assert "environment-dependent" in report["timing_note"]
+    for row in report["cases"]:
+        sequential, coupled = row["sequential"], row["coupled"]
+        if sequential["contact_patch"] is not None and coupled["contact_patch"] is not None:
+            assert row["delta"]["contact_patch_mm"] == [round(c - s, 9) for s, c in zip(sequential["contact_patch"], coupled["contact_patch"])]
+        if sequential["steering_axis"] is not None and coupled["steering_axis"] is not None:
+            assert row["delta"]["steering_axis_unitless"] == [round(c - s, 9) for s, c in zip(sequential["steering_axis"], coupled["steering_axis"])]
+        assert row["delta"]["timing_ms"] == round(coupled["timing_ms"] - sequential["timing_ms"], 9)
 
 
 def test_k4_diagnosis_separates_travel_rack_and_candidate_causes():

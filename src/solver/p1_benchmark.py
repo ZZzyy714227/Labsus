@@ -6,9 +6,16 @@ import argparse
 import hashlib
 import json
 import math
+import sys
 import time
 from pathlib import Path
 from typing import TypedDict, cast
+
+# Production modules use the repository's ``src`` directory as their import
+# root.  Make that same layout available when this file is run with
+# ``python -m src.solver.p1_benchmark`` from the repository root.
+if str(Path(__file__).resolve().parents[1]) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
 
@@ -47,8 +54,8 @@ class DeltaRecord(TypedDict):
     kpi_deg: NumericOrNone
     scrub_radius_mm: NumericOrNone
     trail_mm: NumericOrNone
-    contact_patch_mm: NumericOrNone
-    steering_axis_unitless: NumericOrNone
+    contact_patch_mm: list[float] | None
+    steering_axis_unitless: list[float] | None
     geometry_residual_mm: NumericOrNone
     timing_ms: NumericOrNone
     contact_patch: list[JsonValue] | None
@@ -75,6 +82,7 @@ class Report(TypedDict):
     travel_grid_mm: list[int]
     rack_grid_mm: list[int]
     smoothing: str
+    timing_note: str
     k4_diagnosis: dict[str, JsonValue]
     cases: list[CaseRecord]
 
@@ -181,20 +189,42 @@ def _coupled_path(hp: dict[str, object], travel: int, rack: int) -> PathRecord:
 def _scalar_delta(sequential: PathRecord, coupled: PathRecord, key: str) -> float | None:
     if sequential["angles"] is None or coupled["angles"] is None:
         return None
-    return round(float(coupled["angles"].get(key, 0.0)) - float(sequential["angles"].get(key, 0.0)), 9)
+    candidate = coupled["angles"].get(key, 0.0)
+    baseline = sequential["angles"].get(key, 0.0)
+    return round(float(cast(float, candidate)) - float(cast(float, baseline)), 9)
+
+
+def _vector_delta(sequential: PathRecord, coupled: PathRecord, key: str) -> list[float] | None:
+    first = sequential["contact_patch"] if key == "contact_patch" else sequential["steering_axis"]
+    second = coupled["contact_patch"] if key == "contact_patch" else coupled["steering_axis"]
+    if first is None or second is None or len(first) != len(second):
+        return None
+    first_values = cast(list[float], first)
+    second_values = cast(list[float], second)
+    return [round(candidate - baseline, 9) for baseline, candidate in zip(first_values, second_values)]
+
+
+def _timing_delta(sequential: PathRecord, coupled: PathRecord) -> float | None:
+    baseline, candidate = sequential["timing_ms"], coupled["timing_ms"]
+    if not math.isfinite(baseline) or not math.isfinite(candidate):
+        return None
+    return round(candidate - baseline, 9)
 
 
 def _diagnose_k4(cases: list[CaseRecord]) -> dict[str, JsonValue]:
     valid = [r for r in cases if r["sequential"]["geometry_residual_mm"] is not None]
     def maximum(rows: list[CaseRecord], label: str) -> dict[str, JsonValue]:
-        row = max(rows, key=lambda r: float(r["sequential"]["geometry_residual_mm"] or 0.0)) if rows else None
-        return {"travel": row["travel"], "rack": row["rack"], "residual_mm": float(row["sequential"]["geometry_residual_mm"])} if row else {"travel": 0, "rack": 0, "residual_mm": 0.0}
+        row = max(rows, key=lambda r: r["sequential"]["geometry_residual_mm"] or 0.0) if rows else None
+        residual = row["sequential"]["geometry_residual_mm"] if row else None
+        return {"travel": row["travel"], "rack": row["rack"], "residual_mm": residual} if row and residual is not None else {"travel": 0, "rack": 0, "residual_mm": 0.0}
     neg = [r for r in valid if r["travel"] < 0]
     pos = [r for r in valid if r["travel"] > 0]
     neg_max, pos_max = maximum(neg, "negative"), maximum(pos, "positive")
     rack_effect = max((float(r["sequential"]["geometry_residual_mm"] or 0.0) for r in valid if r["rack"] == 5), default=0.0) - max((float(r["sequential"]["geometry_residual_mm"] or 0.0) for r in valid if r["rack"] == 0), default=0.0)
+    neg_residual = float(cast(float, neg_max["residual_mm"]))
+    pos_residual = float(cast(float, pos_max["residual_mm"]))
     return {"negative_travel_max": neg_max, "positive_travel_max": pos_max,
-            "cause_summary": {"travel_direction": "negative" if neg_max["residual_mm"] > pos_max["residual_mm"] else "positive" if pos_max["residual_mm"] > neg_max["residual_mm"] else "balanced",
+            "cause_summary": {"travel_direction": "negative" if neg_residual > pos_residual else "positive" if pos_residual > neg_residual else "balanced",
                                "rack_input": "rack-sensitive" if abs(rack_effect) > 0.02 else "travel-dominant",
                                "candidate_status": {status: sum(1 for r in cases if r["coupled"]["status"] == status) for status in sorted({r["coupled"]["status"] for r in cases})}}}
 
@@ -210,12 +240,12 @@ def compare_solver_paths() -> Report:
             delta = {"camber_deg": _scalar_delta(sequential, coupled, "camber_deg"), "toe_deg": _scalar_delta(sequential, coupled, "toe_deg"),
                      "caster_deg": _scalar_delta(sequential, coupled, "caster_deg"), "kpi_deg": _scalar_delta(sequential, coupled, "kpi_deg"),
                      "scrub_radius_mm": _scalar_delta(sequential, coupled, "scrub_radius_mm"), "trail_mm": _scalar_delta(sequential, coupled, "caster_trail_mm"),
-                     "contact_patch_mm": None, "steering_axis_unitless": None,
+                     "contact_patch_mm": _vector_delta(sequential, coupled, "contact_patch"), "steering_axis_unitless": _vector_delta(sequential, coupled, "steering_axis"),
                      "geometry_residual_mm": (None if sequential["geometry_residual_mm"] is None or coupled["geometry_residual_mm"] is None else coupled["geometry_residual_mm"] - sequential["geometry_residual_mm"]),
-                     "timing_ms": None, "contact_patch": None, "steering_axis": None}
-            cases.append({"travel": travel, "rack": rack, "sequential": sequential, "coupled": coupled, "delta": delta,
+                     "timing_ms": _timing_delta(sequential, coupled), "contact_patch": None, "steering_axis": None}
+            cases.append({"travel": travel, "rack": rack, "sequential": sequential, "coupled": coupled, "delta": cast(DeltaRecord, delta),
                           "timing_ms": {"sequential": sequential["timing_ms"], "coupled": coupled["timing_ms"]}})
-    return {"hardpoint_side": "front_right", "hardpoint_fingerprint": _hardpoint_fingerprint(), "travel_grid_mm": list(TRAVEL_GRID), "rack_grid_mm": list(RACK_GRID), "smoothing": "none", "k4_diagnosis": _diagnose_k4(cases), "cases": cases}
+    return {"hardpoint_side": "front_right", "hardpoint_fingerprint": _hardpoint_fingerprint(), "travel_grid_mm": list(TRAVEL_GRID), "rack_grid_mm": list(RACK_GRID), "smoothing": "none", "timing_note": "Measured timing is environment-dependent and should not be used for deterministic comparisons.", "k4_diagnosis": _diagnose_k4(cases), "cases": cases}
 
 
 if __name__ == "__main__":
