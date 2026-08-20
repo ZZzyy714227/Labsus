@@ -1,5 +1,21 @@
 # 开发日志
 
+## 2026-08-20 — P4 工程迭代工作流（A/B 对比 / 敏感性 / 导出 / 版本回退）
+
+- **/api/v2/compare**：方案 A/B 对比（跨方案或同方案版本回退）。输出硬点差异（逐轮逐点 3D delta）、
+  指标差异（逐轮定位角）、杆件力差异（载荷层 wheel_end.member_forces）、曲线叠加（travel 扫掠双侧
+  camber/toe/scrub/trail/kpi/RC）、双侧残差/状态（a/b 各自 per-corner status + vehicle status + warnings）。
+  实测：UP1 x+5mm → caster -1.91°、toe -8.06°（敏感性显著）。
+- **/api/v2/sensitivity**：敏感性第一版。选定硬点 × x/y/z × ±delta_mm 各求解一次，
+  输出 per_mm 灵敏度（Δmetric/Δhp）、方向（±）、强度，副作用（几何残差变化、状态变化）；
+  不做黑盒自动优化。实测 UP1 x 对 camber ≈ -0.01°/mm、toe ≈ 0（球头沿主销方向移动影响小）。
+- **/api/v2/export**：solve（每轮一行：定位角 + 载荷）或 sweep（曲线）转 JSON/CSV。
+- 重构：sweep 曲线逻辑抽为 _sweep_curves 助手（sweep 端点与 compare 共用），修复静态点解包。
+- 版本回退/工况复用复用既有 store（get_design(version)/get_case），补对比测试覆盖。
+- 性能预算（§13.3）：25 点扫掠 < 1s 测试通过。
+- 验证：新增 P4 测试 10 项（对比/回退/敏感性/导出/性能）；全量非 e2e 344 passed / 3 xfailed（F1 既有）；
+  ruff/mypy 干净。残差/假设/状态随对比与敏感性输出（双侧 status/residuals/warnings）。
+
 ## 2026-08-20 — P3 载荷与轮边受力（整车层 + 转向节 6-DOF 二力杆模型）
 
 - 新增 src/metrics/wheel_loads.py：四轮 Fx/Fy/Fz 分配——静态、纵向转移（ax·m·g·h_cg/wb）、
