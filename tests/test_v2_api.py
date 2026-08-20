@@ -235,6 +235,32 @@ class TestSweep:
         assert body["curves"]["right_toe_deg"][5] == pytest.approx(
             body["curves"]["left_toe_deg"][5], abs=1e-6)
 
+    def test_travel_sweep_mirror_symmetric(self, client):
+        """P2-4 镜像验证：对称默认几何上，heave 扫掠全程左右曲线相等（1e-3 容差，
+        浮点/分支差异）。"""
+        body = self._sweep(client, min=-30, max=30, points=13)
+        for key in ("camber_deg", "toe_deg", "scrub_radius_mm",
+                    "caster_trail_mm", "kpi_deg"):
+            r_key = f"right_{key}"
+            l_key = f"left_{key}"
+            r_curve = body["curves"][r_key]
+            l_curve = body["curves"][l_key]
+            for i in range(len(r_curve)):
+                if r_curve[i] is None or l_curve[i] is None:
+                    continue
+                assert r_curve[i] == pytest.approx(l_curve[i], abs=1e-3), (
+                    f"{key}@{body['values'][i]}: R={r_curve[i]} L={l_curve[i]}")
+
+    def test_bump_steer_sign_track(self, client):
+        """P2-4 符号方向：默认几何 bump steer 为 +（压缩时 toe-in 增加，P2-0 约定）。"""
+        body = self._sweep(client)
+        bs = body["metrics"]["bump_steer_right"]
+        assert bs["status"] == "VALID"
+        # 默认几何 toe 曲线单调（压缩 toe 增大），bump steer 为正
+        toes = body["curves"]["right_toe_deg"]
+        assert toes[5] == pytest.approx(0.0, abs=1e-6)
+        assert toes[-1] > toes[0]
+
     def test_rack_sweep_ackermann_and_scg(self, client):
         body = self._sweep(client, axis="rack", min=-20, max=20, points=9)
         toes = body["curves"]["right_toe_deg"]
