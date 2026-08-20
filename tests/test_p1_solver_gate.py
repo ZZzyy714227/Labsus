@@ -36,6 +36,7 @@ PATH_FIELDS = {
     "residuals_mm",
     "explanation",
     "state",
+    "rank_deficient",
 }
 
 RESIDUAL_KEYS = {
@@ -315,3 +316,19 @@ def test_k4_diagnosis_separates_travel_rack_and_candidate_causes():
     assert diagnosis["cause_summary"]["travel_direction"] in {"negative", "positive", "balanced", "none"}
     assert diagnosis["cause_summary"]["rack_input"] in {"rack-sensitive", "travel-dominant", "none"}
     assert isinstance(diagnosis["cause_summary"]["candidate_status"], dict)
+    assert diagnosis["rank_deficient_count"] == sum(
+        row["coupled"]["rank_deficient"] for row in compare_solver_paths()["cases"]
+    )
+    assert diagnosis["rank_deficient_cases"] == [
+        {"travel": row["travel"], "rack": row["rack"]}
+        for row in compare_solver_paths()["cases"]
+        if row["coupled"]["rank_deficient"]
+    ]
+    assert set(diagnosis["per_rack"]) == {"0", "5"}
+    for rack, summary in diagnosis["per_rack"].items():
+        assert summary["rack"] == int(rack)
+        assert summary["case_count"] == 8
+        assert summary["max_residual_mm"] >= 0
+        assert isinstance(summary["status_counts"], dict)
+    assert diagnosis["travel_direction_residuals"]
+    assert {entry["travel_direction"] for entry in diagnosis["travel_direction_residuals"]} == {"negative", "zero", "positive"}

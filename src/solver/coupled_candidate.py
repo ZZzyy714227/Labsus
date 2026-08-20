@@ -79,7 +79,8 @@ def solve_coupled_candidate(hp: dict[str, Any], travel: int, rack: int) -> dict[
     base: dict[str, Any] = {"status": "SOLVER_FAILED", "angles": None, "contact_patch": None,
             "steering_axis": None, "geometry_residual_mm": None, "iterations": 0,
             "timing_ms": 0.0, "residuals_mm": {key: None for key in RESIDUAL_KEYS}, "explanation": "",
-            "state": {name: None for name in (*POINTS, "FL1", "steering_angle", "contact_patch")} }
+            "state": {name: None for name in (*POINTS, "FL1", "steering_angle", "contact_patch")},
+            "rank_deficient": False}
     if least_squares is None:
         base["status"] = "NOT_IMPLEMENTED"
         base["explanation"] = "scipy.optimize.least_squares is unavailable"
@@ -113,17 +114,19 @@ def solve_coupled_candidate(hp: dict[str, Any], travel: int, rack: int) -> dict[
         state["FL1"] = (np.asarray(hp["FL1"], float) + np.array([0.0, rack, 0.0])).tolist()
         state["steering_angle"] = float(initial.get("steering_theta", 0.0))
         state["contact_patch"] = None
-        if rank >= min(result.jac.shape):
+        rank_deficient = rank < min(result.jac.shape)
+        if not rank_deficient:
             angles = compute_alignment_angles(state, hp=hp)
             contact = compute_contact_patch(state["UP5"], _upright_y_axis(state), hp)
             state["contact_patch"] = contact["center"]
             base.update({"angles": angles, "contact_patch": contact["center"],
                          "steering_axis": (np.asarray(state["UP2"]) - np.asarray(state["UP1"])).tolist()})
-        full_rank = rank >= min(result.jac.shape)
+        full_rank = not rank_deficient
         base.update({"status": ("VALID" if maximum <= 0.02 else "APPROXIMATE")
                      if full_rank else "SOLVER_FAILED",
                      "geometry_residual_mm": maximum, "iterations": int(result.nfev),
                      "residuals_mm": residuals, "state": state,
+                     "rank_deficient": rank_deficient,
                      "explanation": ("bounded coupled solve" if full_rank
                                      else f"constraint Jacobian is rank-deficient ({rank}/{min(result.jac.shape)}); minimized evidence retained")})
         return base

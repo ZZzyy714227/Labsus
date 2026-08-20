@@ -45,6 +45,7 @@ class PathRecord(TypedDict):
     residuals_mm: dict[str, JsonValue]
     explanation: str
     state: dict[str, JsonValue]
+    rank_deficient: bool
 
 
 class DeltaRecord(TypedDict):
@@ -130,7 +131,7 @@ def _sequential_baseline(hp: dict[str, object], travel: int, rack: int) -> PathR
                 "steering_axis": None, "geometry_residual_mm": None,
                 "iterations": int(bump.get("iterations", 0)) + int(steered.get("iterations", 0)),
                 "timing_ms": (time.perf_counter() - started) * 1000.0,
-                "residuals_mm": {key: None for key in RESIDUAL_KEYS}, "explanation": "steering root unavailable", "state": {},
+                "residuals_mm": {key: None for key in RESIDUAL_KEYS}, "explanation": "steering root unavailable", "state": {}, "rank_deficient": False,
             }
         final = dict(steered)
         for key in ("CH1", "CH2", "CH3", "CH4", "CH5", "track_width", "tire_radius",
@@ -158,14 +159,14 @@ def _sequential_baseline(hp: dict[str, object], travel: int, rack: int) -> PathR
             "iterations": int(bump.get("iterations", 0)) + int(steered.get("iterations", 0)),
             "timing_ms": (time.perf_counter() - started) * 1000.0,
             "residuals_mm": {key: None for key in RESIDUAL_KEYS}, "explanation": "sequential baseline",
-            "state": cast(dict[str, JsonValue], _json_value(final)),
+            "state": cast(dict[str, JsonValue], _json_value(final)), "rank_deficient": False,
         }
     except (KeyError, TypeError, ValueError, FloatingPointError):
         return {
             "status": "SOLVER_FAILED", "angles": None, "contact_patch": None,
             "steering_axis": None, "geometry_residual_mm": None, "iterations": 0,
             "timing_ms": (time.perf_counter() - started) * 1000.0,
-            "residuals_mm": {key: None for key in RESIDUAL_KEYS}, "explanation": "sequential baseline failed", "state": {},
+            "residuals_mm": {key: None for key in RESIDUAL_KEYS}, "explanation": "sequential baseline failed", "state": {}, "rank_deficient": False,
         }
 
 
@@ -183,6 +184,7 @@ def _coupled_path(hp: dict[str, object], travel: int, rack: int) -> PathRecord:
         "residuals_mm": cast(dict[str, JsonValue], result.get("residuals_mm", {})),
         "explanation": str(result.get("explanation", "")),
         "state": cast(dict[str, JsonValue], result.get("state", {})),
+        "rank_deficient": bool(result.get("rank_deficient", False)),
     }
 
 
@@ -213,20 +215,23 @@ def _timing_delta(sequential: PathRecord, coupled: PathRecord) -> float | None:
 
 def _diagnose_k4(cases: list[CaseRecord]) -> dict[str, JsonValue]:
     valid = [r for r in cases if r["sequential"]["geometry_residual_mm"] is not None]
-    def maximum(rows: list[CaseRecord], label: str) -> dict[str, JsonValue]:
+    def maximum(rows: list[CaseRecord]) -> dict[str, JsonValue]:
         row = max(rows, key=lambda r: r["sequential"]["geometry_residual_mm"] or 0.0) if rows else None
         residual = row["sequential"]["geometry_residual_mm"] if row else None
         return {"travel": row["travel"], "rack": row["rack"], "residual_mm": residual} if row and residual is not None else {"travel": 0, "rack": 0, "residual_mm": 0.0}
-    neg = [r for r in valid if r["travel"] < 0]
-    pos = [r for r in valid if r["travel"] > 0]
-    neg_max, pos_max = maximum(neg, "negative"), maximum(pos, "positive")
-    rack_effect = max((float(r["sequential"]["geometry_residual_mm"] or 0.0) for r in valid if r["rack"] == 5), default=0.0) - max((float(r["sequential"]["geometry_residual_mm"] or 0.0) for r in valid if r["rack"] == 0), default=0.0)
-    neg_residual = float(cast(float, neg_max["residual_mm"]))
-    pos_residual = float(cast(float, pos_max["residual_mm"]))
-    return {"negative_travel_max": neg_max, "positive_travel_max": pos_max,
-            "cause_summary": {"travel_direction": "negative" if neg_residual > pos_residual else "positive" if pos_residual > neg_residual else "balanced",
-                               "rack_input": "rack-sensitive" if abs(rack_effect) > 0.02 else "travel-dominant",
-                               "candidate_status": {status: sum(1 for r in cases if r["coupled"]["status"] == status) for status in sorted({r["coupled"]["status"] for r in cases})}}}
+    neg_max, pos_max = maximum([r for r in valid if r["travel"] < 0]), maximum([r for r in valid if r["travel"] > 0])
+    direction_rows: list[dict[str, JsonValue]] = []
+    for direction, rows in (("negative", [r for r in valid if r["travel"] < 0]), ("zero", [r for r in valid if r["travel"] == 0]), ("positive", [r for r in valid if r["travel"] > 0])):
+        direction_rows.append({"travel_direction": direction, "case_count": len(rows), "max_residual_mm": maximum(rows)["residual_mm"], "rack_maxima": {str(rack): maximum([r for r in rows if r["rack"] == rack])["residual_mm"] for rack in RACK_GRID}})
+    per_rack: dict[str, dict[str, JsonValue]] = {}
+    for rack in RACK_GRID:
+        rows = [r for r in valid if r["rack"] == rack]
+        per_rack[str(rack)] = {"rack": rack, "case_count": len(rows), "max_residual_mm": maximum(rows)["residual_mm"], "status_counts": {status: sum(1 for r in rows if r["sequential"]["status"] == status) for status in sorted({r["sequential"]["status"] for r in rows})}}
+    rank_cases = [{"travel": r["travel"], "rack": r["rack"]} for r in cases if r["coupled"]["rank_deficient"]]
+    neg_residual, pos_residual = float(cast(float, neg_max["residual_mm"])), float(cast(float, pos_max["residual_mm"]))
+    rack_effect = float(cast(float, per_rack["5"]["max_residual_mm"])) - float(cast(float, per_rack["0"]["max_residual_mm"]))
+    return cast(dict[str, JsonValue], {"negative_travel_max": neg_max, "positive_travel_max": pos_max, "travel_direction_residuals": direction_rows, "per_rack": per_rack, "rank_deficient_count": len(rank_cases), "rank_deficient_cases": rank_cases,
+            "cause_summary": {"travel_direction": "negative" if neg_residual > pos_residual else "positive" if pos_residual > neg_residual else "balanced", "rack_input": "rack-sensitive" if abs(rack_effect) > 0.02 else "travel-dominant", "candidate_status": {status: sum(1 for r in cases if r["coupled"]["status"] == status) for status in sorted({r["coupled"]["status"] for r in cases})}}})
 
 
 def compare_solver_paths() -> Report:
