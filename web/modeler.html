@@ -23,7 +23,8 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
 #left{width:270px;flex:0 0 270px;border-right:1px solid var(--bd);overflow:auto;background:var(--pnl)}
 #center{flex:1;display:flex;flex-direction:column;min-width:0}
 #views{flex:1;display:flex;flex-wrap:wrap;gap:4px;padding:4px;min-height:0}
-.views{flex:1 1 30%;min-width:220px;height:49%;display:flex;flex-direction:column}
+.views{flex:1 1 30%;min-width:220px;min-height:130px;height:49%;display:flex;flex-direction:column}
+.views canvas{flex:1;display:block;min-height:100px}
 .views canvas{flex:1;width:100%;background:#0a0c0e;border:1px solid var(--bd)}
 .views .vt{font-size:9px;color:var(--tx2);padding:2px 4px;text-transform:uppercase;letter-spacing:.12em}
 #right{width:300px;flex:0 0 300px;border-left:1px solid var(--bd);overflow:auto;background:var(--pnl);padding:6px}
@@ -299,12 +300,8 @@ function viewGeom(view){
     if(q[1]<y0)y0=q[1]; if(q[1]>y1)y1=q[1];
   }
   const s=Math.min((W-pad*2)/Math.max(1,x1-x0),(H-pad*2)/Math.max(1,y1-y0));
-  if(x1-x0>1&&y1-y0>1){
-    view.tgt=[view.tgt[0]-(x0+x1-W)/2/view.s?0:0, view.tgt[1], view.tgt[2]];
-    camIso(view);
-  }
-  const c=isoCenter(view,{W,H,s});
-  return {s, W, H, ox:g?0:(g&&g.ox||0)||0, oy:0};
+  // iso 中心校正在 drawView 由 isoCenter 完成；此处在必要守候肩任 ox/oy=0
+  return {s, W, H, ox:0, oy:0};
 }
 // iso 中计算中心偏移（简化：用投影中心校正）
 function isoCenter(view, g){
@@ -548,7 +545,7 @@ function drawKcurve(d){
 /* ---------- 渲染 ---------- */
 const ANGLE_KEYS=["camber_deg","toe_deg","caster_deg","kpi_deg","scrub_radius_mm","caster_trail_mm"];
 const ANGLE_ZH={"camber_deg":"外倾°","toe_deg":"前束°(正=内)","caster_deg":"后倾°","kpi_deg":"主销内倾°","scrub_radius_mm":"Scrub mm","caster_trail_mm":"拖距 mm"};
-function setStatus(tone){ document.getElementById("st").innerHTML="<span class='"+tone+"'>"+escapeHtml(t)+"</span>"; }
+function setStatus(tone){ document.getElementById("st").innerHTML="<span class='"+tone+"'>"+escapeHtml(tone)+"</span>"; }
 function escapeHtml(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 function renderAll(d){
   const fr=d.front.right;

@@ -1,6 +1,16 @@
 # 开发日志
 
+## 2026-08-20 — 修复：悬架模型不显示的运行时错误
+
+- 根因：viewGeom 等轴测分支引用未定义变量 g（ReferenceError）+ center 校准一行引用未定义 view.s，导致 drawAll 在第一个视图即中断 → 四个 canvas 全空白（界面 HTML 仍完整）。
+- 另修 setStatus(tone) 内部误用未定义的 t（任何状态调用都会抛错，破坏错误/离线路径）。
+- CSS：.views canvas min-height 防高度塌陷。
+- 验证：mock DOM + vm 完整执行 init（buildTable+drawAll+requestSolve）不抛异常；live 页面 200。
+- 注意：修复后必须重启服务（旧进程仍是修复前代码）。
+
+
 ## 2026-08-20 — 修复：根路径进入建模器 + 拖拽命中 ox 兜底
+
 
 - 根路径重定向：GET / → /modeler.html（旧 index.html 仍可经 /index.html 访问），避免用户打开根路径走旧 SPA（依赖 unpkg CDN，无外网即白屏）。验证：GET / 200 落到 modeler.html；modeler.html 200；API v2 200。
 - 修 hitTest 的 g.ox/g.oy 未定义（正交视图拖拽命中损坏）：viewGeom 统一返回 ox/oy=0 兜底，iso 中心校正在 drawView 覆盖。
