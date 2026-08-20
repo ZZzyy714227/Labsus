@@ -4,6 +4,7 @@ import json
 import math
 
 import src.solver.p1_benchmark as p1_benchmark
+from src.solver.coupled_candidate import solve_coupled_candidate
 from src.solver.p1_benchmark import compare_solver_paths
 
 
@@ -166,6 +167,21 @@ def test_k4_residual_remains_visible_outside_nominal_range():
         and row["sequential"]["geometry_residual_mm"] > 0.02
         for row in report["cases"]
     )
+
+
+def test_coupled_candidate_is_explicit_when_unavailable():
+    report = compare_solver_paths()
+    candidate = report["cases"][0]["coupled"]
+    assert candidate["status"] in {"VALID", "APPROXIMATE", "NOT_IMPLEMENTED", "SOLVER_FAILED"}
+    assert "geometry_residual_mm" in candidate
+
+
+def test_candidate_reports_raw_constraint_diagnostics():
+    result = solve_coupled_candidate(dict(p1_benchmark.DEFAULT_HARDPOINTS), 0, 0)
+    assert result["status"] in {"VALID", "APPROXIMATE", "NOT_IMPLEMENTED", "SOLVER_FAILED"}
+    assert "residuals_mm" in result
+    assert isinstance(result["residuals_mm"], dict)
+    assert "explanation" in result
 
 
 def test_compare_covers_both_travel_directions():
