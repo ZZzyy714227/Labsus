@@ -684,6 +684,15 @@ def solve_v2(req: SolveV2Request):
         if not loads:
             warnings.append("载荷计算不可用：几何 Motion Ratio/轮距缺失，"
                             "每轮载荷未计算（显式非 None 空白）")
+        else:
+            for name, ld in loads.items():
+                if ld.get("off_ground"):
+                    warnings.append(f"{name}: 垂向载荷 Fz={ld['fz_n']:.1f}N≤0，"
+                                    "车轮离地（P3 离地警告）")
+                if (cv.options.friction_check and not ld.get("off_ground")
+                        and ld.get("friction_util", 0.0) > 1.0):
+                    warnings.append(f"{name}: 摩擦圆利用率 "
+                                    f"{ld['friction_util']:.2f} > 1.0，轮胎饱和")
 
     result = VehicleResult(
         design_id=req.design_id, design_version=dv.version,

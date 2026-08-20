@@ -20,6 +20,8 @@
 - 验证：手算 benchmark（纵向转移 637.97N、摩擦圆 1.3/1.4、ARB 连杆 572N、静态 Fz 686.7）；
   全量非 e2e 334 passed / 3 xfailed（F1 既有）；ruff/mypy 干净。
   旧 test_loads.py 已按新模型重写（旧 3-link 断言废弃）。
+- 补充：离地警告（Fz≤0）与摩擦圆饱和警告（util>1，受 friction_check 门控）接入
+  v2 warnings；ay=3g 工况实测摩擦饱和 2.14>1 触发警告，内轮 Fz 154N 未离地。
 
 ## 2026-08-20 — P2-3 指标状态机契约收口
 
