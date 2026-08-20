@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V1 交互建模 · DWB-SIM 式硬点模型器</title>
+<style>
+:root{
+  --bg:#0e1013; --pnl:#15181c; --pnl2:#1a1e23; --bd:#2c323a; --tx:#c3cad2;
+  --tx2:#8b95a1; --acc:#2fa9d6; --grn:#54a06a; --amb:#d9a238; --red:#d2543f;
+}
+*{margin:0;padding:0;box-sizing:border-box;border-radius:0!important}
+html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(--tx);
+  font:11px/1.35 ui-monospace,"Cascadia Mono",Consolas,monospace;user-select:none}
+#app{display:flex;flex-direction:column;height:100%}
+#tb{display:flex;align-items:center;height:34px;background:var(--pnl2);border-bottom:1px solid var(--bd);padding:0 10px;gap:14px}
+#tb b{color:var(--acc);letter-spacing:.12em}
+#st{color:var(--tx2)}#st .g{color:var(--grn)}#st .a{color:var(--amb)}#st .r{color:var(--red)}
+#tb .sp{flex:1}
+#tb button{background:var(--bd);color:var(--tx);border:1px solid var(--bd);padding:3px 10px;cursor:pointer}
+#tb button:hover{background:#2a3038}
+#main{flex:1;display:flex;min-height:0}
+#left{width:270px;flex:0 0 270px;border-right:1px solid var(--bd);overflow:auto;background:var(--pnl)}
+#center{flex:1;display:flex;flex-direction:column;min-width:0}
+#views{flex:1;display:flex;flex-wrap:wrap;gap:4px;padding:4px;min-height:0}
+.views{flex:1 1 30%;min-width:240px;height:46%;display:flex;flex-direction:column}
+.views canvas{flex:1;width:100%;background:#0a0c0e;border:1px solid var(--bd)}
+.views .vt{font-size:9px;color:var(--tx2);padding:2px 4px;text-transform:uppercase;letter-spacing:.12em}
+#right{width:300px;flex:0 0 300px;border-left:1px solid var(--bd);overflow:auto;background:var(--pnl);padding:6px}
+.sec{margin-bottom:8px}
+.sh{font-size:9.5px;color:var(--tx2);letter-spacing:.12em;border-bottom:1px solid var(--bd);padding:2px 0;margin-bottom:4px;text-transform:uppercase}
+table{width:100%;border-collapse:collapse}
+th{font-size:9px;color:var(--tx2);text-align:right;font-weight:400;padding:1px 3px}
+td{font-size:10px;text-align:right;padding:1px 3px;border-top:1px solid #1c2126}
+.mname{color:var(--tx);text-align:left}
+.mfix{color:var(--tx3)}
+input{width:56px;background:#0a0c0e;color:var(--tx);border:1px solid #252b31;text-align:right;padding:1px 3px;font:10px monospace}
+input:focus{outline:1px solid var(--acc)}
+input.num:hover{border-color:var(--acc)}
+.ctl{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:10px;color:var(--tx2)}
+.ctl b{width:52px;color:var(--tx);font-weight:400}
+.ctl input[type=range]{flex:1}
+.ctl input[type=number]{width:52px}
+.warn{color:var(--amb);font-size:10px}
+.err{color:var(--red);font-size:10px}
+.v{font-weight:400}
+.na{color:var(--tx3)}
+.force{color:var(--amb)}
+.mr{overflow:hidden;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="tb">
+    <b>V1·MODELER</b>
+    <span id="st">— 加载中 —</span>
+    <span class="sp"></span>
+    <button id="reset" title="恢复默认硬点">重置</button>
+    <button id="mirrorX" title="把右前 ×/z 变化镜像到左前（未实现，占位）">镜像</button>
+  </div>
+  <div id="main">
+    <div id="left">
+      <div class="sec">
+        <div class="sh">工况 Case</div>
+        <div class="ctl"><b>轮跳 mm</b>
+          FL<input type="number" id="t_fl" value="0" step="1"> FR<input type="number" id="t_fr" value="0" step="1">
+        </div>
+        <div class="ctl"><b>齿条 rack</b><input type="number" id="rack" value="0" step="1"></div>
+        <div class="ctl"><b>ay g</b><input type="range" id="ay" min="-2" max="2" step="0.1" value="0"><input type="number" id="ayv" value="0" step="0.1"></div>
+        <div class="ctl"><b>ax g</b><input type="range" id="ax" min="-2" max="2" step="0.1" value="0"><input type="number" id="axv" value="0" step="0.1"></div>
+        <div class="ctl"><b>曲线</b><input type="checkbox" id="curves" checked> <span>扫掠 camber/toe</span></div>
+      </div>
+      <div class="sec">
+        <div class="sh">硬点 Hardpoints（前右 / 可拖动）</div>
+        <table id="hpTable"><thead><tr><th class="mname">点</th><th>X</th><th>Y</th><th>Z</th></tr></thead><tbody></tbody></table>
+        <div class="mr err" id="hpHint" style="margin-top:4px"></div>
+      </div>
+    </div>
+    <div id="center">
+      <div id="views">
+        <div class="views"><div class="vt">正视图 FRONT (Y-Z) · 拖动改 Y/Z</div><canvas id="vFront"></canvas></div>
+        <div class="views"><div class="vt">俯视图 TOP (X-Y) · 拖动改 X/Y</div><canvas id="vTop"></canvas></div>
+        <div class="views"><div class="vt">侧视图 SIDE (X-Z) · 拖动改 X/Z</div><canvas id="vSide"></canvas></div>
+      </div>
+      <div id="bottom"></div>
+    </div>
+    <div id="right">
+      <div class="sec"><div class="sh">定位角 Alignment（右前 · 求解）</div>
+        <table id="angleTable"></table>
+      </div>
+      <div class="sec"><div class="sh">状态 / 残差 Status</div>
+        <div id="statusBox" class="ctl"></div>
+      </div>
+      <div class="sec"><div class="sh">轮边受力 Wheel Forces（右前 · 1.2g 制动静载基准）</div>
+        <div id="forceBox" class="ctl"></div>
+      </div>
+      <div class="sec"><div class="sh">曲线 Curves（travel）</div>
+        <canvas id="chart" style="width:100%;height:150px;background:#0a0c0e;border:1px solid var(--bd)"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============ 种子数据：legacy-import / front_right ============ */
+const POINT_NAMES = {
+  "CH1":"上臂前支","CH2":"上臂后支","CH3":"下臂前支","CH4":"下臂后支","CH5":"推杆车架",
+  "UP1":"上球头UBJ","UP2":"下球头LBJ","UP3":"横拉杆外点","UP4":"推杆下点","UP5":"轮心WC","FL1":"横拉杆内点"
+};
+const FIXED = new Set(["CH1","CH2","CH3","CH4","CH5","FL1"]);
+const LINKS = [["CH1","UP1"],["CH2","UP1"],["CH3","UP2"],["CH4","UP2"],
+  ["CH1","CH2"],["CH3","CH4"],["UP1","UP2"],["CH5","UP4"],["FL1","UP3"]];
+const TIRE = {tire_radius:260.0, tire_width:180.0, tire_spring_rate:150.0, corner_weight_n:700.0};
+
+let hp = null;          // front_right points {UP1:[x,y,z],...}
+let busy = false, pending = false;
+let dragging = false, sweepTimer = null;
+let last = null;        // 最近求解结果
+
+/* ---------- 初始化：若后端不可达则用内置种子 ---------- */
+const SEED = {
+  CH1:[-90,160,285],CH2:[90,152,295],CH3:[-110,128,110],CH4:[110,122,115],CH5:[0,135,305],
+  UP1:[1.9609900410029117,579.0185708764398,277.692885364207],
+  UP2:[-11.112276899016498,585.5614317001745,128.40698293616043],
+  UP3:[-91.06667606419882,550.3704101690648,209.2251650348173],
+  UP4:[0.1613758541883783,576.3779975879934,179.76836718062356],
+  UP5:[0,610,255.3],FL1:[-100,115,200]
+};
+
+async function init(){
+  try{
+    const r = await fetch("/api/v2/designs/legacy-import");
+    if(r.ok){const d = await r.json(); hp = deep(d.front_right.points);}
+  }catch(e){}
+  if(!hp || !hp.UP1){ hp = deep(SEED); setStatus("离线种子模式", "a"); }
+  buildTable(); buildTableState(); drawAll();
+  requestSolve(true, true);
+}
+function deep(o){return JSON.parse(JSON.stringify(o));}
+
+/* ---------- 硬点表 ---------- */
+function buildTable(){
+  const tb = document.querySelector("#hpTable tbody");
+  tb.innerHTML = "";
+  for(const k of Object.keys(hp)){
+    const tr = document.createElement("tr");
+    tr.innerHTML = '<td class="mname '+(FIXED.has(k)?'mfix':'')+'">'+k+'<span style="color:#616b77"> '+ (POINT_NAMES[k]||"") +'</span></td>'+
+      '<td><input data-k="'+k+'" data-a="0" class="num" type="number" step="1"></td>'+
+      '<td><input data-k="'+k+'" data-a="1" class="num" type="number" step="1"></td>'+
+      '<td><input data-k="'+k+'" data-a="2" class="num" type="number" step="1"></td>';
+    tb.appendChild(tr);
+  }
+  tb.querySelectorAll("input").forEach(inp=>{
+    inp.addEventListener("change", ()=>{
+      const k=inp.dataset.k, a=+inp.dataset.a, v=parseFloat(inp.value);
+      if(isFinite(v)){hp[k][a]=v; drawAll(); requestSolve();}
+    });
+    // input 高频事件：延迟合批（去抖）
+    inp.addEventListener("input", ()=>{
+      const k=inp.dataset.k, a=+inp.dataset.a, v=parseFloat(inp.value);
+      if(isFinite(v)){hp[k][a]=v; drawAll(); requestSolve();}
+    });
+  });
+}
+function buildTableState(){
+  const tb = document.querySelector("#hpTable");
+  tb.querySelectorAll("input.num").forEach(inp=>{
+    const k=inp.dataset.k, a=+inp.dataset.a, v=hp[k][a];
+    if(document.activeElement!==inp) inp.value = (+v.toFixed(3));
+  });
+}
+
+/* ---------- 三视图 ---------- */
+const VIEWS = {
+  front:{canvas:"vFront", a:1, b:2, ar:1},   // Y(右)->屏x, Z(上)->屏y
+  top:  {canvas:"vTop",  a:1, b:0, ar:-1},   // Y(右)->屏x, X(前)->屏y
+  side: {canvas:"vSide", a:0, b:2, ar:1},    // X(前)->屏x, Z(上)->屏y
+};
+let drag = null;
+
+function viewGeom(view){
+  const pts = Object.entries(hp);
+  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+  for(const [k,p] of pts){
+    const X=p[view.a], Y=p[view.b];
+    x0=Math.min(x0,X); x1=Math.max(x1,X); y0=Math.min(y0,Y); y1=Math.max(y1,Y);
+  }
+  const pad=40,cv=document.getElementById(view.canvas);
+  const W=cv.clientWidth, H=cv.clientHeight;
+  const s=Math.min((W-pad*2)/Math.max(1,x1-x0),(H-pad*2)/Math.max(1,y1-y0));
+  const cx=(x0+x1)/2, cy=(y0+y1)/2;
+  return {s,cxv:cx,cyv:cy,W,H};
+}
+function toScreen(view,g,p){
+  return [g.W/2 + (p[view.a]-g.cxv)*g.s, g.H/2 - view.ar*(p[view.b]-g.cyv)*g.s];
+}
+function drawView(id){
+  const view=VIEWS[id], cv=document.getElementById(view.canvas);
+  if(cv.width!==cv.clientWidth||cv.height!==cv.clientHeight){cv.width=cv.clientWidth;cv.height=cv.clientHeight;}
+  const ctx=cv.getContext("2d"); ctx.clearRect(0,0,cv.width,cv.height);
+  const g=viewGeom(view);
+  // 地面线
+  ctx.strokeStyle="#1c2126"; ctx.beginPath();
+  const gy=toScreen(view,g,{0:0,1:0,2:0});
+  ctx.moveTo(0,gy[1]); ctx.lineTo(cv.width,gy[1]); ctx.stroke();
+  ctx.fillStyle="#616b77"; ctx.font="9px monospace"; ctx.fillText("0",4,gy[1]+10);
+  // 轮心投影（圆）
+  const wcs=toScreen(view,g,hp.UP5);
+  ctx.strokeStyle="#39414b"; ctx.beginPath(); ctx.arc(wcs[0],wcs[1],10,0,6.283); ctx.stroke();
+  // 杆件
+  ctx.lineWidth=1.3; ctx.strokeStyle="#4a545f";
+  for(const [a,b] of LINKS){
+    const A=toScreen(view,g,hp[a]),B=toScreen(view,g,hp[b]);
+    ctx.beginPath(); ctx.moveTo(A[0],A[1]); ctx.lineTo(B[0],B[1]); ctx.stroke();
+  }
+  // 主销高亮
+  const u1=toScreen(view,g,hp.UP1),u2=toScreen(view,g,hp.UP2);
+  ctx.lineWidth=2; ctx.strokeStyle="#2fa9d6"; ctx.beginPath(); ctx.moveTo(u1[0],u1[1]); ctx.lineTo(u2[0],u2[1]); ctx.stroke();
+  // 硬点
+  const isDown = drag && drag.view===id;
+  for(const k of Object.keys(hp)){
+    const s=toScreen(view,g,hp[k]);
+    const sel = isDown && drag.k===k;
+    ctx.fillStyle="#0a0c0e";
+    ctx.strokeStyle = sel?"#d9a238":(FIXED.has(k)?"#8b95a1":"#c3cad2");
+    ctx.lineWidth=1.2;
+    if(FIXED.has(k)){ctx.fillRect(s[0]-3.4,s[1]-3.4,6.8,6.8);ctx.strokeRect(s[0]-3.4,s[1]-3.4,6.8,6.8);}
+    else{ctx.beginPath();ctx.arc(s[0],s[1],3.4,0,6.283);ctx.fill();ctx.stroke();}
+    ctx.fillStyle="#616b77";ctx.font="8.5px monospace";
+    ctx.fillText(((sel&&drag)?k:k), s[0]+5, s[1]-5);
+  }
+  // 刚体：转向节三角 UP1-UP2-UP3
+  ctx.strokeStyle="#54a06a";ctx.setLineDash([3,3]);ctx.lineWidth=1;
+  ctx.beginPath();
+  const pu1=toScreen(view,g,hp.UP1),pu2=toScreen(view,g,hp.UP2),pu3=toScreen(view,g,hp.UP3);
+  ctx.moveTo(pu1[0],pu1[1]);ctx.lineTo(pu3[0],pu3[1]);ctx.lineTo(pu2[0],pu2[1]);ctx.stroke();
+  ctx.setLineDash([]);
+}
+function drawAll(){ for(const id in VIEWS) drawView(id); }
+
+/* ---------- 拖拽交互 ---------- */
+function hitTest(view, mx, my){
+  const g=(()=>{const cv=document.getElementById(view.canvas),V=VIEWS[view];
+    const pts=Object.entries(hp);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+    for(const [k,p] of pts){const X=p[V.a],Y=p[V.b];x0=Math.min(x0,X);x1=Math.max(x1,X);y0=Math.min(y0,Y);y1=Math.max(y1,Y);}
+    const pad=40,W=cv.clientWidth,H=cv.clientHeight;
+    const s=Math.min((W-pad*2)/Math.max(1,x1-x0),(H-pad*2)/Math.max(1,y1-y0));
+    return {s,cxv:(x0+x1)/2,cyv:(y0+y1)/2,W,H};
+  })();
+  let best=null,bd=1e9;
+  for(const k of Object.keys(hp)){
+    const s=toScreen({a:VIEWS[view].a,b:VIEWS[view].b,ar:VIEWS[view].ar},g,hp[k]);
+    if(!s) continue;
+    const d=Math.hypot(s[0]-mx,s[1]-my);
+    if(d<bd&&d<16){bd=d;best=k;}
+  }
+  return best;
+}
+function bindCanvas(){
+  for(const id in VIEWS){
+    const cv=document.getElementById(VIEWS[id].canvas);
+    cv.addEventListener("mousedown",e=>{
+      const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+      const k=hitTest(id,mx,my);
+      if(!k)return;
+      drag={view:id,k};
+      const g=viewGeom(VIEWS[id]);
+      const s=toScreen(VIEWS[id],g,hp[k]);
+      drag.off=[mx-s[0],my-s[1]];
+      drawAll();
+      e.preventDefault();
+    });
+  }
+  window.addEventListener("mousemove",e=>{
+    if(!drag)return;
+    const V=VIEWS[drag.view],cv=document.getElementById(V.canvas);
+    const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+    const g=viewGeom(V);
+    const X=(mx-drag.off[0]-g.W/2)/g.s+g.cxv;
+    const Y=(my-drag.off[1]-g.H/2)/g.s/g.ar+g.cyv;
+    hp[drag.k][V.a]=X;
+    hp[drag.k][V.b]=Y;
+    buildTableState(); drawAll();
+    requestSolve();
+  });
+  window.addEventListener("mouseup",()=>{
+    if(drag){dragging=true; drag=null; drawAll();
+      setTimeout(()=>{dragging=false; requestSolve();}, 50);}
+  });
+}
+"".length; /* noscript guard */
+bindCanvas();
+
+/* ---------- 求解请求（节流） ---------- */
+// 交互原则：拖动/输入过程中请求「快速解」（无 sweep，~几十 ms）；
+// 停止拖动 400ms 后再补一次带 sweep 的全量请求，保证曲线最终新鲜。
+function requestSolve(){
+  if(busy){pending=true;return;}
+  busy=true;
+  const wantSweep = document.getElementById("curves").checked && !dragging;
+  clearTimeout(sweepTimer);
+  if(document.getElementById("curves").checked && dragging){
+    sweepTimer = setTimeout(()=>{ if(!dragging) requestSolve(); }, 400);
+  }
+  const tl=parseFloat(document.getElementById("t_fl").value)||0;
+  const tr=parseFloat(document.getElementById("t_fr").value)||0;
+  const rack=parseFloat(document.getElementById("rack").value)||0;
+  const ay=parseFloat(document.getElementById("ayv").value)||0;
+  const ax=parseFloat(document.getElementById("axv").value)||0;
+  const payload={
+    case_id:"static",
+    travel:{fl:tl,fr:tr,rl:tl,rr:tr},
+    rack_displacement:rack,
+    loads:{ay_g:ay,ax_g:ax},
+    arb_enabled:true,
+    label:"modeler",
+    front_right:{points:deep(hp),tire:deep(TIRE)},
+  };
+  if(wantSweep){
+    payload.sweep={axis:"travel",axle:"front",min:-25,max:25,points:21};
+  }
+  fetch("/api/v2/solve/hardpoints",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(payload)})
+    .then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+    .then(d=>{ last=d; renderAll(d); })
+    .catch(e=>{ setStatus("求解失败: "+e.message,"r"); })
+    .finally(()=>{ busy=false; if(pending){pending=false; requestSolve();} });
+}
+
+/* ---------- 渲染 ---------- */
+const ANGLE_KEYS=["camber_deg","toe_deg","caster_deg","kpi_deg","scrub_radius_mm","caster_trail_mm"];
+const ANGLE_ZH={"camber_deg":"外倾°","toe_deg":"前束°(正=内)","caster_deg":"后倾°","kpi_deg":"主销内倾°","scrub_radius_mm":"Scrub mm","caster_trail_mm":"拖距 mm"};
+function setStatus(tone){ document.getElementById("st").innerHTML="<span class='"+tone+"'>"+escapeHtml(t)+"</span>"; }
+function escapeHtml(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function renderAll(d){
+  const fr=d.front.right;
+  setStatus((fr.status||"")+" · 残差 "+(d.residuals.front_right!=null?d.residuals.front_right.toFixed(4):"—")+" · "+d.solver+" · "+d.label,"g");
+  const tb=document.querySelector("#angleTable");
+  tb.innerHTML="<tr><th></th><th>右前</th><th>左前</th></tr>";
+  for(const k of ANGLE_KEYS){
+    const a=fr.angles?.[k], l=d.front.left.angles?.[k];
+    tr(k, a, l, ANGLE_ZH[k]);
+  }
+  function tr(k,a,l,zh){
+    tb.innerHTML+="<tr><td class='mname'>"+zh+"</td><td>"+fmt(a)+"</td><td>"+fmt(l)+"</td></tr>";
+  }
+  function fmt(v){ return v==null?"<span class='na'>—</span>":"<span class='v'>"+v+"</span>"; }
+  // 状态
+  const sb=document.getElementById("statusBox");
+  sb.innerHTML="整车状态: <b class='"+(d.status==="VALID"?"g":d.status==="SOLVER_FAILED"?"r":"a")+"'>"+d.status+"</b>";
+  d.warnings.slice(0,4).forEach(w=>{sb.innerHTML+="<div class='warn'>"+escapeHtml(w)+"</div>";});
+  // 载荷
+  const fb=document.getElementById("forceBox");
+  const ld=d.loads&&d.loads.front_right;
+  if(ld){
+    const we=ld.wheel_end||{};
+    fb.innerHTML=
+      "Fz <b>"+ld.fz_n.toFixed(0)+"N</b> Fx <b>"+ld.fx_n.toFixed(0)+"N</b> Fy <b>"+ld.fy_n.toFixed(0)+"N</b>"+
+      "<div>摩擦圆 <b class='"+(ld.friction_util>1?"r":"g")+"'>"+ld.friction_util.toFixed(2)+"</b>"+
+      " 离地 <b>"+(ld.off_ground?"是":"否")+"</b></div>"+
+      "<div class='force'>推杆 <b>"+(we.member_forces?we.member_forces.pushrod_n:"—")+"N</b>"+
+      " 横拉杆 <b>"+(we.member_forces?we.member_forces.tie_rod_n:"—")+"N</b></div>"+
+      "<div class='warn'>残差 "+(we.force_residual_n!=null?we.force_residual_n.toFixed(4):"—")+"N</div>";
+  }else{
+    fb.innerHTML="<span class='na'>载荷不可用</span>";
+  }
+  // 曲线
+  drawChart(d.sweep);
+}
+/* 曲线画布 */
+function drawChart(sw){
+  const cv=document.getElementById("chart");
+  if(!sw||!sw.curves) return;
+  if(cv.width!==cv.clientWidth||cv.height!==cv.clientHeight){cv.width=cv.clientWidth;cv.height=cv.clientHeight;}
+  const ctx=cv.getContext("2d"); ctx.clearRect(0,0,cv.width,cv.height);
+  const X=sw.values||[], cam=sw.curves.right_camber_deg||[], toe=sw.curves.right_toe_deg||[];
+  const series=[["#54a06a","camber",cam],["#2fa9d6","toe",toe]];
+  let y0=0,y1=0;
+  for(const [_,__,arr] of series)for(const v of arr){if(v==null)continue;y0=Math.min(y0,v);y1=Math.max(y1,v);}
+  if(y1===y0)y1=y0+1;
+  const pad=26,W=cv.width,H=cv.height;
+  const sx=v=>pad+(v-X[0])/((X[X.length-1]-X[0])||1)*(W-pad*2);
+  const sy=v=>H-pad-(v-y0)/(y1-y0)*(H-pad*2);
+  ctx.font="9px monospace";ctx.fillStyle="#616b77";
+  ctx.fillText("travel mm",W-58,H-8);ctx.fillText("0",6,sy(0));
+  for(const [col,name,arr] of series){
+    ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.beginPath();let started=false;
+    for(let i=0;i<arr.length;i++){
+      if(arr[i]==null){started=false;continue;}
+      const x=sx(X[i]),y=sy(arr[i]);
+      if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    ctx.fillStyle=col;ctx.fillText(name,name==="camber"?10:40,10);
+  }
+  // 0 线
+  ctx.strokeStyle="#1c2126";ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(pad,sy(0));ctx.lineTo(W-pad,sy(0));ctx.stroke();ctx.setLineDash([]);
+}
+
+/* ---------- 控件绑定 ---------- */
+["t_fl","t_fr","rack","ay","ax"].forEach(id=>{
+  const el=document.getElementById(id);
+  el.addEventListener("input",()=>{
+    if(id==="ay")document.getElementById("ayv").value=el.value;
+    if(id==="ax")document.getElementById("axv").value=el.value;
+    drawAll(); requestSolve();
+  });
+});
+document.getElementById("ay").addEventListener("change",()=>document.getElementById("ayv").value=document.getElementById("ay").value);
+document.getElementById("ax").addEventListener("change",()=>document.getElementById("axv").value=document.getElementById("ax").value);
+["ayv","axv"].forEach(id=>{
+  document.getElementById(id).addEventListener("input",()=>{drawAll();requestSolve();});
+});
+document.getElementById("curves").addEventListener("change",()=>requestSolve());
+document.getElementById("reset").addEventListener("click",()=>{hp=deep(SEED);buildTableState();drawAll();requestSolve();});
+document.getElementById("mirrorX").addEventListener("click",()=>{ alert("左右独立编辑将在后续版本提供；当前由后端按模板镜像。"); });
+
+window.addEventListener("resize",()=>{ drawAll(); if(last&&last.sweep) drawChart(last.sweep); });
+init();
+</script>
+</body>
+</html>

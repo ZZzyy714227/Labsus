@@ -250,6 +250,65 @@ class TestP23StateMachineContract:
                 assert m["value"] is not None, f"{key}: value-state without value"
 
 
+class TestInlineSolve:
+    """交互建模内联求解：硬点内联（不落库）+ 实时指标 + sweep。"""
+
+    def _base_payload(self, client):
+        d = client.get("/api/v2/designs/legacy-import").json()
+        return {
+            "case_id": "static",
+            "travel": {"fl": 0.0, "fr": 0.0, "rl": 0.0, "rr": 0.0},
+            "rack_displacement": 0.0,
+            "loads": {"ay_g": 0.0, "ax_g": 0.0},
+            "arb_enabled": True,
+            "label": "modeler",
+            "front_right": {"points": d["front_right"]["points"],
+                            "tire": d["front_right"]["tire"]},
+        }
+
+    def _post(self, client, payload):
+        r = client.post("/api/v2/solve/hardpoints", json=payload)
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    def test_baseline_matches_golden(self, client):
+        body = self._post(client, self._base_payload(client))
+        assert body["status"] == "VALID"
+        assert body["front"]["right"]["angles"]["camber_deg"] == pytest.approx(-2.49, abs=0.01)
+        # 载荷层可用且 util 有限（无 inf）
+        ld = body["loads"]["front_right"]
+        assert ld["fz_n"] == pytest.approx(280.0 * 9.81 / 4.0, abs=0.01)
+        assert ld["friction_util"] == 0.0
+
+    def test_drag_hardpoint_changes_metrics(self, client):
+        """拖拽模拟：下球头 UP2 内移 20mm → KPI 显著改变（建模闭环）。"""
+        p = self._base_payload(client)
+        p["front_right"]["points"]["UP2"][1] -= 20.0
+        body = self._post(client, p)
+        kpi = body["front"]["right"]["angles"]["kpi_deg"]
+        assert abs(kpi - 2.51) > 3.0   # 从 ~2.51 显著变负
+
+    def test_sweep_returns_curves(self, client):
+        p = self._base_payload(client)
+        p["sweep"] = {"axis": "travel", "axle": "front", "min": -25, "max": 25, "points": 21}
+        body = self._post(client, p)
+        assert "right_camber_deg" in body["sweep"]["curves"]
+        assert len(body["sweep"]["values"]) == 21
+
+    def test_lateral_load_asymmetric(self, client):
+        p = self._base_payload(client)
+        p["loads"]["ay_g"] = 1.3
+        body = self._post(client, p)
+        fr = body["loads"]["front_right"]["fz_n"]
+        fl = body["loads"]["front_left"]["fz_n"]
+        assert abs(fr - fl) > 100.0
+
+    def test_missing_front_right_422(self, client):
+        r = client.post("/api/v2/solve/hardpoints", json={
+            "front_left": {"points": {"UP1": [0, 0, 0]}}})
+        assert r.status_code == 422
+
+
 class TestP4:
     """P4 工程迭代工作流：A/B 对比 / 敏感性 / 导出 / 版本回退。"""
 

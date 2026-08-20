@@ -56,8 +56,8 @@ def distribute_vehicle_loads(vehicle: dict, loads,
     drive_split = float(loads.drive_split_rear)
 
     W = m_total * G
-    if wb <= 0 or tr_f <= 0 or tr_r <= 0:
-        raise ValueError("wheelbase/track 必须为正")
+    if m_total <= 0 or wb <= 0 or tr_f <= 0 or tr_r <= 0:
+        raise ValueError("mass/wheelbase/track 必须为正")
 
     # 纵向转移（ax>0 制动：前轴增载；ax<0 加速：后轴增载）
     dFz_long = ax * W * h_cg / wb
@@ -130,11 +130,12 @@ def distribute_vehicle_loads(vehicle: dict, loads,
     ]
     for name, corner, wheel, sign in mapping:
         fx, fy, fz = wheel["fx"], wheel["fy"], wheel["fz"]
-        util = (math.hypot(fx, fy) / (mu * fz)) if fz > 1e-9 else float("inf")
+        # 离地轮摩擦圆无意义 → None（不产 inf，JSON 兼容）
+        util = (math.hypot(fx, fy) / (mu * fz)) if fz > 1e-9 else None
         out[name] = {
             "fx_n": round(fx, 3), "fy_n": round(fy, 3), "fz_n": round(fz, 3),
             "static_fz_n": round(corner["static_fz"], 3),
-            "friction_util": round(util, 4),
+            "friction_util": (round(util, 4) if util is not None else None),
             "off_ground": bool(fz <= 1e-9),
             "transfers": {k: round(v, 3) for k, v in corner["transfers"].items()},
             "lateral_sign": sign,

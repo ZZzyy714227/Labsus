@@ -643,6 +643,102 @@ def sweep_v2(req: SweepV2Request):
     }
 
 
+# ---------- 交互建模：内联求解（不落库 / 不计版本） ----------
+
+class CornerHardpointsIn(BaseModel):
+    points: dict[str, list[float]]
+    tire: dict[str, float] = {}
+
+
+class SweepInline(BaseModel):
+    axis: str = "travel"        # travel | rack
+    axle: str = "front"         # front | rear
+    min: float = -25.0
+    max: float = 25.0
+    points: int = 21
+
+
+class SolveInlineRequest(BaseModel):
+    case_id: str = "static"
+    travel: dict[str, float] = {"fl": 0.0, "fr": 0.0, "rl": 0.0, "rr": 0.0}
+    rack_displacement: float = 0.0
+    loads: dict[str, float] = {"ax_g": 0.0, "ay_g": 0.0, "az_g": 0.0,
+                               "brake_split_front": 0.5, "drive_split_rear": 1.0}
+    arb_enabled: bool = True
+    label: str = "modeler"
+    sweep: SweepInline | None = None
+    front_right: CornerHardpointsIn
+    front_left: CornerHardpointsIn | None = None
+    rear_right: CornerHardpointsIn | None = None
+    rear_left: CornerHardpointsIn | None = None
+
+
+@router.post("/solve/hardpoints")
+def solve_hardpoints_v2(req: SolveInlineRequest):
+    """交互建模专用：用请求内硬点直接求解四轮（P4 建模前端 / modeler.html）。
+
+    与版本化 solve 不同：此端点不写 store、不计版本，仅用于交互式
+    「拖拽/编辑硬点 → 实时结果」循环。左右/后轴缺省时由右前镜像生成
+    （模板初始化语义 §5.1），但求解时按角独立计算。
+    """
+    from core.models import AxleHardpoints, CaseVersion, DesignVersion, WheelTravel
+
+    tracks = {
+        "front": float(req.front_right.tire.get("track_width", 1220.0)),
+        "rear": float((req.rear_right or req.front_right).tire.get("track_width", 1180.0)),
+    }
+    # 完整整车参数：config.VEHICLE_PARAMS 为基底，再按当前轮距/轴距覆盖
+    from config import VEHICLE_PARAMS as _VP
+    veh = dict(_VP)
+    veh["front_track_mm"] = tracks["front"]
+    veh["rear_track_mm"] = tracks["rear"]
+
+    def mk(points, tire):
+        hp = AxleHardpoints(points=points, tire=tire)
+        return hp
+
+    fr = mk(req.front_right.points, req.front_right.tire)
+    fl = mk(req.front_left.points, req.front_left.tire) if req.front_left else fr.mirrored()
+    rr = mk(req.rear_right.points, req.rear_right.tire) if req.rear_right else fr.mirrored()
+    rl = mk(req.rear_left.points, req.rear_left.tire) if req.rear_left else rr.mirrored()
+    dv = DesignVersion(version=1, front_right=fr, front_left=fl,
+                       rear_right=rr, rear_left=rl, vehicle=veh)
+    cv = CaseVersion(
+        version=1,
+        travel=WheelTravel(**{k: float(req.travel.get(k, 0.0))
+                              for k in ("fl", "fr", "rl", "rr")}),
+        rack_displacement=float(req.rack_displacement),
+        loads=_as_loads(req.loads),
+        options=_as_options(req),
+    )
+    body = _solve_vehicle(dv, cv, design_id="inline", case_id=req.case_id)
+    body["label"] = req.label
+    if req.sweep is not None:
+        if req.sweep.axle not in ("front", "rear") or \
+           req.sweep.axis not in ("travel", "rack"):
+            raise HTTPException(status_code=422, detail="sweep axle|axis bad")
+        sw = _sweep_curves(dv, cv, req.sweep.axle, req.sweep.axis,
+                           req.sweep.min, req.sweep.max, req.sweep.points)
+        body["sweep"] = sw
+    return body
+
+
+def _as_loads(loads: dict):
+    from core.models import LoadsInput
+    return LoadsInput(
+        ax_g=float(loads.get("ax_g", 0.0)),
+        ay_g=float(loads.get("ay_g", 0.0)),
+        az_g=float(loads.get("az_g", 0.0)),
+        brake_split_front=float(loads.get("brake_split_front", 0.5)),
+        drive_split_rear=float(loads.get("drive_split_rear", 1.0)),
+    )
+
+
+def _as_options(req: SolveInlineRequest):
+    from core.models import CaseOptions
+    return CaseOptions(arb_enabled=bool(req.arb_enabled))
+
+
 # ---------- P4：A/B 对比 / 敏感性 / 导出 ----------
 
 class CompareRequest(BaseModel):
@@ -969,7 +1065,7 @@ def export_v2(req: ExportRequest):
 
 @router.post("/solve")
 def solve_v2(req: SolveV2Request):
-    """四轮统一 VehicleResult（P2-1）。
+    """四轮统一 VehicleResult（P2-1）：从 store 取方案+工况求解。
 
     每轮独立求解（方案中独立存储的左右硬点），逐轮输出：
     定位角、残差、状态、姿态/接地点/主销轴/球头几何。
@@ -982,7 +1078,14 @@ def solve_v2(req: SolveV2Request):
         cv = store.get_case(req.case_id, req.case_version)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+    return _solve_vehicle(dv, cv, req.design_id, req.case_id)
 
+
+def _solve_vehicle(dv, cv, design_id: str = "", case_id: str = ""):
+    """用给定的 DesignVersion + CaseVersion 求解四轮 VehicleResult。
+
+    design_id/case_id 仅用于返回的响应标识（内联求解可传入空或自定义标签）。
+    """
     veh = dv.vehicle
     t = cv.travel
     warnings: list[str] = []
@@ -1049,8 +1152,8 @@ def solve_v2(req: SolveV2Request):
                                     f"{ld['friction_util']:.2f} > 1.0，轮胎饱和")
 
     result = VehicleResult(
-        design_id=req.design_id, design_version=dv.version,
-        case_id=req.case_id, case_version=cv.version,
+        design_id=design_id or "", design_version=dv.version,
+        case_id=case_id or "", case_version=cv.version,
         solver=SOLVER_NAME,
         status=_worst_status(r.status for r in reports.values()),
         front=AxleResults(left=reports["front_left"], right=reports["front_right"]),

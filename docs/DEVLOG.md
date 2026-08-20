@@ -1,5 +1,30 @@
 # 开发日志
 
+## 2026-08-20 — 交互建模原型（DWB-SIM 式拖拽模型器 / modeler.html + 内联求解端点）
+
+- **新增 /api/v2/solve/hardpoints**：交互建模专用内联求解端点——请求内直接携带四角硬点 + 工况，
+  求解后返回 VehicleResult（定位角/残差/状态/载荷），可选附带 travel/rack 扫掠曲线（sweep 子对象，
+  复用 _sweep_curves）。不写 store、不计版本（与版本化 solve 语义区分，解决 P2-1「v2 只接受
+  design_id」与交互建模的矛盾）。左右/后轴缺省时由右前镜像生成（模板初始化语义）。
+- 重构：solve_v2 主体抽为 _solve_vehicle(dv, cv)，solve（从 store）与内联端点共用。
+- **新增 web/modeler.html**：自包含单页交互建模器——
+  - 三视图（正/俯/侧）Canvas 绘制底盘/UCA/LCA/主销/推杆/横拉杆/转向节，硬点可**鼠标拖拽**实时移动；
+  - 左侧硬点坐标表（x/y/z 可编辑 + 中文名标注，车架点方形标记）；
+  - 右侧实时显示：右前/左前六项定位角、整车状态/残差、轮边受力（Fz/Fx/Fy/摩擦圆/离地/推杆·横拉杆力）、
+    camber/toe 随 travel 扫掠曲线；
+  - 工况控件：四轮轮跳/齿条/ay/ax 滑块，曲线开关；
+  - 交互策略：拖拽/输入中请求快速解（无 sweep、~几十 ms），停止 400ms 后补带 sweep 的全量请求（曲线最终新鲜）。
+- 修复两个后端 bug：
+  1) 内联端点 veh 曾只含 track/wheelbase → mass=0 → 载荷 Fz=0 → friction_util=inf 导致 JSON 500；
+     改为以 config.VEHICLE_PARAMS 为基底并覆盖轮距。
+  2) wheel_loads 离地轮摩擦圆置 None（不再产 inf），并防御 mass<=0。
+- 端到端验证（uvicorn 起服 + urllib 模拟前端 fetch 序列）：基线 camber -2.49 / Fz 686.7 / 状态 VALID；
+  拖 UP2 下球头内移 20mm → KPI 2.51→-5.15（建模闭环生效）；ay=1.3 → 左右载荷不对称 407N；
+  页面 /modeler.html 200 可达。完整请求（含 21 点 sweep）约 534ms。
+- 验证：新增 5 项内联求解测试（基线=黄金值、拖拽改指标、sweep 曲线、侧向不对称、缺 front_right 422）；
+  全量非 e2e 349 passed / 3 xfailed（F1 既有）；ruff/mypy 干净。
+  启动：python run.py（或 uvicorn）后浏览器打开 http://127.0.0.1:8000/modeler.html。
+
 ## 2026-08-20 — P4 工程迭代工作流（A/B 对比 / 敏感性 / 导出 / 版本回退）
 
 - **/api/v2/compare**：方案 A/B 对比（跨方案或同方案版本回退）。输出硬点差异（逐轮逐点 3D delta）、
