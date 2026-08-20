@@ -129,6 +129,7 @@ canvas.plot.ks{height:66px}
     <div class="brand"><b>FSAE·MODELER</b></div>
     <div class="tt"><span>整车双叉臂底盘 · 硬点建模 / 运动学分析</span><span>whole-chassis hardpoint modeler</span></div>
     <div class="sp"></div>
+    <div class="cell"><i>mode 工况</i><b class="c" id="tbCase">静态</b></div>
     <div class="cell"><i>solver</i><b id="tbSolver">—</b></div>
     <div class="cell"><i>state 状态</i><b class="g" id="tbState">加载中</b></div>
     <div class="cell"><i>pose 姿态</i><b id="tbPose">—</b></div>
@@ -148,6 +149,7 @@ canvas.plot.ks{height:66px}
           <div class="ctl"><b>齿条 rack</b><input type="number" id="rack" value="0" step="1"></div>
           <div class="ctl"><b>ay g</b><input type="range" id="ay" min="-2" max="2" step="0.1" value="0"><input type="number" id="ayv" value="0" step="0.1"></div>
           <div class="ctl"><b>ax g</b><input type="range" id="ax" min="-2" max="2" step="0.1" value="0"><input type="number" id="axv" value="0" step="0.1"></div>
+          <div class="ctl"><b>外倾°</b><input type="number" id="gamma" value="0" step="1"></div>
           <div class="ctl"><b>曲线轴</b>
             <button id="cvFront" class="on">前轴</button><button id="cvRear">后轴</button>
           </div>
@@ -228,6 +230,7 @@ canvas.plot.ks{height:66px}
 </div>
 <script>
 "use strict";
+window.__diag={errs:[],evts:[]};
 /* ============================================================================
    FSAE 整车双叉臂底盘硬点模型器（DWB-SIM 渲染/交互架构移植）
    ----------------------------------------------------------------------------
@@ -408,6 +411,7 @@ const CC={
   node:"#c3cad2",nodeFix:"#d2543f",nodeSel:"#f0e6c8",txt2:"#8b95a1",txt3:"#616b77",
   axis:"#125a75",grid:"#1c2126",grid2:"#262d34",gnd:"#2f6f5e",bg:"#0a0c0e",frc:"#e8b84b",pathC:"#43c9c0"
 };
+let SCENE=[];
 function circPts(c,ax,r,n,e1,e2){
   const u=e1||perpOf(ax),v=e2||cross(nrm(ax),u),o=[];
   for(let k=0;k<=n;k++){const a=2*PI*k/n;o.push(add(c,add(mul(u,r*cos(a)),mul(v,r*sin(a)))));}
@@ -534,7 +538,7 @@ function buildScene(sk){
     L3(sc,P1,P2,CC.kp,2.3,undefined,al);
     L3(sc,FL,P3,CC.tie,1.5,undefined,al);
     L3(sc,H("CH5"),P4,CC.ela,1.7,[5,4],al);
-    PL(sc,[P1,P3,P2,P5],CC.knu,1.1,null,CC.knuF);
+    PL(sc,[P1,P3,P2,P5],CC.knu,1.1,CC.knuF);
     L3(sc,P2,P5,CC.knu,1,undefined,al);
     L3(sc,P1,P5,CC.knu,1,undefined,al);
     /* 车轮 3D 圆盘 */
@@ -550,13 +554,13 @@ function buildScene(sk){
         const o=add(mul(u,R*cos(an)),mul(v,R*sin(an)));
         L3(sc,add(ci,o),add(co,o),CC.tread,0.9,undefined,al);}
       const ri=add(P5,mul(w,-W/2+18)),ro=add(P5,mul(w,W/2-18));
-      PL(sc,circPts(ri,w,168,32,u,v),CC.rim,1.1,undefined,al);
-      PL(sc,circPts(ro,w,168,32,u,v),CC.rim,1.1,undefined,al);
-      PL(sc,circPts(ro,w,150,32,u,v),CC.rim,0.9,undefined,al);
+      PL(sc,circPts(ri,w,168,32,u,v),CC.rim,1.1,undefined,undefined,al);
+      PL(sc,circPts(ro,w,168,32,u,v),CC.rim,1.1,undefined,undefined,al);
+      PL(sc,circPts(ro,w,150,32,u,v),CC.rim,0.9,undefined,undefined,al);
       for(let k2=0;k2<5;k2++){const an=2*PI*k2/5+0.3;
         const o=add(mul(u,150*cos(an)),mul(v,150*sin(an)));
         L3(sc,add(ro,mul(w,-4)),add(ro,o),CC.rim,1.3,undefined,al);}
-      PL(sc,circPts(ro,w,56,20,u,v),CC.rim,1,undefined,al);
+      PL(sc,circPts(ro,w,56,20,u,v),CC.rim,1,undefined,undefined,al);
       if(d.pose&&d.pose.contact_patch&&d.pose.contact_patch.center){
         const cp=d.pose.contact_patch.center;
         L3(sc,cp,[cp[0]+55,cp[1],0],CC.pathC,1.4,undefined,al);
@@ -564,9 +568,9 @@ function buildScene(sk){
     }
     /* 球头 */
     [[P1,10],[P2,12],[P3,8]].forEach(q=>{
-      PL(sc,circPts(q[0],[1,0,0],q[1],12),CC.rig,0.9,undefined,al);
-      PL(sc,circPts(q[0],[0,1,0],q[1],12),CC.rig,0.9,undefined,al);
-      PL(sc,circPts(q[0],[0,0,1],q[1],12),CC.rig,0.9,undefined,al);
+      PL(sc,circPts(q[0],[1,0,0],q[1],12),CC.rig,0.9,undefined,undefined,al);
+      PL(sc,circPts(q[0],[0,1,0],q[1],12),CC.rig,0.9,undefined,undefined,al);
+      PL(sc,circPts(q[0],[0,0,1],q[1],12),CC.rig,0.9,undefined,undefined,al);
     });
     const editable=isBaseline()&&side==="right";
     for(const k in d.pt){
@@ -832,7 +836,7 @@ function requestSolve(){
     body:JSON.stringify(casePayload(wantSweep))})
     .then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
     .then(d=>{if(seq!==solveSeq)return;S.vp=d;resp=d;renderAll(d);fetchHandling();})
-    .catch(e=>{if(seq===solveSeq)setStatus("r","求解失败: "+e.message);})
+    .catch(e=>{if(seq===solveSeq){setStatus("r","求解失败: "+e.message); if(window.__diag)window.__diag.errs.push("SOLVE:"+String((e.stack)||e));}})
     .finally(()=>{busy=false;if(pending){pending=false;requestSolve();}});
 }
 function fetchHandling(){
