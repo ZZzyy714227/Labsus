@@ -395,13 +395,13 @@ class TestMirrorSymmetry:
             assert _coord_close(r_val[2], l_val[2]), f"{key} Z 不对称"
 
     def test_left_angles_symmetric(self, defaults):
-        """左侧角度应满足对称约定（fix_left_angles 已修正符号）。"""
+        """左侧角度应满足对称约定（P2-0：两侧输出车辆全局同号）。"""
         ar = defaults["front"]["angles_right"]
         al = defaults["front"]["angles_left"]
-        # 外倾角: after fix_left_angles, left ≈ -right
-        assert _sign_symmetric(ar["camber_deg"], al["camber_deg"]), \
+        # 外倾角: P2-0 后左右同为负（内倾），数值相等
+        assert _angle_close(ar["camber_deg"], al["camber_deg"]), \
             f"外倾不对称: right={ar['camber_deg']}, left={al['camber_deg']}"
-        # KPI: after fix_left_angles, left ≈ right (sign flip converts -2.078 → +2.078)
+        # KPI: left ≈ right
         assert _angle_close(ar["kpi_deg"], al["kpi_deg"]), \
             f"KPI不对称: right={ar['kpi_deg']}, left={al['kpi_deg']}"
         # 后倾角: left ≈ right (纵向角度不受镜像影响)
@@ -416,7 +416,7 @@ class TestMirrorSymmetry:
         }).json()
         ar = r["front"]["angles_right"]
         al = r["front"]["angles_left"]
-        assert _sign_symmetric(ar["camber_deg"], al["camber_deg"])
+        assert _angle_close(ar["camber_deg"], al["camber_deg"])
         assert _angle_close(ar["kpi_deg"], al["kpi_deg"])
         assert _angle_close(ar["caster_deg"], al["caster_deg"])
 
@@ -877,8 +877,8 @@ class TestChassisAttitude:
         data = resp.json()
         ar = data["front"]["angles_right"]
         al = data["front"]["angles_left"]
-        # 垂向位移时左右外倾应对称
-        assert _sign_symmetric(ar["camber_deg"], al["camber_deg"])
+        # 垂向位移时左右外倾应同号且数值相等（P2-0）
+        assert _angle_close(ar["camber_deg"], al["camber_deg"])
 
 
 # ============================================================

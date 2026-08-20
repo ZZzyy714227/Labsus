@@ -22,7 +22,7 @@ from hardpoints import (
     mirror_left,
     strip_prefix,
 )
-from solver.angles import compute_alignment_angles, fix_left_angles
+from solver.angles import compute_alignment_angles
 from solver.bump import solve_bump
 from solver.rocker import compute_rocker_kinematics
 from solver.steering import solve_steering
@@ -126,8 +126,9 @@ def _solve_axle(hp_right, wheel_travel, rack_displacement, mirror,
         result_left = solve_steering(merged_left, rack_displacement,
                                      tie_rod_length=L_tr_design_left, theta_guess=theta_guess)
         result_left_final = _merge_chassis(result_left, hp_left)
-        angles_left_raw = compute_alignment_angles(result_left_final, hp=hp_left)
-        angles_left = fix_left_angles(angles_left_raw, angles_right)
+        # compute_alignment_angles auto-detects the left side from UP5[1]
+        # and returns vehicle-global conventions directly (P2-0: no sign flip).
+        angles_left = compute_alignment_angles(result_left_final, hp=hp_left)
         cp_left = compute_contact_patch(
             result_left_final["UP5"],
             _upright_y_axis(result_left_final),

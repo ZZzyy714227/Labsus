@@ -5,8 +5,9 @@ design_id/version + case_id，不再接受"全局当前硬点"。
 
 v2 solve 当前直通顺序 bump→steer 求解器，显式标记 APPROXIMATE；
 是否升级为统一约束解由 P1 误差基准决定（§5.2）。
-左轮用方案中独立存储的左侧硬点直接求解（§5.1：运动状态左右独立），
-报告值经 fix_left_angles 翻号对齐右轮符号（现状显示约定，K-2 待 P2 统一）。
+四轮均用方案中独立存储的硬点直接求解（§5.1：运动状态左右独立）；
+compute_alignment_angles 按轮心 Y 自动判别左右侧并输出车辆全局符号约定
+（P2-0：不再需要 fix_left_angles 翻号）。
 """
 from __future__ import annotations
 
@@ -17,7 +18,6 @@ from core.legacy_import import ensure_legacy_import, ensure_preset_cases
 from core.models import DesignVersion, ResultStatus
 from core.store import DataStore
 from routes.solve import _solve_axle
-from solver.angles import fix_left_angles
 
 router = APIRouter(prefix="/api/v2")
 
@@ -155,12 +155,6 @@ def solve_v2(req: SolveV2Request):
                             f"{RESIDUAL_WARN_TOL}mm（§13.2 警告状态）")
         metrics[name] = {k: angles.get(k) for k in _ANGLE_KEYS}
         metrics[name]["contact_patch"] = ax.get("contact_patch_right")
-
-    # 左轮报告值翻号对齐右轮符号（现状显示约定，K-2 待 P2 统一）
-    for left, right in (("front_left", "front_right"), ("rear_left", "rear_right")):
-        aligned = fix_left_angles(metrics[left], metrics[right])
-        aligned["contact_patch"] = metrics[left]["contact_patch"]
-        metrics[left] = aligned
 
     return {
         "design_id": req.design_id, "design_version": dv.version,

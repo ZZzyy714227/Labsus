@@ -27,7 +27,6 @@ from config import DEFAULT_FRAME_NODES
 from hardpoints import DEFAULT_HARDPOINTS, DEFAULT_REAR_HARDPOINTS, mirror_left, strip_prefix
 from routes.solve import _solve_axle
 from solver.angles import compute_alignment_angles
-from solver.angles import fix_left_angles as _fix_left_angles
 from solver.bump import HAS_SCIPY, solve_bump
 from solver.rocker import compute_rocker_kinematics
 from solver.steering import solve_steering
@@ -149,16 +148,22 @@ class TestSolveBumpConvergence:
 class TestSolveBumpPhysical:
     """Physical expectations: camber becomes more negative in bump, etc."""
 
-    def test_camber_more_negative_in_bump(self, hp):
-        """In bump (positive dz), camber should become more negative."""
+    def test_camber_in_bump_stays_negative_and_smooth(self, hp):
+        """In bump, camber must stay negative (top inward) and the change over
+        15 mm must be small (P2-0 corrected geometry has classic positive
+        caster, whose camber gain in bump is positive here: -2.49 -> -2.35)."""
         angles_0 = compute_alignment_angles(
             _merge_with_chassis(solve_bump(hp, 0.0), hp), hp=hp
         )
         angles_bump = compute_alignment_angles(
             _merge_with_chassis(solve_bump(hp, 15.0), hp), hp=hp
         )
-        assert angles_bump["camber_deg"] < angles_0["camber_deg"], (
-            f"camber: static {angles_0['camber_deg']} vs bump {angles_bump['camber_deg']}"
+        assert angles_bump["camber_deg"] < 0, (
+            f"camber in bump must stay negative: {angles_bump['camber_deg']}"
+        )
+        assert abs(angles_bump["camber_deg"] - angles_0["camber_deg"]) < 2.0, (
+            f"camber change in bump too large: {angles_0['camber_deg']} -> "
+            f"{angles_bump['camber_deg']}"
         )
 
     def test_upper_ball_joint_moves_in_bump(self, hp):
@@ -190,20 +195,19 @@ class TestSymmetry:
         r_merged = _merge_with_chassis(solve_bump(hp, 0.0), hp)
         l_merged = _merge_with_chassis(solve_bump(hp_left, 0.0), hp_left)
         a_r = compute_alignment_angles(r_merged, hp=hp)
-        a_l_raw = compute_alignment_angles(l_merged, hp=hp_left)
-        a_l = _fix_left_angles(a_l_raw, a_r)
-        # After _fix_left_angles display conventions:
-        #   camber: LEFT = -RIGHT (mirrored for visual symmetry)
+        a_l = compute_alignment_angles(l_merged, hp=hp_left)
+        # P2-0 车辆全局约定（compute_alignment_angles 按轮心 Y 判别左右）：
+        #   camber: LEFT = +RIGHT (负内倾，两侧相同)
         #   KPI:    LEFT = +RIGHT (KPI sign is same on both sides)
         #   caster: LEFT = +RIGHT (caster sign is same on both sides)
-        assert abs(a_r["camber_deg"] + a_l["camber_deg"]) < 0.1, (
-            f"camber R={a_r['camber_deg']} L_fixed={a_l['camber_deg']}"
+        assert abs(a_r["camber_deg"] - a_l["camber_deg"]) < 0.1, (
+            f"camber R={a_r['camber_deg']} L={a_l['camber_deg']}"
         )
         assert abs(a_r["kpi_deg"] - a_l["kpi_deg"]) < 0.1, (
-            f"KPI R={a_r['kpi_deg']} L_fixed={a_l['kpi_deg']}"
+            f"KPI R={a_r['kpi_deg']} L={a_l['kpi_deg']}"
         )
         assert abs(a_r["caster_deg"] - a_l["caster_deg"]) < 0.1, (
-            f"caster R={a_r['caster_deg']} L_fixed={a_l['caster_deg']}"
+            f"caster R={a_r['caster_deg']} L={a_l['caster_deg']}"
         )
 
     def test_solve_axle_returns_both_sides(self, hp):
@@ -238,7 +242,8 @@ class TestAlignmentAngles:
         )
 
     def test_caster_positive(self, hp):
-        """Caster should be positive (lower BJ behind upper BJ)."""
+        """Caster should be positive (classic: upper BJ behind lower BJ, i.e.
+        the kingpin top leans rearward)."""
         result = _merge_with_chassis(solve_bump(hp, 0.0), hp)
         angles = compute_alignment_angles(result, hp=hp)
         assert angles["caster_deg"] > 0, (
@@ -270,22 +275,24 @@ class TestSteering:
             f"toe at rack=0: {angles['toe_deg']}"
         )
 
-    def test_rack_right_produces_toe_out(self, hp):
-        """Rack moving right pushes tie rod outward → toe-out (negative toe)."""
+    def test_rack_right_produces_toe_in(self, hp):
+        """Rack +Y (toward the right wheel) turns the right wheel's front
+        toward the centreline → toe-in.  P2-0: toe-in = positive."""
         result = solve_steering(hp, 10.0)
         merged = _merge_with_chassis(result, hp)
         angles = compute_alignment_angles(merged, hp=hp)
-        assert angles["toe_deg"] < 0, (
-            f"Expected toe-out with rack right, got {angles['toe_deg']}"
+        assert angles["toe_deg"] > 0, (
+            f"Expected toe-in with rack right, got {angles['toe_deg']}"
         )
 
-    def test_rack_left_produces_toe_in(self, hp):
-        """Rack moving left pulls tie rod inward → toe-in (positive toe)."""
+    def test_rack_left_produces_toe_out(self, hp):
+        """Rack -Y turns the right wheel's front away from the centreline →
+        toe-out.  P2-0: toe-out = negative."""
         result = solve_steering(hp, -10.0)
         merged = _merge_with_chassis(result, hp)
         angles = compute_alignment_angles(merged, hp=hp)
-        assert angles["toe_deg"] > 0, (
-            f"Expected toe-in with rack left, got {angles['toe_deg']}"
+        assert angles["toe_deg"] < 0, (
+            f"Expected toe-out with rack left, got {angles['toe_deg']}"
         )
 
     def test_toe_approximately_linear_with_rack(self, hp):
@@ -296,9 +303,9 @@ class TestSteering:
             merged = _merge_with_chassis(result, hp)
             angles = compute_alignment_angles(merged, hp=hp)
             toes.append(angles["toe_deg"])
-        # Toe should be monotonic (more rack = more toe)
+        # Toe should be monotonic (more rack = more toe); P2-0 toe-in positive
         for i in range(1, len(toes)):
-            assert toes[i] < toes[i-1], (
+            assert toes[i] > toes[i-1], (
                 f"Non-monotonic toe: rack index {i-1}→{i}: {toes[i-1]}→{toes[i]}"
             )
 

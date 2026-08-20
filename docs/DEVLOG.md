@@ -1,5 +1,28 @@
 # 开发日志
 
+## 2026-08-20 — P2-0 坐标与符号规范冻结（K-1/K-2/K-3 修复）
+
+- **冻结八项定义**（写入 `src/core/convention.py`，`spec_revision → v1-p2-0`，`tests/test_convention.py` 锁定）：
+  Camber 负=内倾（两侧同号）；Toe 正=Toe-in（两侧同号）；KPI 正=轴上端向内；Caster 正=轴上端后倾（经典）；
+  Scrub 正=印迹在主销接地点外侧；Trail 正=主销接地点在印迹前方（经典）。
+- **移除 `fix_left_angles`**：`compute_alignment_angles` 按轮心 Y 自动判别左右侧（side=+1/-1），
+  直接输出车辆全局符号约定；`src/routes/solve.py`、`routes/hardpoints.py`、`routes/v2.py` 全部改直通。
+- **K-1 修复**：`src/tire.py::compute_contact_patch` 弃用旧坐标系 "X=up" 外倾公式（实测只算得 -0.218°，
+  正确 -2.49°），改为轮面投影（`rad = normalize(Z - y_ax·y_ax[2])`），横向偏移随轮面法向镜像翻转。
+  静态六项指标左右 delta = 0（1e-6 级），xfail 哨兵移除并升级为严格镜像测试。
+- **K-2 修复**：Toe-in = 正。rack=+5mm → 右轮 +3.33°（toe-in）/ 左轮 -3.42°（toe-out），两轮前向同指 -Y 为平行转向。
+- **K-3 修复**：`caster = atan2(kp_vec[0], -kp_vec[2])`（经典）；`derive_hardpoints` z_local x 分量
+  `-sin(ca)→+sin(ca)`（原注释 "tilt backward" 与实际 top-forward 几何矛盾——坐标系翻转时引入的符号 bug，
+  实测默认几何为反 caster）。trail 公式本身已是经典正确，仅修正 convention.py 中自相矛盾的条款。
+- **黄金值重探针**（默认几何修正后）：静态 camber -2.49 / kpi 2.51 / caster 5.005 / toe 0.0 /
+  scrub 29.90 / trail 22.40；bump15 polish caster 5.598→5.009（几何反 caster 修正所致）。
+- **K-4 如实重基线**：修正几何后 polish 残差负行程侧略升（-15mm ≈ 0.210，原 0.19），正行程侧改善
+  （+30mm 顺序解 0.497→0.290）；哨兵更新为 ≤0.215 并注明 P1 议程，未宣称修复。
+- 验证：P2-0 聚焦 54 passed；波及面 141 passed / 3 xfailed（F1 既有）；P1 聚焦 21 passed；
+  ruff/mypy 改后文件无新增问题（`hardpoints.py` import 排序与 `test_full_validation.py` 既有债务保留）；
+  P1 报告 `data/reports/p1_solver_gate.json` 已按新约定重新生成。
+- 计划：`docs/superpowers/plans/2026-08-20-p2-0-sign-and-symmetry.md`。
+
 ## 2026-08-20 — V1 里程碑进展同步（P0/P1 完成，进入 P2）
 
 - 保存 V1 进度快照至 `docs/superpowers/specs/2026-08-20-v1-progress-sync.md`：产品定位（FSAE 底盘硬点快速迭代的整车准静态几何与轮边受力分析工具）、P0 数据地基 100% 完成（259 passed / 4 xfailed）、P1 求解误差论证完成并冻结 `SEQUENTIAL_PREVIEW_WITH_HIGH_ACCURACY_VALIDATION`。

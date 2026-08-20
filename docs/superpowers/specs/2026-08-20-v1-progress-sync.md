@@ -218,30 +218,21 @@ SEQUENTIAL_PREVIEW_WITH_HIGH_ACCURACY_VALIDATION
 
 ## 三、已知问题登记
 
-### K-1：左右镜像 Scrub 不对称
+### K-1：左右镜像 Scrub 不对称（P2-0 已修复）
 
-当前：
+原状：右 19.78 / 左 17.84 mm，根因是 `compute_contact_patch` 的旧坐标系 "X=up" 外倾公式
+（只算得 -0.218°）与同向横向偏移。P2-0 改为轮面投影后左右完全对称（静态六项指标 delta=0，1e-6 级），
+xfail 哨兵移除并升级为严格镜像测试。新黄金值 scrub ≈ 29.90 mm（含正确的外倾横向偏移）。
 
-```text
-右侧 Scrub ≈ 19.78 mm
-左侧 Scrub ≈ 17.84 mm
-```
+### K-2：Toe 符号（P2-0 已修复）
 
-违反镜像基准阈值。已用严格 xfail 哨兵钉住，归属 P2。
+已统一为 **Toe-in = 正**（两侧同号），rack=+5mm → 右轮 +3.33° / 左轮 -3.42°（平行转向、物理正确）。
 
-### K-2：Toe 符号
+### K-3：Caster Trail 符号（P2-0 已修复）
 
-当前 Toe 符号与工程习惯：
-
-```text
-Toe-in = 正
-```
-
-不一致。归属 P2，需要统一规范和左右符号处理。
-
-### K-3：Caster Trail 符号
-
-当前 `caster_trail_mm` 与经典机械拖距符号相反。归属 P2。
+根因有两层：`caster` 公式与经典相反（top-forward 输出正号），且 `derive_hardpoints` 把默认几何
+推导成反 caster（top-forward）。P2-0 修正公式为 `atan2(kp_vec[0], -kp_vec[2])`、几何 z_local x 分量
+改 `+sin(ca)` 后，默认几何为经典正 caster（5.005°），trail 变 +22.40 mm（经典正）。
 
 ### K-4：全行程求解残差
 
@@ -315,9 +306,11 @@ P1 相关代码：
 
 ## 六、下一阶段：P2 运动学指标与统一结果结构
 
-新对话建议直接从 P2 开始，不重复 P0/P1。
+> **状态（2026-08-20 更新）：P2-0 已完成**——K-1/K-2/K-3 修复、八项定义冻结、
+> `fix_left_angles` 移出规范层、镜像回归达 1e-6。见 `docs/superpowers/plans/2026-08-20-p2-0-sign-and-symmetry.md`
+> 与 DEVLOG。下一步为 P2-1 统一结果结构。
 
-### P2-0：先修坐标和符号问题
+### P2-0：先修坐标和符号问题（已完成）
 
 优先处理：
 
