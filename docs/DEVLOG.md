@@ -1,5 +1,11 @@
 # 开发日志
 
+## 2026-08-20 — P1 Task 1 JSON/type quality fixes
+
+- 修正 `src/solver/p1_benchmark.py` 的 `_json_value`：拒绝不支持的对象类型并显式拒绝非有限浮点值，消除 mypy 对 `float(object)` 的报错。
+- 将 Task 1 报告 TypedDict 的占位字段放宽为 Task 2 可填充的数值、字典和列表联合类型，同时保持现有报告形状不变。
+- 所有 JSON 序列化断言均使用 `allow_nan=False`，并递归验证浮点叶子为有限值。
+
 ## 2026-08-20 — P1 Task 1 solver comparison harness contract
 
 - 修正 `src/solver/p1_benchmark.py` 的 Task 1 语义：当前仅声明并追踪输入矩阵，`NOT_IMPLEMENTED` 路径明确表示尚未评估几何，不输出伪造测量值。
