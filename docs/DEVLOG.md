@@ -1,5 +1,26 @@
 # 开发日志
 
+## 2026-08-20 — P3 载荷与轮边受力（整车层 + 转向节 6-DOF 二力杆模型）
+
+- 新增 src/metrics/wheel_loads.py：四轮 Fx/Fy/Fz 分配——静态、纵向转移（ax·m·g·h_cg/wb）、
+  横向转移三分量（几何经 RC / 弹性按滚转刚度份额 / 非簧载经 h_unsp）、az 额外垂向、
+  每轮 Fy 按 Fz 占比、摩擦圆利用率（μ_peak 参数，默认 1.4）、离地警告（Fz≤0）。
+  符号约定：ax>0 制动（前轴 brake_split）、ax<0 加速（后轴 drive_split）、Fx 正=驱动方向。
+- **重写 src/metrics/loads.py**（旧 3-link 平衡 → 转向节 6-DOF）：
+  未知量 f1..f6 = UCA 前/后支杆、LCA 前/后支杆、推杆、横拉杆（张拉为正）；
+  6×6 线性系统（力平衡 3 + 绕轮心 UP5 力矩平衡 3），含 ARB 连杆力项；
+  输出支杆轴向力、推杆/横拉杆/防倾杆连杆力、上下球头三向反力、摆臂内侧支点反力、
+  转向节合力/力矩残差、奇异性报告（rank<6 → SOLVER_FAILED）。
+- **v2 solve 增加 loads 层**：每轮 tire_force/transfers/friction_util/off_ground/
+  wheel_end{member_forces, ball_joints, chassis_reactions, residuals}/jacking_force_n/status。
+  滚转刚度用 rocker mini-sweep（±2.5mm）几何 MR；RC 高用双侧 IC→接地点交点；
+  **有效滚转角 = 行程派生 + ay 平衡滚转**（φ=ay·m_s·g·(h−rc)/k_total）驱动 ARB 连杆力。
+- **Jacking 解冻**：jacking_force_n = Fy×(z_ic−z_cp)/(y_ic−y_cp)（真实力，左右独立）。
+- 左右独立：lat-1p3g 外侧 Fz 883.8 vs 内侧 489.6，禁止镜像受力；测试断言球头反力不镜像。
+- 验证：手算 benchmark（纵向转移 637.97N、摩擦圆 1.3/1.4、ARB 连杆 572N、静态 Fz 686.7）；
+  全量非 e2e 334 passed / 3 xfailed（F1 既有）；ruff/mypy 干净。
+  旧 test_loads.py 已按新模型重写（旧 3-link 断言废弃）。
+
 ## 2026-08-20 — P2-3 指标状态机契约收口
 
 - v2 表面（solve + sweep）所有指标/结果显式携带七状态：`TestP23StateMachineContract`

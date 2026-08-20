@@ -186,12 +186,15 @@ async def analyze(req: AnalyzeRequest):
     f_static_f = veh["mass_kg"] * 9.81 * veh["front_axle_frac"] / 2.0
     roll_f_frac = roll_stiffness_split_pct(k_f + k_arb_f, k_r + k_arb_r) / 100.0
     f_outside_f = f_static_f + dF * roll_f_frac
+    # P3：转向节 6-DOF 二力杆平衡（UCA/LCA 前后支杆 + 推杆 + 横拉杆 + 球头反力）
     forces_f = solve_link_forces(f_hp, f_design["right"],
                                  tire_force(f_outside_f, 0.0, veh["ay_corner"]))
+    mf = forces_f.get("member_forces") or {}
+    ok_we = forces_f.get("status") != "SOLVER_FAILED"
     metrics.update({
-        "pushrod_force": max_abs(forces_f),
-        "uca_lca_force": max_abs(forces_f),
-        "tie_rod_force": None,
+        "pushrod_force": mf.get("pushrod_n") if ok_we else None,
+        "uca_lca_force": max_abs(forces_f) if ok_we else None,
+        "tie_rod_force": mf.get("tie_rod_n") if ok_we else None,
     })
 
     lights = evaluate_all(metrics)
