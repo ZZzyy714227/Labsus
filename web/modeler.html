@@ -111,13 +111,14 @@ input.num:hover{border-color:var(--acc)}
       </div>
       <div class="sec"><div class="sh">操稳 Handling（P5 · ay 工况）</div>
         <div id="handlingBox" class="ctl"><span class="na">— 待求解 —</span></div>
+        <canvas id="kChart" style="width:100%;height:80px;background:#0a0c0e;border:1px solid var(--bd)"></canvas>
       </div>
       <div class="sec"><div class="sh">敏感性 Sensitivity（前右 · ±1mm/轴）</div>
         <div id="sensBox" class="ctl"><span class="na">— 待请求 —</span>
           <button id="runSens">运行</button></div>
       </div>
       <div class="sec"><div class="sh">导出 Export</div>
-        <div class="ctl"><button id="expCsv">解算结果 CSV</button></div>
+        <div class="ctl"><button id="expCsv">结果 CSV</button><button id="expJson">结果 JSON</button></div>
       </div>
     </div>
   </div>
@@ -519,6 +520,29 @@ function renderHandling(d){
     h+="<div>调平 预载 <b>"+(fl?fl.preload_n.toFixed(0)+"N":"—")+"</b> "+
        "roll <b>"+ride.pose.roll_deg+"°</b> pitch <b>"+ride.pose.pitch_deg+"°</b></div>"; }
   el.innerHTML=h;
+  drawKcurve(d);
+}
+function drawKcurve(d){
+  const cv=document.getElementById("kChart");
+  const curve=(d.k_curve||{}).k_deg_per_g, xs=(d.k_curve||{}).ay_g;
+  if(!curve||!xs){ return; }
+  if(cv.width!==cv.clientWidth||cv.height!==cv.clientHeight){cv.width=cv.clientWidth;cv.height=cv.clientHeight;}
+  const ctx=cv.getContext("2d"); ctx.clearRect(0,0,cv.width,cv.height);
+  const pad=24,W=cv.width,H=cv.height;
+  const vals=curve.map((v,i)=>v==null?null:v);
+  let y0=1e9,y1=-1e9; for(const v of vals) if(v!=null){y0=Math.min(y0,v);y1=Math.max(y1,v);}
+  if(y0===1e9)return; if(y1===y0){y0-=0.1;y1+=0.1;}
+  const sx=v=>pad+(v-xs[0])/((xs[xs.length-1]-xs[0])||1)*(W-pad*2);
+  const sy=v=>H-pad-(v-y0)/(y1-y0)*(H-pad*2);
+  ctx.strokeStyle="#2fa9d6";ctx.lineWidth=1.5;ctx.beginPath();let st=false;
+  for(let i=0;i<vals.length;i++){
+    if(vals[i]==null){st=false;continue;}
+    const x=sx(xs[i]),y=sy(vals[i]);
+    if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.strokeStyle="#1c2126";ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(pad,sy(0));ctx.lineTo(W-pad,sy(0));ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle="#616b77";ctx.font="9px monospace";ctx.fillText("K(ay) 曲线 °/g",6,10);
 }
 
 /* ---------- 渲染 ---------- */
@@ -572,7 +596,8 @@ function drawChart(sw){
   if(cv.width!==cv.clientWidth||cv.height!==cv.clientHeight){cv.width=cv.clientWidth;cv.height=cv.clientHeight;}
   const ctx=cv.getContext("2d"); ctx.clearRect(0,0,cv.width,cv.height);
   const X=sw.values||[], cam=sw.curves.right_camber_deg||[], toe=sw.curves.right_toe_deg||[];
-  const series=[["#54a06a","camber",cam],["#2fa9d6","toe",toe]];
+  const scr=sw.curves.right_scrub_radius_mm||[], trl=sw.curves.right_caster_trail_mm||[];
+  const series=[["#54a06a","camber",cam],["#2fa9d6","toe",toe],["#c07ad0","scrub",scr],["#d9a238","trail",trl]];
   let y0=0,y1=0;
   for(const [_,__,arr] of series)for(const v of arr){if(v==null)continue;y0=Math.min(y0,v);y1=Math.max(y1,v);}
   if(y1===y0)y1=y0+1;
@@ -691,6 +716,13 @@ function download(name, text){
   a.href=URL.createObjectURL(blob); a.download=name; a.click();
   URL.revokeObjectURL(a.href);
 }
+document.getElementById("expJson").addEventListener("click", ()=>{
+  if(!last){ alert("无解算结果"); return; }
+  const blob=new Blob([JSON.stringify(last,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download="solve_"+Date.now()+".json"; a.click();
+  URL.revokeObjectURL(a.href);
+});
 document.getElementById("expCsv").addEventListener("click", ()=>{
   if(!last){ alert("无解算结果"); return; }
   let rows=[["corner","status","camber","toe","caster","kpi","scrub","trail","Fz","Fx","Fy","mu","off_ground"]];
