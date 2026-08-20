@@ -365,7 +365,13 @@ VehicleResult
 - 残差；
 - 状态。
 
-### P2-2：补齐指标
+### P2-2：补齐指标（主体已完成）
+
+> **状态（2026-08-20 更新）**：src/metrics/kinematics.py + /api/v2/sweep 已交付
+> Included Angle / SCG / Bump Steer / Ackermann / Roll Center 曲线 / SVIC / Pitch Center /
+> Anti-dive·squat 重写 / Wheelbase·Track Change / 几何 Motion Ratio / KPI·Scrub·Trail 曲线；
+> **analyze.py 硬编码 mr 0.7/0.6 已移除**（rockers 几何 MR）；Jacking 显式 NOT_IMPLEMENTED（P3 载荷）。
+> 见 DEVLOG 2026-08-20 P2-2 条目。
 
 按顺序：
 

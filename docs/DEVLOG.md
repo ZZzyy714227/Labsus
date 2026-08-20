@@ -1,5 +1,26 @@
 # 开发日志
 
+## 2026-08-20 — P2-2 运动学指标补齐（几何 MR 取代硬编码 0.7/0.6）
+
+- 新增 src/core/metrics.py：MetricResult 七状态状态机（P2-3 地基）——VALID 必须带值，
+  NOT_IMPLEMENTED/NOT_APPLICABLE/SOLVER_FAILED 禁止带值，构造即校验，杜绝 None 空白。
+- 新增 src/metrics/kinematics.py（P2-2 指标，全部返回 MetricResult）：
+  Included Angle（=KPI+Camber 代数和）、Steering Camber Gain、Bump Steer（deg/25mm）、
+  Camber Gain（deg/25mm）、Track Change、纵向位移、Ackermann %（内/外轮转向角 + 理想外轮角）、
+  Roll Center 高（双侧 IC→接地点连线交点，单侧退化）、Side-view IC（球头 + 摆臂轴方向构造）、
+  Anti-dive/squat 重写（SVIC 几何，取代原正视 IC 错误公式）、Pitch Center（前后 SVIC 线交点）、
+  Wheelbase Change、几何 Motion Ratio（|Δdamper/Δwheel|，rocker 扫掠）、Jacking（显式 NOT_IMPLEMENTED，
+  依赖 P3 载荷，不伪造）。
+- 新增 /api/v2/sweep：轴级轮跳/转向扫掠曲线（逐轮 camber/toe/scrub/trail/kpi + RC 高 +
+  Motion Ratio + Track Change + Ackermann 随转向）+ 静态点派生指标（带状态）。
+- analyze.py 移除硬编码 mr_f=0.7 / mr_r=0.6：改 rocker 扫掠几何 MR（实测前 0.216 / 后 0.25）；
+  MR 不可用时下游指标如实 None，不再回退硬编码。anti_dive/anti_squat 同步切到 SVIC 重写版本。
+- SVIC 构造修正：采用 DWB-SIM 参考实现的「球头 + 摆臂轴方向（CH1→CH2/CH3→CH4 投影）」两线交点
+  （初版误用球头→单个车架铰点连线，导致 SVIC 落在轮前、anti 符号错误）。修正后默认前轴
+  SVIC x≈-4558mm（远后）、anti_dive ≈ +2.0%、anti_squat ≈ +2.8%（合成默认几何，臂轴近乎平行）。
+- 验证：新增手算 benchmark/状态机/符号/镜像测试 33 项；全量非 e2e 316 passed / 3 xfailed（F1 既有）；
+  ruff/mypy 干净。P2-3（全量指标状态机）与 P2-4（每指标七类验证）随后续轮次收口。
+
 ## 2026-08-20 — P2-1 统一四轮结果结构（VehicleResult）
 
 - 新增 `src/core/results.py`：`VehicleResult`（front/rear × left/right + per_wheel_geometry +
