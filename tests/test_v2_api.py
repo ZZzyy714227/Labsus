@@ -146,3 +146,70 @@ class TestSolve:
         r = client.post("/api/v2/solve",
                         json={"design_id": "nope", "case_id": "static"})
         assert r.status_code == 404
+
+
+class TestSweep:
+    """P2-2 曲线端点：轮跳/转向扫掠 + 派生指标（七状态）。"""
+
+    def _sweep(self, client, **over):
+        req = {"design_id": "legacy-import", "case_id": "static",
+               "axle": "front", "axis": "travel", "min": -25, "max": 25,
+               "points": 11}
+        req.update(over)
+        r = client.post("/api/v2/sweep", json=req)
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    def test_travel_sweep_curves_and_metrics(self, client):
+        body = self._sweep(client)
+        assert body["axle"] == "front" and body["axis"] == "travel"
+        assert len(body["values"]) == 11
+        for ck in ("right_camber_deg", "right_toe_deg", "right_scrub_radius_mm",
+                   "right_caster_trail_mm", "left_camber_deg", "left_toe_deg",
+                   "roll_center_height_mm", "motion_ratio", "track_change_mm"):
+            assert ck in body["curves"], f"missing curve {ck}"
+            assert len(body["curves"][ck]) == 11
+        # 静态点 toe≈0（P2-0 约定）
+        assert body["curves"]["right_toe_deg"][5] == pytest.approx(0.0, abs=1e-6)
+        # 派生指标：MR 几何值（非硬编码 0.7/0.6）
+        mr = body["metrics"]["motion_ratio"]
+        assert mr["status"] == "VALID" and mr["value"] is not None
+        assert mr["value"] != pytest.approx(0.7, abs=1e-9)
+        # 状态机：jacking 显式 NOT_IMPLEMENTED，不伪造
+        assert body["metrics"]["jacking"]["status"] == "NOT_IMPLEMENTED"
+        assert body["metrics"]["jacking"]["value"] is None
+        # bump steer / camber gain 有值
+        assert body["metrics"]["bump_steer_right"]["status"] == "VALID"
+        assert body["metrics"]["camber_gain_right"]["status"] == "VALID"
+        # included angle = KPI + Camber
+        assert body["metrics"]["included_angle_right"]["value"] == pytest.approx(0.02, abs=1e-6)
+        # 静态 wheelbase change ≈ 0
+        assert body["metrics"]["wheelbase_change"]["value"] == pytest.approx(0.0, abs=0.01)
+        # 镜像：左右曲线静态点一致
+        assert body["curves"]["right_camber_deg"][5] == pytest.approx(
+            body["curves"]["left_camber_deg"][5], abs=1e-6)
+        assert body["curves"]["right_toe_deg"][5] == pytest.approx(
+            body["curves"]["left_toe_deg"][5], abs=1e-6)
+
+    def test_rack_sweep_ackermann_and_scg(self, client):
+        body = self._sweep(client, axis="rack", min=-20, max=20, points=9)
+        toes = body["curves"]["right_toe_deg"]
+        # toe 单调递增（P2-0：toe-in 正）
+        assert all(toes[i + 1] > toes[i] for i in range(len(toes) - 1))
+        # ackermann 曲线在非零 rack 处有值（状态机：零转向点 NOT_APPLICABLE）
+        ack = body["curves"]["ackermann_pct"]
+        assert any(v is not None for v in ack), "ackermann curve empty"
+        assert body["metrics"]["ackermann"]["status"] == "NOT_APPLICABLE"  # rack=0
+        # Steering Camber Gain（caster-camber 耦合）
+        scg = body["metrics"]["steering_camber_gain_right"]
+        assert scg["status"] in {"VALID", "NOT_APPLICABLE"}
+        if scg["status"] == "VALID":
+            assert abs(scg["value"]) < 1.0
+
+    def test_sweep_invalid_args(self, client):
+        assert client.post("/api/v2/sweep", json={
+            "design_id": "legacy-import", "case_id": "static",
+            "axle": "middle", "min": 0, "max": 10}).status_code == 422
+        assert client.post("/api/v2/sweep", json={
+            "design_id": "legacy-import", "case_id": "static",
+            "axle": "front", "min": 10, "max": 0}).status_code == 422
