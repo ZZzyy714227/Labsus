@@ -74,7 +74,12 @@ input.num:hover{border-color:var(--acc)}
           <button id="axRear">后轴 编辑</button>
         </div>
         <div class="ctl"><b>外倾°</b><input type="number" id="gamma" value="0" step="1"></div>
-        <div class="ctl"><b>曲线</b><input type="checkbox" id="curves" checked> <span>扫掠 camber/toe</span></div>
+        <div class="ctl"><b>曲线</b><input type="checkbox" id="curves" checked> <span>扫掠</span>
+          <button id="cvTravel" class="sel">travel</button>
+          <button id="cvRack">rack</button>
+        </div>
+        <div class="ctl"><b>A/B</b><button id="snapA">记基线A</button>
+          <button id="cmpB">对比B−A</button></div>
       </div>
       <div class="sec">
         <div class="sh">硬点 Hardpoints（前右 / 可拖动）</div>
@@ -107,6 +112,13 @@ input.num:hover{border-color:var(--acc)}
       <div class="sec"><div class="sh">操稳 Handling（P5 · ay 工况）</div>
         <div id="handlingBox" class="ctl"><span class="na">— 待求解 —</span></div>
       </div>
+      <div class="sec"><div class="sh">敏感性 Sensitivity（前右 · ±1mm/轴）</div>
+        <div id="sensBox" class="ctl"><span class="na">— 待请求 —</span>
+          <button id="runSens">运行</button></div>
+      </div>
+      <div class="sec"><div class="sh">导出 Export</div>
+        <div class="ctl"><button id="expCsv">解算结果 CSV</button></div>
+      </div>
     </div>
   </div>
 </div>
@@ -127,6 +139,7 @@ let hp = null;          // 当前轴右轮 points {UP1:[x,y,z],...}
 let hpRear = null;      // 后轴右轮（design 读取）
 let hpLeft = null;      // 当前轴左轮（镜像）
 let AXLE = "front";     // front | rear
+let CURVE_AXIS = "travel";   // travel | rack
 let frontHp = null, rearHp = null;
 let busy = false, pending = false;
 let dragging = false, sweepTimer = null;
@@ -462,7 +475,8 @@ function requestSolve(){
   }
   if(wantSweep){
     const axl = AXLE==="rear"?"rear":"front";
-    payload.sweep={axis:"travel",axle:axl,min:-25,max:25,points:21};
+    payload.sweep={axis:CURVE_AXIS,axle:axl,
+      min:CURVE_AXIS==="rack"?-20: -25,max:CURVE_AXIS==="rack"?20:25,points:21};
   }
   fetch("/api/v2/solve/hardpoints",{method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -566,7 +580,7 @@ function drawChart(sw){
   const sx=v=>pad+(v-X[0])/((X[X.length-1]-X[0])||1)*(W-pad*2);
   const sy=v=>H-pad-(v-y0)/(y1-y0)*(H-pad*2);
   ctx.font="9px monospace";ctx.fillStyle="#616b77";
-  ctx.fillText("travel mm",W-58,H-8);ctx.fillText("0",6,sy(0));
+  ctx.fillText((CURVE_AXIS==="rack"?"rack mm":"travel mm"),W-58,H-8);ctx.fillText("0",6,sy(0));
   for(const [col,name,arr] of series){
     ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.beginPath();let started=false;
     for(let i=0;i<arr.length;i++){
@@ -602,14 +616,94 @@ function setAxle(ax){
   hpLeft = curLeft();
   buildTable(); buildTableState(); drawAll(); requestSolve();
 }
+function setCurveAxis(ax){
+  CURVE_AXIS = ax;
+  document.getElementById("cvTravel").classList.toggle("sel", ax==="travel");
+  document.getElementById("cvRack").classList.toggle("sel", ax==="rack");
+  requestSolve();
+}
 document.getElementById("axFront").addEventListener("click", ()=>setAxle("front"));
 document.getElementById("axRear").addEventListener("click", ()=>setAxle("rear"));
+document.getElementById("cvTravel").addEventListener("click", ()=>setCurveAxis("travel"));
+document.getElementById("cvRack").addEventListener("click", ()=>setCurveAxis("rack"));
 document.getElementById("gamma").addEventListener("input",()=>{requestSolve();});
 ["ayv","axv"].forEach(id=>{
   document.getElementById(id).addEventListener("input",()=>{drawAll();requestSolve();});
 });
 document.getElementById("curves").addEventListener("change",()=>requestSolve());
 document.getElementById("reset").addEventListener("click",()=>{hp=deep(SEED);buildTableState();drawAll();requestSolve();});
+let snapA = null;
+/* ---- A/B 快照对比（基线 A = 记基线时的硬点+定位角；B = 当前） ---- */
+document.getElementById("snapA").addEventListener("click", ()=>{
+  snapA = { hp: deep(curWheel()), angles: last ? {angles: last[AXLE==="rear"?"rear":"front"].right.angles, residual: last.residuals[(AXLE==="rear"?"rear":"front")+"_right"]} : null,
+            axle: AXLE };
+  const ab=document.getElementById("sensBox");
+  ab.innerHTML = "<span class='g'>已记基线 A（"+AXLE+"）</span> · 修改硬点后点「对比B−A」";
+});
+document.getElementById("cmpB").addEventListener("click", ()=>{
+  if(!snapA){ alert("先「记基线A」"); return; }
+  if(snapA.axle!==AXLE){ snapA = null; alert("轴已切换，请重新记基线A"); return; }
+  const b=document.getElementById("sensBox");
+  const w=curWheel();
+  let hpDelta = "";
+  let maxD = 0;
+  for(const k of Object.keys(w)){
+    const d0=snapA.hp[k], d1=w[k];
+    const dd=[Math.round((d1[0]-d0[0])*10)/10, Math.round((d1[1]-d0[1])*10)/10, Math.round((d1[2]-d0[2])*10)/10];
+    if(dd[0]||dd[1]||dd[2]){ hpDelta += k+" ["+dd.join(",")+"]  "; maxD=Math.max(maxD,...dd.map(Math.abs)); }
+  }
+  let ang= "";
+  if(last && snapA.angles && last[AXLE==="rear"?"rear":"front"].right.angles){
+    const a0=snapA.angles.angles, a1=last[AXLE==="rear"?"rear":"front"].right.angles;
+    for(const k of ANGLE_KEYS){ if(a0 && a1 && a0[k]!=null && a1[k]!=null){
+      const dd=Math.round((a1[k]-a0[k])*1000)/1000; if(dd) ang+=" "+ANGLE_ZH[k]+" "+dd; }}
+  }
+  b.innerHTML = "<div class='mname'>硬点 Δ "+AXLE+"（≥0.1mm）</div><div class='mr warn'>"+(hpDelta||"— 无变化 —")+"</div>"+
+    "<div class='mr'>定位角 Δ"+(ang||" —")+"</div>"+
+    "<div class='warn'>max 硬点位移 "+(maxD?maxD.toFixed(1)+"mm":"0mm")+"</div>";
+});
+/* ---- 敏感性（legacy 设计基线，前右） ---- */
+document.getElementById("runSens").addEventListener("click", ()=>{
+  const b=document.getElementById("sensBox");
+  fetch("/api/v2/sensitivity",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({design_id:"legacy-import",case_id:"static",corner:"front_right",
+      hardpoints:["UP1","UP2","CH1","CH3","CH5"],metrics:["camber_deg","toe_deg","caster_deg","scrub_radius_mm"]})})
+    .then(r=>r.ok?r.json():null)
+    .then(d=>{
+      if(!d){ b.innerHTML="<span class='r'>敏感性不可用</span>"; return; }
+      const sm=d.summary_per_mm||{};
+      let h="<table style='width:100%'><tr><th>点\轴</th><th>x</th><th>y</th><th>z</th></tr>";
+      for(const pt in sm){
+        const row=sm[pt];
+        h+="<tr><td class='mname'>"+pt+"</td>"+["x","y","z"].map(a=>{
+          const v=row[a]&&row[a].camber_deg!=null?("camber "+row[a].camber_deg.toFixed(3)+"°/mm"):"—";
+          return "<td title='"+JSON.stringify(row[a]||{})+"'>"+v+"</td>";}).join("")+"</tr>";
+      }
+      h+="</table>";
+      b.innerHTML=h;
+    })
+    .catch(()=>{ document.getElementById("sensBox").innerHTML="<span class='r'>请求失败</span>"; });
+});
+/* ---- 导出：当前解算结果 CSV ---- */
+function download(name, text){
+  const blob=new Blob([text],{type:"text/csv"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=name; a.click();
+  URL.revokeObjectURL(a.href);
+}
+document.getElementById("expCsv").addEventListener("click", ()=>{
+  if(!last){ alert("无解算结果"); return; }
+  let rows=[["corner","status","camber","toe","caster","kpi","scrub","trail","Fz","Fx","Fy","mu","off_ground"]];
+  for(const sec of ["front","rear"]) for(const side of ["left","right"]){
+    const name=sec+"_"+side;
+    const rep=last[sec][side], ld=last.loads?last.loads[name]:null;
+    const ag=rep.angles||{};
+    rows.push([name, rep.status, ag.camber_deg, ag.toe_deg, ag.caster_deg, ag.kpi_deg,
+      ag.scrub_radius_mm, ag.caster_trail_mm,
+      ld?ld.fz_n:"", ld?ld.fx_n:"", ld?ld.fy_n:"", ld&&ld.friction_util!=null?ld.friction_util:"", ld?ld.off_ground:""]);
+  }
+  download("solve_"+Date.now()+".csv", rows.map(r=>r.join(",")).join("\n"));
+});
 document.getElementById("mirrorX").addEventListener("click",()=>{ alert("左右独立编辑将在后续版本提供；当前由后端按模板镜像。"); });
 
 window.addEventListener("resize",()=>{ drawAll(); if(last&&last.sweep) drawChart(last.sweep); });
