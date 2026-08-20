@@ -224,6 +224,8 @@ class SolveV2Request(BaseModel):
     case_id: str
     design_version: int | None = None
     case_version: int | None = None
+    settle_ride: bool = False            # P5 调平闭环：把 case 轮跳平移到 ride_mm 调平位形再求解
+    ride_mm: dict[str, float] | None = None        # 调平目标轮跳偏移（来自 /handling ride_level）
 
 
 def _solve_corner(axle_hp, travel: float, rack: float, track: float) -> dict:
@@ -755,6 +757,9 @@ class HandlingRequest(BaseModel):
     gamma_r_deg: float = 0.0
     ride_mm: dict[str, float] = {"fl": 0.0, "fr": 0.0, "rl": 0.0, "rr": 0.0}
     motion_ratio: dict[str, float] | None = None      # 缺省用 rocker mini-sweep 几何 MR
+    yaw_v_m_s: float = 15.0
+    yaw_curve_v_max: float = 40.0
+    brake_g: float = 0.0                              # 回正力矩工况的制动 g（选配制动分析）
 
 
 @router.post("/handling")
@@ -789,10 +794,15 @@ def handling_v2(req: HandlingRequest):
                                      cv.rack_displacement, tr_r, _rear_rocker_frame_nodes()) or 0.25,
         }
 
-    # 静态四轮 Fz（设计姿态，P3 分布；ay=0）
+    # 防倾杆刚度：优先几何（扭杆 d/臂长/力臂）计算，否则回退 k_arb_f/r
+    from metrics.arb_geometry import arb_geometry_from_vehicle
+    kfk = arb_geometry_from_vehicle(veh, True)
+    krk = arb_geometry_from_vehicle(veh, False)
+
+    # 静态四轮 Fz（P3 分布；ay=0）——完整载荷闭环的基础
     try:
         static = distribute_vehicle_loads(
-            veh, cv.loads, None, None, 0.0, 0.0, 0.0)
+            veh, cv.loads, kfk, krk, 0.0, 0.0, 0.0)
     except (ValueError, TypeError, ZeroDivisionError):
         raise HTTPException(status_code=422, detail="无法计算静态载荷")
     fz0 = {k: static[k]["fz_n"] for k in
@@ -800,14 +810,55 @@ def handling_v2(req: HandlingRequest):
     fz0_sym = {"fl": fz0["front_left"], "fr": fz0["front_right"],
                "rl": fz0["rear_left"], "rr": fz0["rear_right"]}
 
-    # 当前 ay 下的四轮 Fz（简化横向转移，handling 内置）
-    from metrics.handling import _loads_with_transfer
-    fz_cur = _loads_with_transfer(veh, fz0_sym, float(req.ay_g))
+    # 完整载荷闭环：滚转刚度（含几何 ARB）→ 每 ay 用完整分布
+    kf_full = compute_roll_stiffness_suspension(
+        float(veh.get("k_spring_f", 26.0)), mr["fr"], tr_f) + float(kfk or 0.0)
+    kr_full = compute_roll_stiffness_suspension(
+        float(veh.get("k_spring_r", 47.0)), mr["rr"], tr_r) + float(krk or 0.0)
 
+    def full_fz(ay):
+        """P3 完整四轮分布（几何/弹性/非簧载转移），闭环 understeer。"""
+        from core.models import LoadsInput
+        ld = LoadsInput(ay_g=float(ay), ax_g=0.0, az_g=0.0)
+        d = distribute_vehicle_loads(veh, ld, kf_full, kr_full, 0.0, 0.0, 0.0)
+        return {"fl": d["front_left"]["fz_n"], "fr": d["front_right"]["fz_n"],
+                "rl": d["rear_left"]["fz_n"], "rr": d["rear_right"]["fz_n"]}
+
+    fz_cur = full_fz(float(req.ay_g))
     ug = understeer_gradient(veh, fz_cur, float(req.ay_g),
                              req.gamma_f_deg, req.gamma_r_deg)
     curve = understeer_curve(veh, fz0_sym, ay_max=1.2, points=13,
-                             gamma_f=req.gamma_f_deg, gamma_r=req.gamma_r_deg)
+                             gamma_f=req.gamma_f_deg, gamma_r=req.gamma_r_deg,
+                             lateral_transfer=lambda f0, ay: full_fz(ay))
+
+    # yaw 横摆动力学（线性单车模型，以当前 af/ar 向下取 Cα）
+    from metrics.handling import yaw_analysis, yaw_gain_curve
+    yaw = {}
+    if ug.get("ca_f_n_per_deg") and ug.get("ca_r_n_per_deg"):
+        yaw = yaw_analysis(veh, ug["ca_f_n_per_deg"], ug["ca_r_n_per_deg"],
+                           req.yaw_v_m_s)
+        yaw["gain_curve"] = yaw_gain_curve(veh, ug["ca_f_n_per_deg"],
+                                           ug["ca_r_n_per_deg"],
+                                           v_max_m_s=req.yaw_curve_v_max)
+
+    # 转向回正（kingpin moment）：需前轮几何 trail/scrub
+    kingpin = None
+    try:
+        ax0 = _solve_corner(dv.front_right, cv.travel.fr, cv.rack_displacement, tr_f)
+        a_fr = ax0["angles"]
+        trail_f = float(a_fr.get("caster_trail_mm", 0.0))
+        scrub_f = float(a_fr.get("scrub_radius_mm", 0.0))
+        fy_fl = fz_cur["fl"] * abs(req.ay_g) * 9.81 * float(veh.get("mass_kg", 0.0)) / (
+            fz_cur["fl"] + fz_cur["fr"] + fz_cur["rl"] + fz_cur["rr"])
+        fx_fl = -float(req.brake_g) * 9.81 * float(veh.get("mass_kg", 0.0)) * 0.5 / 2.0             if req.brake_g else 0.0
+        from metrics.steering_metrics import align_moment_summary
+        kingpin = align_moment_summary(
+            trail_f, scrub_f, fy_fl, fy_fl,
+            fx_fl, fx_fl, fz_cur["fl"] * 0.02, fz_cur["fr"] * 0.02)
+        kingpin["geometry"] = {"trail_mm": round(trail_f, 3),
+                               "scrub_mm": round(scrub_f, 3)}
+    except Exception:  # noqa: BLE001
+        kingpin = None
 
     # 整车调平（设计 ride 位形）
     ride = ride_level(veh, fz0_sym, mr, req.ride_mm)
@@ -817,6 +868,8 @@ def handling_v2(req: HandlingRequest):
         "ay_g": req.ay_g,
         "understeer": ug,
         "k_curve": {k: v for k, v in curve.items()},
+        "yaw": yaw,
+        "kingpin": kingpin,
         "ride_level": ride,
         "warnings": [f"操稳分析 at ay={req.ay_g}g: {ug['explanation']}"]
         if ug["status"] != "VALID" else [],
@@ -1160,7 +1213,26 @@ def solve_v2(req: SolveV2Request):
         cv = store.get_case(req.case_id, req.case_version)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+    if req.settle_ride:
+        cv = _settle_case(dv, cv, req.ride_mm)
     return _solve_vehicle(dv, cv, req.design_id, req.case_id)
+
+
+def _settle_case(dv, cv, ride_mm=None):
+    """P5 调平闭环：把工况轮跳基准平移到调平位形。
+
+    ride_mm（缺省 0）来自 /handling ride_level（含 roll/pitch 姿态）；
+    travel_i = case.travel_i + ride_mm[i]。忽略 dv（占位保持统一签名）。
+    """
+    from core.models import WheelTravel
+    r = ride_mm or {}
+    cv2 = cv.model_copy(deep=True)
+    cv2.travel = WheelTravel(
+        fl=cv.travel.fl + float(r.get("fl", 0.0)),
+        fr=cv.travel.fr + float(r.get("fr", 0.0)),
+        rl=cv.travel.rl + float(r.get("rl", 0.0)),
+        rr=cv.travel.rr + float(r.get("rr", 0.0)))
+    return cv2
 
 
 def _solve_vehicle(dv, cv, design_id: str = "", case_id: str = ""):

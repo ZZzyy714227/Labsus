@@ -337,6 +337,37 @@ class TestP5Handling:
         assert pose["pitch_deg"] != 0.0              # 前后不等
 
 
+
+    def test_handling_yaw_kingpin(self, client):
+        """P5 深化：handling 端点含 yaw 动力学 + kingpin 回正。"""
+        body = client.post("/api/v2/handling", json={
+            "design_id": "legacy-import", "case_id": "static", "ay_g": 1.0}).json()
+        y = body["yaw"]
+        assert y["status"] == "VALID"
+        assert y["yaw_rate_gain_1_over_s"] == pytest.approx(15.0 / 1.55, rel=1e-3)
+        assert len(y["gain_curve"]["v_m_s"]) == 21
+        kp = body["kingpin"]
+        assert kp is not None and kp["geometry"]["trail_mm"] > 0
+        assert kp["total_nmm"] < 0            # 回正方向
+
+    def test_handling_arb_geometry(self, client):
+        """几何 ARB：新车参数含几何键 → k_arb 由几何计算。"""
+        # legacy 方案 vehicle 已含 arb_f_*_mm 几何（config 默认注入）
+        body = client.post("/api/v2/handling", json={
+            "design_id": "legacy-import", "case_id": "static", "ay_g": 0.2}).json()
+        # K 曲线基于完整分布（含几何 ARB）— 确保不抛且 understeer VALID
+        assert body["understeer"]["status"] == "VALID"
+
+    def test_settle_ride_translates_pose(self, client):
+        """调平闭环：settle_ride=ride_mm 平移 → 静态姿态体现调平偏移。"""
+        body = client.post("/api/v2/solve", json={
+            "design_id": "legacy-import", "case_id": "static",
+            "settle_ride": True,
+            "ride_mm": {"fl": -10.0, "fr": -10.0, "rl": 0.0, "rr": 0.0}}).json()
+        # 前轴伸张 10 → pitch 非零；-10mm 处残差属 K-4 区间 → VALID/APPROXIMATE 均可
+        assert body["pose_labels"]["pitch_deg"] != 0.0
+        assert body["status"] in {"VALID", "APPROXIMATE"}
+
 class TestP4:
     """P4 工程迭代工作流：A/B 对比 / 敏感性 / 导出 / 版本回退。"""
 

@@ -68,3 +68,19 @@ def ride_level(vehicle: dict, fz: dict, mr: dict, ride_mm: dict) -> dict:
     out["balance_residual_n"] = balance
     out["status"] = "VALID" if abs(balance) < 1e-6 else "APPROXIMATE"
     return out
+
+
+def settle_offsets(vehicle: dict, fz: dict, mr: dict, preload: dict) -> dict:
+    """调平闭环反解：给定每角预载/轮率 → 求静态 ride 偏移（mm，正=压缩）。
+
+    平衡方程 Fz_i = preload_i + k_wheel_i·ride_i → ride_i = (Fz_i − preload_i)/k_wheel_i。
+    返回四轮 ride_mm 偏移（可直接作为 v2 solve 的 baseline_ride / travel 基准）。
+    """
+    k_spring = {"f": float(vehicle.get("k_spring_f", 26.0)),
+                "r": float(vehicle.get("k_spring_r", 47.0))}
+    corners = {"fl": "f", "fr": "f", "rl": "r", "rr": "r"}
+    ride = {}
+    for c in corners:
+        kw = k_spring[corners[c]] * float(mr.get(c, 0.7)) ** 2
+        ride[c] = (float(fz[c]) - float(preload.get(c, 0.0))) / kw
+    return {c: round(ride[c], 3) for c in corners}

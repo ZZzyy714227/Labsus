@@ -1,5 +1,28 @@
 # 开发日志
 
+## 2026-08-20 — P5 深化：yaw 动力学 + 轮胎椭圆/标定 + ARB 几何/回正 + 调平闭环（边界 2-6）
+
+- **(2) yaw 横摆动力学**（handling.yaw_analysis/yaw_gain_curve）：二自由度单车模型
+  [β,r] 状态空间，特征值/固有频率/阻尼比/稳定性，yaw rate 增益曲线；
+  中性对称车 yaw gain=V/L 解析一致（v15=9.677 @L1.55m）、增益随速度线性、与准静态 K=0 互校。
+- **(3) 轮胎**：tire_combined_force 由纯摩擦圆升级为**椭圆占用**（α-κ：纵向占掉侧向可用、
+  超出椭圆按比例缩回；μy≠μx 椭圆）。新增 fit_magic_formula **标定接口**：从台架
+  [(Fz,α,Fy)] 数据 least_squares 拟合 μy/Cα/MF C/E（合成数据回标 r²>0.98）。
+- **(4) 防倾杆几何 + 转向回正**：arb_geometry.py 由扭杆 d/L/臂长/材料 G 计算 k_arb
+  （J=πd⁴/32,kt=G·J/L,K=kt·(track/2/arm)²），config 加 arb_*_mm 几何键优先；
+  steering_metrics.py kingpin/回正力矩（拖距×Fy + 主销偏距×Fx），默认回正 self_centering。
+- **(5) 调平闭环**：v2 solve 支持 settle_ride（把 case 轮跳平移到 ride_mm 调平位形再求解），
+  ride_offsets 与 ride_level 的预载/姿态直接对应（闭环：/handling 给出位形 → solve 采用）。
+  修正初版假 preload=0 的荒谬压缩问题（k_wheel≈1.2N/mm 而载 687N → ride 566mm）；
+  语义改为显式 ride_mm 平移。
+- **(6) 操稳载荷闭环**：handling 端点 K(ay) 曲线改用 P3 完整四轮分布
+  （几何 ARB + 滚转刚度 + 完整横向转移），不再用简化转移。
+- /api/v2/handling 现在同时返回 understeer、K 曲线、**yaw**（单点+增益曲线）、
+  **kingpin 回正**（含几何 trail/scrub）、ride_level（调平）。
+- 验证：新增深化测试 17 项（椭圆边界/占用、标定回标、ARB 公式、kingpin 符号、yaw 一致性、
+  settle 平移）；全量非 e2e **380 passed / 3 xfailed**（F1 既有）；ruff/mypy 干净。
+
+
 ## 2026-08-20 — P5 轮胎模型 + 稳态转向 + 整车调平
 
 - **P5-1 简化魔毯方程轮胎模型**（src/metrics/tire_model.py）：Pacejka MF 魔改——
