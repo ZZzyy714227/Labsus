@@ -13,7 +13,7 @@ import numpy as np
 from hardpoints import DEFAULT_HARDPOINTS
 from solver.angles import compute_alignment_angles
 from solver.bump import solve_bump
-from solver.coupled_candidate import solve_coupled_candidate
+from solver.coupled_candidate import RESIDUAL_KEYS, solve_coupled_candidate
 from solver.steering import solve_steering
 from tire import _upright_y_axis, compute_contact_patch
 
@@ -33,6 +33,9 @@ class PathRecord(TypedDict):
     geometry_residual_mm: NumericOrNone
     iterations: int
     timing_ms: float
+    residuals_mm: dict[str, JsonValue]
+    explanation: str
+    state: dict[str, JsonValue]
 
 
 class DeltaRecord(TypedDict):
@@ -107,6 +110,7 @@ def _sequential_baseline(hp: dict[str, object], travel: int, rack: int) -> PathR
                 "steering_axis": None, "geometry_residual_mm": None,
                 "iterations": int(bump.get("iterations", 0)) + int(steered.get("iterations", 0)),
                 "timing_ms": (time.perf_counter() - started) * 1000.0,
+                "residuals_mm": {key: None for key in RESIDUAL_KEYS}, "explanation": "steering root unavailable", "state": {},
             }
         final = dict(steered)
         for key in ("CH1", "CH2", "CH3", "CH4", "CH5", "track_width", "tire_radius",
@@ -133,12 +137,15 @@ def _sequential_baseline(hp: dict[str, object], travel: int, rack: int) -> PathR
             "geometry_residual_mm": residual,
             "iterations": int(bump.get("iterations", 0)) + int(steered.get("iterations", 0)),
             "timing_ms": (time.perf_counter() - started) * 1000.0,
+            "residuals_mm": {key: None for key in RESIDUAL_KEYS}, "explanation": "sequential baseline",
+            "state": cast(dict[str, JsonValue], _json_value(final)),
         }
     except (KeyError, TypeError, ValueError, FloatingPointError):
         return {
             "status": "SOLVER_FAILED", "angles": None, "contact_patch": None,
             "steering_axis": None, "geometry_residual_mm": None, "iterations": 0,
             "timing_ms": (time.perf_counter() - started) * 1000.0,
+            "residuals_mm": {key: None for key in RESIDUAL_KEYS}, "explanation": "sequential baseline failed", "state": {},
         }
 
 
@@ -153,6 +160,9 @@ def _coupled_path(hp: dict[str, object], travel: int, rack: int) -> PathRecord:
         "geometry_residual_mm": result.get("geometry_residual_mm"),
         "iterations": int(result.get("iterations", 0)),
         "timing_ms": float(result.get("timing_ms", 0.0)),
+        "residuals_mm": cast(dict[str, JsonValue], result.get("residuals_mm", {})),
+        "explanation": str(result.get("explanation", "")),
+        "state": cast(dict[str, JsonValue], result.get("state", {})),
     }
 
 

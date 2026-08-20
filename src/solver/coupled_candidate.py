@@ -12,8 +12,10 @@ from typing import Any
 import numpy as np
 
 from geometry import dist, distance_point_to_line
+from solver.angles import compute_alignment_angles
 from solver.bump import solve_bump
 from solver.steering import solve_steering
+from tire import _upright_y_axis, compute_contact_patch
 
 try:
     from scipy.optimize import least_squares
@@ -21,6 +23,11 @@ except ImportError:  # pragma: no cover - depends on optional environment
     least_squares = None
 
 POINTS = ("UP1", "UP2", "UP3", "UP4", "UP5")
+RESIDUAL_KEYS = ("uca_axis", "lca_axis", "kingpin_length", "upright_up1_up5",
+                 "upright_up2_up5", "tie_rod_length", "pushrod_length", "wheel_travel",
+                 "rigid_up1_up3", "rigid_up1_up4", "rigid_up1_up5", "rigid_up2_up3",
+                 "rigid_up2_up4", "rigid_up2_up5", "rigid_up3_up4", "rigid_up3_up5",
+                 "rigid_up4_up5")
 
 
 def _lengths(hp: dict[str, Any]) -> dict[str, float]:
@@ -50,6 +57,8 @@ def _residuals(x: np.ndarray, hp: dict[str, Any], travel: float, rack: float,
         "upright_up2_up5": dist(points["UP2"], points["UP5"]) - reference["upright_up2_up5"],
         "tie_rod_length": dist(points["UP3"], fl1) - reference["tie_rod_length"],
         "wheel_travel": points["UP5"][2] - (design["UP5"][2] + travel),
+        "pushrod_length": dist(points["UP4"], np.asarray(hp["CH5"], float))
+        - dist(design["UP4"], np.asarray(hp["CH5"], float)),
     }
     # Every upright point is rigid relative to the kingpin/wheel-center frame.
     for left, right in (("UP1", "UP3"), ("UP1", "UP4"), ("UP1", "UP5"),
@@ -69,7 +78,8 @@ def solve_coupled_candidate(hp: dict[str, Any], travel: int, rack: int) -> dict[
     started = time.perf_counter()
     base: dict[str, Any] = {"status": "SOLVER_FAILED", "angles": None, "contact_patch": None,
             "steering_axis": None, "geometry_residual_mm": None, "iterations": 0,
-            "timing_ms": 0.0, "residuals_mm": {}, "explanation": ""}
+            "timing_ms": 0.0, "residuals_mm": {key: None for key in RESIDUAL_KEYS}, "explanation": "",
+            "state": {name: None for name in (*POINTS, "FL1", "steering_angle", "contact_patch")} }
     if least_squares is None:
         base["status"] = "NOT_IMPLEMENTED"
         base["explanation"] = "scipy.optimize.least_squares is unavailable"
@@ -97,15 +107,23 @@ def solve_coupled_candidate(hp: dict[str, Any], travel: int, rack: int) -> dict[
                                max_nfev=1500)
         singular_values = np.linalg.svd(result.jac, compute_uv=False)
         rank = int(np.sum(singular_values > max(singular_values[0] * 1e-10, 1e-12)))
-        if rank < min(result.jac.shape):
-            base["status"] = "NOT_IMPLEMENTED"
-            base["explanation"] = f"constraint Jacobian is rank-deficient ({rank}/{min(result.jac.shape)})"
-            return base
         residuals = _residuals(result.x, hp, travel, rack, reference)
         maximum = max(abs(value) for value in residuals.values())
+        state = {name: result.x[i * 3:i * 3 + 3].tolist() for i, name in enumerate(POINTS)}
+        state["FL1"] = (np.asarray(hp["FL1"], float) + np.array([0.0, rack, 0.0])).tolist()
+        state["steering_angle"] = float(initial.get("steering_theta", 0.0))
+        state["contact_patch"] = None
+        if rank >= min(result.jac.shape):
+            angles = compute_alignment_angles(state, hp=hp)
+            contact = compute_contact_patch(state["UP5"], _upright_y_axis(state), hp)
+            state["contact_patch"] = contact["center"]
+            base.update({"angles": angles, "contact_patch": contact["center"],
+                         "steering_axis": (np.asarray(state["UP2"]) - np.asarray(state["UP1"])).tolist()})
         base.update({"status": "VALID" if maximum <= 0.02 else "APPROXIMATE",
                      "geometry_residual_mm": maximum, "iterations": int(result.nfev),
-                     "residuals_mm": residuals, "explanation": "bounded coupled solve"})
+                     "residuals_mm": residuals, "state": state,
+                     "explanation": ("bounded coupled solve" if rank >= min(result.jac.shape)
+                                     else f"constraint Jacobian is rank-deficient ({rank}/{min(result.jac.shape)}); minimized evidence retained")})
         return base
     except (KeyError, TypeError, ValueError, FloatingPointError, np.linalg.LinAlgError) as exc:
         base["explanation"] = f"candidate solve failed: {exc}"
