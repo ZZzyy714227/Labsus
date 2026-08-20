@@ -1,5 +1,23 @@
 # 开发日志
 
+## 2026-08-20 — P6 前端建模里程碑1：DWB-SIM 风格四视图建模器 + 操稳面板（另修复 store 旧数据一致性问题）
+
+- 参考 double-wishbone-suspension.html 的建模（投影/相机/图元/配色），升级 web/modeler.html：
+  - **四视图**：等轴测（DWB-SIM camIso 透视相机 + 迭代 fit）+ 正/俯/侧三正交（P2 投影/S2W 反投影）；
+  - **分组图元配色**：车架盒/中横板/CH 支架、防倾杆横杆、UCA/LCA(rig)、主销(kp 红)、横拉杆(tie 青)、
+    推杆(ela 琥珀)、转向节刚体面片(knuF)、轮胎/轮辋圆；节点圆=运动件/方=车架、选中高亮；
+  - **交互**：三个正交视图拖拽硬点（改两分量）、等轴测仅预览不拖（同 DWB-SIM）；
+  - **面板**：定位角/状态/受力/曲线（已有）+ 新增**操稳面板**（understeer K、αf/αr、Cα、yaw ωn/ζ/增益、
+    kingpin 回正力矩、调平预载/roll/pitch）+ 左侧外倾滑杆（操稳输入）。
+- **数据一致性修复**：真实 data/store 的 legacy-import 是 P2-0 前旧几何（top-forward 主销），
+  因幂等导入不覆盖；导致 store 路径（solve/compare/handling/export/modeler）trail=-22.4、caster 负等旧语义
+  （测试用临时 store 掩盖）。已清空 data/store 重建为 P2-0 新几何（UP1.x=-1.961 top-rearward），
+  端到端验证：trail +22.4、kingpin 回正 −23480Nmm、self_centering=True、yaw ζ=1.0、调平 preload 686.7。
+  同上 DEVLOG P2-0 的符号修正现已对真实数据生效（此前只对 DEFAULT_HARDPOINTS 生效）。
+- 验证：modeler.html JS 语法通过；页面 /modeler.html 200；solve/hardpoints、handling 端点契约端到端 OK；
+  v2/handling 回归 69 passed。全量非 e2e 380 passed / 3 xfailed（此前确认）。
+
+
 ## 2026-08-20 — P5 深化：yaw 动力学 + 轮胎椭圆/标定 + ARB 几何/回正 + 调平闭环（边界 2-6）
 
 - **(2) yaw 横摆动力学**（handling.yaw_analysis/yaw_gain_curve）：二自由度单车模型
