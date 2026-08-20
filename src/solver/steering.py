@@ -49,6 +49,7 @@ def solve_steering(hp_right, rack_displacement, max_iter=50, tol=1e-8,
             "push_rod_length": float(dist(UP4, CH5)),
             "tie_rod_length": L_tie_rod, "iterations": 0,
             "_newton_converged": False, "_used_fallback": False,
+            "_fallback_root_found": False,
             "steering_theta": 0.0,
         }
     kp_dir = kp_dir / kp_norm
@@ -65,6 +66,7 @@ def solve_steering(hp_right, rack_displacement, max_iter=50, tol=1e-8,
             "push_rod_length": float(dist(UP4, CH5)),
             "tie_rod_length": L_tie_rod, "iterations": 0,
             "_newton_converged": False, "_used_fallback": False,
+            "_fallback_root_found": False,
             "steering_theta": 0.0,
         }
 
@@ -111,6 +113,7 @@ def solve_steering(hp_right, rack_displacement, max_iter=50, tol=1e-8,
     # Newton can converge to the wrong one at ~5-10°, far below the old
     # 45° threshold).
     used_fallback = False
+    fallback_root_found = False
     jump_from_guess = theta_guess != 0.0 and abs(theta - theta_guess) > 0.30
     if not newton_ok or abs(theta) > 0.7854 or jump_from_guess:
         used_fallback = True
@@ -149,6 +152,7 @@ def solve_steering(hp_right, rack_displacement, max_iter=50, tol=1e-8,
             prev_t = t_i
 
         if best_root is not None:
+            fallback_root_found = True
             theta = best_root
             it = max_iter  # mark that we used fallback
 
@@ -182,5 +186,6 @@ def solve_steering(hp_right, rack_displacement, max_iter=50, tol=1e-8,
         "iterations": it + 1,
         "_newton_converged": newton_ok and not used_fallback,
         "_used_fallback": used_fallback,
+        "_fallback_root_found": fallback_root_found,
         "steering_theta": theta,
     }

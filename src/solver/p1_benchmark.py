@@ -111,8 +111,10 @@ def _sequential_baseline(hp: dict[str, object], travel: int, rack: int) -> PathR
             np.asarray(final["UP3"]) - np.asarray(final["FL1"]))) - tie_rod_length)
         residual = max(float(bump.get("max_residual", 0.0)), tie_residual)
         status = "VALID" if residual <= 0.02 else "APPROXIMATE"
-        if not steered.get("_newton_converged", True) and not steered.get("_used_fallback", False):
-            status = "SOLVER_FAILED"
+        if not steered.get("_newton_converged", True):
+            if (not steered.get("_used_fallback", False)
+                    or not steered.get("_fallback_root_found", False)):
+                status = "SOLVER_FAILED"
         return {
             "status": status,
             "angles": cast(dict[str, JsonValue], _json_value(angles)),
@@ -125,7 +127,7 @@ def _sequential_baseline(hp: dict[str, object], travel: int, rack: int) -> PathR
     except (KeyError, TypeError, ValueError, FloatingPointError):
         return {
             "status": "SOLVER_FAILED", "angles": None, "contact_patch": None,
-            "steering_axis": None, "geometry_residual_mm": 0.0, "iterations": 0,
+            "steering_axis": None, "geometry_residual_mm": None, "iterations": 0,
             "timing_ms": (time.perf_counter() - started) * 1000.0,
         }
 
