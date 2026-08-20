@@ -1,5 +1,14 @@
 # 开发日志
 
+## 2026-08-20 — P2-3 指标状态机契约收口
+
+- v2 表面（solve + sweep）所有指标/结果显式携带七状态：`TestP23StateMachineContract`
+  断言每轮 report.status ∈ 七状态、VALID/APPROXIMATE 角必须有角度值、sweep 每个指标
+  状态-值一致性（value 状态必须带值，非 value 状态禁止带值）。
+- 现状：v2 solve 逐轮 WheelReport 带状态；sweep 指标全部为 MetricResult（构造即校验）。
+  旧 /api/analyze 为 legacy 展示端点（jacking=None 等占位），P4 前端迁移后退出。
+- 验证：44 passed（含 P2-3 契约）；ruff 干净。
+
 ## 2026-08-20 — P2-2 运动学指标补齐（几何 MR 取代硬编码 0.7/0.6）
 
 - 新增 src/core/metrics.py：MetricResult 七状态状态机（P2-3 地基）——VALID 必须带值，
