@@ -1,5 +1,12 @@
 # 开发日志
 
+## 2026-08-20 — V1 里程碑进展同步（P0/P1 完成，进入 P2）
+
+- 保存 V1 进度快照至 `docs/superpowers/specs/2026-08-20-v1-progress-sync.md`：产品定位（FSAE 底盘硬点快速迭代的整车准静态几何与轮边受力分析工具）、P0 数据地基 100% 完成（259 passed / 4 xfailed）、P1 求解误差论证完成并冻结 `SEQUENTIAL_PREVIEW_WITH_HIGH_ACCURACY_VALIDATION`。
+- 已知问题登记不变：K-1 左右镜像 Scrub 不对称（右 ≈19.78 / 左 ≈17.84 mm）、K-2 Toe 符号（Toe-in 应为正）、K-3 Caster Trail 符号相反、K-4 全行程残差超阈值（负行程最高 0.731417 mm，阈值 0.02 mm，**未修复**）。
+- 复跑确认：P1 聚焦测试 `21 passed`；工作区位于 `workbench-rewrite` 分支，最新提交 `3ba1b47`，P1 计划文件收尾提交。
+- 下一阶段：P2 运动学指标与统一结果结构，P2-0 优先修 K-1/K-2/K-3 坐标符号问题。
+
 ## 2026-08-20 — P1 Task 5 solver architecture gate
 
 - 基于 `data/reports/p1_solver_gate.json` 的 16 个 front-right travel/rack 工况冻结决策：`SEQUENTIAL_PREVIEW_WITH_HIGH_ACCURACY_VALIDATION`。
