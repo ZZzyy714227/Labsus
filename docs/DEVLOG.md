@@ -1,5 +1,12 @@
 # 开发日志
 
+## 2026-08-20 — P1 Task 5 solver architecture gate
+
+- 基于 `data/reports/p1_solver_gate.json` 的 16 个 front-right travel/rack 工况冻结决策：`SEQUENTIAL_PREVIEW_WITH_HIGH_ACCURACY_VALIDATION`。
+- 顺序 `bump → steer` 保留为生产预览/兼容路径；coupled candidate 仅保留为后台或按需高精度校验，不修改生产 endpoints。候选 4/16 `VALID`、12/16 `APPROXIMATE`，且平均耗时约 40.69ms，高于顺序路径约 5.72ms；定位角、接地点与残差 delta 不稳定，不能替换生产。
+- K-4 **未修复**：顺序原始残差负行程最大约 0.731417mm（-30mm），正行程最大约 0.497062mm（+30mm），均超过 0.02mm 阈值；报告保留 `smoothing: none`、逐 case raw residual、travel/rack 方向诊断和候选状态。
+- 新增 `docs/superpowers/specs/2026-08-20-p1-solver-gate-report.md`，并更新 V1 设计基线与回归测试。全量验证若受本机 pytest cache/临时目录 `PermissionError` 影响，以命令输出如实记录，不将环境失败归因于代码。
+
 ## 2026-08-20 — P1 Task 4 steering-axis metric normalization
 
 - 修正 coupled candidate：报告前将 `UP2-UP1` 按 sequential baseline 的约定归一化为单位 steering axis；`steering_axis_unitless` delta 现在严格表示两个单位向量之差。

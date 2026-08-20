@@ -322,6 +322,25 @@ def test_comparison_reports_all_requested_deltas_without_smoothing():
         assert row["delta"]["timing_ms"] == round(coupled["timing_ms"] - sequential["timing_ms"], 9)
 
 
+def test_task5_freezes_sequential_preview_architecture_and_raw_residual_contract():
+    report_path = Path("docs/superpowers/specs/2026-08-20-p1-solver-gate-report.md")
+    report = report_path.read_text(encoding="utf-8")
+    assert "SEQUENTIAL_PREVIEW_WITH_HIGH_ACCURACY_VALIDATION" in report
+    assert report.count("FULL_COUPLED") == 0
+    assert report.count("PARTIAL_COUPLED") == 0
+
+    measured = json.loads(Path("data/reports/p1_solver_gate.json").read_text(encoding="utf-8"))
+    residuals = [
+        row["sequential"]["geometry_residual_mm"]
+        for row in measured["cases"]
+        if row["sequential"]["geometry_residual_mm"] is not None
+    ]
+    assert residuals
+    assert max(residuals) > 0.02
+    assert measured["smoothing"] == "none"
+    assert measured["k4_diagnosis"]["negative_travel_max"]["residual_mm"] > 0.02
+
+
 def test_k4_diagnosis_separates_travel_rack_and_candidate_causes():
     diagnosis = compare_solver_paths()["k4_diagnosis"]
     assert diagnosis["negative_travel_max"]["travel"] < 0
