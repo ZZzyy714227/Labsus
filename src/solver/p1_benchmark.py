@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from typing import TypedDict
 
 from hardpoints import DEFAULT_HARDPOINTS
@@ -18,21 +19,25 @@ TRAVEL_GRID = (-30, -15, -5, 0, 5, 10, 15, 30)
 RACK_GRID = (0, 5)
 
 
+JsonValue = None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
+NumericOrNone = float | None
+
+
 class PathRecord(TypedDict):
     status: str
-    angles: None
-    contact_patch: None
-    steering_axis: None
-    geometry_residual_mm: None
+    angles: dict[str, JsonValue] | None
+    contact_patch: list[JsonValue] | None
+    steering_axis: list[JsonValue] | None
+    geometry_residual_mm: NumericOrNone
     iterations: int
     timing_ms: float
 
 
 class DeltaRecord(TypedDict):
-    camber_deg: None
-    toe_deg: None
-    contact_patch: None
-    steering_axis: None
+    camber_deg: NumericOrNone
+    toe_deg: NumericOrNone
+    contact_patch: list[JsonValue] | None
+    steering_axis: list[JsonValue] | None
 
 
 class TimingRecord(TypedDict):
@@ -60,11 +65,11 @@ class Report(TypedDict):
 def _hardpoint_fingerprint() -> str:
     """Return a stable digest of the selected legacy hardpoint snapshot."""
     snapshot = {name: _json_value(point) for name, point in sorted(DEFAULT_HARDPOINTS.items())}
-    encoded = json.dumps(snapshot, separators=(",", ":"), sort_keys=True).encode()
+    encoded = json.dumps(snapshot, allow_nan=False, separators=(",", ":"), sort_keys=True).encode()
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _json_value(value: object) -> object:
+def _json_value(value: object) -> JsonValue:
     """Convert configured NumPy-like values into deterministic JSON values."""
     if hasattr(value, "tolist"):
         return _json_value(value.tolist())
@@ -73,8 +78,10 @@ def _json_value(value: object) -> object:
     if isinstance(value, (list, tuple)):
         return [_json_value(item) for item in value]
     if isinstance(value, (int, float, str, bool)) or value is None:
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ValueError("JSON values must contain finite numbers")
         return value
-    return float(value)
+    raise TypeError(f"Unsupported JSON value: {type(value).__name__}")
 
 
 def _not_implemented_path() -> PathRecord:

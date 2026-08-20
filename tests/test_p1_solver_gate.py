@@ -1,8 +1,21 @@
 """Contract tests for the isolated P1 solver comparison harness."""
 
 import json
+import math
 
 from src.solver.p1_benchmark import compare_solver_paths
+
+
+def _assert_finite_json_leaves(value: object) -> None:
+    if isinstance(value, dict):
+        for item in value.values():
+            _assert_finite_json_leaves(item)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            _assert_finite_json_leaves(item)
+    elif isinstance(value, float):
+        assert math.isfinite(value)
+
 
 PATH_FIELDS = {
     "status",
@@ -47,6 +60,7 @@ def test_compare_is_deterministic_and_strictly_json_serializable():
     second = compare_solver_paths()
 
     assert first == second
+    _assert_finite_json_leaves(first)
     assert json.dumps(first, allow_nan=False, sort_keys=True)
 
 
@@ -63,4 +77,5 @@ def test_compare_output_is_json_safe_and_uses_full_travel_grid():
 
     assert sorted({row["travel"] for row in rows}) == [-30, -15, -5, 0, 5, 10, 15, 30]
     assert sorted({row["rack"] for row in rows}) == [0, 5]
-    json.dumps(report)
+    _assert_finite_json_leaves(report)
+    json.dumps(report, allow_nan=False)
