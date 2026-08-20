@@ -1,5 +1,13 @@
 # 开发日志
 
+## 2026-08-20 — P1 Task 2 review fixes
+
+- 收紧 `tests/test_p1_solver_gate.py` 的可空残差断言：失败行明确要求 `geometry_residual_mm is None`，成功行先完成非空收窄；矩阵中的每一行都校验状态、迭代、计时及结果字段的一致性。
+- 修正失败的 sequential baseline 不再伪造 `geometry_residual_mm=0.0`；保留原始成功残差语义，并新增失败路径回归测试。
+- 确定性测试现在只比较去除 timing 字段后的结果；每个 timing 单独断言有限且非负，不再把计时清零后宣称完整报告相等。
+- 转向求解器新增 `_fallback_root_found`，benchmark 仅将“找到有效 fallback 根”的 fallback 视为成功；无根 fallback 明确报告 `SOLVER_FAILED`。
+- 聚焦测试：9 passed；ruff 与 touched-file mypy 通过（pytest cache 权限 warning 仍存在）。
+
 ## 2026-08-20 — P1 Task 2 sequential baseline adapter
 
 - `src/solver/p1_benchmark.py` now evaluates the explicitly selected front-right side through the production `solve_bump()` → `solve_steering()` → `compute_alignment_angles()` / `compute_contact_patch()` calls; no HTTP route or left-side mirroring is involved.
