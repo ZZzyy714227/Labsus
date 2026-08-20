@@ -13,6 +13,7 @@ import numpy as np
 from hardpoints import DEFAULT_HARDPOINTS
 from solver.angles import compute_alignment_angles
 from solver.bump import solve_bump
+from solver.coupled_candidate import solve_coupled_candidate
 from solver.steering import solve_steering
 from tire import _upright_y_axis, compute_contact_patch
 
@@ -141,11 +142,18 @@ def _sequential_baseline(hp: dict[str, object], travel: int, rack: int) -> PathR
         }
 
 
-def _not_implemented_path() -> PathRecord:
-    """Return an explicit unavailable record for the future coupled candidate."""
-    return {"status": "NOT_IMPLEMENTED", "angles": None, "contact_patch": None,
-            "steering_axis": None, "geometry_residual_mm": None, "iterations": 0,
-            "timing_ms": 0.0}
+def _coupled_path(hp: dict[str, object], travel: int, rack: int) -> PathRecord:
+    """Adapt the isolated candidate to the benchmark path schema."""
+    result = solve_coupled_candidate(hp, travel, rack)
+    return {
+        "status": str(result["status"]),
+        "angles": result.get("angles"),
+        "contact_patch": result.get("contact_patch"),
+        "steering_axis": result.get("steering_axis"),
+        "geometry_residual_mm": result.get("geometry_residual_mm"),
+        "iterations": int(result.get("iterations", 0)),
+        "timing_ms": float(result.get("timing_ms", 0.0)),
+    }
 
 
 def compare_solver_paths() -> Report:
@@ -155,12 +163,14 @@ def compare_solver_paths() -> Report:
     for travel in TRAVEL_GRID:
         for rack in RACK_GRID:
             sequential = _sequential_baseline(hp, travel, rack)
+            coupled = _coupled_path(hp, travel, rack)
             cases.append({
                 "travel": travel, "rack": rack, "sequential": sequential,
-                "coupled": _not_implemented_path(),
+                "coupled": coupled,
                 "delta": {"camber_deg": None, "toe_deg": None,
                            "contact_patch": None, "steering_axis": None},
-                "timing_ms": {"sequential": sequential["timing_ms"], "coupled": 0.0},
+                "timing_ms": {"sequential": sequential["timing_ms"],
+                              "coupled": coupled["timing_ms"]},
             })
 
     return {

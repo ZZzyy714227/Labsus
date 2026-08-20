@@ -1,5 +1,12 @@
 # 开发日志
 
+## 2026-08-20 — P1 Task 3 isolated coupled candidate
+
+- 新增 `src/solver/coupled_candidate.py`：仅供 P1 benchmark 使用的选定前右侧统一约束候选；以 PBD/现有转向结果作分支保持初值，SciPy 可用时执行有界 least_squares。
+- 候选显式建模 UP1/UP2/UP3/UP4/UP5/FL1，并保留 UCA/LCA 轴线、主销长度、立柱到轮心距离、齿条位移后的拉杆长度、轮跳驱动和刚性立柱距离的原始残差；不可用或秩亏时返回 `NOT_IMPLEMENTED`/`SOLVER_FAILED`，不伪造几何输出。
+- `src/solver/p1_benchmark.py` 仅替换 coupled 占位路径，生产 HTTP endpoint 与顺序求解器未修改；新增候选状态/残差诊断测试。
+- 验证：P1 聚焦测试 12 passed；Ruff、mypy、`git diff --check` 通过。pytest cache 写入仍有本机权限 warning。
+
 ## 2026-08-20 — P1 Task 2 fallback failure contract
 
 - 修正 `src/solver/p1_benchmark.py`：转向 Newton 未收敛且 fallback 未找到有效根时，立即按异常失败契约返回 `SOLVER_FAILED`，并将 angles/contact_patch/steering_axis/geometry_residual_mm 全部置为 `None`；找到有效 fallback 根的成功行为保持不变。
