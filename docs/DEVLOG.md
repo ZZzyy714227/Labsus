@@ -1,5 +1,12 @@
 # 开发日志
 
+## 2026-08-20 — P1 Task 4 K-4 diagnosis gap
+
+- 报告逐 case 保留 coupled candidate 的 `rank_deficient`、`explanation` 与 `state`；未观测到秩亏时显式输出 `rank_deficient_count: 0` 和 `rank_deficient_cases: []`。
+- `k4_diagnosis` 新增按 travel direction（negative/zero/positive）的残差覆盖、按 rack 值的最大残差与状态计数，并保留 candidate status 计数，明确关联方向、rack 输入和候选秩亏。
+- 更新测试断言上述精确字段与 16 工况覆盖；重新生成 `data/reports/p1_solver_gate.json`。
+- 验证：focused pytest、root CLI、Ruff、mypy、`git diff --check` 结果以本轮命令输出为准。
+
 ## 2026-08-20 — P1 Task 4 full comparison matrix
 
 - 新增 `tests/fixtures/p1_solver_gate_cases.json`：16 个 front-right travel/rack 工况（travel -30/-15/-5/0/5/10/15/30 mm，rack 0/5 mm），覆盖 static、bump-only、rack-only、bump+rack；fixture 仅保存输入。

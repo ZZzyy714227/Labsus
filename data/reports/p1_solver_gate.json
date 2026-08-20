@@ -19,6 +19,7 @@
         "explanation": "bounded coupled solve",
         "geometry_residual_mm": 1.572090352349072,
         "iterations": 24,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": 0.008998207559869797,
           "lca_axis": -0.823470574201906,
@@ -82,7 +83,7 @@
           6.056325216810137,
           -145.56818200214832
         ],
-        "timing_ms": 46.96230008266866
+        "timing_ms": 59.94690000079572
       },
       "delta": {
         "camber_deg": 0.615,
@@ -102,7 +103,7 @@
           6.002310691,
           -144.574142154
         ],
-        "timing_ms": 42.053400073,
+        "timing_ms": 54.697399959,
         "toe_deg": -0.874,
         "trail_mm": 76.43
       },
@@ -125,6 +126,7 @@
         "explanation": "sequential baseline",
         "geometry_residual_mm": 0.731417,
         "iterations": 84,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": null,
           "lca_axis": null,
@@ -219,11 +221,11 @@
           0.054014525469590326,
           -0.9940398480933694
         ],
-        "timing_ms": 4.908900009468198
+        "timing_ms": 5.2495000418275595
       },
       "timing_ms": {
-        "coupled": 46.96230008266866,
-        "sequential": 4.908900009468198
+        "coupled": 59.94690000079572,
+        "sequential": 5.2495000418275595
       },
       "travel": -30
     },
@@ -246,6 +248,7 @@
         "explanation": "bounded coupled solve",
         "geometry_residual_mm": 1.5162250326828257,
         "iterations": 26,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": 0.054239492149861235,
           "lca_axis": -0.7707096460504772,
@@ -309,7 +312,7 @@
           9.67217767476302,
           -141.9190040915183
         ],
-        "timing_ms": 42.50809992663562
+        "timing_ms": 49.152599880471826
       },
       "delta": {
         "camber_deg": 1.558,
@@ -329,7 +332,7 @@
           9.618163149,
           -140.924964243
         ],
-        "timing_ms": 37.600700045,
+        "timing_ms": 43.627099833,
         "toe_deg": -4.168,
         "trail_mm": -56.44
       },
@@ -352,6 +355,7 @@
         "explanation": "sequential baseline",
         "geometry_residual_mm": 0.731417,
         "iterations": 84,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": null,
           "lca_axis": null,
@@ -446,11 +450,11 @@
           0.054014525469590326,
           -0.9940398480933694
         ],
-        "timing_ms": 4.907399881631136
+        "timing_ms": 5.525500047951937
       },
       "timing_ms": {
-        "coupled": 42.50809992663562,
-        "sequential": 4.907399881631136
+        "coupled": 49.152599880471826,
+        "sequential": 5.525500047951937
       },
       "travel": -30
     },
@@ -473,6 +477,7 @@
         "explanation": "bounded coupled solve",
         "geometry_residual_mm": 0.6238446904200003,
         "iterations": 25,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": 0.01701283021316158,
           "lca_axis": -0.3029296567774509,
@@ -536,7 +541,7 @@
           5.469433281846364,
           -145.82056621726878
         ],
-        "timing_ms": 49.13920001126826
+        "timing_ms": 55.042099906131625
       },
       "delta": {
         "camber_deg": 0.725,
@@ -556,7 +561,7 @@
           5.420370905,
           -144.825550816
         ],
-        "timing_ms": 42.078100145,
+        "timing_ms": 46.735899989,
         "toe_deg": -0.091,
         "trail_mm": 78.33
       },
@@ -579,6 +584,7 @@
         "explanation": "sequential baseline",
         "geometry_residual_mm": 0.190396,
         "iterations": 89,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": null,
           "lca_axis": null,
@@ -673,11 +679,11 @@
           0.04906237634677974,
           -0.9950154011737259
         ],
-        "timing_ms": 7.061099866405129
+        "timing_ms": 8.306199917569757
       },
       "timing_ms": {
-        "coupled": 49.13920001126826,
-        "sequential": 7.061099866405129
+        "coupled": 55.042099906131625,
+        "sequential": 8.306199917569757
       },
       "travel": -15
     },
@@ -700,6 +706,7 @@
         "explanation": "bounded coupled solve",
         "geometry_residual_mm": 0.578744100910356,
         "iterations": 24,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": 0.03206650137164502,
           "lca_axis": -0.2730267183829369,
@@ -763,7 +770,7 @@
           8.768595793480472,
           -141.48626411589902
         ],
-        "timing_ms": 46.763500198721886
+        "timing_ms": 53.40550001710653
       },
       "delta": {
         "camber_deg": 0.835,
@@ -783,7 +790,7 @@
           8.719533417,
           -140.491248715
         ],
-        "timing_ms": 39.899300318,
+        "timing_ms": 45.847499976,
         "toe_deg": -1.415,
         "trail_mm": -63.21
       },
@@ -806,6 +813,7 @@
         "explanation": "sequential baseline",
         "geometry_residual_mm": 0.190396,
         "iterations": 88,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": null,
           "lca_axis": null,
@@ -900,11 +908,11 @@
           0.04906237634677974,
           -0.9950154011737259
         ],
-        "timing_ms": 6.864199880510569
+        "timing_ms": 7.558000041171908
       },
       "timing_ms": {
-        "coupled": 46.763500198721886,
-        "sequential": 6.864199880510569
+        "coupled": 53.40550001710653,
+        "sequential": 7.558000041171908
       },
       "travel": -15
     },
@@ -927,6 +935,7 @@
         "explanation": "bounded coupled solve",
         "geometry_residual_mm": 0.05367671627576698,
         "iterations": 40,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": 0.002549241291688986,
           "lca_axis": -0.024497597571439655,
@@ -990,7 +999,7 @@
           5.071878799906472,
           -146.0726723001526
         ],
-        "timing_ms": 70.39369991980493
+        "timing_ms": 81.51049981825054
       },
       "delta": {
         "camber_deg": 0.78,
@@ -1010,7 +1019,7 @@
           5.026411014,
           -145.077417676
         ],
-        "timing_ms": 63.75500001,
+        "timing_ms": 74.329499854,
         "toe_deg": 0.377,
         "trail_mm": 79.65
       },
@@ -1033,6 +1042,7 @@
         "explanation": "sequential baseline",
         "geometry_residual_mm": 0.037718,
         "iterations": 88,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": null,
           "lca_axis": null,
@@ -1127,11 +1137,11 @@
           0.04546778629821071,
           -0.9952546238655541
         ],
-        "timing_ms": 6.638699909672141
+        "timing_ms": 7.180999964475632
       },
       "timing_ms": {
-        "coupled": 70.39369991980493,
-        "sequential": 6.638699909672141
+        "coupled": 81.51049981825054,
+        "sequential": 7.180999964475632
       },
       "travel": -5
     },
@@ -1154,6 +1164,7 @@
         "explanation": "bounded coupled solve",
         "geometry_residual_mm": 0.00593168754506479,
         "iterations": 32,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": 0.0004424732676113763,
           "lca_axis": -0.0026293473403029566,
@@ -1217,7 +1228,7 @@
           8.144175033289685,
           -141.05497106755078
         ],
-        "timing_ms": 62.65809992328286
+        "timing_ms": 81.47919992916286
       },
       "delta": {
         "camber_deg": 0.346,
@@ -1237,7 +1248,7 @@
           8.098707247,
           -140.059716444
         ],
-        "timing_ms": 56.086699944,
+        "timing_ms": 74.625300011,
         "toe_deg": 0.283,
         "trail_mm": -67.61
       },
@@ -1260,6 +1271,7 @@
         "explanation": "sequential baseline",
         "geometry_residual_mm": 0.037718,
         "iterations": 88,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": null,
           "lca_axis": null,
@@ -1354,11 +1366,11 @@
           0.04546778629821071,
           -0.9952546238655541
         ],
-        "timing_ms": 6.571399979293346
+        "timing_ms": 6.853899918496609
       },
       "timing_ms": {
-        "coupled": 62.65809992328286,
-        "sequential": 6.571399979293346
+        "coupled": 81.47919992916286,
+        "sequential": 6.853899918496609
       },
       "travel": -5
     },
@@ -1381,6 +1393,7 @@
         "explanation": "bounded coupled solve",
         "geometry_residual_mm": 1.1368683772161603e-13,
         "iterations": 1,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": 0.0,
           "lca_axis": 0.0,
@@ -1444,7 +1457,7 @@
           6.5428608237347134,
           -149.28590242804654
         ],
-        "timing_ms": 2.5185998529195786
+        "timing_ms": 2.505300100892782
       },
       "delta": {
         "camber_deg": 0.0,
@@ -1464,7 +1477,7 @@
           6.499241752,
           -148.290663079
         ],
-        "timing_ms": 2.010399941,
+        "timing_ms": 1.936600078,
         "toe_deg": 0.0,
         "trail_mm": 0.0
       },
@@ -1487,6 +1500,7 @@
         "explanation": "sequential baseline",
         "geometry_residual_mm": 1.1368683772161603e-13,
         "iterations": 2,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": null,
           "lca_axis": null,
@@ -1581,11 +1595,11 @@
           0.04361907215823142,
           -0.9952393495203102
         ],
-        "timing_ms": 0.5081999115645885
+        "timing_ms": 0.568700022995472
       },
       "timing_ms": {
-        "coupled": 2.5185998529195786,
-        "sequential": 0.5081999115645885
+        "coupled": 2.505300100892782,
+        "sequential": 0.568700022995472
       },
       "travel": 0
     },
@@ -1608,6 +1622,7 @@
         "explanation": "bounded coupled solve",
         "geometry_residual_mm": 5.684341886080802e-14,
         "iterations": 11,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": 0.0,
           "lca_axis": 0.0,
@@ -1671,7 +1686,7 @@
           6.463499898998521,
           -148.94629852564435
         ],
-        "timing_ms": 19.195600179955363
+        "timing_ms": 26.794099947437644
       },
       "delta": {
         "camber_deg": 0.088,
@@ -1691,7 +1706,7 @@
           6.419880827,
           -147.951059176
         ],
-        "timing_ms": 18.632300198,
+        "timing_ms": 25.965599809,
         "toe_deg": 0.199,
         "trail_mm": -5.88
       },
@@ -1714,6 +1729,7 @@
         "explanation": "sequential baseline",
         "geometry_residual_mm": 5.684341886080802e-14,
         "iterations": 5,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": null,
           "lca_axis": null,
@@ -1808,11 +1824,11 @@
           0.04361907215823142,
           -0.9952393495203102
         ],
-        "timing_ms": 0.5632999818772078
+        "timing_ms": 0.8285001385957003
       },
       "timing_ms": {
-        "coupled": 19.195600179955363,
-        "sequential": 0.5632999818772078
+        "coupled": 26.794099947437644,
+        "sequential": 0.8285001385957003
       },
       "travel": 0
     },
@@ -1835,6 +1851,7 @@
         "explanation": "bounded coupled solve",
         "geometry_residual_mm": 1.1368683772161603e-13,
         "iterations": 23,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": 0.0,
           "lca_axis": 0.0,
@@ -1898,7 +1915,7 @@
           5.8096226041762975,
           -149.20476210920097
         ],
-        "timing_ms": 44.65509997680783
+        "timing_ms": 59.38249989412725
       },
       "delta": {
         "camber_deg": 0.108,
@@ -1918,7 +1935,7 @@
           5.767874013,
           -148.209639563
         ],
-        "timing_ms": 39.546099957,
+        "timing_ms": 50.294099841,
         "toe_deg": 0.688,
         "trail_mm": -1.21
       },
@@ -1941,6 +1958,7 @@
         "explanation": "sequential baseline",
         "geometry_residual_mm": 0.009017,
         "iterations": 52,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": null,
           "lca_axis": null,
@@ -2035,11 +2053,11 @@
           0.04174859133475062,
           -0.9951225461283772
         ],
-        "timing_ms": 5.109000019729137
+        "timing_ms": 9.08840005286038
       },
       "timing_ms": {
-        "coupled": 44.65509997680783,
-        "sequential": 5.109000019729137
+        "coupled": 59.38249989412725,
+        "sequential": 9.08840005286038
       },
       "travel": 5
     },
@@ -2062,6 +2080,7 @@
         "explanation": "bounded coupled solve",
         "geometry_residual_mm": 0.07170964710881833,
         "iterations": 15,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": -0.00470229788967913,
           "lca_axis": 0.030675892654357995,
@@ -2125,7 +2144,7 @@
           5.806775441047876,
           -149.2332399916492
         ],
-        "timing_ms": 31.28549992106855
+        "timing_ms": 33.48709992133081
       },
       "delta": {
         "camber_deg": 0.104,
@@ -2145,7 +2164,7 @@
           5.76502685,
           -148.238117446
         ],
-        "timing_ms": 26.197999949,
+        "timing_ms": 27.98829996,
         "toe_deg": 0.867,
         "trail_mm": -0.51
       },
@@ -2168,6 +2187,7 @@
         "explanation": "sequential baseline",
         "geometry_residual_mm": 0.009017,
         "iterations": 52,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": null,
           "lca_axis": null,
@@ -2262,11 +2282,11 @@
           0.04174859133475062,
           -0.9951225461283772
         ],
-        "timing_ms": 5.087499972432852
+        "timing_ms": 5.498799961060286
       },
       "timing_ms": {
-        "coupled": 31.28549992106855,
-        "sequential": 5.087499972432852
+        "coupled": 33.48709992133081,
+        "sequential": 5.498799961060286
       },
       "travel": 5
     },
@@ -2289,6 +2309,7 @@
         "explanation": "bounded coupled solve",
         "geometry_residual_mm": 0.2736724033167164,
         "iterations": 14,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": -0.019791563298468873,
           "lca_axis": 0.11669535898317918,
@@ -2352,7 +2373,7 @@
           5.608858728532823,
           -149.16036338169994
         ],
-        "timing_ms": 33.85859983973205
+        "timing_ms": 35.25409987196326
       },
       "delta": {
         "camber_deg": 0.026,
@@ -2372,7 +2393,7 @@
           5.569078367,
           -148.165481092
         ],
-        "timing_ms": 23.402599851,
+        "timing_ms": 28.156599961,
         "toe_deg": 1.138,
         "trail_mm": -0.65
       },
@@ -2395,6 +2416,7 @@
         "explanation": "sequential baseline",
         "geometry_residual_mm": 0.014288,
         "iterations": 89,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": null,
           "lca_axis": null,
@@ -2489,11 +2511,11 @@
           0.0397803615392433,
           -0.9948822893860121
         ],
-        "timing_ms": 10.455999989062548
+        "timing_ms": 7.0974999107420444
       },
       "timing_ms": {
-        "coupled": 33.85859983973205,
-        "sequential": 10.455999989062548
+        "coupled": 35.25409987196326,
+        "sequential": 7.0974999107420444
       },
       "travel": 10
     },
@@ -2516,6 +2538,7 @@
         "explanation": "bounded coupled solve",
         "geometry_residual_mm": 0.3469581978049021,
         "iterations": 13,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": -0.027335356147659695,
           "lca_axis": 0.14277935883791315,
@@ -2579,7 +2602,7 @@
           5.621612089960763,
           -149.14279804274497
         ],
-        "timing_ms": 29.147200053557754
+        "timing_ms": 31.43509989604354
       },
       "delta": {
         "camber_deg": 0.018,
@@ -2599,7 +2622,7 @@
           5.581831728,
           -148.147915753
         ],
-        "timing_ms": 22.399100242,
+        "timing_ms": 23.990999907,
         "toe_deg": 1.319,
         "trail_mm": -0.75
       },
@@ -2622,6 +2645,7 @@
         "explanation": "sequential baseline",
         "geometry_residual_mm": 0.014288,
         "iterations": 89,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": null,
           "lca_axis": null,
@@ -2716,11 +2740,11 @@
           0.0397803615392433,
           -0.9948822893860121
         ],
-        "timing_ms": 6.748099811375141
+        "timing_ms": 7.444099988788366
       },
       "timing_ms": {
-        "coupled": 29.147200053557754,
-        "sequential": 6.748099811375141
+        "coupled": 31.43509989604354,
+        "sequential": 7.444099988788366
       },
       "travel": 10
     },
@@ -2743,6 +2767,7 @@
         "explanation": "bounded coupled solve",
         "geometry_residual_mm": 0.526503874743014,
         "iterations": 21,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": -0.047356999883220396,
           "lca_axis": 0.22444163004649909,
@@ -2806,7 +2831,7 @@
           5.419087922432482,
           -149.07099421330705
         ],
-        "timing_ms": 40.45210010372102
+        "timing_ms": 49.24939991906285
       },
       "delta": {
         "camber_deg": -0.069,
@@ -2826,7 +2851,7 @@
           5.381329929,
           -148.076473513
         ],
-        "timing_ms": 33.958100015,
+        "timing_ms": 41.863399791,
         "toe_deg": 1.599,
         "trail_mm": -0.43
       },
@@ -2849,6 +2874,7 @@
         "explanation": "sequential baseline",
         "geometry_residual_mm": 0.06999,
         "iterations": 88,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": null,
           "lca_axis": null,
@@ -2943,11 +2969,11 @@
           0.037757993140429,
           -0.9945207005732616
         ],
-        "timing_ms": 6.4940000884234905
+        "timing_ms": 7.386000128462911
       },
       "timing_ms": {
-        "coupled": 40.45210010372102,
-        "sequential": 6.4940000884234905
+        "coupled": 49.24939991906285,
+        "sequential": 7.386000128462911
       },
       "travel": 15
     },
@@ -2970,6 +2996,7 @@
         "explanation": "bounded coupled solve",
         "geometry_residual_mm": 0.597543890373295,
         "iterations": 18,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": -0.057542322243023136,
           "lca_axis": 0.2435126711947646,
@@ -3033,7 +3060,7 @@
           5.430187850358038,
           -149.03593193911524
         ],
-        "timing_ms": 37.75519994087517
+        "timing_ms": 44.04079983942211
       },
       "delta": {
         "camber_deg": -0.078,
@@ -3053,7 +3080,7 @@
           5.392429857,
           -148.041411239
         ],
-        "timing_ms": 31.462799991,
+        "timing_ms": 36.775199696,
         "toe_deg": 1.785,
         "trail_mm": -0.79
       },
@@ -3076,6 +3103,7 @@
         "explanation": "sequential baseline",
         "geometry_residual_mm": 0.06999,
         "iterations": 88,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": null,
           "lca_axis": null,
@@ -3170,11 +3198,11 @@
           0.037757993140429,
           -0.9945207005732616
         ],
-        "timing_ms": 6.292399950325489
+        "timing_ms": 7.2656001430004835
       },
       "timing_ms": {
-        "coupled": 37.75519994087517,
-        "sequential": 6.292399950325489
+        "coupled": 44.04079983942211,
+        "sequential": 7.2656001430004835
       },
       "travel": 15
     },
@@ -3197,6 +3225,7 @@
         "explanation": "bounded coupled solve",
         "geometry_residual_mm": 1.272132553469234,
         "iterations": 18,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": -0.1820188965316447,
           "lca_axis": 0.44102860279468814,
@@ -3260,7 +3289,7 @@
           4.764085194635072,
           -148.84091989416694
         ],
-        "timing_ms": 38.62000000663102
+        "timing_ms": 38.72309997677803
       },
       "delta": {
         "camber_deg": -0.342,
@@ -3280,7 +3309,7 @@
           4.733113844,
           -147.847864301
         ],
-        "timing_ms": 33.769000089,
+        "timing_ms": 33.220199868,
         "toe_deg": 2.747,
         "trail_mm": 2.6
       },
@@ -3303,6 +3332,7 @@
         "explanation": "sequential baseline",
         "geometry_residual_mm": 0.497062,
         "iterations": 84,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": null,
           "lca_axis": null,
@@ -3397,11 +3427,11 @@
           0.030971350618019592,
           -0.9930555930105939
         ],
-        "timing_ms": 4.850999917834997
+        "timing_ms": 5.50290010869503
       },
       "timing_ms": {
-        "coupled": 38.62000000663102,
-        "sequential": 4.850999917834997
+        "coupled": 38.72309997677803,
+        "sequential": 5.50290010869503
       },
       "travel": 30
     },
@@ -3424,6 +3454,7 @@
         "explanation": "bounded coupled solve",
         "geometry_residual_mm": 1.332379371523416,
         "iterations": 16,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": -0.2002257813200572,
           "lca_axis": 0.43997077131126616,
@@ -3487,7 +3518,7 @@
           4.766069084490482,
           -148.76219696442212
         ],
-        "timing_ms": 33.668499905616045
+        "timing_ms": 36.05909994803369
       },
       "delta": {
         "camber_deg": -0.382,
@@ -3507,7 +3538,7 @@
           4.735097734,
           -147.769141371
         ],
-        "timing_ms": 28.797799954,
+        "timing_ms": 31.052199891,
         "toe_deg": 2.937,
         "trail_mm": 1.63
       },
@@ -3530,6 +3561,7 @@
         "explanation": "sequential baseline",
         "geometry_residual_mm": 0.497062,
         "iterations": 84,
+        "rank_deficient": false,
         "residuals_mm": {
           "kingpin_length": null,
           "lca_axis": null,
@@ -3624,11 +3656,11 @@
           0.030971350618019592,
           -0.9930555930105939
         ],
-        "timing_ms": 4.870699951425195
+        "timing_ms": 5.006900057196617
       },
       "timing_ms": {
-        "coupled": 33.668499905616045,
-        "sequential": 4.870699951425195
+        "coupled": 36.05909994803369,
+        "sequential": 5.006900057196617
       },
       "travel": 30
     }
@@ -3649,11 +3681,62 @@
       "residual_mm": 0.731417,
       "travel": -30
     },
+    "per_rack": {
+      "0": {
+        "case_count": 8,
+        "max_residual_mm": 0.731417,
+        "rack": 0,
+        "status_counts": {
+          "APPROXIMATE": 5,
+          "VALID": 3
+        }
+      },
+      "5": {
+        "case_count": 8,
+        "max_residual_mm": 0.731417,
+        "rack": 5,
+        "status_counts": {
+          "APPROXIMATE": 5,
+          "VALID": 3
+        }
+      }
+    },
     "positive_travel_max": {
       "rack": 0,
       "residual_mm": 0.497062,
       "travel": 30
-    }
+    },
+    "rank_deficient_cases": [],
+    "rank_deficient_count": 0,
+    "travel_direction_residuals": [
+      {
+        "case_count": 6,
+        "max_residual_mm": 0.731417,
+        "rack_maxima": {
+          "0": 0.731417,
+          "5": 0.731417
+        },
+        "travel_direction": "negative"
+      },
+      {
+        "case_count": 2,
+        "max_residual_mm": 1.1368683772161603e-13,
+        "rack_maxima": {
+          "0": 1.1368683772161603e-13,
+          "5": 5.684341886080802e-14
+        },
+        "travel_direction": "zero"
+      },
+      {
+        "case_count": 8,
+        "max_residual_mm": 0.497062,
+        "rack_maxima": {
+          "0": 0.497062,
+          "5": 0.497062
+        },
+        "travel_direction": "positive"
+      }
+    ]
   },
   "rack_grid_mm": [
     0,
