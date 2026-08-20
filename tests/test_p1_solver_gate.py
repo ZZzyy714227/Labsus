@@ -3,7 +3,10 @@
 import json
 import math
 
+import numpy as np
+
 import src.solver.p1_benchmark as p1_benchmark
+from src.solver import coupled_candidate
 from src.solver.coupled_candidate import solve_coupled_candidate
 from src.solver.p1_benchmark import compare_solver_paths
 
@@ -188,6 +191,21 @@ def test_coupled_candidate_is_explicit_when_unavailable():
     assert isinstance(candidate["residuals_mm"], dict)
     assert isinstance(candidate["explanation"], str)
     assert isinstance(candidate["state"], dict)
+
+
+def test_rank_deficient_candidate_is_never_reported_as_success(monkeypatch):
+    class RankDeficientResult:
+        jac = np.zeros((len(coupled_candidate.RESIDUAL_KEYS), 15))
+        x = np.zeros(15)
+        nfev = 4
+
+    monkeypatch.setattr(coupled_candidate, "least_squares", lambda *args, **kwargs: RankDeficientResult())
+    result = solve_coupled_candidate(dict(p1_benchmark.DEFAULT_HARDPOINTS), 0, 0)
+
+    assert result["status"] in {"NOT_IMPLEMENTED", "SOLVER_FAILED"}
+    assert result["residuals_mm"]
+    assert result["explanation"]
+    assert result["state"]
 
 
 def test_candidate_reports_raw_constraint_diagnostics():

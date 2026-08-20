@@ -119,10 +119,12 @@ def solve_coupled_candidate(hp: dict[str, Any], travel: int, rack: int) -> dict[
             state["contact_patch"] = contact["center"]
             base.update({"angles": angles, "contact_patch": contact["center"],
                          "steering_axis": (np.asarray(state["UP2"]) - np.asarray(state["UP1"])).tolist()})
-        base.update({"status": "VALID" if maximum <= 0.02 else "APPROXIMATE",
+        full_rank = rank >= min(result.jac.shape)
+        base.update({"status": ("VALID" if maximum <= 0.02 else "APPROXIMATE")
+                     if full_rank else "SOLVER_FAILED",
                      "geometry_residual_mm": maximum, "iterations": int(result.nfev),
                      "residuals_mm": residuals, "state": state,
-                     "explanation": ("bounded coupled solve" if rank >= min(result.jac.shape)
+                     "explanation": ("bounded coupled solve" if full_rank
                                      else f"constraint Jacobian is rank-deficient ({rank}/{min(result.jac.shape)}); minimized evidence retained")})
         return base
     except (KeyError, TypeError, ValueError, FloatingPointError, np.linalg.LinAlgError) as exc:
