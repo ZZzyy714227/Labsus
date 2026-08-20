@@ -1,5 +1,11 @@
 # 开发日志
 
+## 2026-08-20 — P1 Task 1 solver comparison harness contract
+
+- 新增 `src/solver/p1_benchmark.py`：固定前右 legacy 硬点、travel `[-30, -15, -5, 0, 5, 10, 15, 30]` mm 与 rack `[0, 5]` mm 的 JSON-safe 比较矩阵；sequential/coupled 路径当前明确标记 `NOT_IMPLEMENTED`。
+- 新增 `tests/test_p1_solver_gate.py`：验证输出字段、双向 travel 覆盖及完整矩阵/JSON 可序列化。
+- 聚焦测试：3 passed（pytest cache 写入受本机权限限制，仅产生 warning）。
+
 ## 2026-08-20 — V1 P0 数据地基完成（规范冻结 + benchmark + 方案/工况/结果模型 + v2 API）
 
 按设计文档 §14 实施阶段完成 P0，实施计划：`docs/superpowers/plans/2026-08-20-v1-p0-data-foundation.md`。
