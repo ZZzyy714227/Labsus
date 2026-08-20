@@ -4,8 +4,9 @@
 
 - 候选残差补齐 CH5/pushrod 约束；selected-side state 明确包含 UP1..UP5、FL1、steering_angle 与 contact_patch，缺失字段不再静默当作有效结果。
 - 成功候选复用现有 alignment/contact-patch helpers 填充 angles、contact_patch、steering_axis；秩亏仍保留最小化 raw residual evidence，并给出明确 explanation。
+- 修正秩亏状态门：constraint Jacobian rank-deficient 时强制返回 `SOLVER_FAILED`，禁止被低残差误报为 `VALID`/`APPROXIMATE`；新增回归断言并保留 residuals/explanation/state 诊断。
 - benchmark path 保留 residuals_mm、state 与 explanation，避免仅暴露直接结果；新增残差键、诊断透传及成功几何契约测试。
-- 验证：聚焦 pytest 14 passed；Ruff、mypy、git diff --check 待提交前复核。
+- 验证：聚焦 pytest 15 passed；Ruff、mypy、git diff --check 通过。
 
 ## 2026-08-20 — P1 Task 3 isolated coupled candidate
 
