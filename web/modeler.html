@@ -287,7 +287,7 @@ function viewGeom(view){
       x0=Math.min(x0,X); x1=Math.max(x1,X); y0=Math.min(y0,Y); y1=Math.max(y1,Y);
     }
     const s=Math.min((W-pad*2)/Math.max(1,x1-x0),(H-pad*2)/Math.max(1,y1-y0));
-    return {s,cxv:(x0+x1)/2,cyv:(y0+y1)/2,W,H};
+    return {s,cxv:(x0+x1)/2,cyv:(y0+y1)/2,W,H,ox:0,oy:0};
   }
   /* iso：迭代 fit（DWB-SIM fitView iso 分支） */
   view.dist=1800; camIso(view);
@@ -303,8 +303,8 @@ function viewGeom(view){
     view.tgt=[view.tgt[0]-(x0+x1-W)/2/view.s?0:0, view.tgt[1], view.tgt[2]];
     camIso(view);
   }
-  view.sRef=s;
-  return {s, W, H};
+  const c=isoCenter(view,{W,H,s});
+  return {s, W, H, ox:g?0:(g&&g.ox||0)||0, oy:0};
 }
 // iso 中计算中心偏移（简化：用投影中心校正）
 function isoCenter(view, g){
@@ -319,10 +319,10 @@ function drawView(id){
   const ctx=cv.getContext("2d"); ctx.clearRect(0,0,cv.width,cv.height);
   const g=viewGeom(view);
   if(view.iso){
-    // 居中校正
+    // 居中校正（覆盖 viewGeom 兜底值）
     const c=isoCenter(view,{W:g.W,H:g.H,s:g.s});
     g.ox=g.W/2-c[0]; g.oy=g.H/2-c[1];
-  }else{ g.ox=0; g.oy=0; }
+  }
   const P=(p)=>{const q=projPt(view,g,p); return q?[q[0]+g.ox, q[1]+g.oy]:null;};
   const seg=(a,b,col,w,d)=>{const A=P(a),B=P(b); if(!A||!B)return;
     if(d)ctx.setLineDash(d); ctx.strokeStyle=col; ctx.lineWidth=w||1;

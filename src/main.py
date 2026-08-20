@@ -43,6 +43,15 @@ ensure_legacy_import(_store)
 ensure_preset_cases(_store)
 
 # ── Static files (web frontend) ────────────────────────────────
+from fastapi.responses import RedirectResponse
+
+
+@app.get("/", include_in_schema=False)
+def _root():
+    """根路径默认进入建模器（旧 index.html 仍可经 /index.html 访问）。"""
+    return RedirectResponse(url="/modeler.html")
+
+
 web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "web")
 app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
 

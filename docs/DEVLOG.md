@@ -1,5 +1,11 @@
 # 开发日志
 
+## 2026-08-20 — 修复：根路径进入建模器 + 拖拽命中 ox 兜底
+
+- 根路径重定向：GET / → /modeler.html（旧 index.html 仍可经 /index.html 访问），避免用户打开根路径走旧 SPA（依赖 unpkg CDN，无外网即白屏）。验证：GET / 200 落到 modeler.html；modeler.html 200；API v2 200。
+- 修 hitTest 的 g.ox/g.oy 未定义（正交视图拖拽命中损坏）：viewGeom 统一返回 ox/oy=0 兜底，iso 中心校正在 drawView 覆盖。
+- 回归：test_v2_api 43 passed。
+
 ## 2026-08-20 — P6 里程碑2 尾部 + 3（曲线 rack 切换 / A-B 对比 / 敏感性 / CSV 导出）
 
 - 曲线面板：新增 travel/rack 切换（sweep.axis 联动；rack 轴 −20..20），x 轴标题随轴。
