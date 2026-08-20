@@ -133,6 +133,31 @@ def test_failed_sequential_solve_reports_no_geometry_residual(monkeypatch):
     assert result["angles"] is None
 
 
+def test_fallback_without_root_reports_no_geometry(monkeypatch):
+    hp = dict(p1_benchmark.DEFAULT_HARDPOINTS)
+
+    monkeypatch.setattr(p1_benchmark, "solve_bump", lambda *args, **kwargs: {
+        **hp,
+        "max_residual": 0.0,
+        "iterations": 1,
+    })
+    monkeypatch.setattr(p1_benchmark, "solve_steering", lambda *args, **kwargs: {
+        **hp,
+        "_newton_converged": False,
+        "_used_fallback": True,
+        "_fallback_root_found": False,
+        "iterations": 1,
+    })
+
+    result = p1_benchmark._sequential_baseline(hp, 0, 0)
+
+    assert result["status"] == "SOLVER_FAILED"
+    assert result["angles"] is None
+    assert result["contact_patch"] is None
+    assert result["steering_axis"] is None
+    assert result["geometry_residual_mm"] is None
+
+
 def test_k4_residual_remains_visible_outside_nominal_range():
     report = compare_solver_paths()
     assert any(

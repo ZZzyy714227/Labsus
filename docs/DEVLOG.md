@@ -1,5 +1,11 @@
 # 开发日志
 
+## 2026-08-20 — P1 Task 2 fallback failure contract
+
+- 修正 `src/solver/p1_benchmark.py`：转向 Newton 未收敛且 fallback 未找到有效根时，立即按异常失败契约返回 `SOLVER_FAILED`，并将 angles/contact_patch/steering_axis/geometry_residual_mm 全部置为 `None`；找到有效 fallback 根的成功行为保持不变。
+- 新增 fallback 无根分支回归测试，覆盖四个几何字段的空值契约。
+- 验证：聚焦 pytest、Ruff、mypy、diff check。
+
 ## 2026-08-20 — P1 Task 2 review fixes
 
 - 收紧 `tests/test_p1_solver_gate.py` 的可空残差断言：失败行明确要求 `geometry_residual_mm is None`，成功行先完成非空收窄；矩阵中的每一行都校验状态、迭代、计时及结果字段的一致性。
