@@ -148,6 +148,50 @@ class TestSolve:
         assert r.status_code == 404
 
 
+_STATES = {"VALID", "APPROXIMATE", "NOT_APPLICABLE", "NOT_IMPLEMENTED",
+          "SOLVER_FAILED", "EQUILIBRIUM_FAILED", "OUT_OF_RANGE"}
+_VALUE_STATES = {"VALID", "APPROXIMATE", "OUT_OF_RANGE"}
+
+
+class TestP23StateMachineContract:
+    """P2-3：v2 表面所有指标显式带七状态，禁止 None 空白。"""
+
+    def test_solve_every_corner_has_status(self, client):
+        body = client.post("/api/v2/solve", json={
+            "design_id": "legacy-import", "case_id": "static"}).json()
+        for section in ("front", "rear"):
+            for side in ("left", "right"):
+                report = body[section][side]
+                assert report["status"] in _STATES
+                # VALID/APPROXIMATE 角必须有角度值；其余角可为 None 但状态说明
+                if report["status"] in _VALUE_STATES:
+                    assert report["angles"] is not None
+                    assert all(v is not None for v in report["angles"].values())
+        assert all(s in _STATES for s in body["solver_status"].values())
+
+    def test_sweep_metrics_all_have_status(self, client):
+        body = client.post("/api/v2/sweep", json={
+            "design_id": "legacy-import", "case_id": "static",
+            "axle": "front", "axis": "travel", "min": -25, "max": 25,
+            "points": 11}).json()
+        for key, m in body["metrics"].items():
+            assert m["status"] in _STATES, f"{key}: bad status {m['status']}"
+            if m["status"] in _VALUE_STATES:
+                assert m["value"] is not None, f"{key}: value-state without value"
+            else:
+                assert m["value"] is None, f"{key}: {m['status']} must not carry value"
+
+    def test_sweep_rack_metrics_all_have_status(self, client):
+        body = client.post("/api/v2/sweep", json={
+            "design_id": "legacy-import", "case_id": "static",
+            "axle": "front", "axis": "rack", "min": -20, "max": 20,
+            "points": 9}).json()
+        for key, m in body["metrics"].items():
+            assert m["status"] in _STATES, f"{key}: bad status {m['status']}"
+            if m["status"] in _VALUE_STATES:
+                assert m["value"] is not None, f"{key}: value-state without value"
+
+
 class TestSweep:
     """P2-2 曲线端点：轮跳/转向扫掠 + 派生指标（七状态）。"""
 
