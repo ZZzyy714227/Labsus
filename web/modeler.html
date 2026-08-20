@@ -36,6 +36,7 @@ td{font-size:10px;text-align:right;padding:1px 3px;border-top:1px solid #1c2126}
 .mfix{color:var(--tx3)}
 input{width:56px;background:#0a0c0e;color:var(--tx);border:1px solid #252b31;text-align:right;padding:1px 3px;font:10px monospace}
 input:focus{outline:1px solid var(--acc)}
+button.sel{background:#2a3038;border:1px solid var(--acc);color:var(--acc)}
 input.num:hover{border-color:var(--acc)}
 .ctl{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:10px;color:var(--tx2)}
 .ctl b{width:52px;color:var(--tx);font-weight:400}
@@ -68,6 +69,10 @@ input.num:hover{border-color:var(--acc)}
         <div class="ctl"><b>齿条 rack</b><input type="number" id="rack" value="0" step="1"></div>
         <div class="ctl"><b>ay g</b><input type="range" id="ay" min="-2" max="2" step="0.1" value="0"><input type="number" id="ayv" value="0" step="0.1"></div>
         <div class="ctl"><b>ax g</b><input type="range" id="ax" min="-2" max="2" step="0.1" value="0"><input type="number" id="axv" value="0" step="0.1"></div>
+        <div class="ctl"><b>轴</b>
+          <button id="axFront" class="sel">前轴 编辑</button>
+          <button id="axRear">后轴 编辑</button>
+        </div>
         <div class="ctl"><b>外倾°</b><input type="number" id="gamma" value="0" step="1"></div>
         <div class="ctl"><b>曲线</b><input type="checkbox" id="curves" checked> <span>扫掠 camber/toe</span></div>
       </div>
@@ -118,7 +123,11 @@ const LINKS = [["CH1","UP1"],["CH2","UP1"],["CH3","UP2"],["CH4","UP2"],
   ["CH1","CH2"],["CH3","CH4"],["UP1","UP2"],["CH5","UP4"],["FL1","UP3"]];
 const TIRE = {tire_radius:260.0, tire_width:180.0, tire_spring_rate:150.0, corner_weight_n:700.0};
 
-let hp = null;          // front_right points {UP1:[x,y,z],...}
+let hp = null;          // 当前轴右轮 points {UP1:[x,y,z],...}
+let hpRear = null;      // 后轴右轮（design 读取）
+let hpLeft = null;      // 当前轴左轮（镜像）
+let AXLE = "front";     // front | rear
+let frontHp = null, rearHp = null;
 let busy = false, pending = false;
 let dragging = false, sweepTimer = null;
 let last = null;        // 最近求解结果
@@ -133,12 +142,22 @@ const SEED = {
   UP5:[0,610,255.3],FL1:[-100,115,200]
 };
 
+function curWheel(){ return hp; }   // 全局 hp 恒为当前轴右轮（setAxle 切换对象）
+function curLeft(){
+  const w=curWheel(); const out={};
+  for(const k in w){ out[k]=[w[k][0], -w[k][1], w[k][2]]; }
+  return out;
+}
 async function init(){
   try{
     const r = await fetch("/api/v2/designs/legacy-import");
-    if(r.ok){const d = await r.json(); hp = deep(d.front_right.points);}
+    if(r.ok){const d = await r.json();
+      hp = deep(d.front_right.points);
+      hpRear = deep(d.rear_right.points);
+    }else{ hpRear = null; }
   }catch(e){}
   if(!hp || !hp.UP1){ hp = deep(SEED); setStatus("离线种子模式", "a"); }
+  hpLeft = curLeft();
   buildTable(); buildTableState(); drawAll();
   requestSolve(true, true);
 }
@@ -146,9 +165,12 @@ function deep(o){return JSON.parse(JSON.stringify(o));}
 
 /* ---------- 硬点表 ---------- */
 function buildTable(){
+  const w = curWheel();
+  document.querySelector("#hpTable thead").innerHTML = 
+    '<tr><th class="mname">点 · '+(AXLE==="front"?"前轴":"后轴")+'</th><th>X</th><th>Y</th><th>Z</th></tr>';
   const tb = document.querySelector("#hpTable tbody");
   tb.innerHTML = "";
-  for(const k of Object.keys(hp)){
+  for(const k of Object.keys(w)){
     const tr = document.createElement("tr");
     tr.innerHTML = '<td class="mname '+(FIXED.has(k)?'mfix':'')+'">'+k+'<span style="color:#616b77"> '+ (POINT_NAMES[k]||"") +'</span></td>'+
       '<td><input data-k="'+k+'" data-a="0" class="num" type="number" step="1"></td>'+
@@ -156,22 +178,22 @@ function buildTable(){
       '<td><input data-k="'+k+'" data-a="2" class="num" type="number" step="1"></td>';
     tb.appendChild(tr);
   }
+  const onEdit = (k,a)=>()=>{
+    const v=parseFloat(document.querySelector("input[data-k='"+k+"'][data-a='"+a+"']").value);
+    if(isFinite(v)){curWheel()[k][a]=v; hpLeft=curLeft(); drawAll(); requestSolve();}
+  };
   tb.querySelectorAll("input").forEach(inp=>{
-    inp.addEventListener("change", ()=>{
-      const k=inp.dataset.k, a=+inp.dataset.a, v=parseFloat(inp.value);
-      if(isFinite(v)){hp[k][a]=v; drawAll(); requestSolve();}
-    });
-    // input 高频事件：延迟合批（去抖）
-    inp.addEventListener("input", ()=>{
-      const k=inp.dataset.k, a=+inp.dataset.a, v=parseFloat(inp.value);
-      if(isFinite(v)){hp[k][a]=v; drawAll(); requestSolve();}
-    });
+    inp.addEventListener("change", ()=>{const k=inp.dataset.k,a=+inp.dataset.a,v=parseFloat(inp.value);
+      if(isFinite(v)){curWheel()[k][a]=v; hpLeft=curLeft(); drawAll(); requestSolve();}});
+    inp.addEventListener("input", ()=>{const k=inp.dataset.k,a=+inp.dataset.a,v=parseFloat(inp.value);
+      if(isFinite(v)){curWheel()[k][a]=v; hpLeft=curLeft(); drawAll(); requestSolve();}});
   });
 }
 function buildTableState(){
+  const w = curWheel();
   const tb = document.querySelector("#hpTable");
   tb.querySelectorAll("input.num").forEach(inp=>{
-    const k=inp.dataset.k, a=+inp.dataset.a, v=hp[k][a];
+    const k=inp.dataset.k, a=+inp.dataset.a, v=w[k][a];
     if(document.activeElement!==inp) inp.value = (+v.toFixed(3));
   });
 }
@@ -195,7 +217,8 @@ const CC = {
 
 /* —— 参与取景的 3D 点（悬架点 + 车架盒角点 + 轮外缘） —— */
 function collectPts(){
-  const pts = Object.values(hp).map(p => p.slice());
+  const L=curLeft();
+  const pts = Object.values(hp).map(p => p.slice()).concat(Object.values(L).map(p=>p.slice()));
   const box = chassisBox();
   for(const p of box) pts.push(p);
   const wc = hp.UP5;
@@ -330,6 +353,19 @@ function drawView(id){
     ctx.beginPath(); ctx.arc(wp[0],wp[1],R*g.s*0.92,0,6.283); ctx.stroke();
     ctx.strokeStyle="#39414b";ctx.beginPath();ctx.arc(wp[0],wp[1],R*g.s*0.62,0,6.283);ctx.stroke();}
 
+  /* 左轮（镜像，半透明区分） */
+  {
+    const L=curLeft();
+    ctx.globalAlpha=0.45;
+    seg(L.CH1,L.UP1,CC.rigArm,1.1); seg(L.CH2,L.UP1,CC.rigArm,1.1);
+    seg(L.CH3,L.UP2,CC.rig,1.1);    seg(L.CH4,L.UP2,CC.rig,1.1);
+    seg(L.UP1,L.UP2,CC.kp,1.8);
+    seg(L.FL1,L.UP3,CC.tie,1.2);
+    seg(L.CH5,L.UP4,CC.ela,1.3,[4,3]);
+    poly([L.UP1,L.UP3,L.UP2,L.UP5],CC.knu,0.9,null,CC.knuF);
+    const lw=P(L.UP5); if(lw){ctx.strokeStyle=CC.tire;ctx.beginPath();ctx.arc(lw[0],lw[1],R*g.s*0.9,0,6.283);ctx.stroke();}
+    ctx.globalAlpha=1;
+  }
   /* 硬点节点（圆=运动件 / 方=车架） */
   const isDown = drag && drag.view===id && !view.iso;
   for(const k of Object.keys(hp)){
@@ -410,17 +446,23 @@ function requestSolve(){
   const rack=parseFloat(document.getElementById("rack").value)||0;
   const ay=parseFloat(document.getElementById("ayv").value)||0;
   const ax=parseFloat(document.getElementById("axv").value)||0;
+  const cur=deep(hp);
   const payload={
     case_id:"static",
     travel:{fl:tl,fr:tr,rl:tl,rr:tr},
     rack_displacement:rack,
     loads:{ay_g:ay,ax_g:ax},
     arb_enabled:true,
-    label:"modeler",
-    front_right:{points:deep(hp),tire:deep(TIRE)},
+    label:AXLE==="rear"?"modeler-rear":"modeler",
+    front_right:{points:deep(frontHp||cur),tire:deep(TIRE)},
   };
+  if(AXLE==="rear"){
+    payload.rear_right={points:cur,tire:deep(TIRE)};
+    for(const k in cur) payload.front_right.points[k]=deep((frontHp||hp)?(frontHp||hp)[k]:cur[k]);
+  }
   if(wantSweep){
-    payload.sweep={axis:"travel",axle:"front",min:-25,max:25,points:21};
+    const axl = AXLE==="rear"?"rear":"front";
+    payload.sweep={axis:"travel",axle:axl,min:-25,max:25,points:21};
   }
   fetch("/api/v2/solve/hardpoints",{method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -474,34 +516,38 @@ function renderAll(d){
   const fr=d.front.right;
   setStatus((fr.status||"")+" · 残差 "+(d.residuals.front_right!=null?d.residuals.front_right.toFixed(4):"—")+" · "+d.solver+" · "+d.label,"g");
   const tb=document.querySelector("#angleTable");
-  tb.innerHTML="<tr><th></th><th>右前</th><th>左前</th></tr>";
+  const corners=[["右前",d.front.right],["左前",d.front.left],["右后",d.rear.right],["左后",d.rear.left]];
+  tb.innerHTML="<tr><th></th>"+corners.map(c=>"<th>"+c[0]+"</th>").join("")+"</tr>";
+  const fmt=v=> v==null?"<span class='na'>—</span>":"<span class='v'>"+v+"</span>";
+  function stat(c){ const s=c[1].status; return s==="VALID"?"<span class='g'>"+s+"</span>":(s==="SOLVER_FAILED"?"<span class='r'>"+s+"</span>":"<span class='a'>"+s+"</span>"); }
+  tb.innerHTML+="<tr><td class='mname'>状态</td>"+corners.map(c=>"<td>"+stat(c)+"</td>").join("")+"</tr>";
   for(const k of ANGLE_KEYS){
-    const a=fr.angles?.[k], l=d.front.left.angles?.[k];
-    tr(k, a, l, ANGLE_ZH[k]);
+    tb.innerHTML+="<tr><td class='mname'>"+ANGLE_ZH[k]+"</td>"+corners.map(c=>"<td>"+fmt(c[1].angles?.[k])+"</td>").join("")+"</tr>";
   }
-  function tr(k,a,l,zh){
-    tb.innerHTML+="<tr><td class='mname'>"+zh+"</td><td>"+fmt(a)+"</td><td>"+fmt(l)+"</td></tr>";
-  }
-  function fmt(v){ return v==null?"<span class='na'>—</span>":"<span class='v'>"+v+"</span>"; }
+  /* 四轮载荷汇总 */
+  const ld=d.loads||{};
+  const fbBox=document.getElementById("forceBox");
+  if(ld && ld.front_right){
+    let hh="<table style='width:100%'><tr><th>轮</th><th>Fz</th><th>Fx</th><th>Fy</th><th>μ</th><th>离地</th></tr>";
+    for(const c of corners){
+      const L=ld[c[0]==="右前"?"front_right":c[0]==="左前"?"front_left":c[0]==="右后"?"rear_right":"rear_left"];
+      hh+="<tr><td class='mname'>"+c[0]+"</td><td>"+(L?L.fz_n.toFixed(0):"—")+"</td><td>"+(L?L.fx_n.toFixed(0):"—")+
+         "</td><td>"+(L?L.fy_n.toFixed(0):"—")+"</td><td>"+(L?(L.friction_util!=null?L.friction_util.toFixed(2):"<span class='na'>—</span>"):"—")+
+         "</td><td>"+(L?(L.off_ground?"<span class='r'>是</span>":"否"):"—")+"</td></tr>";
+    }
+    hh+="</table>";
+    const curLd = ld[AXLE==="rear"?"rear_right":"front_right"]||{};
+    const we=curLd.wheel_end||{}; const mf=we.member_forces||{};
+    hh+="<div class='warn'>"+(AXLE==="rear"?"右后":"右前")+" 轮边: 推杆 "+
+       (mf.pushrod_n!=null?mf.pushrod_n.toFixed(0)+"N":"—")+
+       " · 横拉杆 "+(mf.tie_rod_n!=null?mf.tie_rod_n.toFixed(0)+"N":"—")+
+       " · 球头残差 "+(we.force_residual_n!=null?we.force_residual_n.toFixed(4):"—")+"N</div>";
+    fbBox.innerHTML=hh;
+  } else { fbBox.innerHTML="<span class='na'>载荷不可用</span>"; }
   // 状态
   const sb=document.getElementById("statusBox");
   sb.innerHTML="整车状态: <b class='"+(d.status==="VALID"?"g":d.status==="SOLVER_FAILED"?"r":"a")+"'>"+d.status+"</b>";
   d.warnings.slice(0,4).forEach(w=>{sb.innerHTML+="<div class='warn'>"+escapeHtml(w)+"</div>";});
-  // 载荷
-  const fb=document.getElementById("forceBox");
-  const ld=d.loads&&d.loads.front_right;
-  if(ld){
-    const we=ld.wheel_end||{};
-    fb.innerHTML=
-      "Fz <b>"+ld.fz_n.toFixed(0)+"N</b> Fx <b>"+ld.fx_n.toFixed(0)+"N</b> Fy <b>"+ld.fy_n.toFixed(0)+"N</b>"+
-      "<div>摩擦圆 <b class='"+(ld.friction_util>1?"r":"g")+"'>"+ld.friction_util.toFixed(2)+"</b>"+
-      " 离地 <b>"+(ld.off_ground?"是":"否")+"</b></div>"+
-      "<div class='force'>推杆 <b>"+(we.member_forces?we.member_forces.pushrod_n:"—")+"N</b>"+
-      " 横拉杆 <b>"+(we.member_forces?we.member_forces.tie_rod_n:"—")+"N</b></div>"+
-      "<div class='warn'>残差 "+(we.force_residual_n!=null?we.force_residual_n.toFixed(4):"—")+"N</div>";
-  }else{
-    fb.innerHTML="<span class='na'>载荷不可用</span>";
-  }
   // 曲线
   drawChart(d.sweep);
 }
@@ -546,6 +592,18 @@ function drawChart(sw){
 });
 document.getElementById("ay").addEventListener("change",()=>document.getElementById("ayv").value=document.getElementById("ay").value);
 document.getElementById("ax").addEventListener("change",()=>document.getElementById("axv").value=document.getElementById("ax").value);
+function setAxle(ax){
+  AXLE = ax;
+  document.getElementById("axFront").classList.toggle("sel", ax==="front");
+  document.getElementById("axRear").classList.toggle("sel", ax==="rear");
+  if(ax==="rear" && !rearHp){ rearHp = deep(hpRear||SEED); rearHp.UP5=[0,-610,255.3]; }
+  if(ax==="rear"){ frontHp = hp; hp = rearHp; }
+  else if(frontHp){ hp = frontHp; }
+  hpLeft = curLeft();
+  buildTable(); buildTableState(); drawAll(); requestSolve();
+}
+document.getElementById("axFront").addEventListener("click", ()=>setAxle("front"));
+document.getElementById("axRear").addEventListener("click", ()=>setAxle("rear"));
 document.getElementById("gamma").addEventListener("input",()=>{requestSolve();});
 ["ayv","axv"].forEach(id=>{
   document.getElementById(id).addEventListener("input",()=>{drawAll();requestSolve();});
