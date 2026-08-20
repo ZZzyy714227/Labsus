@@ -4,6 +4,7 @@ No project-specific imports — only numpy + math.
 """
 
 import math
+
 import numpy as np
 
 
@@ -19,13 +20,7 @@ def dist(a, b):
 
 def distance_point_to_line(p, a, b):
     """Shortest distance from point p to line through a-b."""
-    ap = vec3(a, p)
-    ab = vec3(a, b)
-    ab_norm = np.linalg.norm(ab)
-    if ab_norm < 1e-12:
-        return float(np.linalg.norm(ap))
-    t = np.dot(ap, ab) / (ab_norm * ab_norm)
-    closest = np.array(a) + t * ab
+    closest = closest_point_on_line(p, a, b)
     return float(np.linalg.norm(np.array(p) - closest))
 
 
@@ -106,6 +101,16 @@ def rotate_around_z(pt, pivot, theta):
         pivot[1] + dx * st + dy * ct,
         pt[2],
     ])
+
+
+def normalize_or_default(vec, fallback=None):
+    """Return unit vector in direction of vec, or fallback if norm ≈ 0.
+    If fallback is None, defaults to [1, 0, 0].
+    """
+    n = np.linalg.norm(vec)
+    if n < 1e-12:
+        return np.array(fallback) if fallback is not None else np.array([1.0, 0.0, 0.0])
+    return vec / n
 
 
 def deg(r):
