@@ -4,14 +4,50 @@ import json
 
 from src.solver.p1_benchmark import compare_solver_paths
 
+PATH_FIELDS = {
+    "status",
+    "angles",
+    "contact_patch",
+    "steering_axis",
+    "geometry_residual_mm",
+    "iterations",
+    "timing_ms",
+}
+
 
 def test_compare_solver_paths_returns_required_fields():
     report = compare_solver_paths()
 
+    assert {
+        "hardpoint_side",
+        "hardpoint_fingerprint",
+        "travel_grid_mm",
+        "rack_grid_mm",
+        "cases",
+    } == report.keys()
     assert report["cases"]
     row = report["cases"][0]
-    assert {"travel", "sequential", "coupled", "delta", "timing_ms"} <= row.keys()
+    assert {"travel", "rack", "sequential", "coupled", "delta", "timing_ms"} <= row.keys()
     assert {"camber_deg", "toe_deg", "contact_patch", "steering_axis"} <= row["delta"].keys()
+    assert PATH_FIELDS == row["sequential"].keys()
+    assert PATH_FIELDS == row["coupled"].keys()
+
+
+def test_compare_has_exactly_sixteen_travel_rack_combinations():
+    report = compare_solver_paths()
+
+    combinations = {(row["travel"], row["rack"]) for row in report["cases"]}
+
+    assert len(combinations) == 16
+    assert len(report["cases"]) == 16
+
+
+def test_compare_is_deterministic_and_strictly_json_serializable():
+    first = compare_solver_paths()
+    second = compare_solver_paths()
+
+    assert first == second
+    assert json.dumps(first, allow_nan=False, sort_keys=True)
 
 
 def test_compare_covers_both_travel_directions():
