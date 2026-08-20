@@ -13,6 +13,7 @@ __pycache__/
 data/hardpoint_overrides.json
 data/defaults_pipe.json
 data/persistent_state.json
+data/store/
 
 # Logs
 logs/
