@@ -3,739 +3,1150 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>V1 交互建模 · DWB-SIM 式硬点模型器</title>
+<title>FSAE MODELER · 整车双叉臂底盘硬点模型器</title>
 <style>
 :root{
-  --bg:#0e1013; --pnl:#15181c; --pnl2:#1a1e23; --bd:#2c323a; --tx:#c3cad2;
-  --tx2:#8b95a1; --acc:#2fa9d6; --grn:#54a06a; --amb:#d9a238; --red:#d2543f;
+  --bg:#0e1013; --bg2:#0a0c0e; --pnl:#15181c; --pnl2:#1a1e23; --head:#21262d; --headhi:#2a3038;
+  --bd:#2c323a; --bd2:#39414b; --bd3:#4a545f;
+  --tx:#c3cad2; --tx2:#8b95a1; --tx3:#616b77;
+  --acc:#2fa9d6; --accd:#125a75; --amb:#d9a238; --red:#d2543f; --grn:#54a06a;
+  --grid:#1c2126; --grid2:#262d34;
 }
-*{margin:0;padding:0;box-sizing:border-box;border-radius:0!important}
+*{margin:0;padding:0;box-sizing:border-box;border-radius:0!important;outline:none}
 html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(--tx);
-  font:11px/1.35 ui-monospace,"Cascadia Mono",Consolas,monospace;user-select:none}
+  font:11px/1.35 ui-monospace,"Cascadia Mono",Consolas,"Noto Sans Mono CJK SC",monospace;-webkit-font-smoothing:antialiased;user-select:none;cursor:default}
 #app{display:flex;flex-direction:column;height:100%}
-#tb{display:flex;align-items:center;height:34px;background:var(--pnl2);border-bottom:1px solid var(--bd);padding:0 10px;gap:14px}
-#tb b{color:var(--acc);letter-spacing:.12em}
-#st{color:var(--tx2)}#st .g{color:var(--grn)}#st .a{color:var(--amb)}#st .r{color:var(--red)}
+#tb{display:flex;align-items:center;height:34px;background:var(--pnl2);border-bottom:1px solid var(--bd);flex:0 0 auto}
+#tb .brand{display:flex;align-items:center;padding:0 10px;height:100%;border-right:1px solid var(--bd)}
+#tb .brand b{color:var(--acc);font-size:13px;letter-spacing:.14em}
+#tb .tt{display:flex;flex-direction:column;justify-content:center;padding:0 12px;height:100%;border-right:1px solid var(--bd)}
+#tb .tt span:first-child{font-size:11.5px;color:var(--tx)}
+#tb .tt span:last-child{font-size:8.5px;color:var(--tx3);letter-spacing:.16em;text-transform:uppercase}
 #tb .sp{flex:1}
-#tb button{background:var(--bd);color:var(--tx);border:1px solid var(--bd);padding:3px 10px;cursor:pointer}
-#tb button:hover{background:#2a3038}
+#tb .cell{display:flex;flex-direction:column;justify-content:center;padding:0 10px;border-left:1px solid var(--bd);height:100%}
+#tb .cell i{font-style:normal;font-size:8.5px;color:var(--tx3);letter-spacing:.12em;text-transform:uppercase}
+#tb .cell b{font-weight:400;font-size:11px;color:var(--tx)}
+#tb .cell b.g{color:var(--grn)}#tb .cell b.a{color:var(--amb)}#tb .cell b.r{color:var(--red)}#tb .cell b.c{color:var(--acc)}
 #main{flex:1;display:flex;min-height:0}
-#left{width:270px;flex:0 0 270px;border-right:1px solid var(--bd);overflow:auto;background:var(--pnl)}
-#center{flex:1;display:flex;flex-direction:column;min-width:0}
-#views{flex:1;display:flex;flex-wrap:wrap;gap:4px;padding:4px;min-height:0}
-.views{flex:1 1 30%;min-width:220px;min-height:130px;height:49%;display:flex;flex-direction:column}
-.views canvas{flex:1;display:block;min-height:100px}
-.views canvas{flex:1;width:100%;background:#0a0c0e;border:1px solid var(--bd)}
-.views .vt{font-size:9px;color:var(--tx2);padding:2px 4px;text-transform:uppercase;letter-spacing:.12em}
-#right{width:300px;flex:0 0 300px;border-left:1px solid var(--bd);overflow:auto;background:var(--pnl);padding:6px}
-.sec{margin-bottom:8px}
-.sh{font-size:9.5px;color:var(--tx2);letter-spacing:.12em;border-bottom:1px solid var(--bd);padding:2px 0;margin-bottom:4px;text-transform:uppercase}
-table{width:100%;border-collapse:collapse}
-th{font-size:9px;color:var(--tx2);text-align:right;font-weight:400;padding:1px 3px}
-td{font-size:10px;text-align:right;padding:1px 3px;border-top:1px solid #1c2126}
-.mname{color:var(--tx);text-align:left}
-.mfix{color:var(--tx3)}
-input{width:56px;background:#0a0c0e;color:var(--tx);border:1px solid #252b31;text-align:right;padding:1px 3px;font:10px monospace}
-input:focus{outline:1px solid var(--acc)}
-button.sel{background:#2a3038;border:1px solid var(--acc);color:var(--acc)}
-input.num:hover{border-color:var(--acc)}
+#left{width:254px;flex:0 0 254px;background:var(--pnl);border-right:1px solid var(--bd2);overflow-y:auto;overflow-x:hidden}
+#right{width:324px;flex:0 0 324px;background:var(--pnl);border-left:1px solid var(--bd2);overflow-y:auto;overflow-x:hidden}
+.sec{border-bottom:1px solid var(--bd)}
+.sh{display:flex;align-items:center;height:20px;background:var(--pnl2);border-bottom:1px solid var(--bd);padding-left:7px;
+    font-size:9.5px;letter-spacing:.14em;color:var(--tx2);text-transform:uppercase;cursor:pointer}
+.sh b{font-weight:400;color:var(--tx);letter-spacing:.02em;font-size:10px;margin-right:7px;text-transform:none}
+.sh .tg{margin-left:auto;margin-right:7px;color:var(--tx3);font-size:9px}
+.sb{padding:4px 8px 6px}
 .ctl{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:10px;color:var(--tx2)}
-.ctl b{width:52px;color:var(--tx);font-weight:400}
+.ctl b{width:64px;font-weight:400;color:var(--tx);flex:0 0 auto}
 .ctl input[type=range]{flex:1}
-.ctl input[type=number]{width:52px}
-.warn{color:var(--amb);font-size:10px}
+.ctl input[type=number]{width:52px;background:var(--bg2);border:1px solid var(--bd);color:var(--tx);font:10px monospace;text-align:right;padding:1px 3px}
+.ctl input[type=number]:focus{border-color:var(--acc)}
+.ctl input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:12px;background:transparent;cursor:ew-resize}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--bd2)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:5px;height:13px;background:var(--tx2);margin-top:-5.5px}
+input[type=range]:hover::-webkit-slider-thumb{background:var(--acc)}
+.btnrow{display:flex;gap:4px;padding:4px 2px}
+button{flex:1;background:var(--head);border:1px solid var(--bd2);color:var(--tx2);
+  font:9.5px/1 inherit;letter-spacing:.08em;text-transform:uppercase;padding:5px 2px;cursor:pointer;white-space:nowrap}
+button:hover{background:var(--headhi);color:var(--tx);border-color:var(--bd3)}
+button:active{background:var(--accd)}
+button.on{background:var(--accd);border-color:var(--acc);color:#dff2f9}
+button.wide{flex:1 1 100%}
+button:disabled{color:var(--tx3);background:var(--pnl2);cursor:not-allowed;border-color:var(--bd)}
+table.hp{width:100%;border-collapse:collapse;font-size:9.5px}
+table.hp th{background:var(--pnl2);color:var(--tx3);font-weight:400;letter-spacing:.08em;text-transform:uppercase;
+  border-bottom:1px solid var(--bd);padding:2px 3px;text-align:right;font-size:9px;white-space:nowrap}
+table.hp th:first-child{text-align:left;padding-left:6px}
+table.hp td{border-bottom:1px solid #1d2126;padding:0}
+table.hp td.n{padding-left:6px;color:var(--tx2);font-size:9.5px;white-space:nowrap}
+table.hp td.n b{font-weight:400;color:var(--tx)}
+table.hp td.n i{font-style:normal;color:var(--tx3);font-size:8.5px}
+table.hp tr:hover td.n{color:var(--acc)}
+table.hp tr.held td.n b{color:var(--amb)}
+table.hp input{border:none;border-left:1px solid #1d2126;background:transparent;height:16px;font-size:9.5px;padding-right:3px;color:var(--tx)}
+table.hp input:hover{background:#0d1114}
+table.hp input:focus{background:#0d1418;border:1px solid var(--acc)}
+table.ro{width:100%;border-collapse:collapse;font-size:9.5px}
+table.ro th{background:var(--pnl2);color:var(--tx3);font-weight:400;letter-spacing:.06em;font-size:9px;
+  border-bottom:1px solid var(--bd);padding:2px 3px;text-align:right}
+table.ro th:first-child{text-align:left;padding-left:6px}
+table.ro td{text-align:right;padding:1.5px 3px;border-bottom:1px solid #1d2126;font-variant-numeric:tabular-nums;white-space:nowrap}
+table.ro td:first-child{text-align:left;padding-left:6px;color:var(--tx2);white-space:nowrap}
+table.ro td.mn{color:var(--tx)}
+table.ro td.g{color:var(--grn)}table.ro td.a{color:var(--amb)}table.ro td.r{color:var(--red)}
+table.ro td.na{color:var(--tx3)}
+table.ro td.sx{border-left:1px solid #22282f}
+table.ro th.sx{border-left:1px solid #22282f}
+.warn{color:var(--amb);font-size:9.5px;line-height:1.4}
 .err{color:var(--red);font-size:10px}
-.v{font-weight:400}
 .na{color:var(--tx3)}
 .force{color:var(--amb)}
-.mr{overflow:hidden;white-space:nowrap}
+.mr{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#center{flex:1;min-width:0;display:flex;flex-direction:column}
+#vp{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:1px;background:var(--bd2);padding:0}
+#vp.max0{grid-template-columns:1fr;grid-template-rows:1fr}
+#vp.max0 .vw{display:none}#vp.max0 .vw.mx{display:flex}
+.vw{position:relative;background:var(--bg2);display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
+.vwh{display:flex;align-items:center;height:18px;background:var(--pnl);border-bottom:1px solid var(--bd);
+     padding:0 0 0 7px;font-size:9px;letter-spacing:.1em;color:var(--tx3);text-transform:uppercase;flex:0 0 18px}
+.vwh b{font-weight:400;color:var(--tx2);letter-spacing:.02em;font-size:10px;margin-right:7px;text-transform:none}
+.vwh .en{color:#4a545f}
+.vwh .vi{margin-left:auto;color:var(--tx3);font-size:9px;padding-right:6px;letter-spacing:.03em}
+.vwh .vb{width:18px;height:17px;line-height:17px;text-align:center;border-left:1px solid var(--bd);color:var(--tx3);cursor:pointer;font-size:9px}
+.vwh .vb:hover{background:var(--headhi);color:var(--acc)}
+.wrapc{flex:1 1 auto;min-height:0;position:relative}
+.vw canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.vw.act .vwh{background:var(--head)}
+.vw.act .vwh b{color:var(--acc)}
+#statsRow{height:40px;background:var(--pnl);border-top:1px solid var(--bd2);overflow:auto;padding:2px 6px}
+#sb{display:flex;height:22px;background:var(--head);border-top:1px solid var(--bd2);flex:0 0 auto;align-items:stretch}
+#sb .c{display:flex;align-items:center;padding:0 9px;border-right:1px solid var(--bd);font-size:9.5px;color:var(--tx2);white-space:nowrap}
+#sb .c u{text-decoration:none;color:var(--tx3);margin-right:5px;font-size:8.5px;letter-spacing:.1em}
+#sb .c b{font-weight:400;color:var(--tx);font-variant-numeric:tabular-nums}
+#sb .sp{flex:1;border-right:1px solid var(--bd)}
+#sb .c.ok b{color:var(--grn)}#sb .c.bad b{color:var(--red)}#sb .c.hl b{color:var(--acc)}
+.plotbox{padding:2px 4px;position:relative}
+canvas.plot{display:block;width:100%;height:88px;background:var(--bg2);border:1px solid var(--bd)}
+canvas.plot.ks{height:66px}
+.legend{padding:2px 8px;display:grid;grid-template-columns:1fr 1fr;gap:1px 8px;font-size:9px;color:var(--tx2)}
+.legend div{display:flex;align-items:center;gap:5px;height:13px}
+.legend s{text-decoration:none;width:14px;height:0;border-top-width:2px;border-top-style:solid;flex:0 0 14px}
+.legend q{quotes:none;width:7px;height:7px;flex:0 0 7px;display:block}
+.chk{display:flex;align-items:center;gap:5px;padding:1.5px 0;cursor:pointer;font-size:10px;color:var(--tx2)}
+.chk i{width:11px;height:11px;border:1px solid var(--bd3);flex:0 0 11px;position:relative;background:var(--bg2);display:inline-block}
+.chk.on i{background:var(--acc);border-color:var(--acc)}
+.chk.on i::after{content:"";position:absolute;left:2px;top:2px;width:5px;height:5px;background:#0b1418}
+.chk.on{color:var(--tx)}
+::-webkit-scrollbar{width:9px;background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--bd2);border:1px solid var(--bg2)}
+::-webkit-scrollbar-thumb:hover{background:var(--bd3)}
 </style>
 </head>
 <body>
 <div id="app">
   <div id="tb">
-    <b>V1·MODELER</b>
-    <span id="st">— 加载中 —</span>
-    <span class="sp"></span>
-    <button id="reset" title="恢复默认硬点">重置</button>
-    <button id="mirrorX" title="把右前 ×/z 变化镜像到左前（未实现，占位）">镜像</button>
+    <div class="brand"><b>FSAE·MODELER</b></div>
+    <div class="tt"><span>整车双叉臂底盘 · 硬点建模 / 运动学分析</span><span>whole-chassis hardpoint modeler</span></div>
+    <div class="sp"></div>
+    <div class="cell"><i>solver</i><b id="tbSolver">—</b></div>
+    <div class="cell"><i>state 状态</i><b class="g" id="tbState">加载中</b></div>
+    <div class="cell"><i>pose 姿态</i><b id="tbPose">—</b></div>
   </div>
   <div id="main">
-    <div id="left">
-      <div class="sec">
-        <div class="sh">工况 Case</div>
-        <div class="ctl"><b>轮跳 mm</b>
-          FL<input type="number" id="t_fl" value="0" step="1"> FR<input type="number" id="t_fr" value="0" step="1">
+    <aside id="left">
+      <div class="sec"><div class="sh"><b>工况 Case</b><span class="tg">—</span></div>
+        <div class="sb">
+          <div class="ctl"><b>轮跳 mm</b>
+            <span>FL<input type="number" id="t_fl" value="0" step="1" style="width:46px"></span>
+            <span>FR<input type="number" id="t_fr" value="0" step="1" style="width:46px"></span>
+          </div>
+          <div class="ctl"><b></b>
+            <span>RL<input type="number" id="t_rl" value="0" step="1" style="width:46px"></span>
+            <span>RR<input type="number" id="t_rr" value="0" step="1" style="width:46px"></span>
+          </div>
+          <div class="ctl"><b>齿条 rack</b><input type="number" id="rack" value="0" step="1"></div>
+          <div class="ctl"><b>ay g</b><input type="range" id="ay" min="-2" max="2" step="0.1" value="0"><input type="number" id="ayv" value="0" step="0.1"></div>
+          <div class="ctl"><b>ax g</b><input type="range" id="ax" min="-2" max="2" step="0.1" value="0"><input type="number" id="axv" value="0" step="0.1"></div>
+          <div class="ctl"><b>曲线轴</b>
+            <button id="cvFront" class="on">前轴</button><button id="cvRear">后轴</button>
+          </div>
+          <div class="ctl"><b>扫掠</b><span class="chk on" id="curves" style="padding:0"><i></i>sweep</span></div>
         </div>
-        <div class="ctl"><b>齿条 rack</b><input type="number" id="rack" value="0" step="1"></div>
-        <div class="ctl"><b>ay g</b><input type="range" id="ay" min="-2" max="2" step="0.1" value="0"><input type="number" id="ayv" value="0" step="0.1"></div>
-        <div class="ctl"><b>ax g</b><input type="range" id="ax" min="-2" max="2" step="0.1" value="0"><input type="number" id="axv" value="0" step="0.1"></div>
-        <div class="ctl"><b>轴</b>
-          <button id="axFront" class="sel">前轴 编辑</button>
-          <button id="axRear">后轴 编辑</button>
-        </div>
-        <div class="ctl"><b>外倾°</b><input type="number" id="gamma" value="0" step="1"></div>
-        <div class="ctl"><b>曲线</b><input type="checkbox" id="curves" checked> <span>扫掠</span>
-          <button id="cvTravel" class="sel">travel</button>
-          <button id="cvRack">rack</button>
-        </div>
-        <div class="ctl"><b>A/B</b><button id="snapA">记基线A</button>
-          <button id="cmpB">对比B−A</button></div>
       </div>
-      <div class="sec">
-        <div class="sh">硬点 Hardpoints（前右 / 可拖动）</div>
-        <table id="hpTable"><thead><tr><th class="mname">点</th><th>X</th><th>Y</th><th>Z</th></tr></thead><tbody></tbody></table>
-        <div class="mr err" id="hpHint" style="margin-top:4px"></div>
+      <div class="sec"><div class="sh"><b>硬点 Hardpoints</b><span class="tg">正交视图拖动编辑</span></div>
+        <div class="sb" style="padding:0">
+          <div class="ctl" style="padding:3px 8px"><b>编辑轴</b>
+            <button id="hpFront" class="on">右前</button><button id="hpRear">右后</button>
+          </div>
+          <table class="hp" id="hpTable"><thead><tr><th>点</th><th>X</th><th>Y</th><th>Z</th></tr></thead><tbody></tbody></table>
+          <div style="padding:3px 8px;margin-top:3px">
+            <div class="btnrow"><button id="reset" class="wide">重置为默认</button></div>
+          </div>
+        </div>
       </div>
-    </div>
+      <div class="sec"><div class="sh"><b>A/B 快照</b><span class="tg">—</span></div>
+        <div class="sb"><div class="btnrow">
+          <button id="snapA">记基线A</button><button id="cmpB">对比 B−A</button></div>
+          <div id="abBox" class="mr warn" style="font-size:9.5px">—</div>
+        </div>
+      </div>
+    </aside>
     <div id="center">
-      <div id="views">
-        <div class="views"><div class="vt">等轴测 ISO（参考 · 主视图）</div><canvas id="vIso"></canvas></div>
-        <div class="views"><div class="vt">正视图 FRONT (Y-Z) · 拖动改 Y/Z</div><canvas id="vFront"></canvas></div>
-        <div class="views"><div class="vt">俯视图 TOP (X-Y) · 拖动改 X/Y</div><canvas id="vTop"></canvas></div>
-        <div class="views"><div class="vt">侧视图 SIDE (X-Z) · 拖动改 X/Z</div><canvas id="vSide"></canvas></div>
-      </div>
-      <div id="bottom"></div>
+      <div id="vp"></div>
+      <div id="statsRow"><div class="legend">
+          <div><s style="border-top-color:#e0603f"></s>主销</div>
+          <div><s style="border-top-color:#43c9c0"></s>横拉杆/立柱</div>
+          <div><s style="border-top-color:#d9a238"></s>推杆(弹性)</div>
+          <div><s style="border-top-color:#aab9c7"></s>摆臂</div>
+          <div><q style="background:#c3cad2"></q>运动小球</div>
+          <div><q style="background:#d2543f"></q>车架节点</div>
+          <div><s style="border-top-color:#c07ad0"></s>防倾杆</div>
+        </div></div>
     </div>
-    <div id="right">
-      <div class="sec"><div class="sh">定位角 Alignment（右前 · 求解）</div>
-        <table id="angleTable"></table>
+    <aside id="right">
+      <div class="sec"><div class="sh"><b>定位角 Alignment</b><span class="tg">4 轮求解</span></div>
+        <div class="sb" style="padding:0"><table class="ro" id="angleTable"></table></div>
       </div>
-      <div class="sec"><div class="sh">状态 / 残差 Status</div>
-        <div id="statusBox" class="ctl"></div>
+      <div class="sec"><div class="sh"><b>轮边受力 Wheel Forces</b><span class="tg">多工况</span></div>
+        <div class="sb" style="padding:0"><table class="ro" id="forceTable"></table>
+          <div id="forceNote" class="warn" style="padding:3px 8px"></div>
+        </div>
       </div>
-      <div class="sec"><div class="sh">轮边受力 Wheel Forces（右前 · 1.2g 制动静载基准）</div>
-        <div id="forceBox" class="ctl"></div>
+      <div class="sec"><div class="sh"><b>状态 / 警告</b><span class="tg">—</span></div>
+        <div class="sb"><div id="statusBox" class="ctl"></div></div>
       </div>
-      <div class="sec"><div class="sh">曲线 Curves（travel）</div>
-        <canvas id="chart" style="width:100%;height:150px;background:#0a0c0e;border:1px solid var(--bd)"></canvas>
+      <div class="sec"><div class="sh"><b>曲线 Curves</b><span class="tg"><span id="curveTitle">前轴 travel</span></span></div>
+        <div class="plotbox"><canvas id="chart" class="plot"></canvas></div>
       </div>
-      <div class="sec"><div class="sh">操稳 Handling（P5 · ay 工况）</div>
-        <div id="handlingBox" class="ctl"><span class="na">— 待求解 —</span></div>
-        <canvas id="kChart" style="width:100%;height:80px;background:#0a0c0e;border:1px solid var(--bd)"></canvas>
+      <div class="sec"><div class="sh"><b>操稳 Handling · 调平</b><span class="tg">P5 ay 工况</span></div>
+        <div class="sb" style="padding:3px 8px"><div id="handlingBox" style="font-size:10px">— 待求解 —</div>
+          <div class="plotbox" style="padding:2px 0 0"><canvas id="kChart" class="plot ks"></canvas></div>
+        </div>
       </div>
-      <div class="sec"><div class="sh">敏感性 Sensitivity（前右 · ±1mm/轴）</div>
-        <div id="sensBox" class="ctl"><span class="na">— 待请求 —</span>
-          <button id="runSens">运行</button></div>
+      <div class="sec"><div class="sh"><b>敏感性 Sensitivity</b><span class="tg">右前 ±1mm</span></div>
+        <div class="sb"><div id="sensBox" style="font-size:9.5px">— 待请求 —
+          <div class="btnrow"><button id="runSens">运行</button></div></div>
+        </div>
       </div>
-      <div class="sec"><div class="sh">导出 Export</div>
-        <div class="ctl"><button id="expCsv">结果 CSV</button><button id="expJson">结果 JSON</button></div>
+      <div class="sec"><div class="sh"><b>导出 Export</b><span class="tg">—</span></div>
+        <div class="sb"><div class="btnrow">
+          <button id="expCsv">结果 CSV</button><button id="expJson">结果 JSON</button></div>
+        </div>
       </div>
-    </div>
+    </aside>
+  </div>
+  <div id="sb">
+    <div class="c"><u>node 节点</u><b id="sbNode">-</b></div>
+    <div class="c"><u>rigid 刚性</u><b id="sbRig">-</b></div>
+    <div class="c"><u>elastic 弹性</u><b id="sbEla">-</b></div>
+    <div class="c ok"><u>residual 残差</u><b id="sbRes">-</b></div>
+    <div class="sp"></div>
+    <div class="c"><u>cursor</u><b id="sbCur">-</b></div>
+    <div class="c hl"><u>hint</u><b id="sbHint">等轴测: 左键旋转 · Shift/中键平移 · 滚轮缩放 ‖ 正交: 拖动硬点编辑 · 滚轮缩放 · 双击/ F 适应</b></div>
   </div>
 </div>
-
 <script>
 "use strict";
-/* ============ 种子数据：legacy-import / front_right ============ */
-const POINT_NAMES = {
+/* ============================================================================
+   FSAE 整车双叉臂底盘硬点模型器（DWB-SIM 渲染/交互架构移植）
+   ----------------------------------------------------------------------------
+   坐标系：X 向前(车头)，Y 向右(右为正)，Z 向上；原点 = 前轴中心地面。
+   整车建模：前轴 X≈0 与后轴 X≈-1550 同时显示，右前/右后为可编辑硬点模板，
+            左前/左后由镜像生成并在求解时一起运动 —— 完整底盘，无轴切换。
+   求解：POST /api/v2/solve/hardpoints —— 四角独立求解，回传姿态/球头/轮心/接地/主销轴。
+   视图：等轴测(透视,左键旋转) + 正/俯/侧正交(拖动硬点编辑)。
+   车轮：3D 圆盘，自旋轴指向车横向(Y)，按外倾/前束倾斜 —— 任意视角投影正确。
+   ============================================================================ */
+const abs=Math.abs,sqrt=Math.sqrt,sin=Math.sin,cos=Math.cos,atan2=Math.atan2,PI=Math.PI;
+const D2R=PI/180,R2D=180/PI;
+const add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]];
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+const mul=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const len=a=>Math.hypot(a[0],a[1],a[2]);
+const nrm=a=>{const l=Math.hypot(a[0],a[1],a[2])||1;return[a[0]/l,a[1]/l,a[2]/l];};
+const dst=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
+const cpy=a=>[a[0],a[1],a[2]];
+const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+function perpOf(a){const x=abs(a[0]),y=abs(a[1]),z=abs(a[2]);
+  let t=(x<=y&&x<=z)?[1,0,0]:((y<=z)?[0,1,0]:[0,0,1]);
+  return nrm(cross(a,t));}
+const fmt=(v,d)=>(v===null||v===undefined||!isFinite(v))?"--":v.toFixed(d===undefined?2:d);
+const sfmt=(v,d)=>{const s=fmt(v,d);return(isFinite(v)&&v>0)?"+"+s:s;};
+
+/* ================================ 硬点数据 ================================ */
+const POINT_NAMES={
   "CH1":"上臂前支","CH2":"上臂后支","CH3":"下臂前支","CH4":"下臂后支","CH5":"推杆车架",
   "UP1":"上球头UBJ","UP2":"下球头LBJ","UP3":"横拉杆外点","UP4":"推杆下点","UP5":"轮心WC","FL1":"横拉杆内点"
 };
-const FIXED = new Set(["CH1","CH2","CH3","CH4","CH5","FL1"]);
-const LINKS = [["CH1","UP1"],["CH2","UP1"],["CH3","UP2"],["CH4","UP2"],
+const FIXED=new Set(["CH1","CH2","CH3","CH4","CH5","FL1"]);
+const LINKS=[["CH1","UP1"],["CH2","UP1"],["CH3","UP2"],["CH4","UP2"],
   ["CH1","CH2"],["CH3","CH4"],["UP1","UP2"],["CH5","UP4"],["FL1","UP3"]];
-const TIRE = {tire_radius:260.0, tire_width:180.0, tire_spring_rate:150.0, corner_weight_n:700.0};
-
-let hp = null;          // 当前轴右轮 points {UP1:[x,y,z],...}
-let hpRear = null;      // 后轴右轮（design 读取）
-let hpLeft = null;      // 当前轴左轮（镜像）
-let AXLE = "front";     // front | rear
-let CURVE_AXIS = "travel";   // travel | rack
-let frontHp = null, rearHp = null;
-let busy = false, pending = false;
-let dragging = false, sweepTimer = null;
-let last = null;        // 最近求解结果
-
-/* ---------- 初始化：若后端不可达则用内置种子 ---------- */
-const SEED = {
+const TIRE={tire_radius:260.0,tire_width:180.0,tire_spring_rate:150.0,corner_weight_n:700.0};
+const SEED={
   CH1:[-90,160,285],CH2:[90,152,295],CH3:[-110,128,110],CH4:[110,122,115],CH5:[0,135,305],
-  UP1:[1.9609900410029117,579.0185708764398,277.692885364207],
-  UP2:[-11.112276899016498,585.5614317001745,128.40698293616043],
-  UP3:[-91.06667606419882,550.3704101690648,209.2251650348173],
-  UP4:[0.1613758541883783,576.3779975879934,179.76836718062356],
-  UP5:[0,610,255.3],FL1:[-100,115,200]
+  UP1:[1.96,579.02,277.69],UP2:[-11.11,585.56,128.41],UP3:[-91.07,550.37,209.23],
+  UP4:[0.16,576.38,179.77],UP5:[0,610,255.3],FL1:[-100,115,200]
 };
 
-function curWheel(){ return hp; }   // 全局 hp 恒为当前轴右轮（setAxle 切换对象）
-function curLeft(){
-  const w=curWheel(); const out={};
-  for(const k in w){ out[k]=[w[k][0], -w[k][1], w[k][2]]; }
+const S={
+  frontR:null, rearR:null, tire:Object.assign({},TIRE),
+  curveAxle:"front", curveAxis:"travel", hpAxle:"front",
+  vp:null, held:null, keep:false
+};
+let busy=false, pending=false, dragging=false, sweepTimer=null, solveSeq=0;
+let lastH=null, snapA=null, resp=null;
+function deep(o){return JSON.parse(JSON.stringify(o));}
+const mirrorPts=w=>{const out={};for(const k in w)out[k]=[w[k][0],-w[k][1],w[k][2]];return out;};
+
+/* ================================ 视图 ================================ */
+const VDEF=[
+  {key:"front",zh:"正视图",en:"FRONT",ax:"Y-Z",bx:[0,1,0],by:[0,0,1],type:"o",note:"拖动改 Y/Z"},
+  {key:"top",  zh:"俯视图",en:"TOP",   ax:"X-Y",bx:[1,0,0],by:[0,1,0],type:"o",note:"拖动改 X/Y"},
+  {key:"side", zh:"侧视图",en:"SIDE",  ax:"X-Z",bx:[1,0,0],by:[0,0,1],type:"o",note:"拖动改 X/Z"},
+  {key:"iso",  zh:"等轴测",en:"ISO",   ax:"3D",  type:"p",note:"左键旋转 · Shift平移"}
+];
+const VW=[]; let UI={drag:null,hover:null,sel:null}; const PICK=[];
+
+function initViews(){
+  const vp=document.getElementById("vp");
+  VDEF.forEach(d=>{
+    const w=document.createElement("div");w.className="vw";w.dataset.k=d.key;
+    w.innerHTML='<div class="vwh"><b>'+d.zh+'</b><span class="en">'+d.en+'</span> <span style="color:#39414b">['+d.ax+']</span>'+
+      '<span class="vi">'+d.note+'</span><span class="vb" title="适应窗口">F</span><span class="vb" title="最大化">M</span></div>'+
+      '<div class="wrapc"><canvas></canvas></div>';
+    vp.appendChild(w);
+    const v=Object.assign({},d,{el:w,cv:w.querySelector("canvas"),w:10,h:10,dpr:1,
+      s:0.5,cx:0,cy:0,az:-52*D2R,elv:24*D2R,dist:3400,tgt:[0,0,320],mx:false,inited:false});
+    v.ctx=v.cv.getContext("2d");
+    VW.push(v);
+    const bts=w.querySelectorAll(".vb");
+    bts[0].addEventListener("click",e=>{e.stopPropagation();fitView(v);});
+    bts[1].addEventListener("click",e=>{e.stopPropagation();toggleMax(v);});
+    hookView(v);
+    w.addEventListener("mouseenter",()=>{VW.forEach(q=>q.el.classList.remove("act"));w.classList.add("act");});
+  });
+  const ro=new ResizeObserver(()=>{VW.forEach(sizeView);});
+  ro.observe(vp);
+  VW.forEach(sizeView);
+}
+function sizeView(v){
+  const cv=v.cv;
+  const w=Math.max(10,cv.clientWidth||10),h=Math.max(10,cv.clientHeight||10),dpr=Math.min(2,window.devicePixelRatio||1);
+  if(cv.width!==w*dpr||cv.height!==h*dpr||v.dpr!==dpr){
+    v.w=w;v.h=h;v.dpr=dpr;cv.width=w*dpr;cv.height=h*dpr;
+    v.ctx.setTransform(dpr,0,0,dpr,0,0);
+    if(!v.inited){fitView(v);v.inited=true;}
+  }
+}
+function toggleMax(v){
+  const vp=document.getElementById("vp");
+  const on=!v.mx;VW.forEach(q=>{q.mx=false;q.el.classList.remove("mx");});
+  if(on){v.mx=true;v.el.classList.add("mx");vp.classList.add("max0");}else vp.classList.remove("max0");
+  setTimeout(()=>VW.forEach(sizeView),0);
+}
+function camIso(v){
+  const ce=cos(v.elv),se=sin(v.elv);
+  const dir=[ce*cos(v.az),ce*sin(v.az),se];
+  v.eye=add(v.tgt,mul(dir,v.dist));
+  v.fw=nrm(sub(v.tgt,v.eye));
+  v.rt=nrm(cross(v.fw,[0,0,1]));
+  v.up=cross(v.rt,v.fw);
+}
+function P2(v,p){
+  if(v.type==="o") return[v.w/2+(dot(p,v.bx)-v.cx)*v.s, v.h/2-(dot(p,v.by)-v.cy)*v.s];
+  const q=sub(p,v.eye),z=dot(q,v.fw);
+  if(z<80)return null;
+  const f=v.dist/z;
+  return[v.w/2+dot(q,v.rt)*f*v.s, v.h/2-dot(q,v.up)*f*v.s];
+}
+function S2W(v,sx,sy,base){
+  const a=(sx-v.w/2)/v.s+v.cx, b=-(sy-v.h/2)/v.s+v.cy;
+  const out=cpy(base);
+  for(let k=0;k<3;k++)out[k]=base[k]+v.bx[k]*(a-dot(base,v.bx))+v.by[k]*(b-dot(base,v.by));
   return out;
 }
-async function init(){
-  try{
-    const r = await fetch("/api/v2/designs/legacy-import");
-    if(r.ok){const d = await r.json();
-      hp = deep(d.front_right.points);
-      hpRear = deep(d.rear_right.points);
-    }else{ hpRear = null; }
-  }catch(e){}
-  if(!hp || !hp.UP1){ hp = deep(SEED); setStatus("离线种子模式", "a"); }
-  hpLeft = curLeft();
-  buildTable(); buildTableState(); drawAll();
-  requestSolve(true, true);
-}
-function deep(o){return JSON.parse(JSON.stringify(o));}
-
-/* ---------- 硬点表 ---------- */
-function buildTable(){
-  const w = curWheel();
-  document.querySelector("#hpTable thead").innerHTML = 
-    '<tr><th class="mname">点 · '+(AXLE==="front"?"前轴":"后轴")+'</th><th>X</th><th>Y</th><th>Z</th></tr>';
-  const tb = document.querySelector("#hpTable tbody");
-  tb.innerHTML = "";
-  for(const k of Object.keys(w)){
-    const tr = document.createElement("tr");
-    tr.innerHTML = '<td class="mname '+(FIXED.has(k)?'mfix':'')+'">'+k+'<span style="color:#616b77"> '+ (POINT_NAMES[k]||"") +'</span></td>'+
-      '<td><input data-k="'+k+'" data-a="0" class="num" type="number" step="1"></td>'+
-      '<td><input data-k="'+k+'" data-a="1" class="num" type="number" step="1"></td>'+
-      '<td><input data-k="'+k+'" data-a="2" class="num" type="number" step="1"></td>';
-    tb.appendChild(tr);
+function fitPoints(){
+  const pts=[[0,0,0]];
+  const sk=buildSkeleton();
+  for(const n in sk){const c=sk[n];if(!c||!c.pt)continue;
+    for(const k in c.pt)pts.push(c.pt[k]);
+    if(c.wc){const wc=c.wc,R=260,W=180;
+      [[R,0,0],[-R,0,0],[0,R,0],[0,-R,0],[0,0,R],[0,0,-R]].forEach(o=>pts.push(add(wc,o)));
+      pts.push([wc[0],wc[1]+W,wc[2]]);pts.push([wc[0],wc[1]-W,wc[2]]);
+    }
   }
-  const onEdit = (k,a)=>()=>{
-    const v=parseFloat(document.querySelector("input[data-k='"+k+"'][data-a='"+a+"']").value);
-    if(isFinite(v)){curWheel()[k][a]=v; hpLeft=curLeft(); drawAll(); requestSolve();}
-  };
-  tb.querySelectorAll("input").forEach(inp=>{
-    inp.addEventListener("change", ()=>{const k=inp.dataset.k,a=+inp.dataset.a,v=parseFloat(inp.value);
-      if(isFinite(v)){curWheel()[k][a]=v; hpLeft=curLeft(); drawAll(); requestSolve();}});
-    inp.addEventListener("input", ()=>{const k=inp.dataset.k,a=+inp.dataset.a,v=parseFloat(inp.value);
-      if(isFinite(v)){curWheel()[k][a]=v; hpLeft=curLeft(); drawAll(); requestSolve();}});
-  });
-}
-function buildTableState(){
-  const w = curWheel();
-  const tb = document.querySelector("#hpTable");
-  tb.querySelectorAll("input.num").forEach(inp=>{
-    const k=inp.dataset.k, a=+inp.dataset.a, v=w[k][a];
-    if(document.activeElement!==inp) inp.value = (+v.toFixed(3));
-  });
-}
-
-/* ============ 四视图：三正交 + 等轴测（DWB-SIM 式投影/相机） ============ */
-const VIEWS = {
-  iso:   {canvas:"vIso",  iso:true, az:0.70, elv:0.42, zh:"等轴测 ISO（参考 · 主视图）"},
-  front: {canvas:"vFront", a:1, b:2, ar:1, zh:"正视图 FRONT (Y-Z) · 拖动改 Y/Z"},
-  top:   {canvas:"vTop",  a:1, b:0, ar:-1, zh:"俯视图 TOP (X-Y) · 拖动改 X/Y"},
-  side:  {canvas:"vSide", a:0, b:2, ar:1, zh:"侧视图 SIDE (X-Z) · 拖动改 X/Z"},
-};
-const DRAW_ORDER = ["iso", "front", "top", "side"];
-let drag = null;
-
-/* —— 配色（DWB-SIM 语义分组） —— */
-const CC = {
-  rig:"#8d9caa", rigArm:"#aab9c7", knu:"#43c9c0", knuF:"rgba(67,201,192,0.12)",
-  kp:"#e0603f", tie:"#43c9c0", ela:"#d9a238", chas:"#414b56", chas2:"#333c46",
-  arb:"#c07ad0", tire:"#5f6a76", node:"#c3cad2", nodeFix:"#d2543f", nodeSel:"#f0e6c8",
-};
-
-/* —— 参与取景的 3D 点（悬架点 + 车架盒角点 + 轮外缘） —— */
-function collectPts(){
-  const L=curLeft();
-  const pts = Object.values(hp).map(p => p.slice()).concat(Object.values(L).map(p=>p.slice()));
-  const box = chassisBox();
-  for(const p of box) pts.push(p);
-  const wc = hp.UP5;
-  [[260,0,0],[-260,0,0],[0,260,0],[0,-260,0],[0,0,260],[0,0,-260]].forEach(o=>{
-    pts.push([wc[0]+o[0], wc[1]+o[1], wc[2]+o[2]]);
-  });
+  const box=chassisBox(sk);
+  for(const p of box)pts.push(p);
   return pts;
 }
-function chassisBox(){
-  const xs = [hp.CH1[0], hp.CH2[0], hp.CH3[0], hp.CH4[0]];
-  const ys = [Math.abs(hp.CH1[1]), Math.abs(hp.CH2[1]), Math.abs(hp.CH3[1]), Math.abs(hp.CH4[1])];
-  const zs = [hp.CH1[2], hp.CH2[2], hp.CH3[2], hp.CH4[2]];
-  const bx = Math.max(...xs) + 30, by = Math.max(...ys) + 45;
-  const z0 = Math.min(...zs) - 30, z1 = Math.max(...zs, hp.CH5[2]) + 20;
-  return [[-bx,-by,z0],[bx,-by,z0],[bx,by,z0],[-bx,by,z0],
-          [-bx,-by,z1],[bx,-by,z1],[bx,by,z1],[-bx,by,z1]];
-}
-/* —— 等轴测相机（DWB-SIM camIso + 透视投影 P2） —— */
-function camIso(v){
-  const ce=Math.cos(v.elv), se=Math.sin(v.elv);
-  const dir=[ce*Math.cos(v.az), ce*Math.sin(v.az), se];
-  v.eye=[v.tgt[0]+dir[0]*v.dist, v.tgt[1]+dir[1]*v.dist, v.tgt[2]+dir[2]*v.dist];
-  const fx=v.tgt[0]-v.eye[0],fy=v.tgt[1]-v.eye[1],fz=v.tgt[2]-v.eye[2];
-  const fl=Math.hypot(fx,fy,fz)||1;
-  v.fw=[fx/fl,fy/fl,fz/fl];
-  let rx=v.fw[1], ry=-v.fw[0], rz=0;                 // cross(fw,[0,0,1])
-  const rl=Math.hypot(rx,ry)||1; v.rt=[rx/rl,ry/rl,rz];
-  v.up=[v.rt[1]*v.fw[2]-v.rt[2]*v.fw[1], v.rt[2]*v.fw[0]-v.rt[0]*v.fw[2],
-        v.rt[0]*v.fw[1]-v.rt[1]*v.fw[0]];
-}
-const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
-function projPt(view, g, p){
-  if(view.iso){
-    const q=[p[0]-view.eye[0], p[1]-view.eye[1], p[2]-view.eye[2]];
-    const z=dot(q, view.fw);
-    if(z<80) return null;
-    const f=view.dist/z;
-    return [g.W/2 + dot(q,view.rt)*f*g.s, g.H/2 - dot(q,view.up)*f*g.s];
-  }
-  return [g.W/2 + (p[view.a]-g.cxv)*g.s, g.H/2 - view.ar*(p[view.b]-g.cyv)*g.s];
-}
-function viewGeom(view){
-  const pts = collectPts();
-  const pad=40, cv=document.getElementById(view.canvas);
-  const W=cv.clientWidth, H=cv.clientHeight;
-  if(!view.hasOwnProperty("tgt")) view.tgt=[0,0,180];
-  if(!view.hasOwnProperty("dist")) view.dist=1800;
-  if(view.hasOwnProperty("a")){
-    let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
-    for(const p of pts){
-      const X=p[view.a],Y=p[view.b];
-      x0=Math.min(x0,X); x1=Math.max(x1,X); y0=Math.min(y0,Y); y1=Math.max(y1,Y);
-    }
-    const s=Math.min((W-pad*2)/Math.max(1,x1-x0),(H-pad*2)/Math.max(1,y1-y0));
-    return {s,cxv:(x0+x1)/2,cyv:(y0+y1)/2,W,H,ox:0,oy:0};
-  }
-  /* iso：迭代 fit（DWB-SIM fitView iso 分支） */
-  view.dist=1800; camIso(view);
-  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
-  for(const p of pts){
-    const q=projPt(view,{W,H,s:1},p);
-    if(!q)continue;
-    if(q[0]<x0)x0=q[0]; if(q[0]>x1)x1=q[0];
-    if(q[1]<y0)y0=q[1]; if(q[1]>y1)y1=q[1];
-  }
-  const s=Math.min((W-pad*2)/Math.max(1,x1-x0),(H-pad*2)/Math.max(1,y1-y0));
-  // iso 中心校正在 drawView 由 isoCenter 完成；此处在必要守候肩任 ox/oy=0
-  return {s, W, H, ox:0, oy:0};
-}
-// iso 中计算中心偏移（简化：用投影中心校正）
-function isoCenter(view, g){
-  const pts=collectPts();
-  let cx=0,cy=0,n=0;
-  for(const p of pts){const q=projPt(view,{W:g.W,H:g.H,s:g.s},p); if(q){cx+=q[0];cy+=q[1];n++;}}
-  return [cx/n, cy/n];
-}
-function drawView(id){
-  const view=VIEWS[id], cv=document.getElementById(view.canvas);
-  if(cv.width!==cv.clientWidth||cv.height!==cv.clientHeight){cv.width=cv.clientWidth;cv.height=cv.clientHeight;}
-  const ctx=cv.getContext("2d"); ctx.clearRect(0,0,cv.width,cv.height);
-  const g=viewGeom(view);
-  if(view.iso){
-    // 居中校正（覆盖 viewGeom 兜底值）
-    const c=isoCenter(view,{W:g.W,H:g.H,s:g.s});
-    g.ox=g.W/2-c[0]; g.oy=g.H/2-c[1];
-  }
-  const P=(p)=>{const q=projPt(view,g,p); return q?[q[0]+g.ox, q[1]+g.oy]:null;};
-  const seg=(a,b,col,w,d)=>{const A=P(a),B=P(b); if(!A||!B)return;
-    if(d)ctx.setLineDash(d); ctx.strokeStyle=col; ctx.lineWidth=w||1;
-    ctx.beginPath(); ctx.moveTo(A[0],A[1]); ctx.lineTo(B[0],B[1]); ctx.stroke(); ctx.setLineDash([]);};
-  const poly=(pts,col,w,d,f)=>{const S=[]; for(const p of pts){const q=P(p); if(!q)return; S.push(q);}
-    if(f){ctx.fillStyle=f;ctx.beginPath();ctx.moveTo(S[0][0],S[0][1]);
-      for(let i=1;i<S.length;i++)ctx.lineTo(S[i][0],S[i][1]);ctx.closePath();ctx.fill();}
-    if(d)ctx.setLineDash(d); ctx.strokeStyle=col; ctx.lineWidth=w||1;
-    ctx.beginPath(); ctx.moveTo(S[0][0],S[0][1]);
-    for(let i=1;i<S.length;i++)ctx.lineTo(S[i][0],S[i][1]); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);};
-
-  /* 地面网格（前/侧视图为地平线；iso 画车下轮廓） */
-  if(!view.iso && view.b===2){
-    const gy=P([0,0,0]); if(gy){ctx.strokeStyle="#1c2126";ctx.beginPath();
-      ctx.moveTo(0,gy[1]);ctx.lineTo(cv.width,gy[1]);ctx.stroke();}
-  }
-
-  /* 车架盒 + 中横板 + CH 支架 */
-  const box = chassisBox();
-  const E=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
-  E.forEach(e=>seg(box[e[0]],box[e[1]],CC.chas,1));
-  seg([box[0][0],0,box[0][2]],[box[1][0],0,box[1][2]],CC.chas2,1,[3,3]);
-  seg([box[4][0],0,box[4][2]],[box[5][0],0,box[5][2]],CC.chas2,1,[3,3]);
-  ["CH1","CH2","CH3","CH4"].forEach(k=>{
-    const p=hp[k]; seg(p,[p[0]>0?box[1][0]:box[0][0],p[1],p[2]],CC.chas2,1);
+function chassisBox(sk){
+  const xs=[],ys=[],zs=[];
+  ["front_right","rear_right"].forEach(n=>{
+    const c=sk[n];if(!c||!c.tpl)return;
+    ["CH1","CH2","CH3","CH4","CH5","FL1"].forEach(k=>{const p=c.tpl[k];if(!p)return;
+      xs.push(p[0]);ys.push(abs(p[1]));zs.push(p[2]);});
   });
-  /* 防倾杆横杆（前沿近似：LCA/跨车架） */
-  const av1=[hp.CH3[0],0,hp.CH3[2]], av2=[hp.CH4[0],0,hp.CH4[2]];
-  seg(av1,av2,CC.arb,2.4);
-
-  /* 悬挂组（DWB-SIM 语义配色） */
-  seg(hp.CH1,hp.UP1,CC.rigArm,1.3); seg(hp.CH2,hp.UP1,CC.rigArm,1.3); seg(hp.CH1,hp.CH2,CC.rig,1);
-  seg(hp.CH3,hp.UP2,CC.rig,1.3);    seg(hp.CH4,hp.UP2,CC.rig,1.3);    seg(hp.CH3,hp.CH4,CC.rig,1);
-  seg(hp.UP1,hp.UP2,CC.kp,2.2);                                     /* 主销 */
-  seg(hp.FL1,hp.UP3,CC.tie,1.4);                                    /* 横拉杆 */
-  seg(hp.CH5,hp.UP4,CC.ela,1.6,[4,3]);                              /* 推杆（弹性组示意） */
-  /* 转向节刚体面片 + 轮辋 */
-  poly([hp.UP1,hp.UP3,hp.UP2,hp.UP5],CC.knu,1.1,null,CC.knuF);
-  /* 轮胎（轮辋）：前/侧视图为圆；iso 近似圆 */
-  const wc=hp.UP5, R=260;
-  const wp=P(wc); if(wp){ctx.strokeStyle=CC.tire;ctx.lineWidth=1.4;
-    ctx.beginPath(); ctx.arc(wp[0],wp[1],R*g.s*0.92,0,6.283); ctx.stroke();
-    ctx.strokeStyle="#39414b";ctx.beginPath();ctx.arc(wp[0],wp[1],R*g.s*0.62,0,6.283);ctx.stroke();}
-
-  /* 左轮（镜像，半透明区分） */
-  {
-    const L=curLeft();
-    ctx.globalAlpha=0.45;
-    seg(L.CH1,L.UP1,CC.rigArm,1.1); seg(L.CH2,L.UP1,CC.rigArm,1.1);
-    seg(L.CH3,L.UP2,CC.rig,1.1);    seg(L.CH4,L.UP2,CC.rig,1.1);
-    seg(L.UP1,L.UP2,CC.kp,1.8);
-    seg(L.FL1,L.UP3,CC.tie,1.2);
-    seg(L.CH5,L.UP4,CC.ela,1.3,[4,3]);
-    poly([L.UP1,L.UP3,L.UP2,L.UP5],CC.knu,0.9,null,CC.knuF);
-    const lw=P(L.UP5); if(lw){ctx.strokeStyle=CC.tire;ctx.beginPath();ctx.arc(lw[0],lw[1],R*g.s*0.9,0,6.283);ctx.stroke();}
-    ctx.globalAlpha=1;
-  }
-  /* 硬点节点（圆=运动件 / 方=车架） */
-  const isDown = drag && drag.view===id && !view.iso;
-  for(const k of Object.keys(hp)){
-    const s=P(hp[k]); if(!s)continue;
-    const sel = isDown && drag.k===k;
-    ctx.fillStyle="#0a0c0e";
-    ctx.strokeStyle = sel?CC.nodeSel:(FIXED.has(k)?CC.nodeFix:CC.node);
-    ctx.lineWidth=1.2;
-    if(FIXED.has(k)){ctx.fillRect(s[0]-3.4,s[1]-3.4,6.8,6.8);ctx.strokeRect(s[0]-3.4,s[1]-3.4,6.8,6.8);}
-    else{ctx.beginPath();ctx.arc(s[0],s[1],3.4,0,6.283);ctx.fill();ctx.stroke();}
-    if(sel){ctx.fillStyle=CC.nodeSel;ctx.font="8.5px monospace";ctx.fillText(k,s[0]+5,s[1]-5);}
+  if(!xs.length)return[[-900,-700,0],[200,-700,0],[200,700,0],[-900,700,0],[-900,-700,400],[200,-700,400],[200,700,400],[-900,700,400]];
+  const x0=Math.min.apply(null,xs)-40,x1=Math.max.apply(null,xs)+40,ym=Math.max.apply(null,ys)+60,
+    z0=Math.min.apply(null,zs)-30,z1=Math.max.apply(null,zs)+26;
+  return[[x0,-ym,z0],[x1,-ym,z0],[x1,ym,z0],[x0,ym,z0],[x0,-ym,z1],[x1,-ym,z1],[x1,ym,z1],[x0,ym,z1]];
+}
+function fitView(v){
+  const pts=fitPoints();
+  if(v.type==="o"){
+    let a0=1e9,a1=-1e9,b0=1e9,b1=-1e9;
+    pts.forEach(p=>{const a=dot(p,v.bx),b=dot(p,v.by);
+      if(a<a0)a0=a;if(a>a1)a1=a;if(b<b0)b0=b;if(b>b1)b1=b;});
+    v.cx=(a0+a1)/2;v.cy=(b0+b1)/2;
+    v.s=Math.min((v.w-26)/Math.max(1,a1-a0),(v.h-30)/Math.max(1,b1-b0));
+  }else{
+    let c=[0,0,0];pts.forEach(p=>c=add(c,p));c=mul(c,1/pts.length);
+    let r=1;pts.forEach(p=>r=Math.max(r,dst(p,c)));
+    v.tgt=c;v.dist=Math.max(2800,r*4.5);v.s=Math.min(v.w,v.h)/(r*2.4);
+    for(let it=0;it<5;it++){
+      camIso(v);
+      let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+      pts.forEach(p=>{const q=P2(v,p);if(!q)return;
+        if(q[0]<x0)x0=q[0];if(q[0]>x1)x1=q[0];if(q[1]<y0)y0=q[1];if(q[1]>y1)y1=q[1];});
+      if(x1<=x0||y1<=y0)break;
+      const dx=(v.w/2-(x0+x1)/2)/v.s,dy=(v.h/2-(y0+y1)/2)/v.s;
+      v.tgt=add(v.tgt,add(mul(v.rt,-dx),mul(v.up,dy)));
+      v.s*=clamp(Math.min((v.w-30)/(x1-x0),(v.h-34)/(y1-y0)),0.35,2.6);
+    }
+    camIso(v);
   }
 }
-function drawAll(){ for(const id of DRAW_ORDER) drawView(id); }
 
-/* ---------- 拖拽交互 ---------- */
-function hitTest(view, mx, my){
-  const V=VIEWS[view];
-  if(V.iso) return null;      // 等轴测仅预览，编辑在正交视图（DWB-SIM 同）
-  const g2=viewGeom(V);
-  let best=null,bd=1e9;
-  for(const k of Object.keys(hp)){
-    const s=projPt(V,g2,hp[k]);
-    if(!s) continue;
-    const d=Math.hypot(s[0]+g2.ox-mx,s[1]+g2.oy-my);
-    if(d<bd&&d<16){bd=d;best=k;}
+/* ================================ 场景构建 ================================ */
+const CC={
+  rig:"#aab9c7",rigArm:"#aab9c7",knu:"#43c9c0",knuF:"rgba(67,201,192,0.10)",
+  kp:"#e0603f",tie:"#43c9c0",tieD:"#2c7d76",ela:"#d9a238",chas:"#414b56",chas2:"#333c46",chas3:"#2c333b",
+  arb:"#c07ad0",rack:"#8191a0",tire:"#5f6a76",tread:"#3d454d",rim:"#7c8894",disc:"#6a747f",
+  node:"#c3cad2",nodeFix:"#d2543f",nodeSel:"#f0e6c8",txt2:"#8b95a1",txt3:"#616b77",
+  axis:"#125a75",grid:"#1c2126",grid2:"#262d34",gnd:"#2f6f5e",bg:"#0a0c0e",frc:"#e8b84b",pathC:"#43c9c0"
+};
+function circPts(c,ax,r,n,e1,e2){
+  const u=e1||perpOf(ax),v=e2||cross(nrm(ax),u),o=[];
+  for(let k=0;k<=n;k++){const a=2*PI*k/n;o.push(add(c,add(mul(u,r*cos(a)),mul(v,r*sin(a)))));}
+  return o;
+}
+function L3(sc,a,b,col,w,d,al){sc.push({k:"l",a:a,b:b,c:col,w:w||1,d:d,al:al!==undefined?al:null});}
+function PL(sc,pts,col,w,f,d,al){sc.push({k:"p",pts:pts,c:col,w:w||1,f:f,d:d,al:al!==undefined?al:null});}
+function TX(sc,p,str,col,dx,dy){sc.push({k:"t",p:p,s:str,c:col,dx:dx||0,dy:dy||0});}
+function NODE(sc,k,p,fix,corner,sx,sel){sc.push({k:"n",id:k,p:p,fix:fix,corner:corner,sx:sx||1,sel:sel});}
+function cyl(sc,a,b,r,col,w,nseg){
+  const ax=nrm(sub(b,a)),u=perpOf(ax),v=cross(ax,u);
+  PL(sc,circPts(a,ax,r,nseg||20,u,v),col,w||1);
+  PL(sc,circPts(b,ax,r,nseg||20,u,v),col,w||1);
+  for(let k=0;k<4;k++){const an=PI/4+k*PI/2;
+    const o=add(mul(u,r*cos(an)),mul(v,r*sin(an)));
+    L3(sc,add(a,o),add(b,o),col,w||1);}
+}
+function springPts(a,b,r,turns,seg){
+  const d=sub(b,a),L=len(d)||1,u=mul(d,1/L);
+  let ref=[0,1,0]; if(abs(dot(ref,u))>0.9)ref=[1,0,0];
+  const e1=nrm(sub(ref,mul(u,dot(ref,u)))),e2=cross(u,e1);
+  const pts=[a],t0=0.10,t1=0.88;
+  for(let k=0;k<=seg;k++){
+    const t=t0+(t1-t0)*k/seg,an=2*PI*turns*(k/seg);
+    pts.push(add(add(a,mul(u,L*t)),add(mul(e1,r*cos(an)),mul(e2,r*sin(an)))));
   }
+  pts.push(b);return pts;
+}
+/* 由解算姿态重建单轮显示点集：
+   - UP5/UP1/UP2 直接取解算值（含轮跳/转向）
+   - UP3/UP4(立柱上点) 用刚性转向节局部坐标重建
+   - 车架点 CH1/CH2/CH3/CH4/CH5/FL1 用模板 */
+function displayCorner(tpl,pose,angles,sx){
+  const pt={};
+  for(const k in tpl)pt[k]=cpy(tpl[k]);
+  const wc=pose&&pose.wheel_center?pose.wheel_center:[tpl.UP5[0],tpl.UP5[1],tpl.UP5[2]];
+  const UP1=pose&&pose.ball_joints&&pose.ball_joints.upper?pose.ball_joints.upper:[tpl.UP1[0],tpl.UP1[1],tpl.UP1[2]];
+  const UP2=pose&&pose.ball_joints&&pose.ball_joints.lower?pose.ball_joints.lower:[tpl.UP2[0],tpl.UP2[1],tpl.UP2[2]];
+  pt.UP5=wc;pt.UP1=UP1;pt.UP2=UP2;
+  const O=tpl.UP2,bz=nrm(sub(tpl.UP1,tpl.UP2));
+  const wr=sub(tpl.UP5,O),bu0=nrm(sub(wr,mul(bz,dot(wr,bz))));
+  const bv0=cross(bz,bu0),coords={};
+  ["UP3","UP4"].forEach(k=>{const rel=sub(tpl[k],O);coords[k]=[dot(rel,bu0),dot(rel,bv0),dot(rel,bz)];});
+  const O2=UP2,bz2=nrm(sub(UP1,UP2));
+  const wr2=sub(wc,O2),bu2=nrm(sub(wr2,mul(bz2,dot(wr2,bz2))));
+  const bv2=cross(bz2,bu2);
+  ["UP3","UP4"].forEach(k=>{pt[k]=add(O2,add(mul(bu2,coords[k][0]),add(mul(bv2,coords[k][1]),mul(bz2,coords[k][2]))));});
+  return {tpl:tpl,pt:pt,angles:angles||{},wc:wc,sx:sx,pose:pose||null};
+}
+/* 车轮自旋轴：指向车横向(Y)，右轮 +Y / 左轮 -Y，按 前束→外倾 依次旋转 */
+/*   e=camber rad(负=顶内倾)  t=toe rad(正=内束) */
+function wheelAxis(e,t,sx){
+  return[sin(t), sx*cos(e)*cos(t), -sin(e)*cos(t)];
+}
+function buildSkeleton(){
+  const sk={};
+  const axes={front:S.frontR||deep(SEED), rear:S.rearR||deep(SEED)};
+  const names=["front_right","front_left","rear_right","rear_left"];
+  names.forEach(n=>{
+    const axis=n.split("_")[0],side=n.split("_")[1];
+    const tpl=side==="right"?axes[axis]:mirrorPts(axes[axis]);
+    const pose=S.vp&&S.vp.per_wheel_geometry&&S.vp.per_wheel_geometry[n];
+    const angles=S.vp&&S.vp[n]&&S.vp[n].angles||{};
+    sk[n]=displayCorner(tpl,pose,angles,side==="right"?1:-1);
+  });
+  if(S.held&&sk[S.held.corner]){
+    const c=sk[S.held.corner];
+    if(c.pt[S.held.k])c.pt[S.held.k]=cpy(c.tpl[S.held.k]);
+  }
+  return sk;
+}
+function isBaseline(){
+  const g=document.getElementById;
+  try{
+    return(!g("t_fl").value||+g("t_fl").value===0)&&(!g("t_fr").value||+g("t_fr").value===0)&&
+      (!g("t_rl").value||+g("t_rl").value===0)&&(!g("t_rr").value||+g("t_rr").value===0)&&
+      (!g("rack").value||+g("rack").value===0)&&(!g("ayv").value||+g("ayv").value===0)&&
+      (!g("axv").value||+g("axv").value===0);
+  }catch(e){return false;}
+}
+/* ================================ 主绘制 ================================ */
+function buildScene(sk){
+  const sc=[];
+  const box=chassisBox(sk);
+  const E=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+  E.forEach(e=>L3(sc,box[e[0]],box[e[1]],CC.chas,0.9));
+  if(box[0]) L3(sc,[box[0][0],0,box[0][2]],[box[1][0],0,box[1][2]],CC.chas3,1,[4,4]);
+  if(box[4]) L3(sc,[box[4][0],0,box[4][2]],[box[5][0],0,box[5][2]],CC.chas3,1,[4,4]);
+  /* 各轴横向构件 + 交叉杆 */
+  ["front_right","rear_right"].forEach(n=>{
+    const r=sk[n],l=sk[n.replace("right","left")];if(!r||!l)return;
+    ["CH1","CH2","CH3","CH4"].forEach(k=>L3(sc,r.tpl[k],l.tpl[k],CC.chas2,1));
+    L3(sc,r.tpl.CH3,l.tpl.CH4,CC.chas3,0.8,[3,3]);
+    L3(sc,r.tpl.CH4,l.tpl.CH3,CC.chas3,0.8,[3,3]);
+    L3(sc,r.tpl.CH1,l.tpl.CH2,CC.chas3,0.8,[3,3]);
+    L3(sc,r.tpl.CH2,l.tpl.CH1,CC.chas3,0.8,[3,3]);
+  });
+  /* 前转向机壳体 */
+  if(sk.front_right&&sk.front_left&&sk.front_right.tpl.FL1&&sk.front_left.tpl.FL1){
+    const F=sk.front_right.tpl.FL1,Lf=sk.front_left.tpl.FL1;
+    cyl(sc,[F[0],F[1],F[2]],[Lf[0],Lf[1],Lf[2]],22,CC.rack,1.1,14);
+  }
+  /* 防倾杆（整车横向） */
+  ["front_right","rear_right"].forEach(n=>{
+    const rd=sk[n],ld=sk[n.replace("right","left")];if(!rd||!ld)return;
+    const ay=rd.tpl.CH3[1],az=(rd.tpl.CH3[2]+rd.tpl.CH4[2])/2;
+    L3(sc,[ld.tpl.CH3[0],-ay,az],[rd.tpl.CH3[0],ay,az],CC.arb,2.6);
+  });
+  /* 悬架总成：4 角 */
+  ["front_right","front_left","rear_right","rear_left"].forEach(n=>{
+    const d=sk[n];if(!d)return;
+    const H=k=>d.pt[k];
+    const axis=n.split("_")[0],side=n.split("_")[1];
+    const al=axis==="front"?1:0.88;
+    const P1=H("UP1"),P2=H("UP2"),P3=H("UP3"),P4=H("UP4"),P5=H("UP5"),FL=H("FL1");
+    L3(sc,H("CH1"),P1,CC.rigArm,1.35,undefined,al);
+    L3(sc,H("CH2"),P1,CC.rigArm,1.35,undefined,al);
+    L3(sc,H("CH1"),H("CH2"),CC.rig,0.9,undefined,al);
+    L3(sc,H("CH3"),P2,CC.rig,1.35,undefined,al);
+    L3(sc,H("CH4"),P2,CC.rig,1.35,undefined,al);
+    L3(sc,H("CH3"),H("CH4"),CC.rig,0.9,undefined,al);
+    PL(sc,[H("CH1"),P1,H("CH2"),H("CH1")],CC.rigArm,0.8,"rgba(170,185,199,0.05)",undefined,al);
+    PL(sc,[H("CH3"),P2,H("CH4"),H("CH3")],CC.rigArm,0.8,"rgba(170,185,199,0.05)",undefined,al);
+    L3(sc,P1,P2,CC.kp,2.3,undefined,al);
+    L3(sc,FL,P3,CC.tie,1.5,undefined,al);
+    L3(sc,H("CH5"),P4,CC.ela,1.7,[5,4],al);
+    PL(sc,[P1,P3,P2,P5],CC.knu,1.1,null,CC.knuF);
+    L3(sc,P2,P5,CC.knu,1,undefined,al);
+    L3(sc,P1,P5,CC.knu,1,undefined,al);
+    /* 车轮 3D 圆盘 */
+    if(P5){
+      const e=(d.angles.camber_deg||0)*D2R,t=(d.angles.toe_deg||0)*D2R;
+      const w=wheelAxis(e,t,d.sx),R=260,W=180;
+      const u=nrm(sub([0,0,1],mul(w,dot([0,0,1],w)))),v=cross(w,u);
+      const ci=add(P5,mul(w,-W/2)),co=add(P5,mul(w,W/2));
+      PL(sc,circPts(co,w,R,40,u,v),CC.tire,1.2);
+      PL(sc,circPts(ci,w,R*0.97,40,u,v),CC.tread,1);
+      PL(sc,circPts(co,w,R*0.97,40,u,v),CC.tread,1);
+      for(let k2=0;k2<22;k2++){const an=2*PI*k2/22;
+        const o=add(mul(u,R*cos(an)),mul(v,R*sin(an)));
+        L3(sc,add(ci,o),add(co,o),CC.tread,0.9,undefined,al);}
+      const ri=add(P5,mul(w,-W/2+18)),ro=add(P5,mul(w,W/2-18));
+      PL(sc,circPts(ri,w,168,32,u,v),CC.rim,1.1,undefined,al);
+      PL(sc,circPts(ro,w,168,32,u,v),CC.rim,1.1,undefined,al);
+      PL(sc,circPts(ro,w,150,32,u,v),CC.rim,0.9,undefined,al);
+      for(let k2=0;k2<5;k2++){const an=2*PI*k2/5+0.3;
+        const o=add(mul(u,150*cos(an)),mul(v,150*sin(an)));
+        L3(sc,add(ro,mul(w,-4)),add(ro,o),CC.rim,1.3,undefined,al);}
+      PL(sc,circPts(ro,w,56,20,u,v),CC.rim,1,undefined,al);
+      if(d.pose&&d.pose.contact_patch&&d.pose.contact_patch.center){
+        const cp=d.pose.contact_patch.center;
+        L3(sc,cp,[cp[0]+55,cp[1],0],CC.pathC,1.4,undefined,al);
+      }
+    }
+    /* 球头 */
+    [[P1,10],[P2,12],[P3,8]].forEach(q=>{
+      PL(sc,circPts(q[0],[1,0,0],q[1],12),CC.rig,0.9,undefined,al);
+      PL(sc,circPts(q[0],[0,1,0],q[1],12),CC.rig,0.9,undefined,al);
+      PL(sc,circPts(q[0],[0,0,1],q[1],12),CC.rig,0.9,undefined,al);
+    });
+    const editable=isBaseline()&&side==="right";
+    for(const k in d.pt){
+      if(!d.pt[k])continue;
+      const selk=(S.held&&S.held.corner===n&&S.held.k===k)||UI.hover===n+"."+k;
+      NODE(sc,k,d.pt[k],FIXED.has(k),n,d.sx,selk);
+    }
+  });
+  return sc;
+}
+
+/* ================================ 绘制视口 ================================ */
+function drawGrid(v){
+  const ctx=v.ctx;
+  if(v.type==="p"){drawGrid3(v);return;}
+  const step=100,maj=500;
+  const a0=v.cx-v.w/2/v.s,a1=v.cx+v.w/2/v.s,b0=v.cy-v.h/2/v.s,b1=v.cy+v.h/2/v.s;
+  if((a1-a0)/step>260)return;
+  ctx.lineWidth=1;ctx.setLineDash([]);
+  for(let a=Math.ceil(a0/step)*step;a<=a1;a+=step){
+    const x=Math.round(v.w/2+(a-v.cx)*v.s)+.5;
+    ctx.beginPath();ctx.strokeStyle=(a%maj===0)?CC.grid2:CC.grid;
+    ctx.moveTo(x,0);ctx.lineTo(x,v.h);ctx.stroke();
+  }
+  for(let b=Math.ceil(b0/step)*step;b<=b1;b+=step){
+    const y=Math.round(v.h/2-(b-v.cy)*v.s)+.5;
+    ctx.beginPath();ctx.strokeStyle=(b%maj===0)?CC.grid2:CC.grid;
+    ctx.moveTo(0,y);ctx.lineTo(v.w,y);ctx.stroke();
+  }
+  ctx.strokeStyle=CC.axis;ctx.lineWidth=1;
+  const ox=v.w/2+(0-v.cx)*v.s,oy=v.h/2-(0-v.cy)*v.s;
+  ctx.beginPath();ctx.moveTo(Math.round(ox)+.5,0);ctx.lineTo(Math.round(ox)+.5,v.h);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,Math.round(oy)+.5);ctx.lineTo(v.w,Math.round(oy)+.5);ctx.stroke();
+  ctx.fillStyle=CC.txt3;ctx.font="8px monospace";ctx.textAlign="left";
+  for(let a=Math.ceil(a0/maj)*maj;a<=a1;a+=maj){
+    if(a===0)continue;const x=v.w/2+(a-v.cx)*v.s;ctx.fillText(a,x+2,v.h-2);}
+  for(let b=Math.ceil(b0/maj)*maj;b<=b1;b+=maj){
+    if(b===0)continue;const y=v.h/2-(b-v.cy)*v.s;ctx.fillText(b,2,y-2);}
+}
+function drawGrid3(v){
+  const ctx=v.ctx,ext=1750,step=250,gz=0;
+  ctx.lineWidth=1;ctx.setLineDash([]);
+  for(let x=Math.ceil(-ext/step)*step;x<=ext;x+=step){
+    const A=P2(v,[x,-ext,gz]),B=P2(v,[x,ext,gz]);if(!A||!B)continue;
+    ctx.beginPath();ctx.strokeStyle=(x===0)?CC.axis:CC.grid;ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();
+  }
+  for(let y=-ext;y<=ext;y+=step){
+    const A=P2(v,[-ext,y,gz]),B=P2(v,[ext,y,gz]);if(!A||!B)continue;
+    ctx.beginPath();ctx.strokeStyle=(y===0)?CC.axis:CC.grid;ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();
+  }
+}
+function drawGround(v){
+  if(v.type==="p")return;
+  const ctx=v.ctx,gz=0;
+  if(v.key==="top"){
+    ctx.setLineDash([6,4]);ctx.strokeStyle=CC.gnd;ctx.lineWidth=1;
+    const A=P2(v,[-1600,0,0]),B=P2(v,[1600,0,0]);
+    if(A&&B){ctx.beginPath();ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();}
+    ctx.setLineDash([]);return;
+  }
+  let gA,gB;
+  if(v.key==="front"){gA=[-1750,0,gz];gB=[1750,0,gz];}else{gA=[0,-1750,gz];gB=[0,1750,gz];}
+  const A=P2(v,gA),B=P2(v,gB);if(!A||!B)return;
+  ctx.strokeStyle=CC.gnd;ctx.lineWidth=1.6;ctx.setLineDash([]);
+  ctx.beginPath();ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();
+  ctx.strokeStyle="#242b32";ctx.lineWidth=1;
+  const dx=B[0]-A[0],dy=B[1]-A[1],L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L;
+  ctx.beginPath();
+  for(let t=0;t<L;t+=9){
+    const x=A[0]+ux*t,y=A[1]+uy*t;
+    ctx.moveTo(x,y);ctx.lineTo(x-7*ux+7*uy,y-7*uy-7*ux);
+  }
+  ctx.stroke();
+}
+function drawAll(){
+  const sk=buildSkeleton();
+  SCENE=buildScene(sk);
+  PICK.length=0;
+  for(const v of VW){
+    if(document.getElementById("vp").classList.contains("max0")&&!v.mx)continue;
+    drawView(v,sk);
+  }
+}
+function drawView(v,sk){
+  if(v.type==="p")camIso(v);
+  const ctx=v.ctx;
+  ctx.save();
+  ctx.fillStyle=CC.bg;ctx.fillRect(0,0,v.w,v.h);
+  ctx.lineJoin="round";ctx.lineCap="butt";
+  drawGrid(v);drawGround(v);
+  for(let i=0;i<SCENE.length;i++){
+    const o=SCENE[i];
+    if(o.k==="l"){
+      const A=P2(v,o.a),B=P2(v,o.b);if(!A||!B)continue;
+      ctx.beginPath();if(o.d)ctx.setLineDash(o.d);ctx.strokeStyle=o.c;ctx.lineWidth=o.w;
+      if(o.al!==null)ctx.globalAlpha=o.al;
+      ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();
+      ctx.globalAlpha=1;ctx.setLineDash([]);
+    }else if(o.k==="p"){
+      ctx.beginPath();if(o.d)ctx.setLineDash(o.d);let st=false;
+      for(let j=0;j<o.pts.length;j++){
+        const Q=P2(v,o.pts[j]);if(!Q){st=false;continue;}
+        if(!st){ctx.moveTo(Q[0],Q[1]);st=true;}else ctx.lineTo(Q[0],Q[1]);
+      }
+      if(o.f){ctx.fillStyle=o.f;ctx.fill();}
+      ctx.strokeStyle=o.c;ctx.lineWidth=o.w;
+      if(o.al!==null)ctx.globalAlpha=o.al;
+      ctx.stroke();ctx.globalAlpha=1;ctx.setLineDash([]);
+    }else if(o.k==="n"){
+      const A=P2(v,o.p);if(!A)continue;
+      if(v.type==="o")PICK.push({x:A[0],y:A[1],id:o.id,corner:o.corner,sx:o.sx});
+      const sel=o.sel;
+      ctx.fillStyle=CC.bg;ctx.strokeStyle=sel?CC.nodeSel:(o.fix?CC.nodeFix:CC.node);ctx.lineWidth=sel?1.8:1.3;
+      ctx.setLineDash([]);
+      if(o.fix){ctx.beginPath();ctx.rect(A[0]-3.6,A[1]-3.6,7.2,7.2);ctx.fill();ctx.stroke();}
+      else{ctx.beginPath();ctx.arc(A[0],A[1],3.4,0,6.2832);ctx.fill();ctx.stroke();}
+      if(sel){ctx.beginPath();ctx.rect(A[0]-6.5,A[1]-6.5,13,13);ctx.strokeStyle=CC.nodeSel;ctx.lineWidth=1;ctx.stroke();}
+    }else if(o.k==="t"){
+      const A=P2(v,o.p);if(!A)continue;
+      ctx.fillStyle=o.c;ctx.font="9px monospace";ctx.fillText(o.s,A[0]+o.dx,A[1]+o.dy);
+    }
+  }
+  /* 视口角标 */
+  ctx.fillStyle=CC.txt3;ctx.font="9px ui-monospace,monospace";ctx.textAlign="left";
+  if(v.type==="p")ctx.fillText(v.key+"  AZ "+fmt(v.az*R2D,0)+"°  EL "+fmt(v.elv*R2D,0)+"°  s",6,12);
+  ctx.restore();
+}
+function setStatus(tone,html){
+  const el=document.getElementById("tbState");
+  if(html!==undefined)el.innerHTML=html;
+  else el.innerHTML="<span class='"+tone+"'>"+tone+"</span>";
+}
+
+/* ================================ 交互 ================================ */
+function pickNode(v,mx,my){
+  let best=null,bd=90;
+  for(let i=0;i<PICK.length;i++){const p=PICK[i];if(p.v!==undefined&&p.v!==v)continue;
+    const d=(p.x-mx)*(p.x-mx)+(p.y-my)*(p.y-my);
+    if(d<bd){bd=d;best=p;}}
   return best;
 }
-function bindCanvas(){
-  for(const id in VIEWS){
-    const cv=document.getElementById(VIEWS[id].canvas);
-    cv.addEventListener("mousedown",e=>{
-      const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
-      const k=hitTest(id,mx,my);
-      if(!k)return;
-      drag={view:id,k};
-      const g=viewGeom(VIEWS[id]);
-      const s=projPt(VIEWS[id],g,hp[k]);
-      drag.off=[mx-s[0]-g.ox, my-s[1]-g.oy];
-      drawAll();
-      e.preventDefault();
-    });
-  }
-  window.addEventListener("mousemove",e=>{
-    if(!drag)return;
-    const V=VIEWS[drag.view],cv=document.getElementById(V.canvas);
+function hookView(v){
+  const cv=v.cv;
+  cv.addEventListener("mousedown",e=>{
+    cv.focus&&cv.focus();
     const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
-    const g=viewGeom(V);
-    const X=(mx-drag.off[0]-g.W/2)/g.s+g.cxv;
-    const Y=(my-drag.off[1]-g.H/2)/g.s/g.ar+g.cyv;
-    hp[drag.k][V.a]=X;
-    hp[drag.k][V.b]=Y;
-    buildTableState(); drawAll();
-    requestSolve();
+    const hit=pickNode(v,mx,my);
+    if(e.button===0&&hit&&v.type==="o"){
+      const axis=hit.corner.split("_")[0];
+      if(axis==="front"||axis==="rear"){
+        const tpl=S[axis==="front"?"frontR":"rearR"];
+        if(tpl&&tpl[hit.id]&&hit.sx>0&&isBaseline()){
+          UI.sel=hit.id;UI.drag={mode:"hp",v:v,corner:hit.corner,k:hit.id,sx:hit.sx,x0:e.clientX,y0:e.clientY,base:cpy(tpl[hit.id])};
+          S.held={corner:hit.corner,k:hit.id};
+          e.preventDefault();return;
+        }
+      }
+      UI.drag={mode:"pan",v:v,x0:e.clientX,y0:e.clientY,cx:v.cx,cy:v.cy};e.preventDefault();return;
+    }else if(e.button===0&&v.type==="p"&&!e.shiftKey){
+      UI.drag={mode:"orb",v:v,x0:e.clientX,y0:e.clientY,az:v.az,el:v.elv};
+    }else{
+      if(v.type==="o")UI.drag={mode:"pan",v:v,x0:e.clientX,y0:e.clientY,cx:v.cx,cy:v.cy};
+      else{UI.drag={mode:"pan3",v:v,x0:e.clientX,y0:e.clientY,tgt:cpy(v.tgt)};}
+    }
+    e.preventDefault();
   });
-  window.addEventListener("mouseup",()=>{
-    if(drag){dragging=true; drag=null; drawAll();
-      setTimeout(()=>{dragging=false; requestSolve();}, 50);}
+  cv.addEventListener("mousemove",e=>{
+    const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+    if(!UI.drag){
+      const hit=pickNode(v,mx,my);
+      UI.hover=hit?(hit.corner+"."+hit.id):null;
+      cv.style.cursor=hit?"crosshair":"default";
+      let txt;
+      if(v.type==="o"){
+        const a=(mx-v.w/2)/v.s+v.cx,b=-(my-v.h/2)/v.s+v.cy;
+        const la=v.bx[0]?"X":(v.bx[1]?"Y":"Z"),lb=v.by[2]?"Z":(v.by[1]?"Y":"X");
+        txt=la+" "+fmt(a,1)+"  "+lb+" "+fmt(b,1);
+      }else txt="等轴测";
+      if(hit)txt+=hit.corner+"."+hit.id;
+      document.getElementById("sbCur").textContent=txt;
+    }
   });
+  cv.addEventListener("wheel",e=>{
+    e.preventDefault();
+    const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+    const f=Math.pow(1.0016,-e.deltaY);
+    if(v.type==="o"){
+      const ax=(mx-v.w/2)/v.s+v.cx,by=-(my-v.h/2)/v.s+v.cy;
+      v.s=clamp(v.s*f,0.02,40);
+      v.cx=ax-(mx-v.w/2)/v.s;v.cy=by+(my-v.h/2)/v.s;
+    }else v.s=clamp(v.s*f,0.02,40);
+  },{passive:false});
+  cv.addEventListener("dblclick",()=>fitView(v));
+  cv.addEventListener("contextmenu",e=>e.preventDefault());
 }
-"".length; /* noscript guard */
-bindCanvas();
-
-/* ---------- 求解请求（节流） ---------- */
-// 交互原则：拖动/输入过程中请求「快速解」（无 sweep，~几十 ms）；
-// 停止拖动 400ms 后再补一次带 sweep 的全量请求，保证曲线最终新鲜。
-function requestSolve(){
-  if(busy){pending=true;return;}
-  busy=true;
-  const wantSweep = document.getElementById("curves").checked && !dragging;
-  clearTimeout(sweepTimer);
-  if(document.getElementById("curves").checked && dragging){
-    sweepTimer = setTimeout(()=>{ if(!dragging) requestSolve(); }, 400);
+window.addEventListener("mousemove",e=>{
+  const d=UI.drag;if(!d)return;
+  const v=d.v;
+  if(d.mode==="hp"){
+    const da=(e.clientX-d.x0)/v.s,db=-(e.clientY-d.y0)/v.s;
+    const w=[v.bx[0]*da+v.by[0]*db,v.bx[1]*da+v.by[1]*db,v.bx[2]*da+v.by[2]*db];
+    const snap=e.shiftKey?0.1:1;
+    const axis=d.corner.split("_")[0],tpl=S[axis==="front"?"frontR":"rearR"];
+    if(tpl&&tpl[d.k]){
+      for(let k=0;k<3;k++)tpl[d.k][k]=Math.round((d.base[k]+w[k])/snap)*snap;
+    }
+    S.held={corner:d.corner,k:d.k};
+    refreshTableInputs();
+    drawAll();requestSolve();
+  }else if(d.mode==="orb"){
+    v.az=d.az-(e.clientX-d.x0)*0.006;
+    v.elv=clamp(d.el+(e.clientY-d.y0)*0.005,-85*D2R,85*D2R);
+    camIso(v);drawAll();
+  }else if(d.mode==="pan"){
+    v.cx=d.cx-(e.clientX-d.x0)/v.s;v.cy=d.cy+(e.clientY-d.y0)/v.s;drawAll();
+  }else{
+    camIso(v);
+    const k=1/v.s;
+    v.tgt=add(d.tgt,add(mul(v.rt,-(e.clientX-d.x0)*k),mul(v.up,(e.clientY-d.y0)*k)));
+    drawAll();
   }
-  const tl=parseFloat(document.getElementById("t_fl").value)||0;
-  const tr=parseFloat(document.getElementById("t_fr").value)||0;
-  const rack=parseFloat(document.getElementById("rack").value)||0;
-  const ay=parseFloat(document.getElementById("ayv").value)||0;
-  const ax=parseFloat(document.getElementById("axv").value)||0;
-  const cur=deep(hp);
-  const payload={
+});
+window.addEventListener("mouseup",()=>{
+  if(UI.drag&&UI.drag.mode==="hp"){S.held=null;requestSolve();}
+  if(UI.drag&&UI.drag.mode==="hp"){drawAll();}
+  UI.drag=null;
+});
+
+/* ================================ 求解请求 ================================ */
+function casePayload(withSweep){
+  const tl=+document.getElementById("t_fl").value||0,tr=+document.getElementById("t_fr").value||0;
+  const rl=+document.getElementById("t_rl").value||0,rr=+document.getElementById("t_rr").value||0;
+  const rack=+document.getElementById("rack").value||0;
+  const ay=+document.getElementById("ayv").value||0,ax=+document.getElementById("axv").value||0;
+  const p={
     case_id:"static",
-    travel:{fl:tl,fr:tr,rl:tl,rr:tr},
+    travel:{fl:tl,fr:tr,rl:rl,rr:rr},
     rack_displacement:rack,
     loads:{ay_g:ay,ax_g:ax},
     arb_enabled:true,
-    label:AXLE==="rear"?"modeler-rear":"modeler",
-    front_right:{points:deep(frontHp||cur),tire:deep(TIRE)},
+    label:"modeler",
+    front_right:{points:deep(S.frontR),tire:Object.assign({},S.tire,{track_width:1220})},
+    rear_right:{points:deep(S.rearR),tire:Object.assign({},S.tire,{track_width:1180})}
   };
-  if(AXLE==="rear"){
-    payload.rear_right={points:cur,tire:deep(TIRE)};
-    for(const k in cur) payload.front_right.points[k]=deep((frontHp||hp)?(frontHp||hp)[k]:cur[k]);
+  if(withSweep){
+    const axl=S.curveAxle,axism=S.curveAxis;
+    p.sweep={axis:axism,axle:axl,
+      min:axism==="rack"?-20:-25,max:axism==="rack"?20:25,points:21};
   }
-  if(wantSweep){
-    const axl = AXLE==="rear"?"rear":"front";
-    payload.sweep={axis:CURVE_AXIS,axle:axl,
-      min:CURVE_AXIS==="rack"?-20: -25,max:CURVE_AXIS==="rack"?20:25,points:21};
+  return p;
+}
+function requestSolve(){
+  if(busy){pending=true;return;}
+  busy=true;
+  const wantSweep=document.getElementById("curves").classList.contains("on")&&!dragging;
+  clearTimeout(sweepTimer);
+  if(document.getElementById("curves").classList.contains("on")&&dragging){
+    sweepTimer=setTimeout(()=>{if(!dragging)requestSolve();},400);
   }
+  const seq=++solveSeq;
   fetch("/api/v2/solve/hardpoints",{method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify(payload)})
-    .then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
-    .then(d=>{ last=d; renderAll(d); fetchHandling(); })
-    .catch(e=>{ setStatus("求解失败: "+e.message,"r"); })
-    .finally(()=>{ busy=false; if(pending){pending=false; requestSolve();} });
+    body:JSON.stringify(casePayload(wantSweep))})
+    .then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
+    .then(d=>{if(seq!==solveSeq)return;S.vp=d;resp=d;renderAll(d);fetchHandling();})
+    .catch(e=>{if(seq===solveSeq)setStatus("r","求解失败: "+e.message);})
+    .finally(()=>{busy=false;if(pending){pending=false;requestSolve();}});
 }
-let lastH = null;
 function fetchHandling(){
-  const ay=parseFloat(document.getElementById("ayv").value)||0;
-  const ga=parseFloat(document.getElementById("gamma").value)||0;
+  const ay=+document.getElementById("ayv").value||0;
+  const gamma=+document.getElementById("gamma").value||0;
   fetch("/api/v2/handling",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({design_id:"legacy-import",case_id:"static",ay_g:ay,
-      gamma_f_deg:ga,gamma_r_deg:ga})})
+      gamma_f_deg:gamma,gamma_r_deg:gamma})})
     .then(r=>r.ok?r.json():null)
-    .then(d=>{ if(d){lastH=d; renderHandling(d);} })
+    .then(d=>{if(d){lastH=d;renderHandling(d);}})
     .catch(()=>{});
+}
+/* ================================ 面板渲染 ================================ */
+const ANGLES=[["camber_deg","外倾°"],["toe_deg","前束°"],["caster_deg","后倾°"],["kpi_deg","主销内倾°"],
+  ["scrub_radius_mm","Scrub mm"],["caster_trail_mm","拖距 mm"]];
+function renderAll(d){
+  setStatus(d.status==="VALID"?"g":(d.status==="SOLVER_FAILED"?"r":"a"),
+    "<span>"+(d.status||"—")+"</span> · "+d.solver+" · "+d.label);
+  document.getElementById("tbSolver").textContent=d.solver||"—";
+  const pl=d.pose_labels||{};
+  document.getElementById("tbPose").textContent="heave "+fmt(pl.heave_mm,1)+" · roll "+fmt(pl.roll_deg,2)+"° · pitch "+fmt(pl.pitch_deg,2)+"°";
+  const corners=[["FL",d.front.left],["FR",d.front.right],["RL",d.rear.left],["RR",d.rear.right]];
+  const tb=document.getElementById("angleTable");
+  let h="<tr><th></th>"+corners.map(c=>"<th class='sx'>"+c[0]+"</th>").join("")+"</tr>";
+  const stat=c=>{const s=c.status;
+    return s==="VALID"?"<span class='g'>OK</span>":(s==="SOLVER_FAILED"?"<span class='r'>FAIL</span>":"<span class='a'>~"+s+"</span>");};
+  h+="<tr><td class='mn'>状态</td>"+corners.map(c=>"<td class='sx'>"+stat(c)+"</td>").join("")+"</tr>";
+  ANGLES.forEach(a=>{
+    h+="<tr><td class='mn'>"+a[1]+"</td>"+corners.map(c=>{
+      const v=c[1].angles&&c[1].angles[a[0]];
+      return"<td class='sx'>"+(v!=null?+v.toFixed(3):"<span class='na'>—</span>")+"</td>";}).join("")+"</tr>";
+  });
+  tb.innerHTML=h;
+  /* 载荷 */
+  const ld=d.loads||{};
+  const ft=document.getElementById("forceTable");
+  const FE=document.getElementById("forceNote");
+  if(ld&&ld.front_right){
+    let hh="<tr><th></th><th>Fz N</th><th>Fx N</th><th>Fy N</th><th>μ</th><th>离地</th></tr>";
+    for(const c of corners){
+      const L=ld[c[0]==="FL"?"front_left":c[0]==="FR"?"front_right":c[0]==="RL"?"rear_left":"rear_right"];
+      const onGround=L&&!L.off_ground;
+      hh+="<tr><td class='mn'>"+c[0]+"</td><td>"+(L?L.fz_n.toFixed(0):"—")+"</td><td>"+(L?L.fx_n.toFixed(0):"—")+
+        "</td><td>"+(L?L.fy_n.toFixed(0):"—")+"</td><td>"+(L?(L.friction_util!=null?L.friction_util.toFixed(2):"<span class='na'>—</span>"):"—")+
+        "</td><td>"+(L?(onGround?"否":"<span class='r'>是</span>"):"—")+"</td></tr>";
+    }
+    ft.innerHTML=hh;
+    let note="";
+    for(const c of corners){
+      const L=ld[c[0]==="FL"?"front_left":c[0]==="FR"?"front_right":c[0]==="RL"?"rear_left":"rear_right"];
+      if(!L)continue;
+      const mf=L.wheel_end&&L.wheel_end.member_forces||{};
+      note+=c[0]+" 推杆 "+(mf.pushrod_n!=null?mf.pushrod_n.toFixed(0)+"N":"—")+" · 横拉杆 "+
+        (mf.tie_rod_n!=null?mf.tie_rod_n.toFixed(0)+"N":"—")+" · 球头残差 "+
+        (L.wheel_end&&L.wheel_end.force_residual_n!=null?L.wheel_end.force_residual_n.toFixed(3)+"N":"—")+"<br>";
+    }
+    FE.innerHTML=note;
+  }else{ft.innerHTML="<tr><td class='na'>载荷不可用（需四轮几何）</td></tr>";FE.innerHTML="";}
+  /* 状态 */
+  const sb=document.getElementById("statusBox");
+  let sh="整车 <b class='"+(d.status==="VALID"?"g":d.status==="SOLVER_FAILED"?"r":"a")+"'>"+d.status+"</b> · 残差 ";
+  const rs=d.residuals||{};
+  sh+="FL "+fmt(rs.front_left,4)+" · FR "+fmt(rs.front_right,4)+" · RL "+fmt(rs.rear_left,4)+" · RR "+fmt(rs.rear_right,4);
+  const warnBox=document.createElement("div");
+  warnBox.style.paddingTop="3px";
+  (d.warnings||[]).slice(0,6).forEach(w=>warnBox.innerHTML+="<div class='warn'>· "+w+"</div>");
+  sb.innerHTML=sh+(warnBox.innerHTML?"<div>"+warnBox.innerHTML+"</div>":"");
+  const sbr=document.getElementById("sbRes");
+  if(sbr){
+    sbr.innerHTML=["FL "+fmt(rs.front_left,3),"FR "+fmt(rs.front_right,3),"RL "+fmt(rs.rear_left,3),"RR "+fmt(rs.rear_right,3)].join("  ");
+    if(sbr.parentElement)sbr.parentElement.className=d.status==="VALID"?"c ok":(d.status==="SOLVER_FAILED"?"c bad":"c hl");
+  }
+  drawChart(d.sweep||null);
+  drawAll();
+}
+function drawChart(sw){
+  const cv=document.getElementById("chart");
+  if(!sw||!sw.curves){ const ctx=cv.getContext("2d");ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.fillStyle=CC.txt3;ctx.font="9px monospace";ctx.fillText("无扫掠数据",8,14);return;}
+  const X=sw.values||[],cam=sw.curves.right_camber_deg||[],toe=sw.curves.right_toe_deg||[];
+  const scr=sw.curves.right_scrub_radius_mm||[],trl=sw.curves.right_caster_trail_mm||[];
+  const series=[["#54a06a","camber",cam],["#2fa9d6","toe",toe],["#c07ad0","scrub",scr],["#d9a238","trail",trl]];
+  let y0=0,y1=0;
+  for(const s of series)for(const v of s[2]){if(v==null)continue;y0=Math.min(y0,v);y1=Math.max(y1,v);}
+  if(y1===y0)y1=y0+1;
+  const pad=24,W=cv.width,H=cv.height;
+  const sx=v=>pad+(v-X[0])/((X[X.length-1]-X[0])||1)*(W-pad*2);
+  const sy=v=>H-pad-(v-y0)/(y1-y0)*(H-pad*2);
+  const ctx=cv.getContext("2d");ctx.clearRect(0,0,W,H);
+  ctx.font="9px monospace";ctx.fillStyle=CC.txt3;
+  ctx.fillText(S.curveAxis==="rack"?"rack mm":"travel mm",W-56,H-6);ctx.fillText("0",4,sy(0)+3);
+  for(const s of series){
+    ctx.strokeStyle=s[0];ctx.lineWidth=1.4;ctx.beginPath();let started=false;
+    for(let i=0;i<s[2].length;i++){
+      if(s[2][i]==null){started=false;continue;}
+      const x=sx(X[i]),y=sy(s[2][i]);
+      if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    ctx.fillStyle=s[0];ctx.fillText(s[1],s[1]==="camber"?8:44,10);
+  }
+  ctx.strokeStyle=CC.grid;ctx.setLineDash([4,4]);
+  const yz=sy(0);ctx.beginPath();ctx.moveTo(pad,yz);ctx.lineTo(W-pad,yz);ctx.stroke();ctx.setLineDash([]);
 }
 function renderHandling(d){
   const el=document.getElementById("handlingBox");
-  const ug=d.understeer||{};
-  const y=d.yaw&&d.yaw.status==="VALID"?d.yaw:null;
-  const kp=d.kingpin;
-  const ride=d.ride_level||{};
-  let h="";
-  h+="K <b class='"+(ug.k_deg_per_g>0.2?"a":ug.k_deg_per_g<-0.2?"r":"g")+"'>"+
-     (ug.k_deg_per_g!=null?ug.k_deg_per_g.toFixed(3)+" °/g":"—")+"</b> "+
-     "<span>"+(ug.understeer||"—")+"</span>";
-  h+="<div>αf <b>"+(ug.alpha_f_deg!=null?ug.alpha_f_deg.toFixed(2)+"°":"—")+"</b> "+
-     "αr <b>"+(ug.alpha_r_deg!=null?ug.alpha_r_deg.toFixed(2)+"°":"—")+"</b> "+
-     "Cαf <b>"+(ug.ca_f_n_per_deg?ug.ca_f_n_per_deg.toFixed(0)+"N/°":"—")+"</b></div>";
-  if(y){ h+="<div>yaw ωn <b>"+y.omega_n_rad_per_s.toFixed(1)+"</b> ζ <b>"+y.damping_zeta.toFixed(2)+
-     "</b> gain <b>"+y.yaw_rate_gain_deg_per_s_per_deg.toFixed(1)+"°</b></div>"; }
-  if(kp){ h+="<div class='force'>回正 <b>"+kp.total_nmm.toFixed(0)+" N·mm</b> "+
-     (kp.self_centering?"<span class='g'>自回正</span>":"<span class='r'>不回正</span>")+"</div>"; }
-  if(ride.wheels){ const fl=ride.wheels.fl;
-    h+="<div>调平 预载 <b>"+(fl?fl.preload_n.toFixed(0)+"N":"—")+"</b> "+
-       "roll <b>"+ride.pose.roll_deg+"°</b> pitch <b>"+ride.pose.pitch_deg+"°</b></div>"; }
+  const ug=d.understeer||{},y=d.yaw&&d.yaw.status==="VALID"?d.yaw:null;
+  const kp=d.kingpin,ride=d.ride_level||{};
+  let h="K <b class='"+(ug.k_deg_per_g!=null?(ug.k_deg_per_g>0.2?"a":ug.k_deg_per_g<-0.2?"r":"g"):"")+"'>"+
+     (ug.k_deg_per_g!=null?ug.k_deg_per_g.toFixed(3)+" °/g":"—")+"</b> <span>"+(ug.understeer||"—")+"</span>";
+  h+="<div>αf <b>"+(ug.alpha_f_deg!=null?ug.alpha_f_deg.toFixed(2)+"°":"—")+"</b> αr <b>"+
+    (ug.alpha_r_deg!=null?ug.alpha_r_deg.toFixed(2)+"°":"—")+"</b> Cαf <b>"+
+    (ug.ca_f_n_per_deg?ug.ca_f_n_per_deg.toFixed(0)+"N/°":"—")+"</b></div>";
+  if(y)h+="<div>yaw ωn <b>"+y.omega_n_rad_per_s.toFixed(1)+"</b> ζ <b>"+y.damping_zeta.toFixed(2)+
+    "</b> gain <b>"+y.yaw_rate_gain_deg_per_s_per_deg.toFixed(1)+"</b></div>";
+  if(kp)h+="<div class='force'>回正 <b>"+kp.total_nmm.toFixed(0)+" N·mm</b> "+
+    (kp.self_centering?"<span class='g'>自回正</span>":"<span class='r'>不回正</span>")+"</div>";
+  if(ride.wheels){
+    h+="<div>调平 预载 "+(ride.wheels.fl?ride.wheels.fl.preload_n.toFixed(0)+"N":"—")+
+      " · roll "+fmt(ride.pose.roll_deg,2)+"° · pitch "+fmt(ride.pose.pitch_deg,2)+"°</div>";
+  }
   el.innerHTML=h;
   drawKcurve(d);
 }
 function drawKcurve(d){
   const cv=document.getElementById("kChart");
-  const curve=(d.k_curve||{}).k_deg_per_g, xs=(d.k_curve||{}).ay_g;
-  if(!curve||!xs){ return; }
-  if(cv.width!==cv.clientWidth||cv.height!==cv.clientHeight){cv.width=cv.clientWidth;cv.height=cv.clientHeight;}
-  const ctx=cv.getContext("2d"); ctx.clearRect(0,0,cv.width,cv.height);
-  const pad=24,W=cv.width,H=cv.height;
-  const vals=curve.map((v,i)=>v==null?null:v);
-  let y0=1e9,y1=-1e9; for(const v of vals) if(v!=null){y0=Math.min(y0,v);y1=Math.max(y1,v);}
-  if(y0===1e9)return; if(y1===y0){y0-=0.1;y1+=0.1;}
+  const curve=(d.k_curve||{}).k_deg_per_g,xs=(d.k_curve||{}).ay_g;
+  const ctx=cv.getContext("2d");ctx.clearRect(0,0,cv.width,cv.height);
+  if(!curve||!xs||!curve.length){ctx.fillStyle=CC.txt3;ctx.font="9px monospace";ctx.fillText("无 K(ay)",6,12);return;}
+  const pad=20,W=cv.width,H=cv.height;
+  let y0=1e9,y1=-1e9;for(const v of curve)if(v!=null){y0=Math.min(y0,v);y1=Math.max(y1,v);}
+  if(y0===1e9)return;if(y1===y0){y0-=0.1;y1+=0.1;}
   const sx=v=>pad+(v-xs[0])/((xs[xs.length-1]-xs[0])||1)*(W-pad*2);
   const sy=v=>H-pad-(v-y0)/(y1-y0)*(H-pad*2);
-  ctx.strokeStyle="#2fa9d6";ctx.lineWidth=1.5;ctx.beginPath();let st=false;
-  for(let i=0;i<vals.length;i++){
-    if(vals[i]==null){st=false;continue;}
-    const x=sx(xs[i]),y=sy(vals[i]);
+  ctx.strokeStyle=CC.acc;ctx.lineWidth=1.5;ctx.beginPath();let st=false;
+  for(let i=0;i<curve.length;i++){
+    if(curve[i]==null){st=false;continue;}
+    const x=sx(xs[i]),y=sy(curve[i]);
     if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y);
   }
   ctx.stroke();
-  ctx.strokeStyle="#1c2126";ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(pad,sy(0));ctx.lineTo(W-pad,sy(0));ctx.stroke();ctx.setLineDash([]);
-  ctx.fillStyle="#616b77";ctx.font="9px monospace";ctx.fillText("K(ay) 曲线 °/g",6,10);
+  ctx.strokeStyle=CC.grid;ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(pad,sy(0));ctx.lineTo(W-pad,sy(0));ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle=CC.txt3;ctx.font="9px monospace";ctx.fillText("K(ay) °/g",4,9);
 }
 
-/* ---------- 渲染 ---------- */
-const ANGLE_KEYS=["camber_deg","toe_deg","caster_deg","kpi_deg","scrub_radius_mm","caster_trail_mm"];
-const ANGLE_ZH={"camber_deg":"外倾°","toe_deg":"前束°(正=内)","caster_deg":"后倾°","kpi_deg":"主销内倾°","scrub_radius_mm":"Scrub mm","caster_trail_mm":"拖距 mm"};
-function setStatus(tone){ document.getElementById("st").innerHTML="<span class='"+tone+"'>"+escapeHtml(tone)+"</span>"; }
-function escapeHtml(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
-function renderAll(d){
-  const fr=d.front.right;
-  setStatus((fr.status||"")+" · 残差 "+(d.residuals.front_right!=null?d.residuals.front_right.toFixed(4):"—")+" · "+d.solver+" · "+d.label,"g");
-  const tb=document.querySelector("#angleTable");
-  const corners=[["右前",d.front.right],["左前",d.front.left],["右后",d.rear.right],["左后",d.rear.left]];
-  tb.innerHTML="<tr><th></th>"+corners.map(c=>"<th>"+c[0]+"</th>").join("")+"</tr>";
-  const fmt=v=> v==null?"<span class='na'>—</span>":"<span class='v'>"+v+"</span>";
-  function stat(c){ const s=c[1].status; return s==="VALID"?"<span class='g'>"+s+"</span>":(s==="SOLVER_FAILED"?"<span class='r'>"+s+"</span>":"<span class='a'>"+s+"</span>"); }
-  tb.innerHTML+="<tr><td class='mname'>状态</td>"+corners.map(c=>"<td>"+stat(c)+"</td>").join("")+"</tr>";
-  for(const k of ANGLE_KEYS){
-    tb.innerHTML+="<tr><td class='mname'>"+ANGLE_ZH[k]+"</td>"+corners.map(c=>"<td>"+fmt(c[1].angles?.[k])+"</td>").join("")+"</tr>";
+/* ================================ 硬点表 ================================ */
+function curTpl(){return S[S.hpAxle==="front"?"frontR":"rearR"]||(S[S.hpAxle==="front"?"frontR":"rearR"]=deep(SEED));}
+function buildTable(){
+  const tb=document.querySelector("#hpTable thead");
+  tb.innerHTML="<tr><th>点 · "+(S.hpAxle==="front"?"右前":"右后")+"</th><th>X</th><th>Y</th><th>Z</th></tr>";
+  const tbody=document.querySelector("#hpTable tbody");
+  tbody.innerHTML="";
+  const w=curTpl();
+  for(const k of Object.keys(w)){
+    const tr=document.createElement("tr");
+    tr.innerHTML='<td class="n"><b>'+k+'</b> <i>'+ (POINT_NAMES[k]||"") +'</i></td>'+
+      '<td><input data-k="'+k+'" data-a="0" type="number" step="1"></td>'+
+      '<td><input data-k="'+k+'" data-a="1" type="number" step="1"></td>'+
+      '<td><input data-k="'+k+'" data-a="2" type="number" step="1"></td>';
+    tbody.appendChild(tr);
   }
-  /* 四轮载荷汇总 */
-  const ld=d.loads||{};
-  const fbBox=document.getElementById("forceBox");
-  if(ld && ld.front_right){
-    let hh="<table style='width:100%'><tr><th>轮</th><th>Fz</th><th>Fx</th><th>Fy</th><th>μ</th><th>离地</th></tr>";
-    for(const c of corners){
-      const L=ld[c[0]==="右前"?"front_right":c[0]==="左前"?"front_left":c[0]==="右后"?"rear_right":"rear_left"];
-      hh+="<tr><td class='mname'>"+c[0]+"</td><td>"+(L?L.fz_n.toFixed(0):"—")+"</td><td>"+(L?L.fx_n.toFixed(0):"—")+
-         "</td><td>"+(L?L.fy_n.toFixed(0):"—")+"</td><td>"+(L?(L.friction_util!=null?L.friction_util.toFixed(2):"<span class='na'>—</span>"):"—")+
-         "</td><td>"+(L?(L.off_ground?"<span class='r'>是</span>":"否"):"—")+"</td></tr>";
-    }
-    hh+="</table>";
-    const curLd = ld[AXLE==="rear"?"rear_right":"front_right"]||{};
-    const we=curLd.wheel_end||{}; const mf=we.member_forces||{};
-    hh+="<div class='warn'>"+(AXLE==="rear"?"右后":"右前")+" 轮边: 推杆 "+
-       (mf.pushrod_n!=null?mf.pushrod_n.toFixed(0)+"N":"—")+
-       " · 横拉杆 "+(mf.tie_rod_n!=null?mf.tie_rod_n.toFixed(0)+"N":"—")+
-       " · 球头残差 "+(we.force_residual_n!=null?we.force_residual_n.toFixed(4):"—")+"N</div>";
-    fbBox.innerHTML=hh;
-  } else { fbBox.innerHTML="<span class='na'>载荷不可用</span>"; }
-  // 状态
-  const sb=document.getElementById("statusBox");
-  sb.innerHTML="整车状态: <b class='"+(d.status==="VALID"?"g":d.status==="SOLVER_FAILED"?"r":"a")+"'>"+d.status+"</b>";
-  d.warnings.slice(0,4).forEach(w=>{sb.innerHTML+="<div class='warn'>"+escapeHtml(w)+"</div>";});
-  // 曲线
-  drawChart(d.sweep);
-}
-/* 曲线画布 */
-function drawChart(sw){
-  const cv=document.getElementById("chart");
-  if(!sw||!sw.curves) return;
-  if(cv.width!==cv.clientWidth||cv.height!==cv.clientHeight){cv.width=cv.clientWidth;cv.height=cv.clientHeight;}
-  const ctx=cv.getContext("2d"); ctx.clearRect(0,0,cv.width,cv.height);
-  const X=sw.values||[], cam=sw.curves.right_camber_deg||[], toe=sw.curves.right_toe_deg||[];
-  const scr=sw.curves.right_scrub_radius_mm||[], trl=sw.curves.right_caster_trail_mm||[];
-  const series=[["#54a06a","camber",cam],["#2fa9d6","toe",toe],["#c07ad0","scrub",scr],["#d9a238","trail",trl]];
-  let y0=0,y1=0;
-  for(const [_,__,arr] of series)for(const v of arr){if(v==null)continue;y0=Math.min(y0,v);y1=Math.max(y1,v);}
-  if(y1===y0)y1=y0+1;
-  const pad=26,W=cv.width,H=cv.height;
-  const sx=v=>pad+(v-X[0])/((X[X.length-1]-X[0])||1)*(W-pad*2);
-  const sy=v=>H-pad-(v-y0)/(y1-y0)*(H-pad*2);
-  ctx.font="9px monospace";ctx.fillStyle="#616b77";
-  ctx.fillText((CURVE_AXIS==="rack"?"rack mm":"travel mm"),W-58,H-8);ctx.fillText("0",6,sy(0));
-  for(const [col,name,arr] of series){
-    ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.beginPath();let started=false;
-    for(let i=0;i<arr.length;i++){
-      if(arr[i]==null){started=false;continue;}
-      const x=sx(X[i]),y=sy(arr[i]);
-      if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
-    }
-    ctx.stroke();
-    ctx.fillStyle=col;ctx.fillText(name,name==="camber"?10:40,10);
-  }
-  // 0 线
-  ctx.strokeStyle="#1c2126";ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(pad,sy(0));ctx.lineTo(W-pad,sy(0));ctx.stroke();ctx.setLineDash([]);
-}
-
-/* ---------- 控件绑定 ---------- */
-["t_fl","t_fr","rack","ay","ax"].forEach(id=>{
-  const el=document.getElementById(id);
-  el.addEventListener("input",()=>{
-    if(id==="ay")document.getElementById("ayv").value=el.value;
-    if(id==="ax")document.getElementById("axv").value=el.value;
-    drawAll(); requestSolve();
+  tbody.querySelectorAll("input").forEach(inp=>{
+    const k=inp.dataset.k,a=+inp.dataset.a;
+    const onEdit=()=>{const v=parseFloat(inp.value);
+      if(isFinite(v)){curTpl()[k][a]=v;refreshTableInputs([k]);drawAll();requestSolve();}
+    };
+    inp.addEventListener("change",onEdit);
+    inp.addEventListener("input",onEdit);
   });
-});
-document.getElementById("ay").addEventListener("change",()=>document.getElementById("ayv").value=document.getElementById("ay").value);
-document.getElementById("ax").addEventListener("change",()=>document.getElementById("axv").value=document.getElementById("ax").value);
-function setAxle(ax){
-  AXLE = ax;
-  document.getElementById("axFront").classList.toggle("sel", ax==="front");
-  document.getElementById("axRear").classList.toggle("sel", ax==="rear");
-  if(ax==="rear" && !rearHp){ rearHp = deep(hpRear||SEED); rearHp.UP5=[0,-610,255.3]; }
-  if(ax==="rear"){ frontHp = hp; hp = rearHp; }
-  else if(frontHp){ hp = frontHp; }
-  hpLeft = curLeft();
-  buildTable(); buildTableState(); drawAll(); requestSolve();
+  refreshTableInputs();
 }
-function setCurveAxis(ax){
-  CURVE_AXIS = ax;
-  document.getElementById("cvTravel").classList.toggle("sel", ax==="travel");
-  document.getElementById("cvRack").classList.toggle("sel", ax==="rack");
+function refreshTableInputs(){
+  const w=curTpl();
+  const rows=document.querySelectorAll("#hpTable input.num,#hpTable input[type=number]");
+  rows.forEach(inp=>{
+    const k=inp.dataset.k,a=+inp.dataset.a;
+    if(k&&w[k]&&document.activeElement!==inp)inp.value=+w[k][a].toFixed(3);
+  });
+}
+
+/* ================================ 控件 ================================ */
+function setHpAxle(ax){
+  S.hpAxle=ax;
+  document.getElementById("hpFront").classList.toggle("on",ax==="front");
+  document.getElementById("hpRear").classList.toggle("on",ax==="rear");
+  buildTable();
+}
+function setCurveAxle(ax){
+  S.curveAxle=ax;
+  document.getElementById("cvFront").classList.toggle("on",ax==="front");
+  document.getElementById("cvRear").classList.toggle("on",ax==="rear");
+  document.getElementById("curveTitle").textContent=(ax==="front"?"前轴":"后轴")+" "+S.curveAxis;
   requestSolve();
 }
-document.getElementById("axFront").addEventListener("click", ()=>setAxle("front"));
-document.getElementById("axRear").addEventListener("click", ()=>setAxle("rear"));
-document.getElementById("cvTravel").addEventListener("click", ()=>setCurveAxis("travel"));
-document.getElementById("cvRack").addEventListener("click", ()=>setCurveAxis("rack"));
-document.getElementById("gamma").addEventListener("input",()=>{requestSolve();});
-["ayv","axv"].forEach(id=>{
-  document.getElementById(id).addEventListener("input",()=>{drawAll();requestSolve();});
-});
-document.getElementById("curves").addEventListener("change",()=>requestSolve());
-document.getElementById("reset").addEventListener("click",()=>{hp=deep(SEED);buildTableState();drawAll();requestSolve();});
-let snapA = null;
-/* ---- A/B 快照对比（基线 A = 记基线时的硬点+定位角；B = 当前） ---- */
-document.getElementById("snapA").addEventListener("click", ()=>{
-  snapA = { hp: deep(curWheel()), angles: last ? {angles: last[AXLE==="rear"?"rear":"front"].right.angles, residual: last.residuals[(AXLE==="rear"?"rear":"front")+"_right"]} : null,
-            axle: AXLE };
-  const ab=document.getElementById("sensBox");
-  ab.innerHTML = "<span class='g'>已记基线 A（"+AXLE+"）</span> · 修改硬点后点「对比B−A」";
-});
-document.getElementById("cmpB").addEventListener("click", ()=>{
-  if(!snapA){ alert("先「记基线A」"); return; }
-  if(snapA.axle!==AXLE){ snapA = null; alert("轴已切换，请重新记基线A"); return; }
-  const b=document.getElementById("sensBox");
-  const w=curWheel();
-  let hpDelta = "";
-  let maxD = 0;
-  for(const k of Object.keys(w)){
-    const d0=snapA.hp[k], d1=w[k];
-    const dd=[Math.round((d1[0]-d0[0])*10)/10, Math.round((d1[1]-d0[1])*10)/10, Math.round((d1[2]-d0[2])*10)/10];
-    if(dd[0]||dd[1]||dd[2]){ hpDelta += k+" ["+dd.join(",")+"]  "; maxD=Math.max(maxD,...dd.map(Math.abs)); }
+function bind(){
+  ["t_fl","t_fr","t_rl","t_rr","rack","ay","ax"].forEach(id=>{
+    const el=document.getElementById(id);
+    el.addEventListener("input",()=>{
+      if(id==="ay")document.getElementById("ayv").value=el.value;
+      if(id==="ax")document.getElementById("axv").value=el.value;
+      const ayv=+document.getElementById("ayv").value||0,axv=+document.getElementById("axv").value||0;
+      document.getElementById("tbCase").innerHTML=ayv!==0||axv!==0?"动态":((+document.getElementById("rack").value)? "转向":"轮跳/静态");
+      drawAll();requestSolve();
+    });
+  });
+  document.getElementById("ay").addEventListener("change",()=>document.getElementById("ayv").value=document.getElementById("ay").value);
+  document.getElementById("ax").addEventListener("change",()=>document.getElementById("axv").value=document.getElementById("ax").value);
+  document.getElementById("gamma").addEventListener("input",()=>{});
+  ["ayv","axv"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{drawAll();requestSolve();}));
+  document.getElementById("curves").addEventListener("click",()=>{
+    document.getElementById("curves").classList.toggle("on");requestSolve();});
+  document.getElementById("reset").addEventListener("click",()=>{
+    const ax=S.hpAxle==="front"?"front":"rear";
+    S[ax==="front"?"frontR":"rearR"]=deep(ax==="front"?S._seedF:S._seedR);
+    buildTable();refreshTableInputs();drawAll();requestSolve();
+    setStatus("g","已重置为默认硬点");
+  });
+  ["snapA","cmpB"].forEach(id=>document.getElementById(id));
+  document.getElementById("snapA").addEventListener("click",()=>{
+    snapA={hp:deep(curTpl()),corner:S.hpAxle==="front"?"front_right":"rear_right",angles:resp?(resp[S.hpAxle==="front"?"front":"rear"].right.angles||null):null};
+    document.getElementById("abBox").innerHTML="<span class='g'>已记基线 A（"+(S.hpAxle==="front"?"右前":"右后")+"）</span>";
+  });
+  document.getElementById("cmpB").addEventListener("click",()=>{
+    if(!snapA){document.getElementById("abBox").innerHTML="先「记基线A」";return;}
+    if(snapA.corner!==(S.hpAxle==="front"?"front_right":"rear_right")){document.getElementById("abBox").innerHTML="轴已切换，重新记 A";return;}
+    const w=curTpl();let hpDelta="",maxD=0;
+    for(const k in w){
+      const d0=snapA.hp[k],d1=w[k];if(!d0)continue;
+      const dd=[Math.round((d1[0]-d0[0])*10)/10,Math.round((d1[1]-d0[1])*10)/10,Math.round((d1[2]-d0[2])*10)/10];
+      if(dd[0]||dd[1]||dd[2]){hpDelta+=k+" ["+dd.join(",")+"]  ";maxD=Math.max(maxD,Math.abs(dd[0]),Math.abs(dd[1]),Math.abs(dd[2]));}
+    }
+    let ang="";
+    const a1=resp&&resp[S.hpAxle==="front"?"front":"rear"].right.angles;
+    if(snapA.angles&&a1){
+      for(const an of ANGLES){const k=an[0];
+        if(snapA.angles[k]!=null&&a1[k]!=null){
+          const dd=Math.round((a1[k]-snapA.angles[k])*1000)/1000;if(dd)ang+=" "+an[1]+" "+dd;}}
+    }
+    document.getElementById("abBox").innerHTML="<div>硬点 Δ（≥0.1mm）</div><div class='mr'>"+(hpDelta||"— 无变化 —")+
+      "</div><div>定位角 Δ"+(ang||" —")+"</div><div>max "+(maxD?maxD.toFixed(1)+"mm":"0mm")+"</div>";
+  });
+  document.getElementById("runSens").addEventListener("click",()=>{
+    const b=document.getElementById("sensBox");
+    fetch("/api/v2/sensitivity",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({design_id:"legacy-import",case_id:"static",corner:"front_right",
+        hardpoints:["UP1","UP2","CH1","CH3","CH5"],metrics:["camber_deg","toe_deg","caster_deg","scrub_radius_mm"]})})
+      .then(r=>r.ok?r.json():null)
+      .then(d=>{
+        if(!d){b.innerHTML="<span class='r'>敏感性不可用</span>";return;}
+        const sm=d.summary_per_mm||{};
+        let h="<table class='ro'><tr><th>点\轴</th><th>x</th><th>y</th><th>z</th></tr>";
+        for(const pt in sm){
+          const row=sm[pt];
+          h+="<tr><td class='mn'>"+pt+"</td>"+["x","y","z"].map(a=>{
+            const v=row[a]&&row[a].camber_deg!=null?("c "+row[a].camber_deg.toFixed(3)):"<span class='na'>—</span>";
+            return"<td title='"+JSON.stringify(row[a]||{})+"'>"+v+"</td>";}).join("")+"</tr>";
+        }
+        h+="</table>";
+        b.innerHTML=h;
+      })
+      .catch(()=>{b.innerHTML="<span class='r'>请求失败</span>";});
+  });
+  function download(name,text){
+    const blob=new Blob([text],{type:"text/csv"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);a.download=name;a.click();
+    URL.revokeObjectURL(a.href);
   }
-  let ang= "";
-  if(last && snapA.angles && last[AXLE==="rear"?"rear":"front"].right.angles){
-    const a0=snapA.angles.angles, a1=last[AXLE==="rear"?"rear":"front"].right.angles;
-    for(const k of ANGLE_KEYS){ if(a0 && a1 && a0[k]!=null && a1[k]!=null){
-      const dd=Math.round((a1[k]-a0[k])*1000)/1000; if(dd) ang+=" "+ANGLE_ZH[k]+" "+dd; }}
-  }
-  b.innerHTML = "<div class='mname'>硬点 Δ "+AXLE+"（≥0.1mm）</div><div class='mr warn'>"+(hpDelta||"— 无变化 —")+"</div>"+
-    "<div class='mr'>定位角 Δ"+(ang||" —")+"</div>"+
-    "<div class='warn'>max 硬点位移 "+(maxD?maxD.toFixed(1)+"mm":"0mm")+"</div>";
-});
-/* ---- 敏感性（legacy 设计基线，前右） ---- */
-document.getElementById("runSens").addEventListener("click", ()=>{
-  const b=document.getElementById("sensBox");
-  fetch("/api/v2/sensitivity",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({design_id:"legacy-import",case_id:"static",corner:"front_right",
-      hardpoints:["UP1","UP2","CH1","CH3","CH5"],metrics:["camber_deg","toe_deg","caster_deg","scrub_radius_mm"]})})
-    .then(r=>r.ok?r.json():null)
-    .then(d=>{
-      if(!d){ b.innerHTML="<span class='r'>敏感性不可用</span>"; return; }
-      const sm=d.summary_per_mm||{};
-      let h="<table style='width:100%'><tr><th>点\轴</th><th>x</th><th>y</th><th>z</th></tr>";
-      for(const pt in sm){
-        const row=sm[pt];
-        h+="<tr><td class='mname'>"+pt+"</td>"+["x","y","z"].map(a=>{
-          const v=row[a]&&row[a].camber_deg!=null?("camber "+row[a].camber_deg.toFixed(3)+"°/mm"):"—";
-          return "<td title='"+JSON.stringify(row[a]||{})+"'>"+v+"</td>";}).join("")+"</tr>";
-      }
-      h+="</table>";
-      b.innerHTML=h;
-    })
-    .catch(()=>{ document.getElementById("sensBox").innerHTML="<span class='r'>请求失败</span>"; });
-});
-/* ---- 导出：当前解算结果 CSV ---- */
-function download(name, text){
-  const blob=new Blob([text],{type:"text/csv"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob); a.download=name; a.click();
-  URL.revokeObjectURL(a.href);
+  document.getElementById("expJson").addEventListener("click",()=>{
+    if(!resp){document.getElementById("statusBox").innerHTML+="<span class='r'> 无结果</span>";return;}
+    const blob=new Blob([JSON.stringify(resp,null,2)],{type:"application/json"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="solve_"+Date.now()+".json";a.click();
+    URL.revokeObjectURL(a.href);
+  });
+  document.getElementById("expCsv").addEventListener("click",()=>{
+    if(!resp){document.getElementById("statusBox").innerHTML+="<span class='r'> 无结果</span>";return;}
+    let rows=[["corner","status","camber","toe","caster","kpi","scrub","trail","Fz","Fx","Fy","mu","off_ground"]];
+    for(const sec of ["front","rear"])for(const side of ["left","right"]){
+      const name=sec+"_"+side;
+      const rep=resp[sec][side],ld=resp.loads?resp.loads[name]:null;
+      const ag=rep.angles||{};
+      rows.push([name,rep.status,ag.camber_deg,ag.toe_deg,ag.caster_deg,ag.kpi_deg,
+        ag.scrub_radius_mm,ag.caster_trail_mm,
+        ld?ld.fz_n:"",ld?ld.fx_n:"",ld?ld.fy_n:"",ld&&ld.friction_util!=null?ld.friction_util:"",ld?ld.off_ground:""]);
+    }
+    download("solve_"+Date.now()+".csv",rows.map(r=>r.join(",")).join("\n"));
+  });
+  VW.forEach(v=>v.cv.addEventListener("mousemove",e=>{PICK.some(()=>false);}));
+  window.addEventListener("resize",()=>{VW.forEach(sizeView);drawAll();if(resp&&resp.sweep)drawChart(resp.sweep);});
 }
-document.getElementById("expJson").addEventListener("click", ()=>{
-  if(!last){ alert("无解算结果"); return; }
-  const blob=new Blob([JSON.stringify(last,null,2)],{type:"application/json"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob); a.download="solve_"+Date.now()+".json"; a.click();
-  URL.revokeObjectURL(a.href);
-});
-document.getElementById("expCsv").addEventListener("click", ()=>{
-  if(!last){ alert("无解算结果"); return; }
-  let rows=[["corner","status","camber","toe","caster","kpi","scrub","trail","Fz","Fx","Fy","mu","off_ground"]];
-  for(const sec of ["front","rear"]) for(const side of ["left","right"]){
-    const name=sec+"_"+side;
-    const rep=last[sec][side], ld=last.loads?last.loads[name]:null;
-    const ag=rep.angles||{};
-    rows.push([name, rep.status, ag.camber_deg, ag.toe_deg, ag.caster_deg, ag.kpi_deg,
-      ag.scrub_radius_mm, ag.caster_trail_mm,
-      ld?ld.fz_n:"", ld?ld.fx_n:"", ld?ld.fy_n:"", ld&&ld.friction_util!=null?ld.friction_util:"", ld?ld.off_ground:""]);
-  }
-  download("solve_"+Date.now()+".csv", rows.map(r=>r.join(",")).join("\n"));
-});
-document.getElementById("mirrorX").addEventListener("click",()=>{ alert("左右独立编辑将在后续版本提供；当前由后端按模板镜像。"); });
 
-window.addEventListener("resize",()=>{ drawAll(); if(last&&last.sweep) drawChart(last.sweep); });
+/* ================================ 初始化 ================================ */
+async function init(){
+  try{
+    const r=await fetch("/api/v2/designs/legacy-import");
+    if(r.ok){const d=await r.json();
+      S.frontR=d.front_right&&d.front_right.points?deep(d.front_right.points):deep(SEED);
+      S.rearR=d.rear_right&&d.rear_right.points?deep(d.rear_right.points):deep(SEED);
+      if(S.rearR.UP5)S.rearR.UP5=[S.rearR.UP5[0],Math.abs(S.rearR.UP5[1]),S.rearR.UP5[2]];
+    }else{S.frontR=deep(SEED);S.rearR=deep(SEED);}
+  }catch(e){S.frontR=deep(SEED);S.rearR=deep(SEED);setStatus("a","离线种子模式");}
+  S._seedF=deep(S.frontR); S._seedR=deep(S.rearR);
+  initViews();
+  buildTable();
+  document.getElementById("hpFront").addEventListener("click",()=>setHpAxle("front"));
+  document.getElementById("hpRear").addEventListener("click",()=>setHpAxle("rear"));
+  document.getElementById("cvFront").addEventListener("click",()=>setCurveAxle("front"));
+  document.getElementById("cvRear").addEventListener("click",()=>setCurveAxle("rear"));
+  bind();
+  buildTable();
+  setStatus("g","运行");
+  requestSolve();
+}
 init();
 </script>
 </body>
