@@ -1,5 +1,11 @@
 # 开发日志
 
+## 2026-08-20 — P1 Task 2 sequential baseline adapter
+
+- `src/solver/p1_benchmark.py` now evaluates the explicitly selected front-right side through the production `solve_bump()` → `solve_steering()` → `compute_alignment_angles()` / `compute_contact_patch()` calls; no HTTP route or left-side mirroring is involved.
+- Each baseline row exposes solver status, alignment angles, contact patch, normalized steering axis, raw maximum geometry residual, iteration count, and elapsed timing. The raw residual remains visible beyond the nominal travel range for K-4 diagnostics.
+- Added focused baseline diagnostics and K-4 visibility assertions. Focused suite: 7 passed; Ruff and mypy on touched files pass.
+
 ## 2026-08-20 — P1 Task 1 JSON/type quality fixes
 
 - 修正 `src/solver/p1_benchmark.py` 的 `_json_value`：拒绝不支持的对象类型并显式拒绝非有限浮点值，消除 mypy 对 `float(object)` 的报错。

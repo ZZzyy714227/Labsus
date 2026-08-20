@@ -1,19 +1,20 @@
-"""Deterministic input contract for the P1 solver comparison benchmark.
-
-Task 1 exposes the comparison matrix before either solver path is adapted.  The
-placeholder records describe unavailable measurements; they do not evaluate
-geometry.  Later tasks can replace the path records without changing the report
-shape consumed by this harness.
-"""
+"""Deterministic P1 comparison benchmark for the legacy front-right solver."""
 
 from __future__ import annotations
 
 import hashlib
 import json
 import math
-from typing import TypedDict
+import time
+from typing import TypedDict, cast
+
+import numpy as np
 
 from hardpoints import DEFAULT_HARDPOINTS
+from solver.angles import compute_alignment_angles
+from solver.bump import solve_bump
+from solver.steering import solve_steering
+from tire import _upright_y_axis, compute_contact_patch
 
 TRAVEL_GRID = (-30, -15, -5, 0, 5, 10, 15, 30)
 RACK_GRID = (0, 5)
@@ -84,48 +85,72 @@ def _json_value(value: object) -> JsonValue:
     raise TypeError(f"Unsupported JSON value: {type(value).__name__}")
 
 
+def _sequential_baseline(hp: dict[str, object], travel: int, rack: int) -> PathRecord:
+    """Adapt the production bump→steer calls for one physical front-right side."""
+    started = time.perf_counter()
+    try:
+        bump = solve_bump(hp, travel, polish=True)
+        merged = dict(bump)
+        for key in ("CH1", "CH2", "CH3", "CH4", "CH5", "track_width", "tire_radius",
+                    "tire_width", "tire_spring_rate", "corner_weight_n"):
+            if key in hp:
+                merged[key] = hp[key]
+        tie_rod_length = float(np.linalg.norm(
+            np.asarray(hp["UP3"]) - np.asarray(hp["FL1"])))
+        steered = solve_steering(merged, rack, tie_rod_length=tie_rod_length)
+        final = dict(steered)
+        for key in ("CH1", "CH2", "CH3", "CH4", "CH5", "track_width", "tire_radius",
+                    "tire_width", "tire_spring_rate", "corner_weight_n"):
+            if key in hp:
+                final[key] = hp[key]
+        angles = compute_alignment_angles(final, hp=hp)
+        axis = np.asarray(final["UP2"], dtype=float) - np.asarray(final["UP1"], dtype=float)
+        axis /= np.linalg.norm(axis)
+        contact = compute_contact_patch(final["UP5"], _upright_y_axis(final), hp)
+        tie_residual = abs(float(np.linalg.norm(
+            np.asarray(final["UP3"]) - np.asarray(final["FL1"]))) - tie_rod_length)
+        residual = max(float(bump.get("max_residual", 0.0)), tie_residual)
+        status = "VALID" if residual <= 0.02 else "APPROXIMATE"
+        if not steered.get("_newton_converged", True) and not steered.get("_used_fallback", False):
+            status = "SOLVER_FAILED"
+        return {
+            "status": status,
+            "angles": cast(dict[str, JsonValue], _json_value(angles)),
+            "contact_patch": cast(list[JsonValue], _json_value(contact["center"])),
+            "steering_axis": cast(list[JsonValue], _json_value(axis.tolist())),
+            "geometry_residual_mm": residual,
+            "iterations": int(bump.get("iterations", 0)) + int(steered.get("iterations", 0)),
+            "timing_ms": (time.perf_counter() - started) * 1000.0,
+        }
+    except (KeyError, TypeError, ValueError, FloatingPointError):
+        return {
+            "status": "SOLVER_FAILED", "angles": None, "contact_patch": None,
+            "steering_axis": None, "geometry_residual_mm": 0.0, "iterations": 0,
+            "timing_ms": (time.perf_counter() - started) * 1000.0,
+        }
+
+
 def _not_implemented_path() -> PathRecord:
-    """Return an explicit unavailable record; no geometry was evaluated."""
-    return {
-        "status": "NOT_IMPLEMENTED",
-        "angles": None,
-        "contact_patch": None,
-        "steering_axis": None,
-        "geometry_residual_mm": None,
-        "iterations": 0,
-        "timing_ms": 0.0,
-    }
+    """Return an explicit unavailable record for the future coupled candidate."""
+    return {"status": "NOT_IMPLEMENTED", "angles": None, "contact_patch": None,
+            "steering_axis": None, "geometry_residual_mm": None, "iterations": 0,
+            "timing_ms": 0.0}
 
 
 def compare_solver_paths() -> Report:
-    """Return the deterministic P1 input matrix and its output contract.
-
-    The matrix identifies legacy front-right inputs over the complete
-    travel/rack grid.  Solver adapters are intentionally deferred to Task 2 and
-    Task 3; no geometry is evaluated while paths are ``NOT_IMPLEMENTED``.
-    """
-    # Resolve the legacy geometry at call time so this harness follows the same
-    # configured front-right defaults as the existing endpoint.
-    _ = DEFAULT_HARDPOINTS
-
+    """Evaluate the production sequential baseline over the P1 matrix."""
+    hp = dict(DEFAULT_HARDPOINTS)
     cases: list[CaseRecord] = []
     for travel in TRAVEL_GRID:
         for rack in RACK_GRID:
-            cases.append(
-                {
-                    "travel": travel,
-                    "rack": rack,
-                    "sequential": _not_implemented_path(),
-                    "coupled": _not_implemented_path(),
-                    "delta": {
-                        "camber_deg": None,
-                        "toe_deg": None,
-                        "contact_patch": None,
-                        "steering_axis": None,
-                    },
-                    "timing_ms": {"sequential": 0.0, "coupled": 0.0},
-                }
-            )
+            sequential = _sequential_baseline(hp, travel, rack)
+            cases.append({
+                "travel": travel, "rack": rack, "sequential": sequential,
+                "coupled": _not_implemented_path(),
+                "delta": {"camber_deg": None, "toe_deg": None,
+                           "contact_patch": None, "steering_axis": None},
+                "timing_ms": {"sequential": sequential["timing_ms"], "coupled": 0.0},
+            })
 
     return {
         "hardpoint_side": "front_right",

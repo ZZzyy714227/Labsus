@@ -59,9 +59,30 @@ def test_compare_is_deterministic_and_strictly_json_serializable():
     first = compare_solver_paths()
     second = compare_solver_paths()
 
+    for report in (first, second):
+        for row in report["cases"]:
+            row["sequential"]["timing_ms"] = 0.0
+            row["coupled"]["timing_ms"] = 0.0
+            row["timing_ms"]["sequential"] = 0.0
+            row["timing_ms"]["coupled"] = 0.0
     assert first == second
     _assert_finite_json_leaves(first)
     assert json.dumps(first, allow_nan=False, sort_keys=True)
+
+
+def test_sequential_baseline_contains_solver_diagnostics():
+    report = compare_solver_paths()
+    baseline = report["cases"][0]["sequential"]
+    assert baseline["status"] in {"VALID", "APPROXIMATE", "SOLVER_FAILED"}
+    assert baseline["timing_ms"] >= 0
+    assert baseline["geometry_residual_mm"] >= 0
+    assert baseline["angles"] is not None
+
+
+def test_k4_residual_remains_visible_outside_nominal_range():
+    report = compare_solver_paths()
+    assert any(row["travel"] < -15 and row["sequential"]["geometry_residual_mm"] > 0.02
+               for row in report["cases"])
 
 
 def test_compare_covers_both_travel_directions():
