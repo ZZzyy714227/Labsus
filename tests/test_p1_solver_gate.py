@@ -52,8 +52,10 @@ def test_compare_solver_paths_returns_required_fields():
         "hardpoint_fingerprint",
         "travel_grid_mm",
         "rack_grid_mm",
+        "smoothing",
+        "k4_diagnosis",
         "cases",
-    } == report.keys()
+    } <= report.keys()
     assert report["cases"]
     row = report["cases"][0]
     assert {"travel", "rack", "sequential", "coupled", "delta", "timing_ms"} <= row.keys()
@@ -256,3 +258,34 @@ def test_compare_output_is_json_safe_and_uses_full_travel_grid():
     assert sorted({row["rack"] for row in rows}) == [0, 5]
     _assert_finite_json_leaves(report)
     json.dumps(report, allow_nan=False)
+
+
+def test_fixture_is_input_only_and_covers_named_case_types():
+    fixture = json.loads((__import__("pathlib").Path("tests/fixtures/p1_solver_gate_cases.json")).read_text())
+    assert fixture["travel_mm"] == [-30, -15, -5, 0, 5, 10, 15, 30]
+    assert fixture["rack_mm"] == [0, 5]
+    assert len(fixture["cases"]) == 16
+    assert {case["kind"] for case in fixture["cases"]} >= {"static", "bump-only", "rack-only", "bump+rack"}
+    assert all(set(case) == {"travel", "rack", "kind"} for case in fixture["cases"])
+
+
+def test_comparison_reports_all_requested_deltas_without_smoothing():
+    report = compare_solver_paths()
+    expected = {"camber_deg", "toe_deg", "caster_deg", "kpi_deg", "scrub_radius_mm",
+                "trail_mm", "contact_patch_mm", "steering_axis_unitless",
+                "geometry_residual_mm", "timing_ms"}
+    for row in report["cases"]:
+        assert expected <= set(row["delta"])
+    assert report["smoothing"] == "none"
+
+
+def test_k4_diagnosis_separates_travel_rack_and_candidate_causes():
+    diagnosis = compare_solver_paths()["k4_diagnosis"]
+    assert diagnosis["negative_travel_max"]["travel"] < 0
+    assert diagnosis["positive_travel_max"]["travel"] > 0
+    assert diagnosis["negative_travel_max"]["residual_mm"] >= 0
+    assert diagnosis["positive_travel_max"]["residual_mm"] >= 0
+    assert {"travel_direction", "rack_input", "candidate_status"} <= diagnosis["cause_summary"].keys()
+    assert diagnosis["cause_summary"]["travel_direction"] in {"negative", "positive", "balanced", "none"}
+    assert diagnosis["cause_summary"]["rack_input"] in {"rack-sensitive", "travel-dominant", "none"}
+    assert isinstance(diagnosis["cause_summary"]["candidate_status"], dict)
