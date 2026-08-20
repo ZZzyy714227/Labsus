@@ -1,5 +1,11 @@
 # 开发日志
 
+## 2026-08-20 — P1 Task 4 steering-axis metric normalization
+
+- 修正 coupled candidate：报告前将 `UP2-UP1` 按 sequential baseline 的约定归一化为单位 steering axis；`steering_axis_unitless` delta 现在严格表示两个单位向量之差。
+- 新增回归测试，覆盖所有 `VALID`/`APPROXIMATE` 路径的 steering-axis 范数及 delta 语义；重新生成 `data/reports/p1_solver_gate.json`。
+- 验证：focused pytest、root CLI、Ruff、mypy、`git diff --check` 结果以本轮命令输出为准。
+
 ## 2026-08-20 — P1 Task 4 K-4 diagnosis gap
 
 - 报告逐 case 保留 coupled candidate 的 `rank_deficient`、`explanation` 与 `state`；未观测到秩亏时显式输出 `rank_deficient_count: 0` 和 `rank_deficient_cases: []`。
