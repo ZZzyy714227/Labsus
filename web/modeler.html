@@ -23,7 +23,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
 #left{width:270px;flex:0 0 270px;border-right:1px solid var(--bd);overflow:auto;background:var(--pnl)}
 #center{flex:1;display:flex;flex-direction:column;min-width:0}
 #views{flex:1;display:flex;flex-wrap:wrap;gap:4px;padding:4px;min-height:0}
-.views{flex:1 1 30%;min-width:240px;height:46%;display:flex;flex-direction:column}
+.views{flex:1 1 30%;min-width:220px;height:49%;display:flex;flex-direction:column}
 .views canvas{flex:1;width:100%;background:#0a0c0e;border:1px solid var(--bd)}
 .views .vt{font-size:9px;color:var(--tx2);padding:2px 4px;text-transform:uppercase;letter-spacing:.12em}
 #right{width:300px;flex:0 0 300px;border-left:1px solid var(--bd);overflow:auto;background:var(--pnl);padding:6px}
@@ -68,6 +68,7 @@ input.num:hover{border-color:var(--acc)}
         <div class="ctl"><b>齿条 rack</b><input type="number" id="rack" value="0" step="1"></div>
         <div class="ctl"><b>ay g</b><input type="range" id="ay" min="-2" max="2" step="0.1" value="0"><input type="number" id="ayv" value="0" step="0.1"></div>
         <div class="ctl"><b>ax g</b><input type="range" id="ax" min="-2" max="2" step="0.1" value="0"><input type="number" id="axv" value="0" step="0.1"></div>
+        <div class="ctl"><b>外倾°</b><input type="number" id="gamma" value="0" step="1"></div>
         <div class="ctl"><b>曲线</b><input type="checkbox" id="curves" checked> <span>扫掠 camber/toe</span></div>
       </div>
       <div class="sec">
@@ -78,6 +79,7 @@ input.num:hover{border-color:var(--acc)}
     </div>
     <div id="center">
       <div id="views">
+        <div class="views"><div class="vt">等轴测 ISO（参考 · 主视图）</div><canvas id="vIso"></canvas></div>
         <div class="views"><div class="vt">正视图 FRONT (Y-Z) · 拖动改 Y/Z</div><canvas id="vFront"></canvas></div>
         <div class="views"><div class="vt">俯视图 TOP (X-Y) · 拖动改 X/Y</div><canvas id="vTop"></canvas></div>
         <div class="views"><div class="vt">侧视图 SIDE (X-Z) · 拖动改 X/Z</div><canvas id="vSide"></canvas></div>
@@ -96,6 +98,9 @@ input.num:hover{border-color:var(--acc)}
       </div>
       <div class="sec"><div class="sh">曲线 Curves（travel）</div>
         <canvas id="chart" style="width:100%;height:150px;background:#0a0c0e;border:1px solid var(--bd)"></canvas>
+      </div>
+      <div class="sec"><div class="sh">操稳 Handling（P5 · ay 工况）</div>
+        <div id="handlingBox" class="ctl"><span class="na">— 待求解 —</span></div>
       </div>
     </div>
   </div>
@@ -171,88 +176,185 @@ function buildTableState(){
   });
 }
 
-/* ---------- 三视图 ---------- */
+/* ============ 四视图：三正交 + 等轴测（DWB-SIM 式投影/相机） ============ */
 const VIEWS = {
-  front:{canvas:"vFront", a:1, b:2, ar:1},   // Y(右)->屏x, Z(上)->屏y
-  top:  {canvas:"vTop",  a:1, b:0, ar:-1},   // Y(右)->屏x, X(前)->屏y
-  side: {canvas:"vSide", a:0, b:2, ar:1},    // X(前)->屏x, Z(上)->屏y
+  iso:   {canvas:"vIso",  iso:true, az:0.70, elv:0.42, zh:"等轴测 ISO（参考 · 主视图）"},
+  front: {canvas:"vFront", a:1, b:2, ar:1, zh:"正视图 FRONT (Y-Z) · 拖动改 Y/Z"},
+  top:   {canvas:"vTop",  a:1, b:0, ar:-1, zh:"俯视图 TOP (X-Y) · 拖动改 X/Y"},
+  side:  {canvas:"vSide", a:0, b:2, ar:1, zh:"侧视图 SIDE (X-Z) · 拖动改 X/Z"},
 };
+const DRAW_ORDER = ["iso", "front", "top", "side"];
 let drag = null;
 
-function viewGeom(view){
-  const pts = Object.entries(hp);
-  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
-  for(const [k,p] of pts){
-    const X=p[view.a], Y=p[view.b];
-    x0=Math.min(x0,X); x1=Math.max(x1,X); y0=Math.min(y0,Y); y1=Math.max(y1,Y);
-  }
-  const pad=40,cv=document.getElementById(view.canvas);
-  const W=cv.clientWidth, H=cv.clientHeight;
-  const s=Math.min((W-pad*2)/Math.max(1,x1-x0),(H-pad*2)/Math.max(1,y1-y0));
-  const cx=(x0+x1)/2, cy=(y0+y1)/2;
-  return {s,cxv:cx,cyv:cy,W,H};
+/* —— 配色（DWB-SIM 语义分组） —— */
+const CC = {
+  rig:"#8d9caa", rigArm:"#aab9c7", knu:"#43c9c0", knuF:"rgba(67,201,192,0.12)",
+  kp:"#e0603f", tie:"#43c9c0", ela:"#d9a238", chas:"#414b56", chas2:"#333c46",
+  arb:"#c07ad0", tire:"#5f6a76", node:"#c3cad2", nodeFix:"#d2543f", nodeSel:"#f0e6c8",
+};
+
+/* —— 参与取景的 3D 点（悬架点 + 车架盒角点 + 轮外缘） —— */
+function collectPts(){
+  const pts = Object.values(hp).map(p => p.slice());
+  const box = chassisBox();
+  for(const p of box) pts.push(p);
+  const wc = hp.UP5;
+  [[260,0,0],[-260,0,0],[0,260,0],[0,-260,0],[0,0,260],[0,0,-260]].forEach(o=>{
+    pts.push([wc[0]+o[0], wc[1]+o[1], wc[2]+o[2]]);
+  });
+  return pts;
 }
-function toScreen(view,g,p){
+function chassisBox(){
+  const xs = [hp.CH1[0], hp.CH2[0], hp.CH3[0], hp.CH4[0]];
+  const ys = [Math.abs(hp.CH1[1]), Math.abs(hp.CH2[1]), Math.abs(hp.CH3[1]), Math.abs(hp.CH4[1])];
+  const zs = [hp.CH1[2], hp.CH2[2], hp.CH3[2], hp.CH4[2]];
+  const bx = Math.max(...xs) + 30, by = Math.max(...ys) + 45;
+  const z0 = Math.min(...zs) - 30, z1 = Math.max(...zs, hp.CH5[2]) + 20;
+  return [[-bx,-by,z0],[bx,-by,z0],[bx,by,z0],[-bx,by,z0],
+          [-bx,-by,z1],[bx,-by,z1],[bx,by,z1],[-bx,by,z1]];
+}
+/* —— 等轴测相机（DWB-SIM camIso + 透视投影 P2） —— */
+function camIso(v){
+  const ce=Math.cos(v.elv), se=Math.sin(v.elv);
+  const dir=[ce*Math.cos(v.az), ce*Math.sin(v.az), se];
+  v.eye=[v.tgt[0]+dir[0]*v.dist, v.tgt[1]+dir[1]*v.dist, v.tgt[2]+dir[2]*v.dist];
+  const fx=v.tgt[0]-v.eye[0],fy=v.tgt[1]-v.eye[1],fz=v.tgt[2]-v.eye[2];
+  const fl=Math.hypot(fx,fy,fz)||1;
+  v.fw=[fx/fl,fy/fl,fz/fl];
+  let rx=v.fw[1], ry=-v.fw[0], rz=0;                 // cross(fw,[0,0,1])
+  const rl=Math.hypot(rx,ry)||1; v.rt=[rx/rl,ry/rl,rz];
+  v.up=[v.rt[1]*v.fw[2]-v.rt[2]*v.fw[1], v.rt[2]*v.fw[0]-v.rt[0]*v.fw[2],
+        v.rt[0]*v.fw[1]-v.rt[1]*v.fw[0]];
+}
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+function projPt(view, g, p){
+  if(view.iso){
+    const q=[p[0]-view.eye[0], p[1]-view.eye[1], p[2]-view.eye[2]];
+    const z=dot(q, view.fw);
+    if(z<80) return null;
+    const f=view.dist/z;
+    return [g.W/2 + dot(q,view.rt)*f*g.s, g.H/2 - dot(q,view.up)*f*g.s];
+  }
   return [g.W/2 + (p[view.a]-g.cxv)*g.s, g.H/2 - view.ar*(p[view.b]-g.cyv)*g.s];
+}
+function viewGeom(view){
+  const pts = collectPts();
+  const pad=40, cv=document.getElementById(view.canvas);
+  const W=cv.clientWidth, H=cv.clientHeight;
+  if(!view.hasOwnProperty("tgt")) view.tgt=[0,0,180];
+  if(!view.hasOwnProperty("dist")) view.dist=1800;
+  if(view.hasOwnProperty("a")){
+    let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+    for(const p of pts){
+      const X=p[view.a],Y=p[view.b];
+      x0=Math.min(x0,X); x1=Math.max(x1,X); y0=Math.min(y0,Y); y1=Math.max(y1,Y);
+    }
+    const s=Math.min((W-pad*2)/Math.max(1,x1-x0),(H-pad*2)/Math.max(1,y1-y0));
+    return {s,cxv:(x0+x1)/2,cyv:(y0+y1)/2,W,H};
+  }
+  /* iso：迭代 fit（DWB-SIM fitView iso 分支） */
+  view.dist=1800; camIso(view);
+  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+  for(const p of pts){
+    const q=projPt(view,{W,H,s:1},p);
+    if(!q)continue;
+    if(q[0]<x0)x0=q[0]; if(q[0]>x1)x1=q[0];
+    if(q[1]<y0)y0=q[1]; if(q[1]>y1)y1=q[1];
+  }
+  const s=Math.min((W-pad*2)/Math.max(1,x1-x0),(H-pad*2)/Math.max(1,y1-y0));
+  if(x1-x0>1&&y1-y0>1){
+    view.tgt=[view.tgt[0]-(x0+x1-W)/2/view.s?0:0, view.tgt[1], view.tgt[2]];
+    camIso(view);
+  }
+  view.sRef=s;
+  return {s, W, H};
+}
+// iso 中计算中心偏移（简化：用投影中心校正）
+function isoCenter(view, g){
+  const pts=collectPts();
+  let cx=0,cy=0,n=0;
+  for(const p of pts){const q=projPt(view,{W:g.W,H:g.H,s:g.s},p); if(q){cx+=q[0];cy+=q[1];n++;}}
+  return [cx/n, cy/n];
 }
 function drawView(id){
   const view=VIEWS[id], cv=document.getElementById(view.canvas);
   if(cv.width!==cv.clientWidth||cv.height!==cv.clientHeight){cv.width=cv.clientWidth;cv.height=cv.clientHeight;}
   const ctx=cv.getContext("2d"); ctx.clearRect(0,0,cv.width,cv.height);
   const g=viewGeom(view);
-  // 地面线
-  ctx.strokeStyle="#1c2126"; ctx.beginPath();
-  const gy=toScreen(view,g,{0:0,1:0,2:0});
-  ctx.moveTo(0,gy[1]); ctx.lineTo(cv.width,gy[1]); ctx.stroke();
-  ctx.fillStyle="#616b77"; ctx.font="9px monospace"; ctx.fillText("0",4,gy[1]+10);
-  // 轮心投影（圆）
-  const wcs=toScreen(view,g,hp.UP5);
-  ctx.strokeStyle="#39414b"; ctx.beginPath(); ctx.arc(wcs[0],wcs[1],10,0,6.283); ctx.stroke();
-  // 杆件
-  ctx.lineWidth=1.3; ctx.strokeStyle="#4a545f";
-  for(const [a,b] of LINKS){
-    const A=toScreen(view,g,hp[a]),B=toScreen(view,g,hp[b]);
-    ctx.beginPath(); ctx.moveTo(A[0],A[1]); ctx.lineTo(B[0],B[1]); ctx.stroke();
+  if(view.iso){
+    // 居中校正
+    const c=isoCenter(view,{W:g.W,H:g.H,s:g.s});
+    g.ox=g.W/2-c[0]; g.oy=g.H/2-c[1];
+  }else{ g.ox=0; g.oy=0; }
+  const P=(p)=>{const q=projPt(view,g,p); return q?[q[0]+g.ox, q[1]+g.oy]:null;};
+  const seg=(a,b,col,w,d)=>{const A=P(a),B=P(b); if(!A||!B)return;
+    if(d)ctx.setLineDash(d); ctx.strokeStyle=col; ctx.lineWidth=w||1;
+    ctx.beginPath(); ctx.moveTo(A[0],A[1]); ctx.lineTo(B[0],B[1]); ctx.stroke(); ctx.setLineDash([]);};
+  const poly=(pts,col,w,d,f)=>{const S=[]; for(const p of pts){const q=P(p); if(!q)return; S.push(q);}
+    if(f){ctx.fillStyle=f;ctx.beginPath();ctx.moveTo(S[0][0],S[0][1]);
+      for(let i=1;i<S.length;i++)ctx.lineTo(S[i][0],S[i][1]);ctx.closePath();ctx.fill();}
+    if(d)ctx.setLineDash(d); ctx.strokeStyle=col; ctx.lineWidth=w||1;
+    ctx.beginPath(); ctx.moveTo(S[0][0],S[0][1]);
+    for(let i=1;i<S.length;i++)ctx.lineTo(S[i][0],S[i][1]); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);};
+
+  /* 地面网格（前/侧视图为地平线；iso 画车下轮廓） */
+  if(!view.iso && view.b===2){
+    const gy=P([0,0,0]); if(gy){ctx.strokeStyle="#1c2126";ctx.beginPath();
+      ctx.moveTo(0,gy[1]);ctx.lineTo(cv.width,gy[1]);ctx.stroke();}
   }
-  // 主销高亮
-  const u1=toScreen(view,g,hp.UP1),u2=toScreen(view,g,hp.UP2);
-  ctx.lineWidth=2; ctx.strokeStyle="#2fa9d6"; ctx.beginPath(); ctx.moveTo(u1[0],u1[1]); ctx.lineTo(u2[0],u2[1]); ctx.stroke();
-  // 硬点
-  const isDown = drag && drag.view===id;
+
+  /* 车架盒 + 中横板 + CH 支架 */
+  const box = chassisBox();
+  const E=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+  E.forEach(e=>seg(box[e[0]],box[e[1]],CC.chas,1));
+  seg([box[0][0],0,box[0][2]],[box[1][0],0,box[1][2]],CC.chas2,1,[3,3]);
+  seg([box[4][0],0,box[4][2]],[box[5][0],0,box[5][2]],CC.chas2,1,[3,3]);
+  ["CH1","CH2","CH3","CH4"].forEach(k=>{
+    const p=hp[k]; seg(p,[p[0]>0?box[1][0]:box[0][0],p[1],p[2]],CC.chas2,1);
+  });
+  /* 防倾杆横杆（前沿近似：LCA/跨车架） */
+  const av1=[hp.CH3[0],0,hp.CH3[2]], av2=[hp.CH4[0],0,hp.CH4[2]];
+  seg(av1,av2,CC.arb,2.4);
+
+  /* 悬挂组（DWB-SIM 语义配色） */
+  seg(hp.CH1,hp.UP1,CC.rigArm,1.3); seg(hp.CH2,hp.UP1,CC.rigArm,1.3); seg(hp.CH1,hp.CH2,CC.rig,1);
+  seg(hp.CH3,hp.UP2,CC.rig,1.3);    seg(hp.CH4,hp.UP2,CC.rig,1.3);    seg(hp.CH3,hp.CH4,CC.rig,1);
+  seg(hp.UP1,hp.UP2,CC.kp,2.2);                                     /* 主销 */
+  seg(hp.FL1,hp.UP3,CC.tie,1.4);                                    /* 横拉杆 */
+  seg(hp.CH5,hp.UP4,CC.ela,1.6,[4,3]);                              /* 推杆（弹性组示意） */
+  /* 转向节刚体面片 + 轮辋 */
+  poly([hp.UP1,hp.UP3,hp.UP2,hp.UP5],CC.knu,1.1,null,CC.knuF);
+  /* 轮胎（轮辋）：前/侧视图为圆；iso 近似圆 */
+  const wc=hp.UP5, R=260;
+  const wp=P(wc); if(wp){ctx.strokeStyle=CC.tire;ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.arc(wp[0],wp[1],R*g.s*0.92,0,6.283); ctx.stroke();
+    ctx.strokeStyle="#39414b";ctx.beginPath();ctx.arc(wp[0],wp[1],R*g.s*0.62,0,6.283);ctx.stroke();}
+
+  /* 硬点节点（圆=运动件 / 方=车架） */
+  const isDown = drag && drag.view===id && !view.iso;
   for(const k of Object.keys(hp)){
-    const s=toScreen(view,g,hp[k]);
+    const s=P(hp[k]); if(!s)continue;
     const sel = isDown && drag.k===k;
     ctx.fillStyle="#0a0c0e";
-    ctx.strokeStyle = sel?"#d9a238":(FIXED.has(k)?"#8b95a1":"#c3cad2");
+    ctx.strokeStyle = sel?CC.nodeSel:(FIXED.has(k)?CC.nodeFix:CC.node);
     ctx.lineWidth=1.2;
     if(FIXED.has(k)){ctx.fillRect(s[0]-3.4,s[1]-3.4,6.8,6.8);ctx.strokeRect(s[0]-3.4,s[1]-3.4,6.8,6.8);}
     else{ctx.beginPath();ctx.arc(s[0],s[1],3.4,0,6.283);ctx.fill();ctx.stroke();}
-    ctx.fillStyle="#616b77";ctx.font="8.5px monospace";
-    ctx.fillText(((sel&&drag)?k:k), s[0]+5, s[1]-5);
+    if(sel){ctx.fillStyle=CC.nodeSel;ctx.font="8.5px monospace";ctx.fillText(k,s[0]+5,s[1]-5);}
   }
-  // 刚体：转向节三角 UP1-UP2-UP3
-  ctx.strokeStyle="#54a06a";ctx.setLineDash([3,3]);ctx.lineWidth=1;
-  ctx.beginPath();
-  const pu1=toScreen(view,g,hp.UP1),pu2=toScreen(view,g,hp.UP2),pu3=toScreen(view,g,hp.UP3);
-  ctx.moveTo(pu1[0],pu1[1]);ctx.lineTo(pu3[0],pu3[1]);ctx.lineTo(pu2[0],pu2[1]);ctx.stroke();
-  ctx.setLineDash([]);
 }
-function drawAll(){ for(const id in VIEWS) drawView(id); }
+function drawAll(){ for(const id of DRAW_ORDER) drawView(id); }
 
 /* ---------- 拖拽交互 ---------- */
 function hitTest(view, mx, my){
-  const g=(()=>{const cv=document.getElementById(view.canvas),V=VIEWS[view];
-    const pts=Object.entries(hp);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
-    for(const [k,p] of pts){const X=p[V.a],Y=p[V.b];x0=Math.min(x0,X);x1=Math.max(x1,X);y0=Math.min(y0,Y);y1=Math.max(y1,Y);}
-    const pad=40,W=cv.clientWidth,H=cv.clientHeight;
-    const s=Math.min((W-pad*2)/Math.max(1,x1-x0),(H-pad*2)/Math.max(1,y1-y0));
-    return {s,cxv:(x0+x1)/2,cyv:(y0+y1)/2,W,H};
-  })();
+  const V=VIEWS[view];
+  if(V.iso) return null;      // 等轴测仅预览，编辑在正交视图（DWB-SIM 同）
+  const g2=viewGeom(V);
   let best=null,bd=1e9;
   for(const k of Object.keys(hp)){
-    const s=toScreen({a:VIEWS[view].a,b:VIEWS[view].b,ar:VIEWS[view].ar},g,hp[k]);
+    const s=projPt(V,g2,hp[k]);
     if(!s) continue;
-    const d=Math.hypot(s[0]-mx,s[1]-my);
+    const d=Math.hypot(s[0]+g2.ox-mx,s[1]+g2.oy-my);
     if(d<bd&&d<16){bd=d;best=k;}
   }
   return best;
@@ -266,8 +368,8 @@ function bindCanvas(){
       if(!k)return;
       drag={view:id,k};
       const g=viewGeom(VIEWS[id]);
-      const s=toScreen(VIEWS[id],g,hp[k]);
-      drag.off=[mx-s[0],my-s[1]];
+      const s=projPt(VIEWS[id],g,hp[k]);
+      drag.off=[mx-s[0]-g.ox, my-s[1]-g.oy];
       drawAll();
       e.preventDefault();
     });
@@ -324,9 +426,43 @@ function requestSolve(){
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify(payload)})
     .then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
-    .then(d=>{ last=d; renderAll(d); })
+    .then(d=>{ last=d; renderAll(d); fetchHandling(); })
     .catch(e=>{ setStatus("求解失败: "+e.message,"r"); })
     .finally(()=>{ busy=false; if(pending){pending=false; requestSolve();} });
+}
+let lastH = null;
+function fetchHandling(){
+  const ay=parseFloat(document.getElementById("ayv").value)||0;
+  const ga=parseFloat(document.getElementById("gamma").value)||0;
+  fetch("/api/v2/handling",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({design_id:"legacy-import",case_id:"static",ay_g:ay,
+      gamma_f_deg:ga,gamma_r_deg:ga})})
+    .then(r=>r.ok?r.json():null)
+    .then(d=>{ if(d){lastH=d; renderHandling(d);} })
+    .catch(()=>{});
+}
+function renderHandling(d){
+  const el=document.getElementById("handlingBox");
+  const ug=d.understeer||{};
+  const y=d.yaw&&d.yaw.status==="VALID"?d.yaw:null;
+  const kp=d.kingpin;
+  const ride=d.ride_level||{};
+  let h="";
+  h+="K <b class='"+(ug.k_deg_per_g>0.2?"a":ug.k_deg_per_g<-0.2?"r":"g")+"'>"+
+     (ug.k_deg_per_g!=null?ug.k_deg_per_g.toFixed(3)+" °/g":"—")+"</b> "+
+     "<span>"+(ug.understeer||"—")+"</span>";
+  h+="<div>αf <b>"+(ug.alpha_f_deg!=null?ug.alpha_f_deg.toFixed(2)+"°":"—")+"</b> "+
+     "αr <b>"+(ug.alpha_r_deg!=null?ug.alpha_r_deg.toFixed(2)+"°":"—")+"</b> "+
+     "Cαf <b>"+(ug.ca_f_n_per_deg?ug.ca_f_n_per_deg.toFixed(0)+"N/°":"—")+"</b></div>";
+  if(y){ h+="<div>yaw ωn <b>"+y.omega_n_rad_per_s.toFixed(1)+"</b> ζ <b>"+y.damping_zeta.toFixed(2)+
+     "</b> gain <b>"+y.yaw_rate_gain_deg_per_s_per_deg.toFixed(1)+"°</b></div>"; }
+  if(kp){ h+="<div class='force'>回正 <b>"+kp.total_nmm.toFixed(0)+" N·mm</b> "+
+     (kp.self_centering?"<span class='g'>自回正</span>":"<span class='r'>不回正</span>")+"</div>"; }
+  if(ride.wheels){ const fl=ride.wheels.fl;
+    h+="<div>调平 预载 <b>"+(fl?fl.preload_n.toFixed(0)+"N":"—")+"</b> "+
+       "roll <b>"+ride.pose.roll_deg+"°</b> pitch <b>"+ride.pose.pitch_deg+"°</b></div>"; }
+  el.innerHTML=h;
 }
 
 /* ---------- 渲染 ---------- */
@@ -410,6 +546,7 @@ function drawChart(sw){
 });
 document.getElementById("ay").addEventListener("change",()=>document.getElementById("ayv").value=document.getElementById("ay").value);
 document.getElementById("ax").addEventListener("change",()=>document.getElementById("axv").value=document.getElementById("ax").value);
+document.getElementById("gamma").addEventListener("input",()=>{requestSolve();});
 ["ayv","axv"].forEach(id=>{
   document.getElementById(id).addEventListener("input",()=>{drawAll();requestSolve();});
 });
