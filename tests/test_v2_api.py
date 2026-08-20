@@ -192,6 +192,19 @@ class TestP3Loads:
         for name, d in body["loads"].items():
             assert d["wheel_end"]["status"] == "VALID"
 
+    def test_extreme_lateral_warnings(self, client):
+        """极端侧向 → 摩擦圆饱和警告（util>1）或离地警告（P3 警告路径）。"""
+        from core.models import LoadsInput, WheelTravel
+        DataStore().create_case(
+            CaseVersion(version=1, name="extreme-lat",
+                        travel=WheelTravel(),
+                        loads=LoadsInput(ay_g=3.0)),
+            case_id="extreme-lat")
+        body = self._solve(client, "extreme-lat")
+        assert any("摩擦" in w or "离地" in w for w in body["warnings"])
+        # 3g 侧向：所有轮摩擦圆利用率 > 1（饱和）
+        assert all(d["friction_util"] > 1.0 for d in body["loads"].values())
+
 
 _STATES = {"VALID", "APPROXIMATE", "NOT_APPLICABLE", "NOT_IMPLEMENTED",
           "SOLVER_FAILED", "EQUILIBRIUM_FAILED", "OUT_OF_RANGE"}
