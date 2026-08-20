@@ -3,57 +3,71 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FSAE MODELER · 整车双叉臂底盘硬点模型器</title>
+<title>FSAE MODELER · 整车双叉臂运动学仿真台</title>
 <style>
+@charset "utf-8";
 :root{
   --bg:#0e1013; --bg2:#0a0c0e; --pnl:#15181c; --pnl2:#1a1e23; --head:#21262d; --headhi:#2a3038;
   --bd:#2c323a; --bd2:#39414b; --bd3:#4a545f;
   --tx:#c3cad2; --tx2:#8b95a1; --tx3:#616b77;
-  --acc:#2fa9d6; --accd:#125a75; --amb:#d9a238; --red:#d2543f; --grn:#54a06a;
+  --acc:#2fa9d6; --accd:#125a75; --amb:#d9a238; --red:#d2543f; --grn:#54a06a; --mag:#a473c4; --cy2:#43c9c0;
   --grid:#1c2126; --grid2:#262d34;
 }
 *{margin:0;padding:0;box-sizing:border-box;border-radius:0!important;outline:none}
 html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(--tx);
-  font:11px/1.35 ui-monospace,"Cascadia Mono",Consolas,"Noto Sans Mono CJK SC",monospace;-webkit-font-smoothing:antialiased;user-select:none;cursor:default}
+  font:11px/1.35 ui-monospace,"Cascadia Mono","DejaVu Sans Mono",Consolas,"Noto Sans Mono CJK SC",monospace;-webkit-font-smoothing:antialiased;user-select:none;cursor:default}
 #app{display:flex;flex-direction:column;height:100%}
-#tb{display:flex;align-items:center;height:34px;background:var(--pnl2);border-bottom:1px solid var(--bd);flex:0 0 auto}
-#tb .brand{display:flex;align-items:center;padding:0 10px;height:100%;border-right:1px solid var(--bd)}
+#tb{display:flex;align-items:stretch;height:34px;background:var(--head);border-bottom:1px solid var(--bd2);flex:0 0 auto}
+#tb .brand{display:flex;align-items:center;padding:0 10px;border-right:1px solid var(--bd2);background:var(--pnl2)}
 #tb .brand b{color:var(--acc);font-size:13px;letter-spacing:.14em}
-#tb .tt{display:flex;flex-direction:column;justify-content:center;padding:0 12px;height:100%;border-right:1px solid var(--bd)}
+#tb .tt{display:flex;flex-direction:column;justify-content:center;padding:0 12px;border-right:1px solid var(--bd)}
 #tb .tt span:first-child{font-size:11.5px;color:var(--tx)}
 #tb .tt span:last-child{font-size:8.5px;color:var(--tx3);letter-spacing:.16em;text-transform:uppercase}
 #tb .sp{flex:1}
-#tb .cell{display:flex;flex-direction:column;justify-content:center;padding:0 10px;border-left:1px solid var(--bd);height:100%}
+#tb .cell{display:flex;flex-direction:column;justify-content:center;padding:0 10px;border-left:1px solid var(--bd);min-width:84px}
 #tb .cell i{font-style:normal;font-size:8.5px;color:var(--tx3);letter-spacing:.12em;text-transform:uppercase}
 #tb .cell b{font-weight:400;font-size:11px;color:var(--tx)}
 #tb .cell b.g{color:var(--grn)}#tb .cell b.a{color:var(--amb)}#tb .cell b.r{color:var(--red)}#tb .cell b.c{color:var(--acc)}
-#main{flex:1;display:flex;min-height:0}
-#left{width:254px;flex:0 0 254px;background:var(--pnl);border-right:1px solid var(--bd2);overflow-y:auto;overflow-x:hidden}
-#right{width:324px;flex:0 0 324px;background:var(--pnl);border-left:1px solid var(--bd2);overflow-y:auto;overflow-x:hidden}
+#main{flex:1 1 auto;display:flex;min-height:0}
+#left{width:284px;flex:0 0 284px;background:var(--pnl);border-right:1px solid var(--bd2);overflow-y:auto;overflow-x:hidden}
+#right{width:332px;flex:0 0 332px;background:var(--pnl);border-left:1px solid var(--bd2);overflow-y:auto;overflow-x:hidden}
 .sec{border-bottom:1px solid var(--bd)}
 .sh{display:flex;align-items:center;height:20px;background:var(--pnl2);border-bottom:1px solid var(--bd);padding-left:7px;
     font-size:9.5px;letter-spacing:.14em;color:var(--tx2);text-transform:uppercase;cursor:pointer}
 .sh b{font-weight:400;color:var(--tx);letter-spacing:.02em;font-size:10px;margin-right:7px;text-transform:none}
 .sh .tg{margin-left:auto;margin-right:7px;color:var(--tx3);font-size:9px}
 .sb{padding:4px 8px 6px}
-.ctl{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:10px;color:var(--tx2)}
-.ctl b{width:64px;font-weight:400;color:var(--tx);flex:0 0 auto}
-.ctl input[type=range]{flex:1}
-.ctl input[type=number]{width:52px;background:var(--bg2);border:1px solid var(--bd);color:var(--tx);font:10px monospace;text-align:right;padding:1px 3px}
-.ctl input[type=number]:focus{border-color:var(--acc)}
-.ctl input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.ctl{display:grid;grid-template-columns:1fr 48px;grid-template-rows:12px 15px;gap:0 5px;padding:2px 0 3px;align-items:center}
+.ctl>label{grid-column:1/3;grid-row:1;font-size:9.5px;color:var(--tx);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ctl>label u{text-decoration:none;color:var(--tx3);font-size:8.5px;letter-spacing:.06em}
+.ctl>input[type=range]{grid-column:1;grid-row:2;width:100%}
+.ctl>input[type=number]{grid-column:2;grid-row:2;width:100%}
 input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:12px;background:transparent;cursor:ew-resize}
 input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--bd2)}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:5px;height:13px;background:var(--tx2);margin-top:-5.5px}
 input[type=range]:hover::-webkit-slider-thumb{background:var(--acc)}
-.btnrow{display:flex;gap:4px;padding:4px 2px}
+input[type=number]{background:var(--bg2);border:1px solid var(--bd);color:var(--tx);font:9.5px/16px inherit;padding:0 3px;height:16px;text-align:right;appearance:none;-webkit-appearance:none}
+input[type=number]:focus{border-color:var(--acc)}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.btnrow{display:flex;gap:4px;padding:3px 0}
 button{flex:1;background:var(--head);border:1px solid var(--bd2);color:var(--tx2);
-  font:9.5px/1 inherit;letter-spacing:.08em;text-transform:uppercase;padding:5px 2px;cursor:pointer;white-space:nowrap}
+  font:9.5px/1 inherit;letter-spacing:.08em;text-transform:uppercase;padding:5px 3px;cursor:pointer;white-space:nowrap}
 button:hover{background:var(--headhi);color:var(--tx);border-color:var(--bd3)}
 button:active{background:var(--accd)}
 button.on{background:var(--accd);border-color:var(--acc);color:#dff2f9}
 button.wide{flex:1 1 100%}
 button:disabled{color:var(--tx3);background:var(--pnl2);cursor:not-allowed;border-color:var(--bd)}
+select{background:var(--bg2);border:1px solid var(--bd);color:var(--tx);font:9.5px/15px inherit;width:100%;height:17px;text-align:left;appearance:none;-webkit-appearance:none;padding:0 2px;cursor:pointer}
+select:hover{border-color:var(--bd3)}
+.chkrow{display:grid;grid-template-columns:1fr 1fr;gap:1px 10px;padding:2px 0}
+.chk{display:flex;align-items:center;gap:5px;padding:1.5px 0;cursor:pointer;font-size:9.5px;color:var(--tx2)}
+.chk:hover{color:var(--tx)}
+.chk i{width:11px;height:11px;border:1px solid var(--bd3);flex:0 0 11px;position:relative;display:inline-block;background:var(--bg2)}
+.chk.on i{background:var(--acc);border-color:var(--acc)}
+.chk.on i::after{content:"";position:absolute;left:2px;top:2px;width:5px;height:5px;background:#0b1418}
+.chk.on{color:var(--tx)}
+.row{display:flex;gap:6px;align-items:center;font-size:9.5px;color:var(--tx2);padding:2px 0}
+.row b{font-weight:400;color:var(--tx);width:52px;flex:0 0 auto}
 table.hp{width:100%;border-collapse:collapse;font-size:9.5px}
 table.hp th{background:var(--pnl2);color:var(--tx3);font-weight:400;letter-spacing:.08em;text-transform:uppercase;
   border-bottom:1px solid var(--bd);padding:2px 3px;text-align:right;font-size:9px;white-space:nowrap}
@@ -63,7 +77,6 @@ table.hp td.n{padding-left:6px;color:var(--tx2);font-size:9.5px;white-space:nowr
 table.hp td.n b{font-weight:400;color:var(--tx)}
 table.hp td.n i{font-style:normal;color:var(--tx3);font-size:8.5px}
 table.hp tr:hover td.n{color:var(--acc)}
-table.hp tr.held td.n b{color:var(--amb)}
 table.hp input{border:none;border-left:1px solid #1d2126;background:transparent;height:16px;font-size:9.5px;padding-right:3px;color:var(--tx)}
 table.hp input:hover{background:#0d1114}
 table.hp input:focus{background:#0d1418;border:1px solid var(--acc)}
@@ -76,13 +89,9 @@ table.ro td:first-child{text-align:left;padding-left:6px;color:var(--tx2);white-
 table.ro td.mn{color:var(--tx)}
 table.ro td.g{color:var(--grn)}table.ro td.a{color:var(--amb)}table.ro td.r{color:var(--red)}
 table.ro td.na{color:var(--tx3)}
-table.ro td.sx{border-left:1px solid #22282f}
-table.ro th.sx{border-left:1px solid #22282f}
-.warn{color:var(--amb);font-size:9.5px;line-height:1.4}
-.err{color:var(--red);font-size:10px}
-.na{color:var(--tx3)}
-.force{color:var(--amb)}
-.mr{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+table.ro td.sx{border-left:1px solid #22282f}table.ro th.sx{border-left:1px solid #22282f}
+.warn{color:var(--amb);font-size:9.5px;line-height:1.4}.err{color:var(--red);font-size:10px}.na{color:var(--tx3)}
+.force{color:var(--amb)}.mr{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 #center{flex:1;min-width:0;display:flex;flex-direction:column}
 #vp{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:1px;background:var(--bd2);padding:0}
 #vp.max0{grid-template-columns:1fr;grid-template-rows:1fr}
@@ -91,87 +100,90 @@ table.ro th.sx{border-left:1px solid #22282f}
 .vwh{display:flex;align-items:center;height:18px;background:var(--pnl);border-bottom:1px solid var(--bd);
      padding:0 0 0 7px;font-size:9px;letter-spacing:.1em;color:var(--tx3);text-transform:uppercase;flex:0 0 18px}
 .vwh b{font-weight:400;color:var(--tx2);letter-spacing:.02em;font-size:10px;margin-right:7px;text-transform:none}
-.vwh .en{color:#4a545f}
+.vwh .en{color:#4a545f}.vwh .ax{color:#39414b}
 .vwh .vi{margin-left:auto;color:var(--tx3);font-size:9px;padding-right:6px;letter-spacing:.03em}
-.vwh .vb{width:18px;height:17px;line-height:17px;text-align:center;border-left:1px solid var(--bd);color:var(--tx3);cursor:pointer;font-size:9px}
+.vwh .vb{width:18px;height:17px;line-height:17px;text-align:center;border-left:1px solid var(--bd);color:var(--tx3);cursor:pointer;font-size:9px;flex:0 0 18px}
 .vwh .vb:hover{background:var(--headhi);color:var(--acc)}
 .wrapc{flex:1 1 auto;min-height:0;position:relative}
 .vw canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-.vw.act .vwh{background:var(--head)}
-.vw.act .vwh b{color:var(--acc)}
-#statsRow{height:40px;background:var(--pnl);border-top:1px solid var(--bd2);overflow:auto;padding:2px 6px}
+.vw.act .vwh{background:var(--head)}.vw.act .vwh b{color:var(--acc)}
+#statsRow{height:38px;background:var(--pnl);border-top:1px solid var(--bd2);overflow:auto;padding:2px 6px}
 #sb{display:flex;height:22px;background:var(--head);border-top:1px solid var(--bd2);flex:0 0 auto;align-items:stretch}
-#sb .c{display:flex;align-items:center;padding:0 9px;border-right:1px solid var(--bd);font-size:9.5px;color:var(--tx2);white-space:nowrap}
+#sb .c{display:flex;align-items:center;padding:0 8px;border-right:1px solid var(--bd);font-size:9.5px;color:var(--tx2);white-space:nowrap}
 #sb .c u{text-decoration:none;color:var(--tx3);margin-right:5px;font-size:8.5px;letter-spacing:.1em}
 #sb .c b{font-weight:400;color:var(--tx);font-variant-numeric:tabular-nums}
 #sb .sp{flex:1;border-right:1px solid var(--bd)}
 #sb .c.ok b{color:var(--grn)}#sb .c.bad b{color:var(--red)}#sb .c.hl b{color:var(--acc)}
 .plotbox{padding:2px 4px;position:relative}
-canvas.plot{display:block;width:100%;height:88px;background:var(--bg2);border:1px solid var(--bd)}
-canvas.plot.ks{height:66px}
+canvas.plot{display:block;width:100%;height:84px;background:var(--bg2);border:1px solid var(--bd)}
+canvas.plot.ks{height:62px}
 .legend{padding:2px 8px;display:grid;grid-template-columns:1fr 1fr;gap:1px 8px;font-size:9px;color:var(--tx2)}
 .legend div{display:flex;align-items:center;gap:5px;height:13px}
 .legend s{text-decoration:none;width:14px;height:0;border-top-width:2px;border-top-style:solid;flex:0 0 14px}
 .legend q{quotes:none;width:7px;height:7px;flex:0 0 7px;display:block}
-.chk{display:flex;align-items:center;gap:5px;padding:1.5px 0;cursor:pointer;font-size:10px;color:var(--tx2)}
-.chk i{width:11px;height:11px;border:1px solid var(--bd3);flex:0 0 11px;position:relative;background:var(--bg2);display:inline-block}
-.chk.on i{background:var(--acc);border-color:var(--acc)}
-.chk.on i::after{content:"";position:absolute;left:2px;top:2px;width:5px;height:5px;background:#0b1418}
-.chk.on{color:var(--tx)}
 ::-webkit-scrollbar{width:9px;background:var(--bg2)}
 ::-webkit-scrollbar-thumb{background:var(--bd2);border:1px solid var(--bg2)}
 ::-webkit-scrollbar-thumb:hover{background:var(--bd3)}
+
 </style>
 </head>
 <body>
 <div id="app">
   <div id="tb">
     <div class="brand"><b>FSAE·MODELER</b></div>
-    <div class="tt"><span>整车双叉臂底盘 · 硬点建模 / 运动学分析</span><span>whole-chassis hardpoint modeler</span></div>
+    <div class="tt"><span>整车双叉臂底盘 · 运动学仿真台</span><span>whole-chassis kinematic simulator</span></div>
     <div class="sp"></div>
-    <div class="cell"><i>mode 工况</i><b class="c" id="tbCase">静态</b></div>
-    <div class="cell"><i>solver</i><b id="tbSolver">—</b></div>
+    <div class="cell"><i>mode 模式</i><b class="a c" id="tbMode">运动学</b></div>
     <div class="cell"><i>state 状态</i><b class="g" id="tbState">加载中</b></div>
+    <div class="cell"><i>solver</i><b id="tbSolver">—</b></div>
     <div class="cell"><i>pose 姿态</i><b id="tbPose">—</b></div>
+    <div class="cell"><i>fps</i><b id="tbFps">--</b></div>
   </div>
   <div id="main">
     <aside id="left">
-      <div class="sec"><div class="sh"><b>工况 Case</b><span class="tg">—</span></div>
+      <div class="sec"><div class="sh"><b>仿真控制 Sim</b><span class="tg">播放/激励</span></div>
         <div class="sb">
-          <div class="ctl"><b>轮跳 mm</b>
-            <span>FL<input type="number" id="t_fl" value="0" step="1" style="width:46px"></span>
-            <span>FR<input type="number" id="t_fr" value="0" step="1" style="width:46px"></span>
+          <div class="btnrow"><button id="btnPlay" class="on">运行 / 暂停</button><button id="btnReset">复位</button></div>
+          <div class="row"><b>跳动激励</b>
+            <button id="excOff" class="on">静态</button><button id="excSine">正弦</button><button id="excTri">三角</button>
           </div>
-          <div class="ctl"><b></b>
-            <span>RL<input type="number" id="t_rl" value="0" step="1" style="width:46px"></span>
-            <span>RR<input type="number" id="t_rr" value="0" step="1" style="width:46px"></span>
+          <div class="ctl"><label>激励幅值 AMPL <u>mm</u></label><input type="range" id="sExcA" min="0" max="45" step="1" value="18"><input type="number" id="sExcAv" value="18" step="1"></div>
+          <div class="ctl"><label>激励频率 FREQ <u>Hz</u></label><input type="range" id="sExcF" min="0.05" max="1.2" step="0.01" value="0.45"><input type="number" id="sExcFv" value="0.45" step="0.01"></div>
+          <div class="row"><b>转向激励</b>
+            <button id="steerOff" class="on">静态</button><button id="steerSine">正弦</button><button id="steerTri">三角</button>
           </div>
-          <div class="ctl"><b>齿条 rack</b><input type="number" id="rack" value="0" step="1"></div>
-          <div class="ctl"><b>ay g</b><input type="range" id="ay" min="-2" max="2" step="0.1" value="0"><input type="number" id="ayv" value="0" step="0.1"></div>
-          <div class="ctl"><b>ax g</b><input type="range" id="ax" min="-2" max="2" step="0.1" value="0"><input type="number" id="axv" value="0" step="0.1"></div>
-          <div class="ctl"><b>外倾°</b><input type="number" id="gamma" value="0" step="1"></div>
-          <div class="ctl"><b>曲线轴</b>
-            <button id="cvFront" class="on">前轴</button><button id="cvRear">后轴</button>
-          </div>
-          <div class="ctl"><b>扫掠</b><span class="chk on" id="curves" style="padding:0"><i></i>sweep</span></div>
+          <div class="ctl"><label>转向幅值 AMPL <u>mm</u></label><input type="range" id="sStA" min="0" max="30" step="1" value="0"><input type="number" id="sStAv" value="0" step="1"></div>
+          <div class="ctl"><label>转向频率 FREQ <u>Hz</u></label><input type="range" id="sStF" min="0.05" max="0.8" step="0.01" value="0.2"><input type="number" id="sStFv" value="0.2" step="0.01"></div>
         </div>
       </div>
-      <div class="sec"><div class="sh"><b>硬点 Hardpoints</b><span class="tg">正交视图拖动编辑</span></div>
+      <div class="sec"><div class="sh"><b>输入 Input</b><span class="tg">拖动 / 方向键</span></div>
+        <div class="sb">
+          <div class="ctl"><label>轮跳行程 TRAVEL <u>mm</u></label><input type="range" id="t_travel" min="-40" max="40" step="0.5" value="0"><input type="number" id="t_travelv" value="0" step="0.5"></div>
+          <div class="ctl"><label>侧倾 ROLL <u>°</u></label><input type="range" id="t_roll" min="-6" max="6" step="0.1" value="0"><input type="number" id="t_rollv" value="0" step="0.1"></div>
+          <div class="ctl"><label>齿条 RACK <u>mm</u></label><input type="range" id="t_rack" min="-30" max="30" step="0.5" value="0"><input type="number" id="t_rackv" value="0" step="0.5"></div>
+          <div class="ctl"><label>侧向 ay <u>g</u></label><input type="range" id="t_ay" min="-2" max="2" step="0.05" value="0"><input type="number" id="t_ayv" value="0" step="0.05"></div>
+          <div class="ctl"><label>纵向 ax <u>g</u></label><input type="range" id="t_ax" min="-2" max="2" step="0.05" value="0"><input type="number" id="t_axv" value="0" step="0.05"></div>
+        </div>
+      </div>
+      <div class="sec"><div class="sh"><b>视图 View</b><span class="tg">等轴测可旋转</span></div>
+        <div class="sb">
+          <div class="btnrow"><button id="fitAll">全部适应</button><button id="resetView">还原视角</button></div>
+          <div class="ctl"><label>等轴测方位 AZIMUTH <u>°</u></label><input type="range" id="sAz" min="-180" max="180" step="1" value="-52"><input type="number" id="sAzv" value="-52" step="1"></div>
+          <div class="ctl"><label>等轴测仰角 ELEVATION <u>°</u></label><input type="range" id="sEl" min="-85" max="85" step="1" value="24"><input type="number" id="sElv" value="24" step="1"></div>
+          <div class="chkrow" id="showToggles"></div>
+        </div>
+      </div>
+      <div class="sec"><div class="sh"><b>硬点 Hardpoints</b><span class="tg">正交视图拖动</span></div>
         <div class="sb" style="padding:0">
-          <div class="ctl" style="padding:3px 8px"><b>编辑轴</b>
-            <button id="hpFront" class="on">右前</button><button id="hpRear">右后</button>
-          </div>
+          <div class="row" style="padding:3px 8px"><b>编辑轴</b>
+            <button id="hpFront" class="on">右前</button><button id="hpRear">右后</button></div>
           <table class="hp" id="hpTable"><thead><tr><th>点</th><th>X</th><th>Y</th><th>Z</th></tr></thead><tbody></tbody></table>
-          <div style="padding:3px 8px;margin-top:3px">
-            <div class="btnrow"><button id="reset" class="wide">重置为默认</button></div>
-          </div>
+          <div style="padding:3px 8px"><div class="btnrow"><button id="reset" class="wide">重置为默认</button></div></div>
         </div>
       </div>
-      <div class="sec"><div class="sh"><b>A/B 快照</b><span class="tg">—</span></div>
-        <div class="sb"><div class="btnrow">
-          <button id="snapA">记基线A</button><button id="cmpB">对比 B−A</button></div>
-          <div id="abBox" class="mr warn" style="font-size:9.5px">—</div>
-        </div>
+      <div class="sec"><div class="sh"><b>A/B 快照</b><span class="tg">对比</span></div>
+        <div class="sb"><div class="btnrow"><button id="snapA">记基线A</button><button id="cmpB">对比 B−A</button></div>
+          <div id="abBox" class="mr warn" style="font-size:9.5px">—</div></div>
       </div>
     </aside>
     <div id="center">
@@ -179,11 +191,12 @@ canvas.plot.ks{height:66px}
       <div id="statsRow"><div class="legend">
           <div><s style="border-top-color:#e0603f"></s>主销</div>
           <div><s style="border-top-color:#43c9c0"></s>横拉杆/立柱</div>
-          <div><s style="border-top-color:#d9a238"></s>推杆(弹性)</div>
+          <div><s style="border-top-color:#d9a238"></s>弹簧/减振器</div>
           <div><s style="border-top-color:#aab9c7"></s>摆臂</div>
           <div><q style="background:#c3cad2"></q>运动小球</div>
           <div><q style="background:#d2543f"></q>车架节点</div>
           <div><s style="border-top-color:#c07ad0"></s>防倾杆</div>
+          <div><s style="border-top-color:#8191a0"></s>转向机</div>
         </div></div>
     </div>
     <aside id="right">
@@ -192,29 +205,28 @@ canvas.plot.ks{height:66px}
       </div>
       <div class="sec"><div class="sh"><b>轮边受力 Wheel Forces</b><span class="tg">多工况</span></div>
         <div class="sb" style="padding:0"><table class="ro" id="forceTable"></table>
-          <div id="forceNote" class="warn" style="padding:3px 8px"></div>
-        </div>
+          <div id="forceNote" class="warn" style="padding:3px 8px"></div></div>
       </div>
       <div class="sec"><div class="sh"><b>状态 / 警告</b><span class="tg">—</span></div>
         <div class="sb"><div id="statusBox" class="ctl"></div></div>
       </div>
       <div class="sec"><div class="sh"><b>曲线 Curves</b><span class="tg"><span id="curveTitle">前轴 travel</span></span></div>
+        <div class="row" style="padding:2px 8px"><b>曲线轴</b>
+          <button id="cvFront" class="on">前轴</button><button id="cvRear">后轴</button>
+        </div>
         <div class="plotbox"><canvas id="chart" class="plot"></canvas></div>
       </div>
       <div class="sec"><div class="sh"><b>操稳 Handling · 调平</b><span class="tg">P5 ay 工况</span></div>
         <div class="sb" style="padding:3px 8px"><div id="handlingBox" style="font-size:10px">— 待求解 —</div>
-          <div class="plotbox" style="padding:2px 0 0"><canvas id="kChart" class="plot ks"></canvas></div>
-        </div>
+          <div class="plotbox" style="padding:2px 0 0"><canvas id="kChart" class="plot ks"></canvas></div></div>
       </div>
       <div class="sec"><div class="sh"><b>敏感性 Sensitivity</b><span class="tg">右前 ±1mm</span></div>
         <div class="sb"><div id="sensBox" style="font-size:9.5px">— 待请求 —
-          <div class="btnrow"><button id="runSens">运行</button></div></div>
-        </div>
+          <div class="btnrow"><button id="runSens">运行</button></div></div></div>
       </div>
       <div class="sec"><div class="sh"><b>导出 Export</b><span class="tg">—</span></div>
         <div class="sb"><div class="btnrow">
-          <button id="expCsv">结果 CSV</button><button id="expJson">结果 JSON</button></div>
-        </div>
+          <button id="expCsv">结果 CSV</button><button id="expJson">结果 JSON</button></div></div>
       </div>
     </aside>
   </div>
@@ -223,23 +235,22 @@ canvas.plot.ks{height:66px}
     <div class="c"><u>rigid 刚性</u><b id="sbRig">-</b></div>
     <div class="c"><u>elastic 弹性</u><b id="sbEla">-</b></div>
     <div class="c ok"><u>residual 残差</u><b id="sbRes">-</b></div>
-    <div class="sp"></div>
     <div class="c"><u>cursor</u><b id="sbCur">-</b></div>
-    <div class="c hl"><u>hint</u><b id="sbHint">等轴测: 左键旋转 · Shift/中键平移 · 滚轮缩放 ‖ 正交: 拖动硬点编辑 · 滚轮缩放 · 双击/ F 适应</b></div>
+    <div class="sp"></div>
+    <div class="c hl"><u>hint</u><b id="sbHint">等轴测:左键旋转·Shift/中键平移·滚轮缩放 ‖ 正交:拖硬点·滚轮缩放·双击适应 ‖ Space 运行/暂停 · ↑/↓ 轮跳 · Shift+↑/↓ 齿条 · F 适应 · 1-4 最大化</b></div>
   </div>
 </div>
 <script>
+
 "use strict";
-window.__diag={errs:[],evts:[]};
 /* ============================================================================
-   FSAE 整车双叉臂底盘硬点模型器（DWB-SIM 渲染/交互架构移植）
+   FSAE 整车双叉臂底盘 · 运动学仿真台（DWB-SIM 渲染/交互/仿真架构移植）
    ----------------------------------------------------------------------------
-   坐标系：X 向前(车头)，Y 向右(右为正)，Z 向上；原点 = 前轴中心地面。
-   整车建模：前轴 X≈0 与后轴 X≈-1550 同时显示，右前/右后为可编辑硬点模板，
-            左前/左后由镜像生成并在求解时一起运动 —— 完整底盘，无轴切换。
-   求解：POST /api/v2/solve/hardpoints —— 四角独立求解，回传姿态/球头/轮心/接地/主销轴。
-   视图：等轴测(透视,左键旋转) + 正/俯/侧正交(拖动硬点编辑)。
-   车轮：3D 圆盘，自旋轴指向车横向(Y)，按外倾/前束倾斜 —— 任意视角投影正确。
+   坐标系：X 向前，Y 向右(右正)，Z 向上；原点=前轴中心地面。前轴 X≈0，后轴 X≈-1550。
+   整车建模：右前/右后为可编辑硬点模板，左轮镜像生成；四角联合求解显示。
+   仿真：动画循环(播放/暂停)，跳动激励(静态/正弦/三角)+转向激励；后端求解节流+姿态插值。
+   视图：等轴测(透视·旋转/平移/缩放) + 正/俯/侧正交(拖动硬点·缩放/平移)。
+   车轮：3D 圆盘，自旋轴指向车横向(Y)，按外倾/前束倾斜，含轮辋/辐条/制动盘/卡钳。
    ============================================================================ */
 const abs=Math.abs,sqrt=Math.sqrt,sin=Math.sin,cos=Math.cos,atan2=Math.atan2,PI=Math.PI;
 const D2R=PI/180,R2D=180/PI;
@@ -253,6 +264,9 @@ const nrm=a=>{const l=Math.hypot(a[0],a[1],a[2])||1;return[a[0]/l,a[1]/l,a[2]/l]
 const dst=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
 const cpy=a=>[a[0],a[1],a[2]];
 const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+const lerp3=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];
+const mix=(a,b,t)=>a+(b-a)*t;
+const smooth=t=>t*t*(3-2*t);
 function perpOf(a){const x=abs(a[0]),y=abs(a[1]),z=abs(a[2]);
   let t=(x<=y&&x<=z)?[1,0,0]:((y<=z)?[0,1,0]:[0,0,1]);
   return nrm(cross(a,t));}
@@ -265,39 +279,45 @@ const POINT_NAMES={
   "UP1":"上球头UBJ","UP2":"下球头LBJ","UP3":"横拉杆外点","UP4":"推杆下点","UP5":"轮心WC","FL1":"横拉杆内点"
 };
 const FIXED=new Set(["CH1","CH2","CH3","CH4","CH5","FL1"]);
-const LINKS=[["CH1","UP1"],["CH2","UP1"],["CH3","UP2"],["CH4","UP2"],
-  ["CH1","CH2"],["CH3","CH4"],["UP1","UP2"],["CH5","UP4"],["FL1","UP3"]];
 const TIRE={tire_radius:260.0,tire_width:180.0,tire_spring_rate:150.0,corner_weight_n:700.0};
 const SEED={
   CH1:[-90,160,285],CH2:[90,152,295],CH3:[-110,128,110],CH4:[110,122,115],CH5:[0,135,305],
   UP1:[1.96,579.02,277.69],UP2:[-11.11,585.56,128.41],UP3:[-91.07,550.37,209.23],
   UP4:[0.16,576.38,179.77],UP5:[0,610,255.3],FL1:[-100,115,200]
 };
-
 const S={
   frontR:null, rearR:null, tire:Object.assign({},TIRE),
   curveAxle:"front", curveAxis:"travel", hpAxle:"front",
-  vp:null, held:null, keep:false
+  vp:null, resp:null,
+  play:true, t:0,
+  exc:"sine", excA:18, excF:0.45,
+  steerExc:"off", stA:0, stF:0.2,
+  travel:0, roll:0, rack:0, ay:0, ax:0,
+  solveEvery:90, lastSolveT:0,
+  show:{node:1,label:0,rigid:1,face:1,spring:1,wheel:1,disc:1,chassis:1,steer:1,arb:1,dim:1,tirefill:0,mirror:1},
+  held:null
 };
 let busy=false, pending=false, dragging=false, sweepTimer=null, solveSeq=0;
 let lastH=null, snapA=null, resp=null;
+let prevPose=null, curPose=null, interpF=1;
+let SCENE=[];
+let VW=[], UI={drag:null,hover:null,sel:null}, PICK=[];
 function deep(o){return JSON.parse(JSON.stringify(o));}
 const mirrorPts=w=>{const out={};for(const k in w)out[k]=[w[k][0],-w[k][1],w[k][2]];return out;};
+const $=id=>document.getElementById(id);
 
 /* ================================ 视图 ================================ */
 const VDEF=[
-  {key:"front",zh:"正视图",en:"FRONT",ax:"Y-Z",bx:[0,1,0],by:[0,0,1],type:"o",note:"拖动改 Y/Z"},
-  {key:"top",  zh:"俯视图",en:"TOP",   ax:"X-Y",bx:[1,0,0],by:[0,1,0],type:"o",note:"拖动改 X/Y"},
-  {key:"side", zh:"侧视图",en:"SIDE",  ax:"X-Z",bx:[1,0,0],by:[0,0,1],type:"o",note:"拖动改 X/Z"},
+  {key:"front",zh:"正视图",en:"FRONT",ax:"Y-Z",bx:[0,1,0],by:[0,0,1],type:"o",note:"拖 Y/Z · 主销/外倾弧"},
+  {key:"top",  zh:"俯视图",en:"TOP",   ax:"X-Y",bx:[1,0,0],by:[0,1,0],type:"o",note:"拖 X/Y · 前束弧"},
+  {key:"side", zh:"侧视图",en:"SIDE",  ax:"X-Z",bx:[1,0,0],by:[0,0,1],type:"o",note:"拖 X/Z · 后倾/拖距"},
   {key:"iso",  zh:"等轴测",en:"ISO",   ax:"3D",  type:"p",note:"左键旋转 · Shift平移"}
 ];
-const VW=[]; let UI={drag:null,hover:null,sel:null}; const PICK=[];
-
 function initViews(){
-  const vp=document.getElementById("vp");
+  const vp=$("vp");
   VDEF.forEach(d=>{
     const w=document.createElement("div");w.className="vw";w.dataset.k=d.key;
-    w.innerHTML='<div class="vwh"><b>'+d.zh+'</b><span class="en">'+d.en+'</span> <span style="color:#39414b">['+d.ax+']</span>'+
+    w.innerHTML='<div class="vwh"><b>'+d.zh+'</b><span class="en">'+d.en+'</span> <span class="ax">['+d.ax+']</span>'+
       '<span class="vi">'+d.note+'</span><span class="vb" title="适应窗口">F</span><span class="vb" title="最大化">M</span></div>'+
       '<div class="wrapc"><canvas></canvas></div>';
     vp.appendChild(w);
@@ -325,7 +345,7 @@ function sizeView(v){
   }
 }
 function toggleMax(v){
-  const vp=document.getElementById("vp");
+  const vp=$("vp");
   const on=!v.mx;VW.forEach(q=>{q.mx=false;q.el.classList.remove("mx");});
   if(on){v.mx=true;v.el.classList.add("mx");vp.classList.add("max0");}else vp.classList.remove("max0");
   setTimeout(()=>VW.forEach(sizeView),0);
@@ -358,8 +378,7 @@ function fitPoints(){
     for(const k in c.pt)pts.push(c.pt[k]);
     if(c.wc){const wc=c.wc,R=260,W=180;
       [[R,0,0],[-R,0,0],[0,R,0],[0,-R,0],[0,0,R],[0,0,-R]].forEach(o=>pts.push(add(wc,o)));
-      pts.push([wc[0],wc[1]+W,wc[2]]);pts.push([wc[0],wc[1]-W,wc[2]]);
-    }
+      pts.push([wc[0],wc[1]+W,wc[2]]);pts.push([wc[0],wc[1]-W,wc[2]]);}
   }
   const box=chassisBox(sk);
   for(const p of box)pts.push(p);
@@ -374,7 +393,7 @@ function chassisBox(sk){
   });
   if(!xs.length)return[[-900,-700,0],[200,-700,0],[200,700,0],[-900,700,0],[-900,-700,400],[200,-700,400],[200,700,400],[-900,700,400]];
   const x0=Math.min.apply(null,xs)-40,x1=Math.max.apply(null,xs)+40,ym=Math.max.apply(null,ys)+60,
-    z0=Math.min.apply(null,zs)-30,z1=Math.max.apply(null,zs)+26;
+    z0=Math.min.apply(null,zs)-30,z1=Math.max.apply(null,zs)+28;
   return[[x0,-ym,z0],[x1,-ym,z0],[x1,ym,z0],[x0,ym,z0],[x0,-ym,z1],[x1,-ym,z1],[x1,ym,z1],[x0,ym,z1]];
 }
 function fitView(v){
@@ -403,15 +422,50 @@ function fitView(v){
   }
 }
 
+/* ================================ 姿态插值 ================================ */
+function lerpV(a,b,t){return a&&b?[mix(a[0],b[0],t),mix(a[1],b[1],t),mix(a[2],b[2],t)]:(a||b||null);}
+function lerpCorner(a,b,f){
+  if(!a)return b||null; if(!b)return a;
+  const out={};
+  if(a.wheel_center||b.wheel_center)out.wheel_center=lerpV(a.wheel_center,b.wheel_center,f);
+  if(a.ball_joints&&b.ball_joints){
+    out.ball_joints={upper:lerpV(a.ball_joints.upper,b.ball_joints.upper,f),lower:lerpV(a.ball_joints.lower,b.ball_joints.lower,f)};
+  }
+  if(a.tie_rod_inner||b.tie_rod_inner)out.tie_rod_inner=lerpV(a.tie_rod_inner,b.tie_rod_inner,f);
+  if(a.contact_patch&&b.contact_patch){
+    out.contact_patch={center:lerpV(a.contact_patch.center,b.contact_patch.center,f),
+      loaded_radius:mix(a.contact_patch.loaded_radius||0,b.contact_patch.loaded_radius||0,f),
+      camber_deg:mix(a.contact_patch.camber_deg||0,b.contact_patch.camber_deg||0,f),
+      deflection:mix(a.contact_patch.deflection||0,b.contact_patch.deflection||0,f)};
+  }
+  return out;
+}
+function loadPose(d,immediate){
+  const fresh=d&&d.per_wheel_geometry?d.per_wheel_geometry:null;
+  if(!fresh)return;
+  if(!curPose)prevPose=fresh; else prevPose=curPose;
+  curPose=fresh;
+  interpF=immediate?1:0;
+}
+function poseOf(name){
+  if(!curPose)return null;
+  const a=prevPose&&prevPose[name], b=curPose[name];
+  if(!a||interpF>=1||!S.play)return b||null;
+  return lerpCorner(a,b,smooth(clamp(interpF,0,1)));
+}
+function angOf(name){
+  if(!S.vp||!S.vp[name]||!S.vp[name].angles)return{};
+  return S.vp[name].angles;
+}
+
 /* ================================ 场景构建 ================================ */
 const CC={
   rig:"#aab9c7",rigArm:"#aab9c7",knu:"#43c9c0",knuF:"rgba(67,201,192,0.10)",
   kp:"#e0603f",tie:"#43c9c0",tieD:"#2c7d76",ela:"#d9a238",chas:"#414b56",chas2:"#333c46",chas3:"#2c333b",
-  arb:"#c07ad0",rack:"#8191a0",tire:"#5f6a76",tread:"#3d454d",rim:"#7c8894",disc:"#6a747f",
+  arb:"#c07ad0",rack:"#8191a0",tire:"#5f6a76",tread:"#3d454d",rim:"#7c8894",disc:"#6a747f",cal:"#8a5a3a",
   node:"#c3cad2",nodeFix:"#d2543f",nodeSel:"#f0e6c8",txt2:"#8b95a1",txt3:"#616b77",
-  axis:"#125a75",grid:"#1c2126",grid2:"#262d34",gnd:"#2f6f5e",bg:"#0a0c0e",frc:"#e8b84b",pathC:"#43c9c0"
+  axis:"#125a75",grid:"#1c2126",grid2:"#262d34",gnd:"#2f6f5e",bg:"#0a0c0e",frc:"#e8b84b",pathC:"#43c9c0",ic:"#a473c4"
 };
-let SCENE=[];
 function circPts(c,ax,r,n,e1,e2){
   const u=e1||perpOf(ax),v=e2||cross(nrm(ax),u),o=[];
   for(let k=0;k<=n;k++){const a=2*PI*k/n;o.push(add(c,add(mul(u,r*cos(a)),mul(v,r*sin(a)))));}
@@ -419,7 +473,6 @@ function circPts(c,ax,r,n,e1,e2){
 }
 function L3(sc,a,b,col,w,d,al){sc.push({k:"l",a:a,b:b,c:col,w:w||1,d:d,al:al!==undefined?al:null});}
 function PL(sc,pts,col,w,f,d,al){sc.push({k:"p",pts:pts,c:col,w:w||1,f:f,d:d,al:al!==undefined?al:null});}
-function TX(sc,p,str,col,dx,dy){sc.push({k:"t",p:p,s:str,c:col,dx:dx||0,dy:dy||0});}
 function NODE(sc,k,p,fix,corner,sx,sel){sc.push({k:"n",id:k,p:p,fix:fix,corner:corner,sx:sx||1,sel:sel});}
 function cyl(sc,a,b,r,col,w,nseg){
   const ax=nrm(sub(b,a)),u=perpOf(ax),v=cross(ax,u);
@@ -433,17 +486,14 @@ function springPts(a,b,r,turns,seg){
   const d=sub(b,a),L=len(d)||1,u=mul(d,1/L);
   let ref=[0,1,0]; if(abs(dot(ref,u))>0.9)ref=[1,0,0];
   const e1=nrm(sub(ref,mul(u,dot(ref,u)))),e2=cross(u,e1);
-  const pts=[a],t0=0.10,t1=0.88;
+  const pts=[a],t0=0.08,t1=0.86;
   for(let k=0;k<=seg;k++){
     const t=t0+(t1-t0)*k/seg,an=2*PI*turns*(k/seg);
     pts.push(add(add(a,mul(u,L*t)),add(mul(e1,r*cos(an)),mul(e2,r*sin(an)))));
   }
   pts.push(b);return pts;
 }
-/* 由解算姿态重建单轮显示点集：
-   - UP5/UP1/UP2 直接取解算值（含轮跳/转向）
-   - UP3/UP4(立柱上点) 用刚性转向节局部坐标重建
-   - 车架点 CH1/CH2/CH3/CH4/CH5/FL1 用模板 */
+/* 由解算姿态重建单轮显示点集（UP5/UP1/UP2 取解算值；UP3/UP4 刚性转向节重建） */
 function displayCorner(tpl,pose,angles,sx){
   const pt={};
   for(const k in tpl)pt[k]=cpy(tpl[k]);
@@ -461,20 +511,18 @@ function displayCorner(tpl,pose,angles,sx){
   ["UP3","UP4"].forEach(k=>{pt[k]=add(O2,add(mul(bu2,coords[k][0]),add(mul(bv2,coords[k][1]),mul(bz2,coords[k][2]))));});
   return {tpl:tpl,pt:pt,angles:angles||{},wc:wc,sx:sx,pose:pose||null};
 }
-/* 车轮自旋轴：指向车横向(Y)，右轮 +Y / 左轮 -Y，按 前束→外倾 依次旋转 */
-/*   e=camber rad(负=顶内倾)  t=toe rad(正=内束) */
+/* 车轮自旋轴：指向车横向(Y)，右轮+Y/左轮-Y，按 前束→外倾 顺序旋转 */
 function wheelAxis(e,t,sx){
   return[sin(t), sx*cos(e)*cos(t), -sin(e)*cos(t)];
 }
 function buildSkeleton(){
   const sk={};
   const axes={front:S.frontR||deep(SEED), rear:S.rearR||deep(SEED)};
-  const names=["front_right","front_left","rear_right","rear_left"];
-  names.forEach(n=>{
+  ["front_right","front_left","rear_right","rear_left"].forEach(n=>{
     const axis=n.split("_")[0],side=n.split("_")[1];
     const tpl=side==="right"?axes[axis]:mirrorPts(axes[axis]);
-    const pose=S.vp&&S.vp.per_wheel_geometry&&S.vp.per_wheel_geometry[n];
-    const angles=S.vp&&S.vp[n]&&S.vp[n].angles||{};
+    const pose=poseOf(n);
+    const angles=angOf(n);
     sk[n]=displayCorner(tpl,pose,angles,side==="right"?1:-1);
   });
   if(S.held&&sk[S.held.corner]){
@@ -483,73 +531,92 @@ function buildSkeleton(){
   }
   return sk;
 }
-function isBaseline(){
-  const g=document.getElementById;
-  try{
-    return(!g("t_fl").value||+g("t_fl").value===0)&&(!g("t_fr").value||+g("t_fr").value===0)&&
-      (!g("t_rl").value||+g("t_rl").value===0)&&(!g("t_rr").value||+g("t_rr").value===0)&&
-      (!g("rack").value||+g("rack").value===0)&&(!g("ayv").value||+g("ayv").value===0)&&
-      (!g("axv").value||+g("axv").value===0);
-  }catch(e){return false;}
-}
-/* ================================ 主绘制 ================================ */
 function buildScene(sk){
-  const sc=[];
+  const sc=[], sh=S.show;
   const box=chassisBox(sk);
-  const E=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
-  E.forEach(e=>L3(sc,box[e[0]],box[e[1]],CC.chas,0.9));
-  if(box[0]) L3(sc,[box[0][0],0,box[0][2]],[box[1][0],0,box[1][2]],CC.chas3,1,[4,4]);
-  if(box[4]) L3(sc,[box[4][0],0,box[4][2]],[box[5][0],0,box[5][2]],CC.chas3,1,[4,4]);
-  /* 各轴横向构件 + 交叉杆 */
-  ["front_right","rear_right"].forEach(n=>{
-    const r=sk[n],l=sk[n.replace("right","left")];if(!r||!l)return;
-    ["CH1","CH2","CH3","CH4"].forEach(k=>L3(sc,r.tpl[k],l.tpl[k],CC.chas2,1));
-    L3(sc,r.tpl.CH3,l.tpl.CH4,CC.chas3,0.8,[3,3]);
-    L3(sc,r.tpl.CH4,l.tpl.CH3,CC.chas3,0.8,[3,3]);
-    L3(sc,r.tpl.CH1,l.tpl.CH2,CC.chas3,0.8,[3,3]);
-    L3(sc,r.tpl.CH2,l.tpl.CH1,CC.chas3,0.8,[3,3]);
-  });
-  /* 前转向机壳体 */
-  if(sk.front_right&&sk.front_left&&sk.front_right.tpl.FL1&&sk.front_left.tpl.FL1){
-    const F=sk.front_right.tpl.FL1,Lf=sk.front_left.tpl.FL1;
-    cyl(sc,[F[0],F[1],F[2]],[Lf[0],Lf[1],Lf[2]],22,CC.rack,1.1,14);
+  if(sh.chassis){
+    const E=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+    E.forEach(e=>L3(sc,box[e[0]],box[e[1]],CC.chas,0.9));
+    if(box[0]){L3(sc,[box[0][0],0,box[0][2]],[box[1][0],0,box[1][2]],CC.chas3,1,[4,4]);}
+    if(box[4]){L3(sc,[box[4][0],0,box[4][2]],[box[5][0],0,box[5][2]],CC.chas3,1,[4,4]);}
+    ["front_right","rear_right"].forEach(n=>{
+      const r=sk[n],l=sk[n.replace("right","left")];if(!r||!l)return;
+      ["CH1","CH2","CH3","CH4"].forEach(k=>L3(sc,r.tpl[k],l.tpl[k],CC.chas2,1));
+      L3(sc,r.tpl.CH3,l.tpl.CH4,CC.chas3,0.8,[3,3]);
+      L3(sc,r.tpl.CH4,l.tpl.CH3,CC.chas3,0.8,[3,3]);
+      L3(sc,r.tpl.CH1,l.tpl.CH2,CC.chas3,0.8,[3,3]);
+      L3(sc,r.tpl.CH2,l.tpl.CH1,CC.chas3,0.8,[3,3]);
+      /* 减振塔顶板（车架侧，弹簧上点区域） */
+      const T=r.tpl.CH5; if(T){
+        const tw=46,tw2=60;
+        const top=[[T[0]-tw/2,T[1]-tw2/2,T[2]+14],[T[0]+tw/2,T[1]-tw2/2,T[2]+14],[T[0]+tw/2,T[1]+tw2/2,T[2]+14],[T[0]-tw/2,T[1]+tw2/2,T[2]+14]];
+        PL(sc,top.concat([top[0]]),CC.chas2,0.9);
+        L3(sc,top[0],r.tpl.CH1,CC.chas2,0.9);L3(sc,top[1],r.tpl.CH2,CC.chas2,0.9);
+      }
+    });
   }
-  /* 防倾杆（整车横向） */
-  ["front_right","rear_right"].forEach(n=>{
-    const rd=sk[n],ld=sk[n.replace("right","left")];if(!rd||!ld)return;
-    const ay=rd.tpl.CH3[1],az=(rd.tpl.CH3[2]+rd.tpl.CH4[2])/2;
-    L3(sc,[ld.tpl.CH3[0],-ay,az],[rd.tpl.CH3[0],ay,az],CC.arb,2.6);
-  });
-  /* 悬架总成：4 角 */
+  if(sh.steer&&sk.front_right&&sk.front_left&&sk.front_right.tpl.FL1&&sk.front_left.tpl.FL1){
+    const F=sk.front_right.tpl.FL1,Lf=sk.front_left.tpl.FL1;
+    const a=[F[0],Math.abs(F[1])-14,F[2]],b=[Lf[0],-(Math.abs(Lf[1])-14),Lf[2]];
+    cyl(sc,[a[0],a[1],a[2]],[b[0],b[1],b[2]],22,CC.rack,1.1,14);
+    L3(sc,[b[0]+40,b[1],b[2]],[b[0]+40,b[1]+22,b[2]-26],CC.rack,1.3);
+    cyl(sc,[b[0]+40,b[1]-6,b[2]],[b[0]+40,b[1]-32,b[2]-16],14,CC.rack,1,10);
+    L3(sc,[F[0],Math.abs(F[1])-16,F[2]],F,CC.tie,2,undefined,0.9);
+    L3(sc,[Lf[0],-(Math.abs(Lf[1])-16),Lf[2]],Lf,CC.tie,2,undefined,0.9);
+  }
+  if(sh.arb){
+    ["front_right","rear_right"].forEach(n=>{
+      const rd=sk[n],ld=sk[n.replace("right","left")];if(!rd||!ld)return;
+      const ay=rd.tpl.CH3[1],az=(rd.tpl.CH3[2]+rd.tpl.CH4[2])/2;
+      const bx=rd.tpl.CH3[0];
+      L3(sc,[ld.tpl.CH3[0],-ay,az],[rd.tpl.CH3[0],ay,az],CC.arb,2.6);
+      L3(sc,[bx,ay,az],rd.pt.UP2,CC.arb,1.4);
+      L3(sc,[bx,-ay,az],ld.pt.UP2,CC.arb,1.4);
+      cyl(sc,[bx-10,ay,az],[bx+10,ay,az],12,CC.chas2,0.9,8);
+      cyl(sc,[bx-10,-ay,az],[bx+10,-ay,az],12,CC.chas2,0.9,8);
+    });
+  }
   ["front_right","front_left","rear_right","rear_left"].forEach(n=>{
     const d=sk[n];if(!d)return;
     const H=k=>d.pt[k];
-    const axis=n.split("_")[0],side=n.split("_")[1];
-    const al=axis==="front"?1:0.88;
+    const axis=n.split("_")[0];
+    const al=axis==="front"?1:0.9;
     const P1=H("UP1"),P2=H("UP2"),P3=H("UP3"),P4=H("UP4"),P5=H("UP5"),FL=H("FL1");
-    L3(sc,H("CH1"),P1,CC.rigArm,1.35,undefined,al);
-    L3(sc,H("CH2"),P1,CC.rigArm,1.35,undefined,al);
-    L3(sc,H("CH1"),H("CH2"),CC.rig,0.9,undefined,al);
-    L3(sc,H("CH3"),P2,CC.rig,1.35,undefined,al);
-    L3(sc,H("CH4"),P2,CC.rig,1.35,undefined,al);
-    L3(sc,H("CH3"),H("CH4"),CC.rig,0.9,undefined,al);
-    PL(sc,[H("CH1"),P1,H("CH2"),H("CH1")],CC.rigArm,0.8,"rgba(170,185,199,0.05)",undefined,al);
-    PL(sc,[H("CH3"),P2,H("CH4"),H("CH3")],CC.rigArm,0.8,"rgba(170,185,199,0.05)",undefined,al);
-    L3(sc,P1,P2,CC.kp,2.3,undefined,al);
-    L3(sc,FL,P3,CC.tie,1.5,undefined,al);
-    L3(sc,H("CH5"),P4,CC.ela,1.7,[5,4],al);
-    PL(sc,[P1,P3,P2,P5],CC.knu,1.1,CC.knuF);
-    L3(sc,P2,P5,CC.knu,1,undefined,al);
-    L3(sc,P1,P5,CC.knu,1,undefined,al);
-    /* 车轮 3D 圆盘 */
-    if(P5){
+    if(sh.rigid){
+      L3(sc,H("CH1"),P1,CC.rigArm,1.35,undefined,al);
+      L3(sc,H("CH2"),P1,CC.rigArm,1.35,undefined,al);
+      L3(sc,H("CH1"),H("CH2"),CC.rig,0.9,undefined,al);
+      L3(sc,H("CH3"),P2,CC.rig,1.35,undefined,al);
+      L3(sc,H("CH4"),P2,CC.rig,1.35,undefined,al);
+      L3(sc,H("CH3"),H("CH4"),CC.rig,0.9,undefined,al);
+      L3(sc,P1,P2,CC.kp,2.3,undefined,al);
+      L3(sc,FL,P3,CC.tie,1.5,undefined,al);
+      L3(sc,P2,P5,CC.knu,1,undefined,al);
+      L3(sc,P1,P5,CC.knu,1,undefined,al);
+    }
+    if(sh.face){
+      PL(sc,[H("CH1"),P1,H("CH2"),H("CH1")],CC.rigArm,0.8,"rgba(170,185,199,0.05)",undefined,al);
+      PL(sc,[H("CH3"),P2,H("CH4"),H("CH3")],CC.rigArm,0.8,"rgba(170,185,199,0.05)",undefined,al);
+      PL(sc,[P1,P3,P2,P5],CC.knu,1.1,CC.knuF);
+    }
+    if(sh.spring){
+      const u=nrm(sub(P4,H("CH5"))),L=dst(P4,H("CH5"))||1;
+      const bodyA=add(H("CH5"),mul(u,L*0.06)),bodyB=add(H("CH5"),mul(u,L*0.5));
+      cyl(sc,bodyA,bodyB,14,CC.rig,1,12);
+      L3(sc,bodyB,P4,CC.rig,2,undefined,al);
+      PL(sc,springPts(add(H("CH5"),mul(u,L*0.10)),add(P4,mul(u,-L*0.06)),32,7,150),CC.ela,1.6,undefined,undefined,al);
+      PL(sc,circPts(add(H("CH5"),mul(u,L*0.06)),u,40,16),CC.ela,1,undefined,undefined,al);
+      PL(sc,circPts(add(P4,mul(u,-L*0.05)),u,40,16),CC.ela,1,undefined,undefined,al);
+    }
+    if(sh.wheel&&P5){
       const e=(d.angles.camber_deg||0)*D2R,t=(d.angles.toe_deg||0)*D2R;
       const w=wheelAxis(e,t,d.sx),R=260,W=180;
       const u=nrm(sub([0,0,1],mul(w,dot([0,0,1],w)))),v=cross(w,u);
       const ci=add(P5,mul(w,-W/2)),co=add(P5,mul(w,W/2));
-      PL(sc,circPts(co,w,R,40,u,v),CC.tire,1.2);
-      PL(sc,circPts(ci,w,R*0.97,40,u,v),CC.tread,1);
-      PL(sc,circPts(co,w,R*0.97,40,u,v),CC.tread,1);
+      if(sh.tirefill)PL(sc,circPts(co,w,R*0.99,40,u,v),CC.tire,1,null,"rgba(12,15,18,0.7)",al);
+      PL(sc,circPts(co,w,R,40,u,v),CC.tire,1.2,undefined,undefined,al);
+      PL(sc,circPts(ci,w,R*0.97,40,u,v),CC.tread,1,undefined,undefined,al);
+      PL(sc,circPts(co,w,R*0.97,40,u,v),CC.tread,1,undefined,undefined,al);
       for(let k2=0;k2<22;k2++){const an=2*PI*k2/22;
         const o=add(mul(u,R*cos(an)),mul(v,R*sin(an)));
         L3(sc,add(ci,o),add(co,o),CC.tread,0.9,undefined,al);}
@@ -561,28 +628,47 @@ function buildScene(sk){
         const o=add(mul(u,150*cos(an)),mul(v,150*sin(an)));
         L3(sc,add(ro,mul(w,-4)),add(ro,o),CC.rim,1.3,undefined,al);}
       PL(sc,circPts(ro,w,56,20,u,v),CC.rim,1,undefined,undefined,al);
+      if(sh.disc){
+        const d1=add(P5,mul(w,-16)),d2=add(P5,mul(w,4));
+        PL(sc,circPts(d1,w,130,32,u,v),CC.disc,1,undefined,undefined,al);
+        PL(sc,circPts(d2,w,130,32,u,v),CC.disc,1,undefined,undefined,al);
+        PL(sc,circPts(d1,w,80,24,u,v),CC.disc,0.9,undefined,undefined,al);
+        for(let k2=0;k2<16;k2++){const an=2*PI*k2/16;
+          const o1=add(mul(u,84*cos(an)),mul(v,84*sin(an)));
+          const o2=add(mul(u,130*cos(an)),mul(v,130*sin(an)));
+          L3(sc,add(d1,o1),add(d1,o2),CC.disc,0.9,undefined,al);}
+        cyl(sc,add(P5,mul(w,-26)),add(P5,mul(w,26)),42,CC.rim,1,14);
+        cyl(sc,d1,d2,44,CC.rim,1,14);
+        const ca=cross(w,u);
+        const cc=add(P5,mul(w,-30));
+        const bp=[];
+        for(let i=-1;i<=1;i+=2)for(let j=-1;j<=1;j+=2)for(let k2=-1;k2<=1;k2+=2)
+          bp.push(add(add(cc,mul(u,i*34)),add(mul(ca,j*46),mul(w,k2*14))));
+        const be=[[0,1],[0,2],[1,3],[2,3],[4,5],[4,6],[5,7],[6,7],[0,4],[1,5],[2,6],[3,7]];
+        be.forEach(e=>L3(sc,bp[e[0]],bp[e[1]],CC.cal,1));
+      }
       if(d.pose&&d.pose.contact_patch&&d.pose.contact_patch.center){
         const cp=d.pose.contact_patch.center;
         L3(sc,cp,[cp[0]+55,cp[1],0],CC.pathC,1.4,undefined,al);
       }
     }
-    /* 球头 */
-    [[P1,10],[P2,12],[P3,8]].forEach(q=>{
-      PL(sc,circPts(q[0],[1,0,0],q[1],12),CC.rig,0.9,undefined,undefined,al);
-      PL(sc,circPts(q[0],[0,1,0],q[1],12),CC.rig,0.9,undefined,undefined,al);
-      PL(sc,circPts(q[0],[0,0,1],q[1],12),CC.rig,0.9,undefined,undefined,al);
-    });
-    const editable=isBaseline()&&side==="right";
-    for(const k in d.pt){
-      if(!d.pt[k])continue;
-      const selk=(S.held&&S.held.corner===n&&S.held.k===k)||UI.hover===n+"."+k;
-      NODE(sc,k,d.pt[k],FIXED.has(k),n,d.sx,selk);
+    if(sh.rigid){
+      [[P1,10],[P2,12],[P3,8]].forEach(q=>{
+        PL(sc,circPts(q[0],[1,0,0],q[1],12),CC.rig,0.9,undefined,undefined,al);
+        PL(sc,circPts(q[0],[0,1,0],q[1],12),CC.rig,0.9,undefined,undefined,al);
+        PL(sc,circPts(q[0],[0,0,1],q[1],12),CC.rig,0.9,undefined,undefined,al);
+      });
+    }
+    if(sh.node){
+      for(const k in d.pt){
+        if(!d.pt[k])continue;
+        const selk=(S.held&&S.held.corner===n&&S.held.k===k)||UI.hover===n+"."+k;
+        NODE(sc,k,d.pt[k],FIXED.has(k),n,d.sx,selk);
+      }
     }
   });
   return sc;
 }
-
-/* ================================ 绘制视口 ================================ */
 function drawGrid(v){
   const ctx=v.ctx;
   if(v.type==="p"){drawGrid3(v);return;}
@@ -605,10 +691,8 @@ function drawGrid(v){
   ctx.beginPath();ctx.moveTo(Math.round(ox)+.5,0);ctx.lineTo(Math.round(ox)+.5,v.h);ctx.stroke();
   ctx.beginPath();ctx.moveTo(0,Math.round(oy)+.5);ctx.lineTo(v.w,Math.round(oy)+.5);ctx.stroke();
   ctx.fillStyle=CC.txt3;ctx.font="8px monospace";ctx.textAlign="left";
-  for(let a=Math.ceil(a0/maj)*maj;a<=a1;a+=maj){
-    if(a===0)continue;const x=v.w/2+(a-v.cx)*v.s;ctx.fillText(a,x+2,v.h-2);}
-  for(let b=Math.ceil(b0/maj)*maj;b<=b1;b+=maj){
-    if(b===0)continue;const y=v.h/2-(b-v.cy)*v.s;ctx.fillText(b,2,y-2);}
+  for(let a=Math.ceil(a0/maj)*maj;a<=a1;a+=maj){if(a===0)continue;const x=v.w/2+(a-v.cx)*v.s;ctx.fillText(a,x+2,v.h-2);}
+  for(let b=Math.ceil(b0/maj)*maj;b<=b1;b+=maj){if(b===0)continue;const y=v.h/2-(b-v.cy)*v.s;ctx.fillText(b,2,y-2);}
 }
 function drawGrid3(v){
   const ctx=v.ctx,ext=1750,step=250,gz=0;
@@ -624,7 +708,7 @@ function drawGrid3(v){
 }
 function drawGround(v){
   if(v.type==="p")return;
-  const ctx=v.ctx,gz=0;
+  const ctx=v.ctx;
   if(v.key==="top"){
     ctx.setLineDash([6,4]);ctx.strokeStyle=CC.gnd;ctx.lineWidth=1;
     const A=P2(v,[-1600,0,0]),B=P2(v,[1600,0,0]);
@@ -632,7 +716,7 @@ function drawGround(v){
     ctx.setLineDash([]);return;
   }
   let gA,gB;
-  if(v.key==="front"){gA=[-1750,0,gz];gB=[1750,0,gz];}else{gA=[0,-1750,gz];gB=[0,1750,gz];}
+  if(v.key==="front"){gA=[-1750,0,0];gB=[1750,0,0];}else{gA=[0,-1750,0];gB=[0,1750,0];}
   const A=P2(v,gA),B=P2(v,gB);if(!A||!B)return;
   ctx.strokeStyle=CC.gnd;ctx.lineWidth=1.6;ctx.setLineDash([]);
   ctx.beginPath();ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();
@@ -645,12 +729,91 @@ function drawGround(v){
   }
   ctx.stroke();
 }
+function angArc(ctx,O,r,a0,a1,txt,col){
+  ctx.strokeStyle=col;ctx.lineWidth=1.1;ctx.setLineDash([]);
+  ctx.beginPath();ctx.arc(O[0],O[1],r,a0,a1);ctx.stroke();
+  const am=a0+(a1-a0)*0.5;
+  const x=O[0]+(r+12)*Math.cos(am),y=O[1]+(r+12)*Math.sin(am);
+  ctx.fillStyle=col;ctx.font="8.5px monospace";ctx.fillText(txt,x,y);
+}
+function dimLine(ctx,A,B,txt,off,col){
+  ctx.strokeStyle=col;ctx.lineWidth=1;ctx.setLineDash([4,3]);
+  ctx.beginPath();ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();
+  ctx.setLineDash([]);
+  const x=(A[0]+B[0])/2+off,y=(A[1]+B[1])/2;
+  ctx.fillStyle=col;ctx.font="8.5px monospace";ctx.fillText(txt,x,y-4);
+}
+function kingpinGround(ubj,lbj,z){
+  const dz=lbj[2]-ubj[2]||1e-9;
+  const t=(z-ubj[2])/dz;
+  return lerp3(ubj,lbj,t);
+}
+function drawMetrics(v,sk){
+  if(v.type!=="o"||!S.show.dim)return;
+  const ctx=v.ctx;
+  const drawOne=(n)=>{
+    const d=sk[n];if(!d||!d.pt)return;
+    const sx2=d.sx, wc=d.pt.UP5, ubj=d.pt.UP1, lbj=d.pt.UP2;
+    const cp=d.pose&&d.pose.contact_patch?d.pose.contact_patch.center:[wc[0],wc[1],0];
+    const kg=kingpinGround(ubj,lbj,0);
+    const e2=(d.angles.camber_deg||0)*D2R,t2=(d.angles.toe_deg||0)*D2R;
+    if(v.key==="front"){
+      const O=P2(v,[wc[0],sx2*wc[1],wc[2]]);
+      if(O){
+        const w=wheelAxis(e2,t2,d.sx);
+        const uu=nrm(sub([0,0,1],mul(w,dot([0,0,1],w))));
+        const vu=[uu[1],uu[2]];
+        const a=atan2(-vu[1],vu[0]);
+        angArc(ctx,O,260*v.s*0.62,-PI/2,a,"gamma "+fmt(d.angles.camber_deg||0,2)+" deg",CC.knu);
+      }
+      const kb=P2(v,[ubj[0],sx2*ubj[1],ubj[2]]),kt=P2(v,[lbj[0],sx2*lbj[1],lbj[2]]);
+      if(kb&&kt){
+        const a0=atan2(kt[1]-kb[1],kt[0]-kb[0]);
+        angArc(ctx,kb,56,-PI/2,a0,"KPI "+fmt(d.angles.kpi_deg||0,1)+" deg",CC.kp);
+      }
+      if(kg){
+        const K=P2(v,[kg[0],sx2*kg[1],kg[2]]),Cp=P2(v,[cp[0],sx2*cp[1],0]);
+        if(K&&Cp)dimLine(ctx,Cp,K,"scrub "+fmt(d.angles.scrub_radius_mm||0,1),-30,CC.kp);
+      }
+    }else if(v.key==="side"){
+      const kb=P2(v,[ubj[0],sx2*ubj[1],ubj[2]]),kt=P2(v,[lbj[0],sx2*lbj[1],lbj[2]]);
+      if(kb&&kt){
+        const a0=atan2(kt[1]-kb[1],kt[0]-kb[0]);
+        angArc(ctx,kb,56,-PI/2,a0,"cast "+fmt(d.angles.caster_deg||0,1)+" deg",CC.kp);
+      }
+      if(kg){
+        const K=P2(v,[kg[0],sx2*kg[1],kg[2]]),Cp=P2(v,[cp[0],sx2*cp[1],0]);
+        if(K&&Cp)dimLine(ctx,Cp,K,"trail "+fmt(d.angles.caster_trail_mm||0,1),-26,CC.kp);
+      }
+    }else if(v.key==="top"){
+      const O=P2(v,[wc[0],wc[1],wc[2]]);
+      if(O){
+        const w=wheelAxis(e2,t2,d.sx);
+        const A=P2(v,add(wc,mul([w[0],w[1],0],520))),B=P2(v,sub(wc,mul([w[0],w[1],0],520)));
+        if(A&&B){
+          ctx.setLineDash([7,4]);ctx.strokeStyle=CC.knu;ctx.lineWidth=1;
+          ctx.beginPath();ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();ctx.setLineDash([]);
+        }
+        const wl=[wc[0],wc[1]-520,wc[2]],wr=[wc[0],wc[1]+520,wc[2]];
+        const Al=P2(v,wl),Bl=P2(v,wr);
+        if(Al&&Bl){
+          ctx.strokeStyle=CC.axis;ctx.lineWidth=1;ctx.setLineDash([4,4]);
+          ctx.beginPath();ctx.moveTo(Al[0],Al[1]);ctx.lineTo(Bl[0],Bl[1]);ctx.stroke();ctx.setLineDash([]);
+          const a0=atan2(Bl[1]-O[1],Bl[0]-O[0]);
+          angArc(ctx,O,260*v.s*0.8,a0,a0+Math.max(-0.6,Math.min(0.6,t2)),(d.sx>0?"R ":"L ")+"toe "+fmt(d.angles.toe_deg||0,2)+" deg",CC.tie);
+        }
+      }
+    }
+  };
+  drawOne("front_right");
+  if(S.show.mirror)drawOne("front_left");
+}
 function drawAll(){
   const sk=buildSkeleton();
   SCENE=buildScene(sk);
   PICK.length=0;
   for(const v of VW){
-    if(document.getElementById("vp").classList.contains("max0")&&!v.mx)continue;
+    if($("vp").classList.contains("max0")&&!v.mx)continue;
     drawView(v,sk);
   }
 }
@@ -688,18 +851,16 @@ function drawView(v,sk){
       if(o.fix){ctx.beginPath();ctx.rect(A[0]-3.6,A[1]-3.6,7.2,7.2);ctx.fill();ctx.stroke();}
       else{ctx.beginPath();ctx.arc(A[0],A[1],3.4,0,6.2832);ctx.fill();ctx.stroke();}
       if(sel){ctx.beginPath();ctx.rect(A[0]-6.5,A[1]-6.5,13,13);ctx.strokeStyle=CC.nodeSel;ctx.lineWidth=1;ctx.stroke();}
-    }else if(o.k==="t"){
-      const A=P2(v,o.p);if(!A)continue;
-      ctx.fillStyle=o.c;ctx.font="9px monospace";ctx.fillText(o.s,A[0]+o.dx,A[1]+o.dy);
+      if(sel&&S.show.label){ctx.fillStyle=CC.nodeSel;ctx.font="8.5px monospace";ctx.fillText(o.id,A[0]+8,A[1]-6);}
     }
   }
-  /* 视口角标 */
-  ctx.fillStyle=CC.txt3;ctx.font="9px ui-monospace,monospace";ctx.textAlign="left";
-  if(v.type==="p")ctx.fillText(v.key+"  AZ "+fmt(v.az*R2D,0)+"°  EL "+fmt(v.elv*R2D,0)+"°  s",6,12);
+  drawMetrics(v,sk);
+  ctx.fillStyle=CC.txt3;ctx.font="9px monospace";ctx.textAlign="left";
+  if(v.type==="p")ctx.fillText(v.key+"  AZ "+fmt(v.az*R2D,0)+"  EL "+fmt(v.elv*R2D,0),6,12);
   ctx.restore();
 }
 function setStatus(tone,html){
-  const el=document.getElementById("tbState");
+  const el=$("tbState");
   if(html!==undefined)el.innerHTML=html;
   else el.innerHTML="<span class='"+tone+"'>"+tone+"</span>";
 }
@@ -720,18 +881,16 @@ function hookView(v){
     const hit=pickNode(v,mx,my);
     if(e.button===0&&hit&&v.type==="o"){
       const axis=hit.corner.split("_")[0];
-      if(axis==="front"||axis==="rear"){
-        const tpl=S[axis==="front"?"frontR":"rearR"];
-        if(tpl&&tpl[hit.id]&&hit.sx>0&&isBaseline()){
-          UI.sel=hit.id;UI.drag={mode:"hp",v:v,corner:hit.corner,k:hit.id,sx:hit.sx,x0:e.clientX,y0:e.clientY,base:cpy(tpl[hit.id])};
-          S.held={corner:hit.corner,k:hit.id};
-          e.preventDefault();return;
-        }
+      const tpl=S[axis==="front"?"frontR":"rearR"];
+      if(tpl&&tpl[hit.id]&&hit.sx>0){
+        UI.sel=hit.id;UI.drag={mode:"hp",v:v,corner:hit.corner,k:hit.id,sx:hit.sx,x0:e.clientX,y0:e.clientY,base:cpy(tpl[hit.id])};
+        S.held={corner:hit.corner,k:hit.id};
+        e.preventDefault();return;
       }
-      UI.drag={mode:"pan",v:v,x0:e.clientX,y0:e.clientY,cx:v.cx,cy:v.cy};e.preventDefault();return;
-    }else if(e.button===0&&v.type==="p"&&!e.shiftKey){
+    }
+    if(e.button===0&&v.type==="p"&&!e.shiftKey){
       UI.drag={mode:"orb",v:v,x0:e.clientX,y0:e.clientY,az:v.az,el:v.elv};
-    }else{
+    }else if(e.button===0||e.button===1){
       if(v.type==="o")UI.drag={mode:"pan",v:v,x0:e.clientX,y0:e.clientY,cx:v.cx,cy:v.cy};
       else{UI.drag={mode:"pan3",v:v,x0:e.clientX,y0:e.clientY,tgt:cpy(v.tgt)};}
     }
@@ -748,15 +907,15 @@ function hookView(v){
         const a=(mx-v.w/2)/v.s+v.cx,b=-(my-v.h/2)/v.s+v.cy;
         const la=v.bx[0]?"X":(v.bx[1]?"Y":"Z"),lb=v.by[2]?"Z":(v.by[1]?"Y":"X");
         txt=la+" "+fmt(a,1)+"  "+lb+" "+fmt(b,1);
-      }else txt="等轴测";
-      if(hit)txt+=hit.corner+"."+hit.id;
-      document.getElementById("sbCur").textContent=txt;
+      }else txt="iso";
+      if(hit)txt="  "+hit.corner+"."+hit.id;
+      $("sbCur").textContent=txt;
     }
   });
   cv.addEventListener("wheel",e=>{
     e.preventDefault();
     const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
-    const f=Math.pow(1.0016,-e.deltaY);
+    const f=Math.pow(1.0014,-e.deltaY);
     if(v.type==="o"){
       const ax=(mx-v.w/2)/v.s+v.cx,by=-(my-v.h/2)/v.s+v.cy;
       v.s=clamp(v.s*f,0.02,40);
@@ -779,6 +938,7 @@ window.addEventListener("mousemove",e=>{
     }
     S.held={corner:d.corner,k:d.k};
     refreshTableInputs();
+    interpF=1;
     drawAll();requestSolve();
   }else if(d.mode==="orb"){
     v.az=d.az-(e.clientX-d.x0)*0.006;
@@ -794,21 +954,62 @@ window.addEventListener("mousemove",e=>{
   }
 });
 window.addEventListener("mouseup",()=>{
-  if(UI.drag&&UI.drag.mode==="hp"){S.held=null;requestSolve();}
-  if(UI.drag&&UI.drag.mode==="hp"){drawAll();}
+  if(UI.drag&&UI.drag.mode==="hp"){S.held=null;interpF=1;requestSolve({sweep:true});}
   UI.drag=null;
 });
-
+document.addEventListener("keydown",e=>{
+  const tag=(e.target.tagName||"").toLowerCase();
+  if(tag==="input"||tag==="select")return;
+  if(e.code==="Space"){S.play=!S.play;updatePlayBtn();e.preventDefault();}
+  else if(e.key==="ArrowLeft"||e.key==="ArrowRight"){
+    const s=(e.key==="ArrowRight"?1:-1)*(e.altKey?0.5:2);
+    if(e.shiftKey){S.rack=clamp(S.rack+s,-30,30);S.steerExc="off";updateExcBtns();}
+    else{S.travel=clamp(S.travel+s,-40,40);S.exc="off";updateExcBtns();}
+    requestSolve({sweep:true});e.preventDefault();
+  }
+  else if(e.key==="f"||e.key==="F"){VW.forEach(fitView);}
+  else if(e.key>="1"&&e.key<="4"){toggleMax(VW[+e.key-1]);}
+});
+/* ================================ 仿真动画 ================================ */
+let lastTs=0,fpsFc=0,fpsFt=0,fpsV=0;
+function loop(ts){
+  requestAnimationFrame(loop);
+  const dt=Math.min(0.045,lastTs?(ts-lastTs)/1000:0.016);lastTs=ts;
+  if(S.play){
+    S.t+=dt;
+    if(S.exc!=="off"){
+      const ph=2*PI*S.excF*S.t;
+      const u=S.exc==="sine"?sin(ph):(2/PI)*Math.asin(sin(ph));
+      S.travel=clamp(S.excA*u,-40,40);
+    }
+    if(S.steerExc!=="off"){
+      const ph=2*PI*S.stF*S.t;
+      const u=S.steerExc==="sine"?sin(ph):(2/PI)*Math.asin(sin(ph));
+      S.rack=clamp(S.stA*u,-30,30);
+    }
+  }
+  const step=S.play?dt:dt*8;
+  interpF=Math.min(1,interpF+step/((S.solveEvery||90)/1000));
+  syncUI();
+  if(S.play&&!dragging&&(ts-S.lastSolveT)>S.solveEvery){
+    S.lastSolveT=ts;requestSolve({immediate:false});
+  }
+  drawAll();
+  if(resp&&resp.sweep&&!busy&&!S.play)drawChart(resp.sweep);
+  fpsFc++;fpsFt+=dt;
+  if(fpsFt>0.4){fpsV=Math.round(fpsFc/fpsFt);fpsFc=0;fpsFt=0;fpsV&&($("tbFps").textContent=fpsV);}
+}
 /* ================================ 求解请求 ================================ */
 function casePayload(withSweep){
-  const tl=+document.getElementById("t_fl").value||0,tr=+document.getElementById("t_fr").value||0;
-  const rl=+document.getElementById("t_rl").value||0,rr=+document.getElementById("t_rr").value||0;
-  const rack=+document.getElementById("rack").value||0;
-  const ay=+document.getElementById("ayv").value||0,ax=+document.getElementById("axv").value||0;
+  const roll=clamp(S.roll||0,-6,6), tr=clamp((S.travel||0)+(610*sin(roll*D2R)),-60,60);
+  const tl=clamp((S.travel||0)-(610*sin(roll*D2R)),-60,60);
+  const rr=clamp((S.travel||0)+(590*sin(roll*D2R)),-60,60);
+  const rl=clamp((S.travel||0)-(590*sin(roll*D2R)),-60,60);
+  const ay=clamp(S.ay||0,-2,2),ax=clamp(S.ax||0,-2,2);
   const p={
     case_id:"static",
-    travel:{fl:tl,fr:tr,rl:rl,rr:rr},
-    rack_displacement:rack,
+    travel:{fl:+tl.toFixed(2),fr:+tr.toFixed(2),rl:+rl.toFixed(2),rr:+rr.toFixed(2)},
+    rack_displacement:+((S.rack||0)).toFixed(2),
     loads:{ay_g:ay,ax_g:ax},
     arb_enabled:true,
     label:"modeler",
@@ -822,30 +1023,29 @@ function casePayload(withSweep){
   }
   return p;
 }
-function requestSolve(){
+function requestSolve(opts){
+  opts=opts||{};
   if(busy){pending=true;return;}
   busy=true;
-  const wantSweep=document.getElementById("curves").classList.contains("on")&&!dragging;
-  clearTimeout(sweepTimer);
-  if(document.getElementById("curves").classList.contains("on")&&dragging){
-    sweepTimer=setTimeout(()=>{if(!dragging)requestSolve();},400);
-  }
   const seq=++solveSeq;
+  const withSweep=!!(opts.sweep);
   fetch("/api/v2/solve/hardpoints",{method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify(casePayload(wantSweep))})
+    body:JSON.stringify(casePayload(withSweep))})
     .then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
-    .then(d=>{if(seq!==solveSeq)return;S.vp=d;resp=d;renderAll(d);fetchHandling();})
-    .catch(e=>{if(seq===solveSeq){setStatus("r","求解失败: "+e.message); if(window.__diag)window.__diag.errs.push("SOLVE:"+String((e.stack)||e));}})
+    .then(d=>{if(seq!==solveSeq)return;S.vp=d;resp=d;
+      loadPose(d,opts.immediate===false?false:true);
+      renderAll(d);
+      if(opts.handling)fetchHandling();
+    })
+    .catch(e=>{if(seq===solveSeq)setStatus("r","求解失败: "+e.message);})
     .finally(()=>{busy=false;if(pending){pending=false;requestSolve();}});
 }
 function fetchHandling(){
-  const ay=+document.getElementById("ayv").value||0;
-  const gamma=+document.getElementById("gamma").value||0;
   fetch("/api/v2/handling",{method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({design_id:"legacy-import",case_id:"static",ay_g:ay,
-      gamma_f_deg:gamma,gamma_r_deg:gamma})})
+    body:JSON.stringify({design_id:"legacy-import",case_id:"static",
+      ay_g:clamp(S.ay||0,-2,2),gamma_f_deg:0,gamma_r_deg:0})})
     .then(r=>r.ok?r.json():null)
     .then(d=>{if(d){lastH=d;renderHandling(d);}})
     .catch(()=>{});
@@ -855,12 +1055,12 @@ const ANGLES=[["camber_deg","外倾°"],["toe_deg","前束°"],["caster_deg","�
   ["scrub_radius_mm","Scrub mm"],["caster_trail_mm","拖距 mm"]];
 function renderAll(d){
   setStatus(d.status==="VALID"?"g":(d.status==="SOLVER_FAILED"?"r":"a"),
-    "<span>"+(d.status||"—")+"</span> · "+d.solver+" · "+d.label);
-  document.getElementById("tbSolver").textContent=d.solver||"—";
+    "<span>"+(d.status||"—")+"</span> · "+(d.solver||"—")+" · "+(d.label||""));
+  $("tbSolver").textContent=d.solver||"—";
   const pl=d.pose_labels||{};
-  document.getElementById("tbPose").textContent="heave "+fmt(pl.heave_mm,1)+" · roll "+fmt(pl.roll_deg,2)+"° · pitch "+fmt(pl.pitch_deg,2)+"°";
+  $("tbPose").textContent="heave "+fmt(pl.heave_mm,1)+" · roll "+fmt(pl.roll_deg,2)+" · pitch "+fmt(pl.pitch_deg,2);
   const corners=[["FL",d.front.left],["FR",d.front.right],["RL",d.rear.left],["RR",d.rear.right]];
-  const tb=document.getElementById("angleTable");
+  const tb=$("angleTable");
   let h="<tr><th></th>"+corners.map(c=>"<th class='sx'>"+c[0]+"</th>").join("")+"</tr>";
   const stat=c=>{const s=c.status;
     return s==="VALID"?"<span class='g'>OK</span>":(s==="SOLVER_FAILED"?"<span class='r'>FAIL</span>":"<span class='a'>~"+s+"</span>");};
@@ -868,21 +1068,19 @@ function renderAll(d){
   ANGLES.forEach(a=>{
     h+="<tr><td class='mn'>"+a[1]+"</td>"+corners.map(c=>{
       const v=c[1].angles&&c[1].angles[a[0]];
-      return"<td class='sx'>"+(v!=null?+v.toFixed(3):"<span class='na'>—</span>")+"</td>";}).join("")+"</tr>";
+      return"<td class='sx'>"+(v!=null?(+v).toFixed(3):"<span class='na'>—</span>")+"</td>";}).join("")+"</tr>";
   });
   tb.innerHTML=h;
-  /* 载荷 */
   const ld=d.loads||{};
-  const ft=document.getElementById("forceTable");
-  const FE=document.getElementById("forceNote");
+  const ft=$("forceTable"),FE=$("forceNote");
   if(ld&&ld.front_right){
-    let hh="<tr><th></th><th>Fz N</th><th>Fx N</th><th>Fy N</th><th>μ</th><th>离地</th></tr>";
+    let hh="<tr><th></th><th>Fz</th><th>Fx</th><th>Fy</th><th>mu</th><th>离地</th></tr>";
     for(const c of corners){
       const L=ld[c[0]==="FL"?"front_left":c[0]==="FR"?"front_right":c[0]==="RL"?"rear_left":"rear_right"];
-      const onGround=L&&!L.off_ground;
+      const onG=L&&!L.off_ground;
       hh+="<tr><td class='mn'>"+c[0]+"</td><td>"+(L?L.fz_n.toFixed(0):"—")+"</td><td>"+(L?L.fx_n.toFixed(0):"—")+
         "</td><td>"+(L?L.fy_n.toFixed(0):"—")+"</td><td>"+(L?(L.friction_util!=null?L.friction_util.toFixed(2):"<span class='na'>—</span>"):"—")+
-        "</td><td>"+(L?(onGround?"否":"<span class='r'>是</span>"):"—")+"</td></tr>";
+        "</td><td>"+(L?(onG?"否":"<span class='r'>是</span>"):"—")+"</td></tr>";
     }
     ft.innerHTML=hh;
     let note="";
@@ -895,40 +1093,39 @@ function renderAll(d){
         (L.wheel_end&&L.wheel_end.force_residual_n!=null?L.wheel_end.force_residual_n.toFixed(3)+"N":"—")+"<br>";
     }
     FE.innerHTML=note;
-  }else{ft.innerHTML="<tr><td class='na'>载荷不可用（需四轮几何）</td></tr>";FE.innerHTML="";}
-  /* 状态 */
-  const sb=document.getElementById("statusBox");
-  let sh="整车 <b class='"+(d.status==="VALID"?"g":d.status==="SOLVER_FAILED"?"r":"a")+"'>"+d.status+"</b> · 残差 ";
+  }else{ft.innerHTML="<tr><td class='na'>载荷不可用</td></tr>";FE.innerHTML="";}
+  const sb=$("statusBox");
   const rs=d.residuals||{};
+  let sh="整车 <b class='"+(d.status==="VALID"?"g":d.status==="SOLVER_FAILED"?"r":"a")+"'>"+d.status+"</b> · 残差 ";
   sh+="FL "+fmt(rs.front_left,4)+" · FR "+fmt(rs.front_right,4)+" · RL "+fmt(rs.rear_left,4)+" · RR "+fmt(rs.rear_right,4);
-  const warnBox=document.createElement("div");
-  warnBox.style.paddingTop="3px";
+  const warnBox=document.createElement("div");warnBox.style.paddingTop="3px";
   (d.warnings||[]).slice(0,6).forEach(w=>warnBox.innerHTML+="<div class='warn'>· "+w+"</div>");
   sb.innerHTML=sh+(warnBox.innerHTML?"<div>"+warnBox.innerHTML+"</div>":"");
-  const sbr=document.getElementById("sbRes");
+  const sbr=$("sbRes");
   if(sbr){
     sbr.innerHTML=["FL "+fmt(rs.front_left,3),"FR "+fmt(rs.front_right,3),"RL "+fmt(rs.rear_left,3),"RR "+fmt(rs.rear_right,3)].join("  ");
     if(sbr.parentElement)sbr.parentElement.className=d.status==="VALID"?"c ok":(d.status==="SOLVER_FAILED"?"c bad":"c hl");
   }
+  $("sbNode").textContent="44";
+  $("sbRig").textContent="36";
+  $("sbEla").textContent="4";
   drawChart(d.sweep||null);
-  drawAll();
 }
 function drawChart(sw){
-  const cv=document.getElementById("chart");
-  if(!sw||!sw.curves){ const ctx=cv.getContext("2d");ctx.clearRect(0,0,cv.width,cv.height);
-    ctx.fillStyle=CC.txt3;ctx.font="9px monospace";ctx.fillText("无扫掠数据",8,14);return;}
+  const cv=$("chart");
+  if(!sw||!sw.curves){const ctx=cv.getContext("2d");ctx.clearRect(0,0,cv.width,cv.height);ctx.fillStyle=CC.txt3;ctx.font="9px monospace";ctx.fillText("无扫掠（暂停后自动补）",8,14);return;}
   const X=sw.values||[],cam=sw.curves.right_camber_deg||[],toe=sw.curves.right_toe_deg||[];
   const scr=sw.curves.right_scrub_radius_mm||[],trl=sw.curves.right_caster_trail_mm||[];
   const series=[["#54a06a","camber",cam],["#2fa9d6","toe",toe],["#c07ad0","scrub",scr],["#d9a238","trail",trl]];
   let y0=0,y1=0;
   for(const s of series)for(const v of s[2]){if(v==null)continue;y0=Math.min(y0,v);y1=Math.max(y1,v);}
   if(y1===y0)y1=y0+1;
-  const pad=24,W=cv.width,H=cv.height;
+  const pad=22,W=cv.width,H=cv.height;
   const sx=v=>pad+(v-X[0])/((X[X.length-1]-X[0])||1)*(W-pad*2);
   const sy=v=>H-pad-(v-y0)/(y1-y0)*(H-pad*2);
   const ctx=cv.getContext("2d");ctx.clearRect(0,0,W,H);
   ctx.font="9px monospace";ctx.fillStyle=CC.txt3;
-  ctx.fillText(S.curveAxis==="rack"?"rack mm":"travel mm",W-56,H-6);ctx.fillText("0",4,sy(0)+3);
+  ctx.fillText(S.curveAxis==="rack"?"rack mm":"travel mm",W-52,H-4);ctx.fillText("0",4,sy(0)+3);
   for(const s of series){
     ctx.strokeStyle=s[0];ctx.lineWidth=1.4;ctx.beginPath();let started=false;
     for(let i=0;i<s[2].length;i++){
@@ -943,7 +1140,7 @@ function drawChart(sw){
   const yz=sy(0);ctx.beginPath();ctx.moveTo(pad,yz);ctx.lineTo(W-pad,yz);ctx.stroke();ctx.setLineDash([]);
 }
 function renderHandling(d){
-  const el=document.getElementById("handlingBox");
+  const el=$("handlingBox");
   const ug=d.understeer||{},y=d.yaw&&d.yaw.status==="VALID"?d.yaw:null;
   const kp=d.kingpin,ride=d.ride_level||{};
   let h="K <b class='"+(ug.k_deg_per_g!=null?(ug.k_deg_per_g>0.2?"a":ug.k_deg_per_g<-0.2?"r":"g"):"")+"'>"+
@@ -955,19 +1152,16 @@ function renderHandling(d){
     "</b> gain <b>"+y.yaw_rate_gain_deg_per_s_per_deg.toFixed(1)+"</b></div>";
   if(kp)h+="<div class='force'>回正 <b>"+kp.total_nmm.toFixed(0)+" N·mm</b> "+
     (kp.self_centering?"<span class='g'>自回正</span>":"<span class='r'>不回正</span>")+"</div>";
-  if(ride.wheels){
-    h+="<div>调平 预载 "+(ride.wheels.fl?ride.wheels.fl.preload_n.toFixed(0)+"N":"—")+
-      " · roll "+fmt(ride.pose.roll_deg,2)+"° · pitch "+fmt(ride.pose.pitch_deg,2)+"°</div>";
-  }
+  if(ride.wheels)h+="<div>调平 预载 "+(ride.wheels.fl?ride.wheels.fl.preload_n.toFixed(0)+"N":"—")+
+    " · roll "+fmt(ride.pose.roll_deg,2)+" · pitch "+fmt(ride.pose.pitch_deg,2)+"°</div>";
   el.innerHTML=h;
   drawKcurve(d);
 }
 function drawKcurve(d){
-  const cv=document.getElementById("kChart");
-  const curve=(d.k_curve||{}).k_deg_per_g,xs=(d.k_curve||{}).ay_g;
+  const cv=$("kChart"),curve=(d.k_curve||{}).k_deg_per_g,xs=(d.k_curve||{}).ay_g;
   const ctx=cv.getContext("2d");ctx.clearRect(0,0,cv.width,cv.height);
   if(!curve||!xs||!curve.length){ctx.fillStyle=CC.txt3;ctx.font="9px monospace";ctx.fillText("无 K(ay)",6,12);return;}
-  const pad=20,W=cv.width,H=cv.height;
+  const pad=18,W=cv.width,H=cv.height;
   let y0=1e9,y1=-1e9;for(const v of curve)if(v!=null){y0=Math.min(y0,v);y1=Math.max(y1,v);}
   if(y0===1e9)return;if(y1===y0){y0-=0.1;y1+=0.1;}
   const sx=v=>pad+(v-xs[0])/((xs[xs.length-1]-xs[0])||1)*(W-pad*2);
@@ -982,18 +1176,16 @@ function drawKcurve(d){
   ctx.strokeStyle=CC.grid;ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(pad,sy(0));ctx.lineTo(W-pad,sy(0));ctx.stroke();ctx.setLineDash([]);
   ctx.fillStyle=CC.txt3;ctx.font="9px monospace";ctx.fillText("K(ay) °/g",4,9);
 }
-
 /* ================================ 硬点表 ================================ */
 function curTpl(){return S[S.hpAxle==="front"?"frontR":"rearR"]||(S[S.hpAxle==="front"?"frontR":"rearR"]=deep(SEED));}
 function buildTable(){
-  const tb=document.querySelector("#hpTable thead");
-  tb.innerHTML="<tr><th>点 · "+(S.hpAxle==="front"?"右前":"右后")+"</th><th>X</th><th>Y</th><th>Z</th></tr>";
-  const tbody=document.querySelector("#hpTable tbody");
+  $("hpTable").querySelector("thead").innerHTML="<tr><th>点 · "+(S.hpAxle==="front"?"右前":"右后")+"</th><th>X</th><th>Y</th><th>Z</th></tr>";
+  const tbody=$("hpTable").querySelector("tbody");
   tbody.innerHTML="";
   const w=curTpl();
   for(const k of Object.keys(w)){
     const tr=document.createElement("tr");
-    tr.innerHTML='<td class="n"><b>'+k+'</b> <i>'+ (POINT_NAMES[k]||"") +'</i></td>'+
+    tr.innerHTML='<td class="n"><b>'+k+'</b> <i>'+(POINT_NAMES[k]||"")+'</i></td>'+
       '<td><input data-k="'+k+'" data-a="0" type="number" step="1"></td>'+
       '<td><input data-k="'+k+'" data-a="1" type="number" step="1"></td>'+
       '<td><input data-k="'+k+'" data-a="2" type="number" step="1"></td>';
@@ -1002,7 +1194,7 @@ function buildTable(){
   tbody.querySelectorAll("input").forEach(inp=>{
     const k=inp.dataset.k,a=+inp.dataset.a;
     const onEdit=()=>{const v=parseFloat(inp.value);
-      if(isFinite(v)){curTpl()[k][a]=v;refreshTableInputs([k]);drawAll();requestSolve();}
+      if(isFinite(v)){curTpl()[k][a]=v;interpF=1;refreshTableInputs([k]);drawAll();requestSolve({sweep:true});}
     };
     inp.addEventListener("change",onEdit);
     inp.addEventListener("input",onEdit);
@@ -1011,76 +1203,126 @@ function buildTable(){
 }
 function refreshTableInputs(){
   const w=curTpl();
-  const rows=document.querySelectorAll("#hpTable input.num,#hpTable input[type=number]");
-  rows.forEach(inp=>{
+  document.querySelectorAll("#hpTable input[type=number]").forEach(inp=>{
     const k=inp.dataset.k,a=+inp.dataset.a;
     if(k&&w[k]&&document.activeElement!==inp)inp.value=+w[k][a].toFixed(3);
   });
 }
-
 /* ================================ 控件 ================================ */
-function setHpAxle(ax){
-  S.hpAxle=ax;
-  document.getElementById("hpFront").classList.toggle("on",ax==="front");
-  document.getElementById("hpRear").classList.toggle("on",ax==="rear");
-  buildTable();
+const SHOW_DEF=[["node","节点"],["label","标签"],["rigid","连杆"],["face","立柱面"],["spring","弹簧"],
+  ["wheel","车轮"],["disc","制动盘"],["chassis","车架"],["steer","转向机"],["arb","防倾杆"],
+  ["dim","尺寸/角度"],["tirefill","轮胎遮罩"],["mirror","对侧"]];
+function buildToggles(){
+  const host=$("showToggles");
+  host.innerHTML="";
+  SHOW_DEF.forEach(it=>{
+    const c=document.createElement("div");c.className="chk"+(S.show[it[0]]?" on":"");
+    c.innerHTML="<i></i><span>"+it[1]+"</span>";
+    c.addEventListener("click",()=>{S.show[it[0]]=S.show[it[0]]?0:1;c.classList.toggle("on");drawAll();});
+    host.appendChild(c);
+  });
 }
-function setCurveAxle(ax){
-  S.curveAxle=ax;
-  document.getElementById("cvFront").classList.toggle("on",ax==="front");
-  document.getElementById("cvRear").classList.toggle("on",ax==="rear");
-  document.getElementById("curveTitle").textContent=(ax==="front"?"前轴":"后轴")+" "+S.curveAxis;
-  requestSolve();
+function syncUI(){
+  const nm=[["sExcAv","excA"],["sExcFv","excF"],["sStAv","stA"],["sStFv","stF"],["t_travelv","travel"],["t_rollv","roll"],["t_rackv","rack"],["t_ayv","ay"],["t_axv","ax"]];
+  for(const [id,key] of nm){
+    const el=$(id);if(!el||document.activeElement===el)continue;
+    el.value=+S[key].toFixed(2);
+  }
+  const sl=[["sExcA","excA"],["sExcF","excF"],["sStA","stA"],["sStF","stF"],["t_travel","travel"],["t_roll","roll"],["t_rack","rack"],["t_ay","ay"],["t_ax","ax"]];
+  for(const [id,key] of sl){
+    const el=$(id);if(!el||document.activeElement===el)continue;
+    el.value=S[key];
+  }
+  const iso=VW[3];
+  if(iso&&document.activeElement!==$("sAz")&&document.activeElement!==$("sAzv")){
+    if(Math.abs(iso.az*R2D-parseFloat($("sAz").value||-52))>0.5){$("sAz").value=Math.round(iso.az*R2D);$("sAzv").value=Math.round(iso.az*R2D);}
+  }
+  if(iso&&document.activeElement!==$("sEl")&&document.activeElement!==$("sElv")){
+    if(Math.abs(iso.elv*R2D-parseFloat($("sEl").value||24))>0.5){$("sEl").value=Math.round(iso.elv*R2D);$("sElv").value=Math.round(iso.elv*R2D);}
+  }
+  $("tbMode").textContent=S.play?"运行":"暂停";
+  updatePlayBtn();
 }
+function updatePlayBtn(){
+  const b=$("btnPlay");if(b)b.classList.toggle("on",S.play);
+  $("tbMode").textContent=S.play?"运行":"暂停";
+}
+function updateExcBtns(){
+  $("excOff").classList.toggle("on",S.exc==="off");
+  $("excSine").classList.toggle("on",S.exc==="sine");
+  $("excTri").classList.toggle("on",S.exc==="tri");
+  $("steerOff").classList.toggle("on",S.steerExc==="off");
+  $("steerSine").classList.toggle("on",S.steerExc==="sine");
+  $("steerTri").classList.toggle("on",S.steerExc==="tri");
+}
+function setEx(type){S.exc=type;updateExcBtns();if(type!=="off"&&!S.play){S.play=true;updatePlayBtn();}requestSolve();}
+function setSteerEx(type){S.steerExc=type;updateExcBtns();if(type!=="off"&&!S.play){S.play=true;updatePlayBtn();}requestSolve();}
 function bind(){
-  ["t_fl","t_fr","t_rl","t_rr","rack","ay","ax"].forEach(id=>{
-    const el=document.getElementById(id);
-    el.addEventListener("input",()=>{
-      if(id==="ay")document.getElementById("ayv").value=el.value;
-      if(id==="ax")document.getElementById("axv").value=el.value;
-      const ayv=+document.getElementById("ayv").value||0,axv=+document.getElementById("axv").value||0;
-      document.getElementById("tbCase").innerHTML=ayv!==0||axv!==0?"动态":((+document.getElementById("rack").value)? "转向":"轮跳/静态");
-      drawAll();requestSolve();
+  $("btnPlay").addEventListener("click",()=>{S.play=!S.play;updatePlayBtn();requestSolve({sweep:!S.play});});
+  $("btnReset").addEventListener("click",()=>doReset());
+  $("excOff").addEventListener("click",()=>setEx("off"));
+  $("excSine").addEventListener("click",()=>setEx("sine"));
+  $("excTri").addEventListener("click",()=>setEx("tri"));
+  $("steerOff").addEventListener("click",()=>setSteerEx("off"));
+  $("steerSine").addEventListener("click",()=>setSteerEx("sine"));
+  $("steerTri").addEventListener("click",()=>setSteerEx("tri"));
+  const nSliders=[["sExcA","sExcAv","excA",0,45,0],["sExcF","sExcFv","excF",0.05,1.2,0.05],
+    ["sStA","sStAv","stA",0,30,0],["sStF","sStFv","stF",0.05,0.8,0.05],
+    ["t_travel","t_travelv","travel",-40,40,0],["t_roll","t_rollv","roll",-6,6,0],
+    ["t_rack","t_rackv","rack",-30,30,0],["t_ay","t_ayv","ay",-2,2,0],["t_ax","t_axv","ax",-2,2,0]];
+  const getKey=id=>id.replace("sExcA","excA").replace("sExcF","excF").replace("sStA","stA").replace("sStF","stF")
+    .replace("t_travel","travel").replace("t_roll","roll").replace("t_rack","rack").replace("t_ay","ay").replace("t_ax","ax");
+  for(const [si,ni,key] of nSliders){
+    const sl=$(si),nb=$(ni);
+    const push=()=>{let v=parseFloat(nb.value);if(!isFinite(v))v=parseFloat(sl.value);if(!isFinite(v))v=0;
+      v=clamp(v,parseFloat(sl.min),parseFloat(sl.max));S[key]=v;sl.value=v;nb.value=(+v).toFixed(2);
+      if(key==="travel"||key==="roll")S.exc="off";
+      if(key==="rack")S.steerExc="off";
+      updateExcBtns();
+      const anyFree=["travel","roll","rack","ay","ax"].some(k=>Math.abs(S[k])>1e-9);
+      requestSolve({sweep:!anyFree,handling:key==="ay"||key==="ax"});
+    };
+    sl.addEventListener("input",()=>{nb.value=sl.value;push();});
+    nb.addEventListener("input",()=>{
+      const v=clamp(parseFloat(nb.value)||0,parseFloat(sl.min),parseFloat(sl.max));
+      S[key]=v;sl.value=v;nb.value=(+v).toFixed(2);
+      if(key==="travel"||key==="roll")S.exc="off";
+      if(key==="rack")S.steerExc="off";
+      updateExcBtns();
+      requestSolve({handling:key==="ay"||key==="ax"});
     });
-  });
-  document.getElementById("ay").addEventListener("change",()=>document.getElementById("ayv").value=document.getElementById("ay").value);
-  document.getElementById("ax").addEventListener("change",()=>document.getElementById("axv").value=document.getElementById("ax").value);
-  document.getElementById("gamma").addEventListener("input",()=>{});
-  ["ayv","axv"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{drawAll();requestSolve();}));
-  document.getElementById("curves").addEventListener("click",()=>{
-    document.getElementById("curves").classList.toggle("on");requestSolve();});
-  document.getElementById("reset").addEventListener("click",()=>{
-    const ax=S.hpAxle==="front"?"front":"rear";
+  }
+  $("fitAll").addEventListener("click",()=>VW.forEach(fitView));
+  $("resetView").addEventListener("click",()=>{VW.forEach(v=>{if(v.type==="p"){v.az=-52*D2R;v.elv=24*D2R;}fitView(v);});});
+  $("sAz").addEventListener("input",()=>{$("sAzv").value=$("sAz").value;VW[3].az=clamp(parseFloat($("sAz").value)||0,0,1)*0+clamp(parseFloat($("sAz").value)||0,-180,180)*D2R;camIso(VW[3]);drawAll();});
+  $("sAzv").addEventListener("input",()=>{$("sAz").value=$("sAzv").value;VW[3].az=clamp(parseFloat($("sAzv").value)||0,-180,180)*D2R;camIso(VW[3]);drawAll();});
+  $("sEl").addEventListener("input",()=>{$("sElv").value=$("sEl").value;VW[3].elv=clamp(parseFloat($("sEl").value)||0,-85,85)*D2R;camIso(VW[3]);drawAll();});
+  $("sElv").addEventListener("input",()=>{$("sEl").value=$("sElv").value;VW[3].elv=clamp(parseFloat($("sElv").value)||0,-85,85)*D2R;camIso(VW[3]);drawAll();});
+  $("reset").addEventListener("click",()=>{
+    const ax=S.hpAxle;
     S[ax==="front"?"frontR":"rearR"]=deep(ax==="front"?S._seedF:S._seedR);
-    buildTable();refreshTableInputs();drawAll();requestSolve();
-    setStatus("g","已重置为默认硬点");
+    buildTable();refreshTableInputs();drawAll();requestSolve({sweep:true});
   });
-  ["snapA","cmpB"].forEach(id=>document.getElementById(id));
-  document.getElementById("snapA").addEventListener("click",()=>{
+  $("snapA").addEventListener("click",()=>{
     snapA={hp:deep(curTpl()),corner:S.hpAxle==="front"?"front_right":"rear_right",angles:resp?(resp[S.hpAxle==="front"?"front":"rear"].right.angles||null):null};
-    document.getElementById("abBox").innerHTML="<span class='g'>已记基线 A（"+(S.hpAxle==="front"?"右前":"右后")+"）</span>";
+    $("abBox").innerHTML="<span class='g'>已记基线 A（"+(S.hpAxle==="front"?"右前":"右后")+"）</span>";
   });
-  document.getElementById("cmpB").addEventListener("click",()=>{
-    if(!snapA){document.getElementById("abBox").innerHTML="先「记基线A」";return;}
-    if(snapA.corner!==(S.hpAxle==="front"?"front_right":"rear_right")){document.getElementById("abBox").innerHTML="轴已切换，重新记 A";return;}
+  $("cmpB").addEventListener("click",()=>{
+    if(!snapA){$("abBox").innerHTML="先「记基线A」";return;}
+    if(snapA.corner!==(S.hpAxle==="front"?"front_right":"rear_right")){$("abBox").innerHTML="轴已切换，重新记 A";return;}
     const w=curTpl();let hpDelta="",maxD=0;
-    for(const k in w){
-      const d0=snapA.hp[k],d1=w[k];if(!d0)continue;
+    for(const k in w){const d0=snapA.hp[k],d1=w[k];if(!d0)continue;
       const dd=[Math.round((d1[0]-d0[0])*10)/10,Math.round((d1[1]-d0[1])*10)/10,Math.round((d1[2]-d0[2])*10)/10];
-      if(dd[0]||dd[1]||dd[2]){hpDelta+=k+" ["+dd.join(",")+"]  ";maxD=Math.max(maxD,Math.abs(dd[0]),Math.abs(dd[1]),Math.abs(dd[2]));}
-    }
+      if(dd[0]||dd[1]||dd[2]){hpDelta+=k+" ["+dd.join(",")+"]  ";maxD=Math.max(maxD,Math.abs(dd[0]),Math.abs(dd[1]),Math.abs(dd[2]));}}
     let ang="";
     const a1=resp&&resp[S.hpAxle==="front"?"front":"rear"].right.angles;
-    if(snapA.angles&&a1){
-      for(const an of ANGLES){const k=an[0];
-        if(snapA.angles[k]!=null&&a1[k]!=null){
-          const dd=Math.round((a1[k]-snapA.angles[k])*1000)/1000;if(dd)ang+=" "+an[1]+" "+dd;}}
-    }
-    document.getElementById("abBox").innerHTML="<div>硬点 Δ（≥0.1mm）</div><div class='mr'>"+(hpDelta||"— 无变化 —")+
+    if(snapA.angles&&a1){for(const an of ANGLES){const k=an[0];
+      if(snapA.angles[k]!=null&&a1[k]!=null){const dd=Math.round((a1[k]-snapA.angles[k])*1000)/1000;if(dd)ang+=" "+an[1]+" "+dd;}}}
+    $("abBox").innerHTML="<div>硬点 Δ（≥0.1mm）</div><div class='mr'>"+(hpDelta||"— 无变化 —")+
       "</div><div>定位角 Δ"+(ang||" —")+"</div><div>max "+(maxD?maxD.toFixed(1)+"mm":"0mm")+"</div>";
   });
-  document.getElementById("runSens").addEventListener("click",()=>{
-    const b=document.getElementById("sensBox");
+  $("runSens").addEventListener("click",()=>{
+    const b=$("sensBox");
     fetch("/api/v2/sensitivity",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({design_id:"legacy-import",case_id:"static",corner:"front_right",
         hardpoints:["UP1","UP2","CH1","CH3","CH5"],metrics:["camber_deg","toe_deg","caster_deg","scrub_radius_mm"]})})
@@ -1088,47 +1330,41 @@ function bind(){
       .then(d=>{
         if(!d){b.innerHTML="<span class='r'>敏感性不可用</span>";return;}
         const sm=d.summary_per_mm||{};
-        let h="<table class='ro'><tr><th>点\轴</th><th>x</th><th>y</th><th>z</th></tr>";
-        for(const pt in sm){
-          const row=sm[pt];
+        let h="<table class='ro'><tr><th>点/轴</th><th>x</th><th>y</th><th>z</th></tr>";
+        for(const pt in sm){const row=sm[pt];
           h+="<tr><td class='mn'>"+pt+"</td>"+["x","y","z"].map(a=>{
-            const v=row[a]&&row[a].camber_deg!=null?("c "+row[a].camber_deg.toFixed(3)):"<span class='na'>—</span>";
-            return"<td title='"+JSON.stringify(row[a]||{})+"'>"+v+"</td>";}).join("")+"</tr>";
-        }
-        h+="</table>";
-        b.innerHTML=h;
+            const v=row[a]&&row[a].camber_deg!=null?("c "+(+row[a].camber_deg).toFixed(3)):"<span class='na'>—</span>";
+            return"<td title='"+JSON.stringify(row[a]||{})+"'>"+v+"</td>";}).join("")+"</tr>";}
+        h+="</table>";b.innerHTML=h;
       })
       .catch(()=>{b.innerHTML="<span class='r'>请求失败</span>";});
   });
-  function download(name,text){
-    const blob=new Blob([text],{type:"text/csv"});
-    const a=document.createElement("a");
-    a.href=URL.createObjectURL(blob);a.download=name;a.click();
-    URL.revokeObjectURL(a.href);
-  }
-  document.getElementById("expJson").addEventListener("click",()=>{
-    if(!resp){document.getElementById("statusBox").innerHTML+="<span class='r'> 无结果</span>";return;}
+  function download(name,text){const blob=new Blob([text],{type:"text/csv"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href);}
+  $("expJson").addEventListener("click",()=>{
+    if(!resp){return;}
     const blob=new Blob([JSON.stringify(resp,null,2)],{type:"application/json"});
-    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="solve_"+Date.now()+".json";a.click();
-    URL.revokeObjectURL(a.href);
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="solve_"+Date.now()+".json";a.click();URL.revokeObjectURL(a.href);
   });
-  document.getElementById("expCsv").addEventListener("click",()=>{
-    if(!resp){document.getElementById("statusBox").innerHTML+="<span class='r'> 无结果</span>";return;}
+  $("expCsv").addEventListener("click",()=>{
+    if(!resp){return;}
     let rows=[["corner","status","camber","toe","caster","kpi","scrub","trail","Fz","Fx","Fy","mu","off_ground"]];
     for(const sec of ["front","rear"])for(const side of ["left","right"]){
-      const name=sec+"_"+side;
-      const rep=resp[sec][side],ld=resp.loads?resp.loads[name]:null;
+      const name=sec+"_"+side;const rep=resp[sec][side],ld=resp.loads?resp.loads[name]:null;
       const ag=rep.angles||{};
-      rows.push([name,rep.status,ag.camber_deg,ag.toe_deg,ag.caster_deg,ag.kpi_deg,
-        ag.scrub_radius_mm,ag.caster_trail_mm,
+      rows.push([name,rep.status,ag.camber_deg,ag.toe_deg,ag.caster_deg,ag.kpi_deg,ag.scrub_radius_mm,ag.caster_trail_mm,
         ld?ld.fz_n:"",ld?ld.fx_n:"",ld?ld.fy_n:"",ld&&ld.friction_util!=null?ld.friction_util:"",ld?ld.off_ground:""]);
     }
     download("solve_"+Date.now()+".csv",rows.map(r=>r.join(",")).join("\n"));
   });
-  VW.forEach(v=>v.cv.addEventListener("mousemove",e=>{PICK.some(()=>false);}));
   window.addEventListener("resize",()=>{VW.forEach(sizeView);drawAll();if(resp&&resp.sweep)drawChart(resp.sweep);});
 }
-
+function doReset(){
+  S.exc="off";S.steerExc="off";S.travel=0;S.roll=0;S.rack=0;S.ay=0;S.ax=0;S.t=0;S.play=true;
+  updateExcBtns();updatePlayBtn();requestSolve({sweep:true,handling:true});
+}
+function setHpAxle(ax){S.hpAxle=ax;$("hpFront").classList.toggle("on",ax==="front");$("hpRear").classList.toggle("on",ax==="rear");buildTable();}
+function setCurveAxle(ax){S.curveAxle=ax;$("cvFront").classList.toggle("on",ax==="front");$("cvRear").classList.toggle("on",ax==="rear");$("curveTitle").textContent=(ax==="front"?"前轴":"后轴")+" "+S.curveAxis;requestSolve({sweep:true});}
 /* ================================ 初始化 ================================ */
 async function init(){
   try{
@@ -1139,19 +1375,22 @@ async function init(){
       if(S.rearR.UP5)S.rearR.UP5=[S.rearR.UP5[0],Math.abs(S.rearR.UP5[1]),S.rearR.UP5[2]];
     }else{S.frontR=deep(SEED);S.rearR=deep(SEED);}
   }catch(e){S.frontR=deep(SEED);S.rearR=deep(SEED);setStatus("a","离线种子模式");}
-  S._seedF=deep(S.frontR); S._seedR=deep(S.rearR);
+  S._seedF=deep(S.frontR);S._seedR=deep(S.rearR);
   initViews();
+  buildToggles();
   buildTable();
-  document.getElementById("hpFront").addEventListener("click",()=>setHpAxle("front"));
-  document.getElementById("hpRear").addEventListener("click",()=>setHpAxle("rear"));
-  document.getElementById("cvFront").addEventListener("click",()=>setCurveAxle("front"));
-  document.getElementById("cvRear").addEventListener("click",()=>setCurveAxle("rear"));
+  $("hpFront").addEventListener("click",()=>setHpAxle("front"));
+  $("hpRear").addEventListener("click",()=>setHpAxle("rear"));
+  $("cvFront").addEventListener("click",()=>setCurveAxle("front"));
+  $("cvRear").addEventListener("click",()=>setCurveAxle("rear"));
   bind();
-  buildTable();
   setStatus("g","运行");
-  requestSolve();
+  updatePlayBtn();updateExcBtns();
+  requestSolve({sweep:true,handling:true});
+  requestAnimationFrame(loop);
 }
 init();
+
 </script>
 </body>
 </html>
