@@ -2,9 +2,10 @@
 
 ## 2026-08-20 — P1 Task 1 solver comparison harness contract
 
-- 新增 `src/solver/p1_benchmark.py`：固定前右 legacy 硬点、travel `[-30, -15, -5, 0, 5, 10, 15, 30]` mm 与 rack `[0, 5]` mm 的 JSON-safe 比较矩阵；sequential/coupled 路径当前明确标记 `NOT_IMPLEMENTED`。
-- 新增 `tests/test_p1_solver_gate.py`：验证输出字段、双向 travel 覆盖及完整矩阵/JSON 可序列化。
-- 聚焦测试：3 passed（pytest cache 写入受本机权限限制，仅产生 warning）。
+- 修正 `src/solver/p1_benchmark.py` 的 Task 1 语义：当前仅声明并追踪输入矩阵，`NOT_IMPLEMENTED` 路径明确表示尚未评估几何，不输出伪造测量值。
+- 报告新增按排序硬点快照计算的 SHA-256 指纹，保证前右 legacy 输入可追溯；新增 `TypedDict` 报告、路径、case、delta 与 timing 字段别名。
+- `tests/test_p1_solver_gate.py` 现断言 16 个唯一 travel/rack 组合、必需顶层/路径字段、确定性相等，以及 `allow_nan=False` 严格 JSON 序列化。
+- 聚焦测试：5 passed（pytest cache 写入受本机权限限制，仅产生 warning）；生产 endpoints 未修改。
 
 ## 2026-08-20 — V1 P0 数据地基完成（规范冻结 + benchmark + 方案/工况/结果模型 + v2 API）
 
