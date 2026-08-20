@@ -33,6 +33,7 @@ from core.results import (
     WheelReport,
 )
 from core.store import DataStore
+from metrics.handling import understeer_curve, understeer_gradient
 from metrics.kinematics import (
     ackermann_pct,
     anti_dive,
@@ -49,6 +50,7 @@ from metrics.kinematics import (
     wheelbase_change,
 )
 from metrics.loads import arb_droplink_force, solve_upright_forces
+from metrics.ride import ride_level
 from metrics.roll import compute_instant_center, compute_roll_stiffness_suspension
 from metrics.wheel_loads import distribute_vehicle_loads
 from routes.solve import DEFAULT_FRAME_NODES, _rear_rocker_frame_nodes, _solve_axle
@@ -740,6 +742,86 @@ def _as_options(req: SolveInlineRequest):
 
 
 # ---------- P4：A/B 对比 / 敏感性 / 导出 ----------
+
+# ---------- P5：稳态转向 / 整车调平 ----------
+
+class HandlingRequest(BaseModel):
+    design_id: str
+    design_version: int | None = None
+    case_id: str = "static"
+    case_version: int | None = None
+    ay_g: float = 1.0
+    gamma_f_deg: float = 0.0
+    gamma_r_deg: float = 0.0
+    ride_mm: dict[str, float] = {"fl": 0.0, "fr": 0.0, "rl": 0.0, "rr": 0.0}
+    motion_ratio: dict[str, float] | None = None      # 缺省用 rocker mini-sweep 几何 MR
+
+
+@router.post("/handling")
+def handling_v2(req: HandlingRequest):
+    """P5 整车操稳（准静态）：understeer 分析 + K(a_y) 曲线 + 整车调平。
+
+    四轮 Fz 来自 P5 载荷分布（含横向转移）；轮胎用简化魔毯方程（P5-1）。
+    """
+    store = get_store()
+    _ensure_seeded(store)
+    try:
+        dv = store.get_design(req.design_id, req.design_version)
+        cv = store.get_case(req.case_id, req.case_version)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    veh = dv.vehicle
+
+    # 几何 MR（缺省 rocker mini-sweep）
+    tr_f = float(veh.get("front_track_mm", 1220.0))
+    tr_r = float(veh.get("rear_track_mm", 1180.0))
+    if req.motion_ratio is not None:
+        mr = req.motion_ratio
+    else:
+        mr = {
+            "fl": _axle_motion_ratio(dv.front_left, cv.travel.fl,
+                                     cv.rack_displacement, tr_f, DEFAULT_FRAME_NODES) or 0.216,
+            "fr": _axle_motion_ratio(dv.front_right, cv.travel.fr,
+                                     cv.rack_displacement, tr_f, DEFAULT_FRAME_NODES) or 0.216,
+            "rl": _axle_motion_ratio(dv.rear_left, cv.travel.rl,
+                                     cv.rack_displacement, tr_r, _rear_rocker_frame_nodes()) or 0.25,
+            "rr": _axle_motion_ratio(dv.rear_right, cv.travel.rr,
+                                     cv.rack_displacement, tr_r, _rear_rocker_frame_nodes()) or 0.25,
+        }
+
+    # 静态四轮 Fz（设计姿态，P3 分布；ay=0）
+    try:
+        static = distribute_vehicle_loads(
+            veh, cv.loads, None, None, 0.0, 0.0, 0.0)
+    except (ValueError, TypeError, ZeroDivisionError):
+        raise HTTPException(status_code=422, detail="无法计算静态载荷")
+    fz0 = {k: static[k]["fz_n"] for k in
+           ("front_right", "front_left", "rear_right", "rear_left")}
+    fz0_sym = {"fl": fz0["front_left"], "fr": fz0["front_right"],
+               "rl": fz0["rear_left"], "rr": fz0["rear_right"]}
+
+    # 当前 ay 下的四轮 Fz（简化横向转移，handling 内置）
+    from metrics.handling import _loads_with_transfer
+    fz_cur = _loads_with_transfer(veh, fz0_sym, float(req.ay_g))
+
+    ug = understeer_gradient(veh, fz_cur, float(req.ay_g),
+                             req.gamma_f_deg, req.gamma_r_deg)
+    curve = understeer_curve(veh, fz0_sym, ay_max=1.2, points=13,
+                             gamma_f=req.gamma_f_deg, gamma_r=req.gamma_r_deg)
+
+    # 整车调平（设计 ride 位形）
+    ride = ride_level(veh, fz0_sym, mr, req.ride_mm)
+
+    return {
+        "design_id": req.design_id, "case_id": req.case_id,
+        "ay_g": req.ay_g,
+        "understeer": ug,
+        "k_curve": {k: v for k, v in curve.items()},
+        "ride_level": ride,
+        "warnings": [f"操稳分析 at ay={req.ay_g}g: {ug['explanation']}"]
+        if ug["status"] != "VALID" else [],
+    }
+
 
 class CompareRequest(BaseModel):
     design_a_id: str

@@ -533,4 +533,14 @@ VEHICLE_PARAMS = {
     "ax_accel": 1.0,               # g
     "ay_corner": 1.3,              # g
     "unsprung_kg": 20.0,
+    # P5 简化魔毯方程轮胎参数（FSAE 22.5" 半热熔合理默认）
+    "tire_mu_peak_y": 1.4,         # 侧向峰值摩擦系数
+    "tire_mu_peak_x": 1.5,         # 纵向峰值摩擦系数
+    "tire_calpha": 350.0,          # Cα N/deg @ tire_fz_ref
+    "tire_cgamma": 60.0,           # 外倾刚度 N/deg
+    "tire_fz_ref": 1000.0,         # Cα 参考垂直载荷 N
+    "tire_alpha_exp": 0.8,         # Cα(Fz) 硬化指数
+    "tire_mf_c": 1.3,              # Magic Formula 形状系数 C
+    "tire_mf_e": 0.0,              # Magic Formula 曲率系数 E
+    "tire_ckappa": 35.0,           # 纵向刚度 N/% @ ref
 }

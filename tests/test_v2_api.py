@@ -309,6 +309,34 @@ class TestInlineSolve:
         assert r.status_code == 422
 
 
+class TestP5Handling:
+    """P5 操稳：understeer / K 曲线 / 调平（整合 v2）。"""
+
+    def test_understeer_expected_direction(self, client):
+        body = client.post("/api/v2/handling", json={
+            "design_id": "legacy-import", "case_id": "static",
+            "ay_g": 1.0}).json()
+        assert body["understeer"]["status"] == "VALID"
+        assert body["understeer"]["alpha_f_deg"] is not None
+        # 对称默认车接近中性；给定 K 为有限值
+        assert abs(body["understeer"]["k_deg_per_g"]) < 5.0
+        assert "k_curve" in body
+        assert len(body["k_curve"]["ay_g"]) == 13
+        # 调平：静态预载=静载（ride=0）
+        fl = body["ride_level"]["wheels"]["fl"]
+        assert fl["spring_force_n"] == pytest.approx(fl["fz_static_n"], abs=1e-3)
+        assert body["ride_level"]["balance_residual_n"] == pytest.approx(0.0, abs=1e-6)
+
+    def test_ride_custom_height(self, client):
+        body = client.post("/api/v2/handling", json={
+            "design_id": "legacy-import", "case_id": "static",
+            "ay_g": 0.0, "ride_mm": {"fl": 15.0, "fr": 15.0, "rl": 0.0, "rr": 0.0}}).json()
+        # 前轴压缩 15 → roll/pitch 姿态非零
+        pose = body["ride_level"]["pose"]
+        assert abs(pose["roll_deg"]) < 1e-9          # 左右对称
+        assert pose["pitch_deg"] != 0.0              # 前后不等
+
+
 class TestP4:
     """P4 工程迭代工作流：A/B 对比 / 敏感性 / 导出 / 版本回退。"""
 
