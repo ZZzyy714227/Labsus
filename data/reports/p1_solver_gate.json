@@ -1,0 +1,3545 @@
+{
+  "cases": [
+    {
+      "coupled": {
+        "angles": {
+          "_solver_healthy": "not_applicable",
+          "camber_deg": -2.462,
+          "caster_deg": -13.787,
+          "caster_trail_mm": 54.92,
+          "kpi_deg": 2.382,
+          "scrub_radius_mm": 21.27,
+          "toe_deg": -0.928
+        },
+        "contact_patch": [
+          -19.07,
+          609.88,
+          0.0
+        ],
+        "explanation": "bounded coupled solve",
+        "geometry_residual_mm": 1.572090352349072,
+        "iterations": 24,
+        "residuals_mm": {
+          "kingpin_length": 0.008998207559869797,
+          "lca_axis": -0.823470574201906,
+          "pushrod_length": 1.1030954112484892,
+          "rigid_up1_up3": 0.019938322155510946,
+          "rigid_up1_up4": 0.14315248001082637,
+          "rigid_up1_up5": -0.1561123550849075,
+          "rigid_up2_up3": 0.2961882798702362,
+          "rigid_up2_up4": 1.572090352349072,
+          "rigid_up2_up5": -0.8525939612954971,
+          "rigid_up3_up4": -0.28202104664210026,
+          "rigid_up3_up5": 0.02127098379241943,
+          "rigid_up4_up5": 1.2076703113482097,
+          "tie_rod_length": 0.04411613666195535,
+          "uca_axis": -0.2654313302814444,
+          "upright_up1_up5": -0.1561123550849075,
+          "upright_up2_up5": -0.8525939612954971,
+          "wheel_travel": 0.41942685064393004
+        },
+        "state": {
+          "FL1": [
+            -100.0,
+            115.0,
+            200.0
+          ],
+          "UP1": [
+            -25.071207574918066,
+            578.2776408947964,
+            248.25076148810132
+          ],
+          "UP2": [
+            10.648882804213862,
+            584.3339661116065,
+            102.68257948595301
+          ],
+          "UP3": [
+            -90.86753349030417,
+            548.0486785494165,
+            153.781232891121
+          ],
+          "UP4": [
+            5.731249489878122,
+            569.8782160653939,
+            155.47063165046396
+          ],
+          "UP5": [
+            -19.069038988381173,
+            608.4359232785639,
+            225.71942685064394
+          ],
+          "contact_patch": [
+            -19.07,
+            609.88,
+            0.0
+          ],
+          "steering_angle": -0.0716571841932478
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          35.72009037913193,
+          6.056325216810137,
+          -145.56818200214832
+        ],
+        "timing_ms": 49.824299989268184
+      },
+      "delta": {
+        "camber_deg": 0.615,
+        "caster_deg": -19.229,
+        "contact_patch": null,
+        "contact_patch_mm": null,
+        "geometry_residual_mm": 0.8406733523490719,
+        "kpi_deg": -0.728,
+        "scrub_radius_mm": 0.82,
+        "steering_axis": null,
+        "steering_axis_unitless": null,
+        "timing_ms": null,
+        "toe_deg": -0.874,
+        "trail_mm": 76.43
+      },
+      "rack": 0,
+      "sequential": {
+        "angles": {
+          "_solver_healthy": "healthy",
+          "camber_deg": -3.077,
+          "caster_deg": 5.442,
+          "caster_trail_mm": -21.51,
+          "kpi_deg": 3.11,
+          "scrub_radius_mm": 20.45,
+          "toe_deg": -0.054
+        },
+        "contact_patch": [
+          -2.22,
+          611.63,
+          0.0
+        ],
+        "explanation": "sequential baseline",
+        "geometry_residual_mm": 0.731417,
+        "iterations": 84,
+        "residuals_mm": {
+          "kingpin_length": null,
+          "lca_axis": null,
+          "pushrod_length": null,
+          "rigid_up1_up3": null,
+          "rigid_up1_up4": null,
+          "rigid_up1_up5": null,
+          "rigid_up2_up3": null,
+          "rigid_up2_up4": null,
+          "rigid_up2_up5": null,
+          "rigid_up3_up4": null,
+          "rigid_up3_up5": null,
+          "rigid_up4_up5": null,
+          "tie_rod_length": null,
+          "uca_axis": null,
+          "upright_up1_up5": null,
+          "upright_up2_up5": null,
+          "wheel_travel": null
+        },
+        "state": {
+          "CH1": [
+            -90.0,
+            160.0,
+            285.0
+          ],
+          "CH2": [
+            90.0,
+            152.0,
+            295.0
+          ],
+          "CH3": [
+            -110.0,
+            128.0,
+            110.0
+          ],
+          "CH4": [
+            110.0,
+            122.0,
+            115.0
+          ],
+          "CH5": [
+            0.0,
+            135.0,
+            305.0
+          ],
+          "FL1": [
+            -100.0,
+            115.0,
+            200.0
+          ],
+          "UP1": [
+            -0.2160747807716963,
+            577.770155451064,
+            246.82293998107832
+          ],
+          "UP2": [
+            -14.351117195786136,
+            585.8328271439901,
+            98.44402014080131
+          ],
+          "UP3": [
+            -93.82037727025835,
+            549.9987105527314,
+            178.78123289112096
+          ],
+          "UP4": [
+            -2.771085304313022,
+            576.1403562477267,
+            148.89317854063881
+          ],
+          "UP5": [
+            -2.2167086934913374,
+            610.0817924276836,
+            225.51561510846724
+          ],
+          "_fallback_root_found": false,
+          "_newton_converged": true,
+          "_used_fallback": false,
+          "corner_weight_n": 700.0,
+          "iterations": 4,
+          "push_rod_length": 467.9549471159375,
+          "steering_theta": -0.0716571841932478,
+          "tie_rod_length": 435.5597570910808,
+          "tire_radius": 260.0,
+          "tire_spring_rate": 150.0,
+          "tire_width": 180.0,
+          "track_width": 1220.0
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -0.09469536124227965,
+          0.054014525469590326,
+          -0.9940398480933694
+        ],
+        "timing_ms": 5.089799873530865
+      },
+      "timing_ms": {
+        "coupled": 49.824299989268184,
+        "sequential": 5.089799873530865
+      },
+      "travel": -30
+    },
+    {
+      "coupled": {
+        "angles": {
+          "_solver_healthy": "not_applicable",
+          "camber_deg": -1.201,
+          "caster_deg": 18.602,
+          "caster_trail_mm": -79.74,
+          "kpi_deg": 3.899,
+          "scrub_radius_mm": 48.8,
+          "toe_deg": -7.535
+        },
+        "contact_patch": [
+          21.01,
+          641.41,
+          0.0
+        ],
+        "explanation": "bounded coupled solve",
+        "geometry_residual_mm": 1.5162250326828257,
+        "iterations": 26,
+        "residuals_mm": {
+          "kingpin_length": 0.054239492149861235,
+          "lca_axis": -0.7707096460504772,
+          "pushrod_length": 1.0595665534959835,
+          "rigid_up1_up3": -0.044216755389982154,
+          "rigid_up1_up4": 0.1901416031915204,
+          "rigid_up1_up5": -0.21316554305747815,
+          "rigid_up2_up3": 0.21515788560134297,
+          "rigid_up2_up4": 1.5162250326828257,
+          "rigid_up2_up5": -0.8218181372178321,
+          "rigid_up3_up4": -0.36011140143808973,
+          "rigid_up3_up5": 0.2705667369769742,
+          "rigid_up4_up5": 1.108970663642026,
+          "tie_rod_length": 0.11243765133417583,
+          "uca_axis": -0.34446421912133474,
+          "upright_up1_up5": -0.21316554305747815,
+          "upright_up2_up5": -0.8218181372178321,
+          "wheel_travel": 0.2653409786021257
+        },
+        "state": {
+          "FL1": [
+            -100.0,
+            120.0,
+            200.0
+          ],
+          "UP1": [
+            24.783925219228227,
+            575.7031258432509,
+            248.13414720086965
+          ],
+          "UP2": [
+            -22.98342813289807,
+            585.3753035180139,
+            106.21514310935135
+          ],
+          "UP3": [
+            -83.8853657407829,
+            555.3536830638296,
+            204.21313151029423
+          ],
+          "UP4": [
+            -0.0850453927713026,
+            569.1510304178852,
+            153.39597183384234
+          ],
+          "UP5": [
+            21.007493495505912,
+            606.1210485539041,
+            225.56534097860214
+          ],
+          "contact_patch": [
+            21.01,
+            641.41,
+            0.0
+          ],
+          "steering_angle": -0.014024483886683441
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -47.76735335212629,
+          9.67217767476302,
+          -141.9190040915183
+        ],
+        "timing_ms": 47.456600004807115
+      },
+      "delta": {
+        "camber_deg": 1.558,
+        "caster_deg": 13.16,
+        "contact_patch": null,
+        "contact_patch_mm": null,
+        "geometry_residual_mm": 0.7848080326828257,
+        "kpi_deg": 0.789,
+        "scrub_radius_mm": 13.77,
+        "steering_axis": null,
+        "steering_axis_unitless": null,
+        "timing_ms": null,
+        "toe_deg": -4.168,
+        "trail_mm": -56.44
+      },
+      "rack": 5,
+      "sequential": {
+        "angles": {
+          "_solver_healthy": "healthy",
+          "camber_deg": -2.759,
+          "caster_deg": 5.442,
+          "caster_trail_mm": -23.3,
+          "kpi_deg": 3.11,
+          "scrub_radius_mm": 35.03,
+          "toe_deg": -3.367
+        },
+        "contact_patch": [
+          -0.43,
+          626.21,
+          0.0
+        ],
+        "explanation": "sequential baseline",
+        "geometry_residual_mm": 0.731417,
+        "iterations": 84,
+        "residuals_mm": {
+          "kingpin_length": null,
+          "lca_axis": null,
+          "pushrod_length": null,
+          "rigid_up1_up3": null,
+          "rigid_up1_up4": null,
+          "rigid_up1_up5": null,
+          "rigid_up2_up3": null,
+          "rigid_up2_up4": null,
+          "rigid_up2_up5": null,
+          "rigid_up3_up4": null,
+          "rigid_up3_up5": null,
+          "rigid_up4_up5": null,
+          "tie_rod_length": null,
+          "uca_axis": null,
+          "upright_up1_up5": null,
+          "upright_up2_up5": null,
+          "wheel_travel": null
+        },
+        "state": {
+          "CH1": [
+            -90.0,
+            160.0,
+            285.0
+          ],
+          "CH2": [
+            90.0,
+            152.0,
+            295.0
+          ],
+          "CH3": [
+            -110.0,
+            128.0,
+            110.0
+          ],
+          "CH4": [
+            110.0,
+            122.0,
+            115.0
+          ],
+          "CH5": [
+            0.0,
+            135.0,
+            305.0
+          ],
+          "FL1": [
+            -100.0,
+            120.0,
+            200.0
+          ],
+          "UP1": [
+            -0.2160747807716963,
+            577.770155451064,
+            246.82293998107832
+          ],
+          "UP2": [
+            -14.351117195786136,
+            585.8328271439901,
+            98.44402014080131
+          ],
+          "UP3": [
+            -95.47857742858184,
+            555.0399577436119,
+            179.21313151029426
+          ],
+          "UP4": [
+            -3.1801775784188937,
+            575.7639388688945,
+            148.91169604234366
+          ],
+          "UP5": [
+            -0.43323103580722466,
+            610.0285481116993,
+            225.34282220901434
+          ],
+          "_fallback_root_found": false,
+          "_newton_converged": true,
+          "_used_fallback": false,
+          "corner_weight_n": 700.0,
+          "iterations": 4,
+          "push_rod_length": 467.59653759307344,
+          "steering_theta": -0.014024483886683441,
+          "tie_rod_length": 435.5597570910808,
+          "tire_radius": 260.0,
+          "tire_spring_rate": 150.0,
+          "tire_width": 180.0,
+          "track_width": 1220.0
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -0.09469536124227965,
+          0.054014525469590326,
+          -0.9940398480933694
+        ],
+        "timing_ms": 5.0154998898506165
+      },
+      "timing_ms": {
+        "coupled": 47.456600004807115,
+        "sequential": 5.0154998898506165
+      },
+      "travel": -30
+    },
+    {
+      "coupled": {
+        "angles": {
+          "_solver_healthy": "not_applicable",
+          "camber_deg": -2.07,
+          "caster_deg": -13.425,
+          "caster_trail_mm": 57.31,
+          "kpi_deg": 2.148,
+          "scrub_radius_mm": 19.19,
+          "toe_deg": -0.167
+        },
+        "contact_patch": [
+          -16.9,
+          608.47,
+          0.0
+        ],
+        "explanation": "bounded coupled solve",
+        "geometry_residual_mm": 0.6238446904200003,
+        "iterations": 25,
+        "residuals_mm": {
+          "kingpin_length": 0.01701283021316158,
+          "lca_axis": -0.3029296567774509,
+          "pushrod_length": 0.40596790905760827,
+          "rigid_up1_up3": 0.008670446773152207,
+          "rigid_up1_up4": 0.043834505856352735,
+          "rigid_up1_up5": -0.0606716244247707,
+          "rigid_up2_up3": 0.11916468579875072,
+          "rigid_up2_up4": 0.6238446904200003,
+          "rigid_up2_up5": -0.3556307203942879,
+          "rigid_up3_up4": -0.1177470875717006,
+          "rigid_up3_up5": 0.013887375741518326,
+          "rigid_up4_up5": 0.5227343537445108,
+          "tie_rod_length": 0.015970325452826728,
+          "uca_axis": -0.10127227116606718,
+          "upright_up1_up5": -0.0606716244247707,
+          "upright_up2_up5": -0.3556307203942879,
+          "wheel_travel": 0.15421619466991388
+        },
+        "state": {
+          "FL1": [
+            -100.0,
+            115.0,
+            200.0
+          ],
+          "UP1": [
+            -22.329399913461046,
+            579.4172896849724,
+            262.82323492862986
+          ],
+          "UP2": [
+            12.477954282899557,
+            584.8867229668188,
+            117.00266871136107
+          ],
+          "UP3": [
+            -88.74484480792684,
+            549.3084471001131,
+            168.7636658115412
+          ],
+          "UP4": [
+            7.412907159013389,
+            573.7270542540147,
+            169.5975392882076
+          ],
+          "UP5": [
+            -16.903513814284597,
+            609.9243630076836,
+            240.45421619466993
+          ],
+          "contact_patch": [
+            -16.9,
+            608.47,
+            0.0
+          ],
+          "steering_angle": -0.046324345062694484
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          34.807354196360606,
+          5.469433281846364,
+          -145.82056621726878
+        ],
+        "timing_ms": 50.03809998743236
+      },
+      "delta": {
+        "camber_deg": 0.725,
+        "caster_deg": -18.412,
+        "contact_patch": null,
+        "contact_patch_mm": null,
+        "geometry_residual_mm": 0.43344869042000034,
+        "kpi_deg": -0.675,
+        "scrub_radius_mm": -0.76,
+        "steering_axis": null,
+        "steering_axis_unitless": null,
+        "timing_ms": null,
+        "toe_deg": -0.091,
+        "trail_mm": 78.33
+      },
+      "rack": 0,
+      "sequential": {
+        "angles": {
+          "_solver_healthy": "healthy",
+          "camber_deg": -2.795,
+          "caster_deg": 4.987,
+          "caster_trail_mm": -21.02,
+          "kpi_deg": 2.823,
+          "scrub_radius_mm": 19.95,
+          "toe_deg": -0.076
+        },
+        "contact_patch": [
+          -1.4,
+          611.46,
+          0.0
+        ],
+        "explanation": "sequential baseline",
+        "geometry_residual_mm": 0.190396,
+        "iterations": 89,
+        "residuals_mm": {
+          "kingpin_length": null,
+          "lca_axis": null,
+          "pushrod_length": null,
+          "rigid_up1_up3": null,
+          "rigid_up1_up4": null,
+          "rigid_up1_up5": null,
+          "rigid_up2_up3": null,
+          "rigid_up2_up4": null,
+          "rigid_up2_up5": null,
+          "rigid_up3_up4": null,
+          "rigid_up3_up5": null,
+          "rigid_up4_up5": null,
+          "tie_rod_length": null,
+          "uca_axis": null,
+          "upright_up1_up5": null,
+          "upright_up2_up5": null,
+          "wheel_travel": null
+        },
+        "state": {
+          "CH1": [
+            -90.0,
+            160.0,
+            285.0
+          ],
+          "CH2": [
+            90.0,
+            152.0,
+            295.0
+          ],
+          "CH3": [
+            -110.0,
+            128.0,
+            110.0
+          ],
+          "CH4": [
+            110.0,
+            122.0,
+            115.0
+          ],
+          "CH5": [
+            0.0,
+            135.0,
+            305.0
+          ],
+          "FL1": [
+            -100.0,
+            115.0,
+            200.0
+          ],
+          "UP1": [
+            0.482101151925372,
+            578.5691968260226,
+            262.4307477310293
+          ],
+          "UP2": [
+            -12.523956487009121,
+            585.9192120011965,
+            113.36788443907128
+          ],
+          "UP3": [
+            -92.57894626674053,
+            550.4522317495172,
+            193.7884121921843
+          ],
+          "UP4": [
+            -1.2967150997333876,
+            576.4521523908373,
+            164.493132712068
+          ],
+          "UP5": [
+            -1.397669074886163,
+            610.0342802653043,
+            240.4236399503626
+          ],
+          "_fallback_root_found": false,
+          "_newton_converged": true,
+          "_used_fallback": false,
+          "corner_weight_n": 700.0,
+          "iterations": 4,
+          "push_rod_length": 463.275149425934,
+          "steering_theta": -0.046259260896614675,
+          "tie_rod_length": 435.5597570910808,
+          "tire_radius": 260.0,
+          "tire_spring_rate": 150.0,
+          "tire_width": 180.0,
+          "track_width": 1220.0
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -0.0868172485989754,
+          0.04906237634677974,
+          -0.9950154011737259
+        ],
+        "timing_ms": 7.6211001724004745
+      },
+      "timing_ms": {
+        "coupled": 50.03809998743236,
+        "sequential": 7.6211001724004745
+      },
+      "travel": -15
+    },
+    {
+      "coupled": {
+        "angles": {
+          "_solver_healthy": "not_applicable",
+          "camber_deg": -1.669,
+          "caster_deg": 19.151,
+          "caster_trail_mm": -85.97,
+          "kpi_deg": 3.546,
+          "scrub_radius_mm": 38.58,
+          "toe_deg": -4.794
+        },
+        "contact_patch": [
+          20.37,
+          631.9,
+          0.0
+        ],
+        "explanation": "bounded coupled solve",
+        "geometry_residual_mm": 0.578744100910356,
+        "iterations": 24,
+        "residuals_mm": {
+          "kingpin_length": 0.03206650137164502,
+          "lca_axis": -0.2730267183829369,
+          "pushrod_length": 0.37691544469015525,
+          "rigid_up1_up3": -0.011808151197513439,
+          "rigid_up1_up4": 0.057899278024294176,
+          "rigid_up1_up5": -0.07872479227589935,
+          "rigid_up2_up3": 0.08603565286038872,
+          "rigid_up2_up4": 0.578744100910356,
+          "rigid_up2_up5": -0.3302767242088578,
+          "rigid_up3_up4": -0.14108213085899024,
+          "rigid_up3_up5": 0.09950079269967205,
+          "rigid_up4_up5": 0.4678974659316708,
+          "tie_rod_length": 0.03883461879627248,
+          "uca_axis": -0.12600428836520905,
+          "upright_up1_up5": -0.07872479227589935,
+          "upright_up2_up5": -0.3302767242088578,
+          "wheel_travel": 0.09408358813712425
+        },
+        "state": {
+          "FL1": [
+            -100.0,
+            120.0,
+            200.0
+          ],
+          "UP1": [
+            25.48045708861244,
+            577.0656600378642,
+            262.2588500924291
+          ],
+          "UP2": [
+            -23.65577977389696,
+            585.8342558313446,
+            120.77258597653007
+          ],
+          "UP3": [
+            -83.18696048721391,
+            554.8522684446349,
+            219.1561851767233
+          ],
+          "UP4": [
+            -0.3518653797840376,
+            573.1904701917977,
+            167.7683985874514
+          ],
+          "UP5": [
+            20.365186108133077,
+            607.9668124651258,
+            240.39408358813714
+          ],
+          "contact_patch": [
+            20.37,
+            631.9,
+            0.0
+          ],
+          "steering_angle": 0.011166346856319575
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -49.1362368625094,
+          8.768595793480472,
+          -141.48626411589902
+        ],
+        "timing_ms": 46.95170000195503
+      },
+      "delta": {
+        "camber_deg": 0.835,
+        "caster_deg": 14.164,
+        "contact_patch": null,
+        "contact_patch_mm": null,
+        "geometry_residual_mm": 0.388348100910356,
+        "kpi_deg": 0.723,
+        "scrub_radius_mm": 4.07,
+        "steering_axis": null,
+        "steering_axis_unitless": null,
+        "timing_ms": null,
+        "toe_deg": -1.415,
+        "trail_mm": -63.21
+      },
+      "rack": 5,
+      "sequential": {
+        "angles": {
+          "_solver_healthy": "healthy",
+          "camber_deg": -2.504,
+          "caster_deg": 4.987,
+          "caster_trail_mm": -22.76,
+          "kpi_deg": 2.823,
+          "scrub_radius_mm": 34.51,
+          "toe_deg": -3.379
+        },
+        "contact_patch": [
+          0.34,
+          626.02,
+          0.0
+        ],
+        "explanation": "sequential baseline",
+        "geometry_residual_mm": 0.190396,
+        "iterations": 88,
+        "residuals_mm": {
+          "kingpin_length": null,
+          "lca_axis": null,
+          "pushrod_length": null,
+          "rigid_up1_up3": null,
+          "rigid_up1_up4": null,
+          "rigid_up1_up5": null,
+          "rigid_up2_up3": null,
+          "rigid_up2_up4": null,
+          "rigid_up2_up5": null,
+          "rigid_up3_up4": null,
+          "rigid_up3_up5": null,
+          "rigid_up4_up5": null,
+          "tie_rod_length": null,
+          "uca_axis": null,
+          "upright_up1_up5": null,
+          "upright_up2_up5": null,
+          "wheel_travel": null
+        },
+        "state": {
+          "CH1": [
+            -90.0,
+            160.0,
+            285.0
+          ],
+          "CH2": [
+            90.0,
+            152.0,
+            295.0
+          ],
+          "CH3": [
+            -110.0,
+            128.0,
+            110.0
+          ],
+          "CH4": [
+            110.0,
+            122.0,
+            115.0
+          ],
+          "CH5": [
+            0.0,
+            135.0,
+            305.0
+          ],
+          "FL1": [
+            -100.0,
+            120.0,
+            200.0
+          ],
+          "UP1": [
+            0.482101151925372,
+            578.5691968260226,
+            262.4307477310293
+          ],
+          "UP2": [
+            -12.523956487009121,
+            585.9192120011965,
+            113.36788443907128
+          ],
+          "UP3": [
+            -94.23694265622734,
+            555.482754917023,
+            194.18112179761022
+          ],
+          "UP4": [
+            -1.7048805085366174,
+            576.0767070096264,
+            164.5102335078495
+          ],
+          "UP5": [
+            0.3389062333404218,
+            609.9819021108303,
+            240.2695373236179
+          ],
+          "_fallback_root_found": false,
+          "_newton_converged": true,
+          "_used_fallback": false,
+          "corner_weight_n": 700.0,
+          "iterations": 3,
+          "push_rod_length": 462.9135368219676,
+          "steering_theta": 0.011229902231985263,
+          "tie_rod_length": 435.5597570910808,
+          "tire_radius": 260.0,
+          "tire_spring_rate": 150.0,
+          "tire_width": 180.0,
+          "track_width": 1220.0
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -0.0868172485989754,
+          0.04906237634677974,
+          -0.9950154011737259
+        ],
+        "timing_ms": 6.987200118601322
+      },
+      "timing_ms": {
+        "coupled": 46.95170000195503,
+        "sequential": 6.987200118601322
+      },
+      "travel": -15
+    },
+    {
+      "coupled": {
+        "angles": {
+          "_solver_healthy": "not_applicable",
+          "camber_deg": -1.813,
+          "caster_deg": -13.003,
+          "caster_trail_mm": 57.99,
+          "kpi_deg": 1.989,
+          "scrub_radius_mm": 17.88,
+          "toe_deg": 0.34
+        },
+        "contact_patch": [
+          -15.31,
+          607.22,
+          0.0
+        ],
+        "explanation": "bounded coupled solve",
+        "geometry_residual_mm": 0.05367671627576698,
+        "iterations": 40,
+        "residuals_mm": {
+          "kingpin_length": 0.002549241291688986,
+          "lca_axis": -0.024497597571439655,
+          "pushrod_length": 0.032861913691078826,
+          "rigid_up1_up3": 0.0007464238454701899,
+          "rigid_up1_up4": 0.0026587167464811046,
+          "rigid_up1_up5": -0.005080404902884084,
+          "rigid_up2_up3": 0.010141021220945845,
+          "rigid_up2_up4": 0.05367671627576698,
+          "rigid_up2_up5": -0.03162434364190858,
+          "rigid_up3_up4": -0.010279906340812772,
+          "rigid_up3_up5": 0.0015311400441646583,
+          "rigid_up4_up5": 0.04767846866634784,
+          "tie_rod_length": 0.0012508323031852342,
+          "uca_axis": -0.00837758244762199,
+          "upright_up1_up5": -0.005080404902884084,
+          "upright_up2_up5": -0.03162434364190858,
+          "wheel_travel": 0.012427496467267929
+        },
+        "state": {
+          "FL1": [
+            -100.0,
+            115.0,
+            200.0
+          ],
+          "UP1": [
+            -20.26888201450655,
+            579.8761680296335,
+            272.5772424000788
+          ],
+          "UP2": [
+            13.462634871299638,
+            584.94804682954,
+            126.50457009992618
+          ],
+          "UP3": [
+            -87.4198683700178,
+            549.8733855769449,
+            179.01737794620738
+          ],
+          "UP4": [
+            8.375336922116196,
+            576.1009965883793,
+            178.95459399997338
+          ],
+          "UP5": [
+            -15.30525509048262,
+            610.6070526905521,
+            250.31242749646728
+          ],
+          "contact_patch": [
+            -15.31,
+            607.22,
+            0.0
+          ],
+          "steering_angle": -0.01819941834552839
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          33.73151688580619,
+          5.071878799906472,
+          -146.0726723001526
+        ],
+        "timing_ms": 70.88000001385808
+      },
+      "delta": {
+        "camber_deg": 0.78,
+        "caster_deg": -17.943,
+        "contact_patch": null,
+        "contact_patch_mm": null,
+        "geometry_residual_mm": 0.015958716275766976,
+        "kpi_deg": -0.627,
+        "scrub_radius_mm": -1.92,
+        "steering_axis": null,
+        "steering_axis_unitless": null,
+        "timing_ms": null,
+        "toe_deg": 0.377,
+        "trail_mm": 79.65
+      },
+      "rack": 0,
+      "sequential": {
+        "angles": {
+          "_solver_healthy": "healthy",
+          "camber_deg": -2.593,
+          "caster_deg": 4.94,
+          "caster_trail_mm": -21.66,
+          "kpi_deg": 2.616,
+          "scrub_radius_mm": 19.8,
+          "toe_deg": -0.037
+        },
+        "contact_patch": [
+          -0.54,
+          611.17,
+          0.0
+        ],
+        "explanation": "sequential baseline",
+        "geometry_residual_mm": 0.037718,
+        "iterations": 88,
+        "residuals_mm": {
+          "kingpin_length": null,
+          "lca_axis": null,
+          "pushrod_length": null,
+          "rigid_up1_up3": null,
+          "rigid_up1_up4": null,
+          "rigid_up1_up5": null,
+          "rigid_up2_up3": null,
+          "rigid_up2_up4": null,
+          "rigid_up2_up5": null,
+          "rigid_up3_up4": null,
+          "rigid_up3_up5": null,
+          "rigid_up4_up5": null,
+          "tie_rod_length": null,
+          "uca_axis": null,
+          "upright_up1_up5": null,
+          "upright_up2_up5": null,
+          "wheel_travel": null
+        },
+        "state": {
+          "CH1": [
+            -90.0,
+            160.0,
+            285.0
+          ],
+          "CH2": [
+            90.0,
+            152.0,
+            295.0
+          ],
+          "CH3": [
+            -110.0,
+            128.0,
+            110.0
+          ],
+          "CH4": [
+            110.0,
+            122.0,
+            115.0
+          ],
+          "CH5": [
+            0.0,
+            135.0,
+            305.0
+          ],
+          "FL1": [
+            -100.0,
+            115.0,
+            200.0
+          ],
+          "UP1": [
+            1.3632713299863803,
+            578.9116157216473,
+            272.64284551659745
+          ],
+          "UP2": [
+            -11.537768650837101,
+            585.7300687018704,
+            123.3921911814866
+          ],
+          "UP3": [
+            -91.6121015266294,
+            550.460408710418,
+            204.0221390077204
+          ],
+          "UP4": [
+            -0.3310438661804067,
+            576.4475288677339,
+            174.71184903441926
+          ],
+          "UP5": [
+            -0.5445468635881995,
+            610.0053184202171,
+            250.34731291992134
+          ],
+          "_fallback_root_found": false,
+          "_newton_converged": true,
+          "_used_fallback": false,
+          "corner_weight_n": 700.0,
+          "iterations": 4,
+          "push_rod_length": 460.2727806589263,
+          "steering_theta": -0.01819430277082265,
+          "tie_rod_length": 435.5597570910808,
+          "tire_radius": 260.0,
+          "tire_spring_rate": 150.0,
+          "tire_width": 180.0,
+          "track_width": 1220.0
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -0.08602856550806032,
+          0.04546778629821071,
+          -0.9952546238655541
+        ],
+        "timing_ms": 7.310600019991398
+      },
+      "timing_ms": {
+        "coupled": 70.88000001385808,
+        "sequential": 7.310600019991398
+      },
+      "travel": -5
+    },
+    {
+      "coupled": {
+        "angles": {
+          "_solver_healthy": "not_applicable",
+          "camber_deg": -1.959,
+          "caster_deg": 19.652,
+          "caster_trail_mm": -90.98,
+          "kpi_deg": 3.304,
+          "scrub_radius_mm": 32.22,
+          "toe_deg": -3.054
+        },
+        "contact_patch": [
+          20.33,
+          625.58,
+          0.0
+        ],
+        "explanation": "bounded coupled solve",
+        "geometry_residual_mm": 0.00593168754506479,
+        "iterations": 32,
+        "residuals_mm": {
+          "kingpin_length": 0.0004424732676113763,
+          "lca_axis": -0.0026293473403029566,
+          "pushrod_length": 0.0036437542656813093,
+          "rigid_up1_up3": -9.241644340818311e-05,
+          "rigid_up1_up4": 0.0004482242372461087,
+          "rigid_up1_up5": -0.0007782798013025172,
+          "rigid_up2_up3": 0.0008887199934548562,
+          "rigid_up2_up4": 0.00593168754506479,
+          "rigid_up2_up5": -0.003504007352773897,
+          "rigid_up3_up4": -0.001450382969636621,
+          "rigid_up3_up5": 0.000988590589642513,
+          "rigid_up4_up5": 0.005130326469839019,
+          "tie_rod_length": 0.0003618008656189886,
+          "uca_axis": -0.00123717458734518,
+          "upright_up1_up5": -0.0007782798013025172,
+          "upright_up2_up5": -0.003504007352773897,
+          "wheel_travel": 0.0009036605510743811
+        },
+        "state": {
+          "FL1": [
+            -100.0,
+            120.0,
+            200.0
+          ],
+          "UP1": [
+            26.36309957396415,
+            577.670219617783,
+            271.6683361206145
+          ],
+          "UP2": [
+            -24.008522321063396,
+            585.8143946510727,
+            130.61336505306375
+          ],
+          "UP3": [
+            -82.37915620567027,
+            554.209992765145,
+            229.3905633841048
+          ],
+          "UP4": [
+            -0.48287438962942036,
+            575.7203938411491,
+            177.46110607642126
+          ],
+          "UP5": [
+            20.33056173836112,
+            608.8490182599912,
+            250.30090366055109
+          ],
+          "contact_patch": [
+            20.33,
+            625.58,
+            0.0
+          ],
+          "steering_angle": 0.039233446970318574
+        },
+        "status": "VALID",
+        "steering_axis": [
+          -50.371621895027545,
+          8.144175033289685,
+          -141.05497106755078
+        ],
+        "timing_ms": 65.01210015267134
+      },
+      "delta": {
+        "camber_deg": 0.346,
+        "caster_deg": 14.712,
+        "contact_patch": null,
+        "contact_patch_mm": null,
+        "geometry_residual_mm": -0.03178631245493521,
+        "kpi_deg": 0.688,
+        "scrub_radius_mm": -2.13,
+        "steering_axis": null,
+        "steering_axis_unitless": null,
+        "timing_ms": null,
+        "toe_deg": 0.283,
+        "trail_mm": -67.61
+      },
+      "rack": 5,
+      "sequential": {
+        "angles": {
+          "_solver_healthy": "healthy",
+          "camber_deg": -2.305,
+          "caster_deg": 4.94,
+          "caster_trail_mm": -23.37,
+          "kpi_deg": 2.616,
+          "scrub_radius_mm": 34.35,
+          "toe_deg": -3.337
+        },
+        "contact_patch": [
+          1.17,
+          625.72,
+          0.0
+        ],
+        "explanation": "sequential baseline",
+        "geometry_residual_mm": 0.037718,
+        "iterations": 88,
+        "residuals_mm": {
+          "kingpin_length": null,
+          "lca_axis": null,
+          "pushrod_length": null,
+          "rigid_up1_up3": null,
+          "rigid_up1_up4": null,
+          "rigid_up1_up5": null,
+          "rigid_up2_up3": null,
+          "rigid_up2_up4": null,
+          "rigid_up2_up5": null,
+          "rigid_up3_up4": null,
+          "rigid_up3_up5": null,
+          "rigid_up4_up5": null,
+          "tie_rod_length": null,
+          "uca_axis": null,
+          "upright_up1_up5": null,
+          "upright_up2_up5": null,
+          "wheel_travel": null
+        },
+        "state": {
+          "CH1": [
+            -90.0,
+            160.0,
+            285.0
+          ],
+          "CH2": [
+            90.0,
+            152.0,
+            295.0
+          ],
+          "CH3": [
+            -110.0,
+            128.0,
+            110.0
+          ],
+          "CH4": [
+            110.0,
+            122.0,
+            115.0
+          ],
+          "CH5": [
+            0.0,
+            135.0,
+            305.0
+          ],
+          "FL1": [
+            -100.0,
+            120.0,
+            200.0
+          ],
+          "UP1": [
+            1.3632713299863803,
+            578.9116157216473,
+            272.64284551659745
+          ],
+          "UP2": [
+            -11.537768650837101,
+            585.7300687018704,
+            123.3921911814866
+          ],
+          "UP3": [
+            -93.2739138387756,
+            555.485639920124,
+            204.3953595476631
+          ],
+          "UP4": [
+            -0.7384398335012055,
+            576.0720990864216,
+            174.72991248186736
+          ],
+          "UP5": [
+            1.1733792103222285,
+            609.9547258341285,
+            250.1965062368064
+          ],
+          "_fallback_root_found": false,
+          "_newton_converged": true,
+          "_used_fallback": false,
+          "corner_weight_n": 700.0,
+          "iterations": 4,
+          "push_rod_length": 459.90807514966707,
+          "steering_theta": 0.039238290663313274,
+          "tie_rod_length": 435.5597570910808,
+          "tire_radius": 260.0,
+          "tire_spring_rate": 150.0,
+          "tire_width": 180.0,
+          "track_width": 1220.0
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -0.08602856550806032,
+          0.04546778629821071,
+          -0.9952546238655541
+        ],
+        "timing_ms": 7.5599998235702515
+      },
+      "timing_ms": {
+        "coupled": 65.01210015267134,
+        "sequential": 7.5599998235702515
+      },
+      "travel": -5
+    },
+    {
+      "coupled": {
+        "angles": {
+          "_solver_healthy": "not_applicable",
+          "camber_deg": -2.49,
+          "caster_deg": 5.005,
+          "caster_trail_mm": -22.36,
+          "kpi_deg": 2.51,
+          "scrub_radius_mm": 19.78,
+          "toe_deg": 0.0
+        },
+        "contact_patch": [
+          0.0,
+          610.97,
+          0.0
+        ],
+        "explanation": "bounded coupled solve",
+        "geometry_residual_mm": 1.1368683772161603e-13,
+        "iterations": 1,
+        "residuals_mm": {
+          "kingpin_length": 0.0,
+          "lca_axis": 0.0,
+          "pushrod_length": 0.0,
+          "rigid_up1_up3": -4.263256414560601e-14,
+          "rigid_up1_up4": -4.263256414560601e-14,
+          "rigid_up1_up5": 0.0,
+          "rigid_up2_up3": -1.4210854715202004e-14,
+          "rigid_up2_up4": 2.842170943040401e-14,
+          "rigid_up2_up5": 0.0,
+          "rigid_up3_up4": -2.842170943040401e-14,
+          "rigid_up3_up5": -5.684341886080802e-14,
+          "rigid_up4_up5": -2.842170943040401e-14,
+          "tie_rod_length": 1.1368683772161603e-13,
+          "uca_axis": 0.0,
+          "upright_up1_up5": 0.0,
+          "upright_up2_up5": 0.0,
+          "wheel_travel": 0.0
+        },
+        "state": {
+          "FL1": [
+            -100.0,
+            115.0,
+            200.0
+          ],
+          "UP1": [
+            1.9609900410029117,
+            579.0185708764398,
+            277.692885364207
+          ],
+          "UP2": [
+            -11.112276899016498,
+            585.5614317001745,
+            128.40698293616043
+          ],
+          "UP3": [
+            -91.06667606419882,
+            550.3704101690649,
+            209.22516503481734
+          ],
+          "UP4": [
+            0.16137585418838185,
+            576.3779975879934,
+            179.76836718062358
+          ],
+          "UP5": [
+            0.0,
+            610.0,
+            255.3
+          ],
+          "contact_patch": [
+            0.0,
+            610.97,
+            0.0
+          ],
+          "steering_angle": 0.0
+        },
+        "status": "VALID",
+        "steering_axis": [
+          -13.07326694001941,
+          6.5428608237347134,
+          -149.28590242804654
+        ],
+        "timing_ms": 2.5830999948084354
+      },
+      "delta": {
+        "camber_deg": 0.0,
+        "caster_deg": 0.0,
+        "contact_patch": null,
+        "contact_patch_mm": null,
+        "geometry_residual_mm": 0.0,
+        "kpi_deg": 0.0,
+        "scrub_radius_mm": 0.0,
+        "steering_axis": null,
+        "steering_axis_unitless": null,
+        "timing_ms": null,
+        "toe_deg": 0.0,
+        "trail_mm": 0.0
+      },
+      "rack": 0,
+      "sequential": {
+        "angles": {
+          "_solver_healthy": "healthy",
+          "camber_deg": -2.49,
+          "caster_deg": 5.005,
+          "caster_trail_mm": -22.36,
+          "kpi_deg": 2.51,
+          "scrub_radius_mm": 19.78,
+          "toe_deg": 0.0
+        },
+        "contact_patch": [
+          0.0,
+          610.97,
+          0.0
+        ],
+        "explanation": "sequential baseline",
+        "geometry_residual_mm": 1.1368683772161603e-13,
+        "iterations": 2,
+        "residuals_mm": {
+          "kingpin_length": null,
+          "lca_axis": null,
+          "pushrod_length": null,
+          "rigid_up1_up3": null,
+          "rigid_up1_up4": null,
+          "rigid_up1_up5": null,
+          "rigid_up2_up3": null,
+          "rigid_up2_up4": null,
+          "rigid_up2_up5": null,
+          "rigid_up3_up4": null,
+          "rigid_up3_up5": null,
+          "rigid_up4_up5": null,
+          "tie_rod_length": null,
+          "uca_axis": null,
+          "upright_up1_up5": null,
+          "upright_up2_up5": null,
+          "wheel_travel": null
+        },
+        "state": {
+          "CH1": [
+            -90.0,
+            160.0,
+            285.0
+          ],
+          "CH2": [
+            90.0,
+            152.0,
+            295.0
+          ],
+          "CH3": [
+            -110.0,
+            128.0,
+            110.0
+          ],
+          "CH4": [
+            110.0,
+            122.0,
+            115.0
+          ],
+          "CH5": [
+            0.0,
+            135.0,
+            305.0
+          ],
+          "FL1": [
+            -100.0,
+            115.0,
+            200.0
+          ],
+          "UP1": [
+            1.9609900410029117,
+            579.0185708764398,
+            277.692885364207
+          ],
+          "UP2": [
+            -11.112276899016498,
+            585.5614317001745,
+            128.40698293616043
+          ],
+          "UP3": [
+            -91.06667606419882,
+            550.3704101690649,
+            209.22516503481734
+          ],
+          "UP4": [
+            0.16137585418838185,
+            576.3779975879934,
+            179.76836718062358
+          ],
+          "UP5": [
+            0.0,
+            610.0,
+            255.3
+          ],
+          "_fallback_root_found": false,
+          "_newton_converged": true,
+          "_used_fallback": false,
+          "corner_weight_n": 700.0,
+          "iterations": 1,
+          "push_rod_length": 458.80009225757584,
+          "steering_theta": 0.0,
+          "tie_rod_length": 435.5597570910808,
+          "tire_radius": 260.0,
+          "tire_spring_rate": 150.0,
+          "tire_width": 180.0,
+          "track_width": 1220.0
+        },
+        "status": "VALID",
+        "steering_axis": [
+          -0.08715511293346273,
+          0.04361907215823142,
+          -0.9952393495203102
+        ],
+        "timing_ms": 0.5622000899165869
+      },
+      "timing_ms": {
+        "coupled": 2.5830999948084354,
+        "sequential": 0.5622000899165869
+      },
+      "travel": 0
+    },
+    {
+      "coupled": {
+        "angles": {
+          "_solver_healthy": "not_applicable",
+          "camber_deg": -2.111,
+          "caster_deg": 6.333,
+          "caster_trail_mm": -29.95,
+          "kpi_deg": 2.485,
+          "scrub_radius_mm": 33.74,
+          "toe_deg": -3.101
+        },
+        "contact_patch": [
+          -6.59,
+          625.17,
+          0.0
+        ],
+        "explanation": "bounded coupled solve",
+        "geometry_residual_mm": 5.684341886080802e-14,
+        "iterations": 11,
+        "residuals_mm": {
+          "kingpin_length": 0.0,
+          "lca_axis": 0.0,
+          "pushrod_length": 0.0,
+          "rigid_up1_up3": 0.0,
+          "rigid_up1_up4": 1.4210854715202004e-14,
+          "rigid_up1_up5": -1.4210854715202004e-14,
+          "rigid_up2_up3": 0.0,
+          "rigid_up2_up4": -2.842170943040401e-14,
+          "rigid_up2_up5": 0.0,
+          "rigid_up3_up4": 1.4210854715202004e-14,
+          "rigid_up3_up5": -1.4210854715202004e-14,
+          "rigid_up4_up5": -2.842170943040401e-14,
+          "tie_rod_length": -5.684341886080802e-14,
+          "uca_axis": 5.684341886080802e-14,
+          "upright_up1_up5": -1.4210854715202004e-14,
+          "upright_up2_up5": 0.0,
+          "wheel_travel": 0.0
+        },
+        "state": {
+          "FL1": [
+            -100.0,
+            120.0,
+            200.0
+          ],
+          "UP1": [
+            -5.711308926625549,
+            579.3745045860451,
+            277.8374435110038
+          ],
+          "UP2": [
+            -22.24077729573179,
+            585.8380044850436,
+            128.89114498535946
+          ],
+          "UP3": [
+            -101.86009810071461,
+            555.392196935663,
+            211.93636794983408
+          ],
+          "UP4": [
+            -10.159785193232306,
+            576.3293658208646,
+            180.00922320210606
+          ],
+          "UP5": [
+            -6.590092735975955,
+            610.3006606100056,
+            255.3
+          ],
+          "contact_patch": [
+            -6.59,
+            625.17,
+            0.0
+          ],
+          "steering_angle": 0.057415719797895094
+        },
+        "status": "VALID",
+        "steering_axis": [
+          -16.52946836910624,
+          6.463499898998521,
+          -148.94629852564435
+        ],
+        "timing_ms": 19.77070001885295
+      },
+      "delta": {
+        "camber_deg": 0.088,
+        "caster_deg": 1.328,
+        "contact_patch": null,
+        "contact_patch_mm": null,
+        "geometry_residual_mm": 0.0,
+        "kpi_deg": -0.025,
+        "scrub_radius_mm": -0.59,
+        "steering_axis": null,
+        "steering_axis_unitless": null,
+        "timing_ms": null,
+        "toe_deg": 0.199,
+        "trail_mm": -5.88
+      },
+      "rack": 5,
+      "sequential": {
+        "angles": {
+          "_solver_healthy": "healthy",
+          "camber_deg": -2.199,
+          "caster_deg": 5.005,
+          "caster_trail_mm": -24.07,
+          "kpi_deg": 2.51,
+          "scrub_radius_mm": 34.33,
+          "toe_deg": -3.3
+        },
+        "contact_patch": [
+          1.71,
+          625.52,
+          0.0
+        ],
+        "explanation": "sequential baseline",
+        "geometry_residual_mm": 5.684341886080802e-14,
+        "iterations": 5,
+        "residuals_mm": {
+          "kingpin_length": null,
+          "lca_axis": null,
+          "pushrod_length": null,
+          "rigid_up1_up3": null,
+          "rigid_up1_up4": null,
+          "rigid_up1_up5": null,
+          "rigid_up2_up3": null,
+          "rigid_up2_up4": null,
+          "rigid_up2_up5": null,
+          "rigid_up3_up4": null,
+          "rigid_up3_up5": null,
+          "rigid_up4_up5": null,
+          "tie_rod_length": null,
+          "uca_axis": null,
+          "upright_up1_up5": null,
+          "upright_up2_up5": null,
+          "wheel_travel": null
+        },
+        "state": {
+          "CH1": [
+            -90.0,
+            160.0,
+            285.0
+          ],
+          "CH2": [
+            90.0,
+            152.0,
+            295.0
+          ],
+          "CH3": [
+            -110.0,
+            128.0,
+            110.0
+          ],
+          "CH4": [
+            110.0,
+            122.0,
+            115.0
+          ],
+          "CH5": [
+            0.0,
+            135.0,
+            305.0
+          ],
+          "FL1": [
+            -100.0,
+            120.0,
+            200.0
+          ],
+          "UP1": [
+            1.9609900410029117,
+            579.0185708764398,
+            277.692885364207
+          ],
+          "UP2": [
+            -11.112276899016498,
+            585.5614317001745,
+            128.40698293616043
+          ],
+          "UP3": [
+            -92.73165624601769,
+            555.3934813299795,
+            209.5911204598895
+          ],
+          "UP4": [
+            -0.24557652928694207,
+            576.0023822410467,
+            179.78754245542288
+          ],
+          "UP5": [
+            1.7131418631525577,
+            609.9506591654659,
+            255.14781422273046
+          ],
+          "_fallback_root_found": false,
+          "_newton_converged": true,
+          "_used_fallback": false,
+          "corner_weight_n": 700.0,
+          "iterations": 4,
+          "push_rod_length": 458.4335513184681,
+          "steering_theta": 0.057415719797895094,
+          "tie_rod_length": 435.5597570910808,
+          "tire_radius": 260.0,
+          "tire_spring_rate": 150.0,
+          "tire_width": 180.0,
+          "track_width": 1220.0
+        },
+        "status": "VALID",
+        "steering_axis": [
+          -0.08715511293346273,
+          0.04361907215823142,
+          -0.9952393495203102
+        ],
+        "timing_ms": 0.5483999848365784
+      },
+      "timing_ms": {
+        "coupled": 19.77070001885295,
+        "sequential": 0.5483999848365784
+      },
+      "travel": 0
+    },
+    {
+      "coupled": {
+        "angles": {
+          "_solver_healthy": "not_applicable",
+          "camber_deg": -2.28,
+          "caster_deg": 5.471,
+          "caster_trail_mm": -24.55,
+          "kpi_deg": 2.23,
+          "scrub_radius_mm": 17.54,
+          "toe_deg": 0.739
+        },
+        "contact_patch": [
+          -23.99,
+          608.73,
+          0.0
+        ],
+        "explanation": "bounded coupled solve",
+        "geometry_residual_mm": 1.1368683772161603e-13,
+        "iterations": 23,
+        "residuals_mm": {
+          "kingpin_length": 0.0,
+          "lca_axis": 0.0,
+          "pushrod_length": -5.684341886080802e-14,
+          "rigid_up1_up3": 1.4210854715202004e-14,
+          "rigid_up1_up4": -1.4210854715202004e-14,
+          "rigid_up1_up5": 7.815970093361102e-14,
+          "rigid_up2_up3": 2.842170943040401e-14,
+          "rigid_up2_up4": 7.105427357601002e-15,
+          "rigid_up2_up5": 0.0,
+          "rigid_up3_up4": 1.4210854715202004e-14,
+          "rigid_up3_up5": 4.263256414560601e-14,
+          "rigid_up4_up5": 0.0,
+          "tie_rod_length": 0.0,
+          "uca_axis": -1.1368683772161603e-13,
+          "upright_up1_up5": 7.815970093361102e-14,
+          "upright_up2_up5": 0.0,
+          "wheel_travel": 0.0
+        },
+        "state": {
+          "FL1": [
+            -100.0,
+            115.0,
+            200.0
+          ],
+          "UP1": [
+            -21.45213316411115,
+            580.1826137391267,
+            282.79021672666306
+          ],
+          "UP2": [
+            -35.74154354851082,
+            585.992236343303,
+            133.5854546174621
+          ],
+          "UP3": [
+            -114.60844098097502,
+            550.0513876673347,
+            215.1388750596993
+          ],
+          "UP4": [
+            -23.958491052947792,
+            577.1512387411336,
+            184.8925587579731
+          ],
+          "UP5": [
+            -23.992713038762385,
+            611.0512281055323,
+            260.3
+          ],
+          "contact_patch": [
+            -23.99,
+            608.73,
+            0.0
+          ],
+          "steering_angle": 0.020870271198944274
+        },
+        "status": "VALID",
+        "steering_axis": [
+          -14.28941038439967,
+          5.8096226041762975,
+          -149.20476210920097
+        ],
+        "timing_ms": 46.40830005519092
+      },
+      "delta": {
+        "camber_deg": 0.108,
+        "caster_deg": 0.339,
+        "contact_patch": null,
+        "contact_patch_mm": null,
+        "geometry_residual_mm": -0.009016999999886314,
+        "kpi_deg": -0.172,
+        "scrub_radius_mm": -2.26,
+        "steering_axis": null,
+        "steering_axis_unitless": null,
+        "timing_ms": null,
+        "toe_deg": 0.688,
+        "trail_mm": -1.21
+      },
+      "rack": 0,
+      "sequential": {
+        "angles": {
+          "_solver_healthy": "healthy",
+          "camber_deg": -2.388,
+          "caster_deg": 5.132,
+          "caster_trail_mm": -23.34,
+          "kpi_deg": 2.402,
+          "scrub_radius_mm": 19.8,
+          "toe_deg": 0.051
+        },
+        "contact_patch": [
+          0.62,
+          610.74,
+          0.0
+        ],
+        "explanation": "sequential baseline",
+        "geometry_residual_mm": 0.009017,
+        "iterations": 52,
+        "residuals_mm": {
+          "kingpin_length": null,
+          "lca_axis": null,
+          "pushrod_length": null,
+          "rigid_up1_up3": null,
+          "rigid_up1_up4": null,
+          "rigid_up1_up5": null,
+          "rigid_up2_up3": null,
+          "rigid_up2_up4": null,
+          "rigid_up2_up5": null,
+          "rigid_up3_up4": null,
+          "rigid_up3_up5": null,
+          "rigid_up4_up5": null,
+          "tie_rod_length": null,
+          "uca_axis": null,
+          "upright_up1_up5": null,
+          "upright_up2_up5": null,
+          "wheel_travel": null
+        },
+        "state": {
+          "CH1": [
+            -90.0,
+            160.0,
+            285.0
+          ],
+          "CH2": [
+            90.0,
+            152.0,
+            295.0
+          ],
+          "CH3": [
+            -110.0,
+            128.0,
+            110.0
+          ],
+          "CH4": [
+            110.0,
+            122.0,
+            115.0
+          ],
+          "CH5": [
+            0.0,
+            135.0,
+            305.0
+          ],
+          "FL1": [
+            -100.0,
+            115.0,
+            200.0
+          ],
+          "UP1": [
+            2.665623281087571,
+            579.0823956330463,
+            282.6944789524615
+          ],
+          "UP2": [
+            -10.741449223798188,
+            585.3449577274055,
+            133.41958038987542
+          ],
+          "UP3": [
+            -90.48148587773468,
+            550.2148645658276,
+            214.48176602123723
+          ],
+          "UP4": [
+            0.6546686672281776,
+            576.2648610361015,
+            184.77900489276033
+          ],
+          "UP5": [
+            0.6226976082767101,
+            610.0070706475132,
+            260.244369269759
+          ],
+          "_fallback_root_found": false,
+          "_newton_converged": true,
+          "_used_fallback": false,
+          "corner_weight_n": 700.0,
+          "iterations": 4,
+          "push_rod_length": 457.3490940636581,
+          "steering_theta": 0.020871164697807226,
+          "tie_rod_length": 435.5597570910808,
+          "tire_radius": 260.0,
+          "tire_spring_rate": 150.0,
+          "tire_width": 180.0,
+          "track_width": 1220.0
+        },
+        "status": "VALID",
+        "steering_axis": [
+          -0.08937658143238293,
+          0.04174859133475062,
+          -0.9951225461283772
+        ],
+        "timing_ms": 5.627899896353483
+      },
+      "timing_ms": {
+        "coupled": 46.40830005519092,
+        "sequential": 5.627899896353483
+      },
+      "travel": 5
+    },
+    {
+      "coupled": {
+        "angles": {
+          "_solver_healthy": "not_applicable",
+          "camber_deg": -1.986,
+          "caster_deg": 5.336,
+          "caster_trail_mm": -25.56,
+          "kpi_deg": 2.228,
+          "scrub_radius_mm": 31.32,
+          "toe_deg": -2.382
+        },
+        "contact_patch": [
+          -22.67,
+          622.54,
+          0.0
+        ],
+        "explanation": "bounded coupled solve",
+        "geometry_residual_mm": 0.07170964710881833,
+        "iterations": 15,
+        "residuals_mm": {
+          "kingpin_length": -0.00470229788967913,
+          "lca_axis": 0.030675892654357995,
+          "pushrod_length": -0.04234705808067929,
+          "rigid_up1_up3": -0.0004709918002987479,
+          "rigid_up1_up4": -0.004194989970713436,
+          "rigid_up1_up5": 0.007859136019710888,
+          "rigid_up2_up3": -0.008974167262465471,
+          "rigid_up2_up4": -0.07170964710881833,
+          "rigid_up2_up5": 0.041700445308464396,
+          "rigid_up3_up4": 0.012187694196327925,
+          "rigid_up3_up5": -0.005947646322738365,
+          "rigid_up4_up5": -0.06313837417397394,
+          "tie_rod_length": -0.0025531093169774977,
+          "uca_axis": 0.01274409767177076,
+          "upright_up1_up5": 0.007859136019710888,
+          "upright_up2_up5": 0.041700445308464396,
+          "wheel_travel": -0.012322523001728314
+        },
+        "state": {
+          "FL1": [
+            -100.0,
+            120.0,
+            200.0
+          ],
+          "UP1": [
+            -21.802003672244158,
+            580.2123876119621,
+            282.89725130663174
+          ],
+          "UP2": [
+            -35.74154359710455,
+            586.01916305301,
+            133.66401131498253
+          ],
+          "UP3": [
+            -116.4908219684027,
+            554.9733539196499,
+            215.3724464906962
+          ],
+          "UP4": [
+            -24.526982132449227,
+            577.1085307237853,
+            185.0119048019545
+          ],
+          "UP5": [
+            -22.665558967665472,
+            611.0960224759742,
+            260.2876774769983
+          ],
+          "contact_patch": [
+            -22.67,
+            622.54,
+            0.0
+          ],
+          "steering_angle": 0.07827661775495186
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -13.939539924860394,
+          5.806775441047876,
+          -149.2332399916492
+        ],
+        "timing_ms": 31.185000203549862
+      },
+      "delta": {
+        "camber_deg": 0.104,
+        "caster_deg": 0.204,
+        "contact_patch": null,
+        "contact_patch_mm": null,
+        "geometry_residual_mm": 0.06269264710881833,
+        "kpi_deg": -0.174,
+        "scrub_radius_mm": -3.02,
+        "steering_axis": null,
+        "steering_axis_unitless": null,
+        "timing_ms": null,
+        "toe_deg": 0.867,
+        "trail_mm": -0.51
+      },
+      "rack": 5,
+      "sequential": {
+        "angles": {
+          "_solver_healthy": "healthy",
+          "camber_deg": -2.09,
+          "caster_deg": 5.132,
+          "caster_trail_mm": -25.05,
+          "kpi_deg": 2.402,
+          "scrub_radius_mm": 34.34,
+          "toe_deg": -3.249
+        },
+        "contact_patch": [
+          2.33,
+          625.28,
+          0.0
+        ],
+        "explanation": "sequential baseline",
+        "geometry_residual_mm": 0.009017,
+        "iterations": 52,
+        "residuals_mm": {
+          "kingpin_length": null,
+          "lca_axis": null,
+          "pushrod_length": null,
+          "rigid_up1_up3": null,
+          "rigid_up1_up4": null,
+          "rigid_up1_up5": null,
+          "rigid_up2_up3": null,
+          "rigid_up2_up4": null,
+          "rigid_up2_up5": null,
+          "rigid_up3_up4": null,
+          "rigid_up3_up5": null,
+          "rigid_up4_up5": null,
+          "tie_rod_length": null,
+          "uca_axis": null,
+          "upright_up1_up5": null,
+          "upright_up2_up5": null,
+          "wheel_travel": null
+        },
+        "state": {
+          "CH1": [
+            -90.0,
+            160.0,
+            285.0
+          ],
+          "CH2": [
+            90.0,
+            152.0,
+            295.0
+          ],
+          "CH3": [
+            -110.0,
+            128.0,
+            110.0
+          ],
+          "CH4": [
+            110.0,
+            122.0,
+            115.0
+          ],
+          "CH5": [
+            0.0,
+            135.0,
+            305.0
+          ],
+          "FL1": [
+            -100.0,
+            120.0,
+            200.0
+          ],
+          "UP1": [
+            2.665623281087571,
+            579.0823956330463,
+            282.6944789524615
+          ],
+          "UP2": [
+            -10.741449223798188,
+            585.3449577274055,
+            133.41958038987542
+          ],
+          "UP3": [
+            -92.150671843745,
+            555.2360222621295,
+            214.84233708608062
+          ],
+          "UP4": [
+            0.24822010804626782,
+            575.8889153785283,
+            184.79973779767334
+          ],
+          "UP5": [
+            2.3344275353199553,
+            609.9592837209375,
+            260.0886260332236
+          ],
+          "_fallback_root_found": false,
+          "_newton_converged": true,
+          "_used_fallback": false,
+          "corner_weight_n": 700.0,
+          "iterations": 4,
+          "push_rod_length": 456.98052513251065,
+          "steering_theta": 0.07827758812836594,
+          "tie_rod_length": 435.5597570910808,
+          "tire_radius": 260.0,
+          "tire_spring_rate": 150.0,
+          "tire_width": 180.0,
+          "track_width": 1220.0
+        },
+        "status": "VALID",
+        "steering_axis": [
+          -0.08937658143238293,
+          0.04174859133475062,
+          -0.9951225461283772
+        ],
+        "timing_ms": 4.979700082913041
+      },
+      "timing_ms": {
+        "coupled": 31.185000203549862,
+        "sequential": 4.979700082913041
+      },
+      "travel": 5
+    },
+    {
+      "coupled": {
+        "angles": {
+          "_solver_healthy": "not_applicable",
+          "camber_deg": -2.255,
+          "caster_deg": 5.599,
+          "caster_trail_mm": -25.34,
+          "kpi_deg": 2.153,
+          "scrub_radius_mm": 15.54,
+          "toe_deg": 1.258
+        },
+        "contact_patch": [
+          -23.67,
+          606.59,
+          0.0
+        ],
+        "explanation": "bounded coupled solve",
+        "geometry_residual_mm": 0.2736724033167164,
+        "iterations": 14,
+        "residuals_mm": {
+          "kingpin_length": -0.019791563298468873,
+          "lca_axis": 0.11669535898317918,
+          "pushrod_length": -0.1604847037526156,
+          "rigid_up1_up3": -0.005540957844573313,
+          "rigid_up1_up4": -0.01200267642788333,
+          "rigid_up1_up5": 0.02986755222829629,
+          "rigid_up2_up3": -0.04212162334123093,
+          "rigid_up2_up4": -0.2736724033167164,
+          "rigid_up2_up5": 0.1636556613796074,
+          "rigid_up3_up4": 0.05596882145189852,
+          "rigid_up3_up5": -0.02393148754637764,
+          "rigid_up4_up5": -0.24980183193206074,
+          "tie_rod_length": -0.010597228496692424,
+          "uca_axis": 0.049280668043138576,
+          "upright_up1_up5": 0.02986755222829629,
+          "upright_up2_up5": 0.1636556613796074,
+          "wheel_travel": -0.04667715589260979
+        },
+        "state": {
+          "FL1": [
+            -100.0,
+            115.0,
+            200.0
+          ],
+          "UP1": [
+            -20.815511570217716,
+            580.2328072926597,
+            287.59659253704683
+          ],
+          "UP2": [
+            -35.43705807936062,
+            585.8416660211925,
+            138.4362291553469
+          ],
+          "UP3": [
+            -114.04156697253391,
+            549.8556341392008,
+            220.16141144246325
+          ],
+          "UP4": [
+            -23.806843466867864,
+            578.2705835459631,
+            189.69729585091943
+          ],
+          "UP5": [
+            -23.667513344166753,
+            611.2177634950493,
+            265.2533228441074
+          ],
+          "contact_patch": [
+            -23.67,
+            606.59,
+            0.0
+          ],
+          "steering_angle": 0.0446253615222924
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -14.621546509142902,
+          5.608858728532823,
+          -149.16036338169994
+        ],
+        "timing_ms": 32.644799910485744
+      },
+      "delta": {
+        "camber_deg": 0.026,
+        "caster_deg": 0.265,
+        "contact_patch": null,
+        "contact_patch_mm": null,
+        "geometry_residual_mm": 0.25938440331671636,
+        "kpi_deg": -0.137,
+        "scrub_radius_mm": -4.3,
+        "steering_axis": null,
+        "steering_axis_unitless": null,
+        "timing_ms": null,
+        "toe_deg": 1.138,
+        "trail_mm": -0.65
+      },
+      "rack": 0,
+      "sequential": {
+        "angles": {
+          "_solver_healthy": "healthy",
+          "camber_deg": -2.281,
+          "caster_deg": 5.334,
+          "caster_trail_mm": -24.69,
+          "kpi_deg": 2.29,
+          "scrub_radius_mm": 19.84,
+          "toe_deg": 0.12
+        },
+        "contact_patch": [
+          1.33,
+          610.45,
+          0.0
+        ],
+        "explanation": "sequential baseline",
+        "geometry_residual_mm": 0.014288,
+        "iterations": 89,
+        "residuals_mm": {
+          "kingpin_length": null,
+          "lca_axis": null,
+          "pushrod_length": null,
+          "rigid_up1_up3": null,
+          "rigid_up1_up4": null,
+          "rigid_up1_up5": null,
+          "rigid_up2_up3": null,
+          "rigid_up2_up4": null,
+          "rigid_up2_up5": null,
+          "rigid_up3_up4": null,
+          "rigid_up3_up5": null,
+          "rigid_up4_up5": null,
+          "tie_rod_length": null,
+          "uca_axis": null,
+          "upright_up1_up5": null,
+          "upright_up2_up5": null,
+          "wheel_travel": null
+        },
+        "state": {
+          "CH1": [
+            -90.0,
+            160.0,
+            285.0
+          ],
+          "CH2": [
+            90.0,
+            152.0,
+            295.0
+          ],
+          "CH3": [
+            -110.0,
+            128.0,
+            110.0
+          ],
+          "CH4": [
+            110.0,
+            122.0,
+            115.0
+          ],
+          "CH5": [
+            0.0,
+            135.0,
+            305.0
+          ],
+          "FL1": [
+            -100.0,
+            115.0,
+            200.0
+          ],
+          "UP1": [
+            3.493471520449412,
+            579.1115382485651,
+            287.65398623212997
+          ],
+          "UP2": [
+            -10.437248840952725,
+            585.0780241122379,
+            138.4358573374425
+          ],
+          "UP3": [
+            -89.84963715796925,
+            549.9902468966455,
+            219.81810374914363
+          ],
+          "UP4": [
+            1.1472276537119308,
+            576.1096277857363,
+            189.75145218274514
+          ],
+          "UP5": [
+            1.3323923555405923,
+            610.0326168104943,
+            265.1769145698715
+          ],
+          "_fallback_root_found": false,
+          "_newton_converged": true,
+          "_used_fallback": false,
+          "corner_weight_n": 700.0,
+          "iterations": 4,
+          "push_rod_length": 455.91802731472063,
+          "steering_theta": 0.04462151266563172,
+          "tie_rod_length": 435.5597570910808,
+          "tire_radius": 260.0,
+          "tire_spring_rate": 150.0,
+          "tire_width": 180.0,
+          "track_width": 1220.0
+        },
+        "status": "VALID",
+        "steering_axis": [
+          -0.09288031600858335,
+          0.0397803615392433,
+          -0.9948822893860121
+        ],
+        "timing_ms": 6.986099993810058
+      },
+      "timing_ms": {
+        "coupled": 32.644799910485744,
+        "sequential": 6.986099993810058
+      },
+      "travel": 10
+    },
+    {
+      "coupled": {
+        "angles": {
+          "_solver_healthy": "not_applicable",
+          "camber_deg": -1.954,
+          "caster_deg": 5.636,
+          "caster_trail_mm": -27.16,
+          "kpi_deg": 2.159,
+          "scrub_radius_mm": 29.34,
+          "toe_deg": -1.863
+        },
+        "contact_patch": [
+          -21.95,
+          620.42,
+          0.0
+        ],
+        "explanation": "bounded coupled solve",
+        "geometry_residual_mm": 0.3469581978049021,
+        "iterations": 13,
+        "residuals_mm": {
+          "kingpin_length": -0.027335356147659695,
+          "lca_axis": 0.14277935883791315,
+          "pushrod_length": -0.19720334912290127,
+          "rigid_up1_up3": -0.0022941414504913382,
+          "rigid_up1_up4": -0.014922923908770258,
+          "rigid_up1_up5": 0.03702295141270184,
+          "rigid_up2_up3": -0.043185311023819395,
+          "rigid_up2_up4": -0.3469581978049021,
+          "rigid_up2_up5": 0.2054884128242236,
+          "rigid_up3_up4": 0.05879635148808404,
+          "rigid_up3_up5": -0.028680232071707223,
+          "rigid_up4_up5": -0.3157969161488694,
+          "tie_rod_length": -0.011620322574799502,
+          "uca_axis": 0.059774202040955515,
+          "upright_up1_up5": 0.03702295141270184,
+          "upright_up2_up5": 0.2054884128242236,
+          "wheel_travel": -0.05737426781445265
+        },
+        "state": {
+          "FL1": [
+            -100.0,
+            120.0,
+            200.0
+          ],
+          "UP1": [
+            -20.718926069204297,
+            580.2390543690954,
+            287.7001854691563
+          ],
+          "UP2": [
+            -35.43705807936062,
+            585.8606664590561,
+            138.5573874264113
+          ],
+          "UP3": [
+            -115.70106740825906,
+            554.7736194544908,
+            220.67742128990264
+          ],
+          "UP4": [
+            -24.184387575075945,
+            578.244084027742,
+            189.8201098836897
+          ],
+          "UP5": [
+            -21.953934642531944,
+            611.2568580374349,
+            265.24262573218556
+          ],
+          "contact_patch": [
+            -21.95,
+            620.42,
+            0.0
+          ],
+          "steering_angle": 0.10203085625111187
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -14.71813201015632,
+          5.621612089960763,
+          -149.14279804274497
+        ],
+        "timing_ms": 30.744000105187297
+      },
+      "delta": {
+        "camber_deg": 0.018,
+        "caster_deg": 0.302,
+        "contact_patch": null,
+        "contact_patch_mm": null,
+        "geometry_residual_mm": 0.3326701978049021,
+        "kpi_deg": -0.131,
+        "scrub_radius_mm": -5.04,
+        "steering_axis": null,
+        "steering_axis_unitless": null,
+        "timing_ms": null,
+        "toe_deg": 1.319,
+        "trail_mm": -0.75
+      },
+      "rack": 5,
+      "sequential": {
+        "angles": {
+          "_solver_healthy": "healthy",
+          "camber_deg": -1.972,
+          "caster_deg": 5.334,
+          "caster_trail_mm": -26.41,
+          "kpi_deg": 2.29,
+          "scrub_radius_mm": 34.38,
+          "toe_deg": -3.182
+        },
+        "contact_patch": [
+          3.05,
+          624.99,
+          0.0
+        ],
+        "explanation": "sequential baseline",
+        "geometry_residual_mm": 0.014288,
+        "iterations": 89,
+        "residuals_mm": {
+          "kingpin_length": null,
+          "lca_axis": null,
+          "pushrod_length": null,
+          "rigid_up1_up3": null,
+          "rigid_up1_up4": null,
+          "rigid_up1_up5": null,
+          "rigid_up2_up3": null,
+          "rigid_up2_up4": null,
+          "rigid_up2_up5": null,
+          "rigid_up3_up4": null,
+          "rigid_up3_up5": null,
+          "rigid_up4_up5": null,
+          "tie_rod_length": null,
+          "uca_axis": null,
+          "upright_up1_up5": null,
+          "upright_up2_up5": null,
+          "wheel_travel": null
+        },
+        "state": {
+          "CH1": [
+            -90.0,
+            160.0,
+            285.0
+          ],
+          "CH2": [
+            90.0,
+            152.0,
+            295.0
+          ],
+          "CH3": [
+            -110.0,
+            128.0,
+            110.0
+          ],
+          "CH4": [
+            110.0,
+            122.0,
+            115.0
+          ],
+          "CH5": [
+            0.0,
+            135.0,
+            305.0
+          ],
+          "FL1": [
+            -100.0,
+            120.0,
+            200.0
+          ],
+          "UP1": [
+            3.493471520449412,
+            579.1115382485651,
+            287.65398623212997
+          ],
+          "UP2": [
+            -10.437248840952725,
+            585.0780241122379,
+            138.4358573374425
+          ],
+          "UP3": [
+            -91.52442988276631,
+            555.0096890462524,
+            220.1751615687013
+          ],
+          "UP4": [
+            0.7413773255094318,
+            575.7331725745173,
+            189.77428903748907
+          ],
+          "UP5": [
+            3.045994500111925,
+            609.9868183233216,
+            265.0151046846259
+          ],
+          "_fallback_root_found": false,
+          "_newton_converged": true,
+          "_used_fallback": false,
+          "corner_weight_n": 700.0,
+          "iterations": 4,
+          "push_rod_length": 455.5471913147464,
+          "steering_theta": 0.10202691797568786,
+          "tie_rod_length": 435.5597570910808,
+          "tire_radius": 260.0,
+          "tire_spring_rate": 150.0,
+          "tire_width": 180.0,
+          "track_width": 1220.0
+        },
+        "status": "VALID",
+        "steering_axis": [
+          -0.09288031600858335,
+          0.0397803615392433,
+          -0.9948822893860121
+        ],
+        "timing_ms": 6.799000082537532
+      },
+      "timing_ms": {
+        "coupled": 30.744000105187297,
+        "sequential": 6.799000082537532
+      },
+      "travel": 10
+    },
+    {
+      "coupled": {
+        "angles": {
+          "_solver_healthy": "not_applicable",
+          "camber_deg": -2.243,
+          "caster_deg": 5.862,
+          "caster_trail_mm": -26.79,
+          "kpi_deg": 2.082,
+          "scrub_radius_mm": 13.44,
+          "toe_deg": 1.806
+        },
+        "contact_patch": [
+          -22.92,
+          604.28,
+          0.0
+        ],
+        "explanation": "bounded coupled solve",
+        "geometry_residual_mm": 0.526503874743014,
+        "iterations": 21,
+        "residuals_mm": {
+          "kingpin_length": -0.047356999883220396,
+          "lca_axis": 0.22444163004649909,
+          "pushrod_length": -0.3062695358499923,
+          "rigid_up1_up3": -0.011157030391927947,
+          "rigid_up1_up4": -0.01591814910692335,
+          "rigid_up1_up5": 0.05897736788173802,
+          "rigid_up2_up3": -0.09908836069159577,
+          "rigid_up2_up4": -0.526503874743014,
+          "rigid_up2_up5": 0.3283529223806738,
+          "rigid_up3_up4": 0.13254740548202903,
+          "rigid_up3_up5": -0.058906809739170285,
+          "rigid_up4_up5": -0.5006997566816409,
+          "tie_rod_length": -0.024047681660192666,
+          "uca_axis": 0.09709583353622975,
+          "upright_up1_up5": 0.05897736788173802,
+          "upright_up2_up5": 0.3283529223806738,
+          "wheel_travel": -0.08898099654720681
+        },
+        "state": {
+          "FL1": [
+            -100.0,
+            115.0,
+            200.0
+          ],
+          "UP1": [
+            -19.684806656336157,
+            580.2063227788506,
+            292.38686452015133
+          ],
+          "UP2": [
+            -34.9906001040995,
+            585.625410701283,
+            143.3158703068443
+          ],
+          "UP3": [
+            -113.13585878121863,
+            549.5971651112917,
+            225.37927229208486
+          ],
+          "UP4": [
+            -23.394916829653553,
+            579.3636172955826,
+            194.50004993440032
+          ],
+          "UP5": [
+            -22.91703589528677,
+            611.3100003708129,
+            270.2110190034528
+          ],
+          "contact_patch": [
+            -22.92,
+            604.28,
+            0.0
+          ],
+          "steering_angle": 0.06958782955104166
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -15.305793447763342,
+          5.419087922432482,
+          -149.07099421330705
+        ],
+        "timing_ms": 45.72420008480549
+      },
+      "delta": {
+        "camber_deg": -0.069,
+        "caster_deg": 0.264,
+        "contact_patch": null,
+        "contact_patch_mm": null,
+        "geometry_residual_mm": 0.45651387474301397,
+        "kpi_deg": -0.092,
+        "scrub_radius_mm": -6.46,
+        "steering_axis": null,
+        "steering_axis_unitless": null,
+        "timing_ms": null,
+        "toe_deg": 1.599,
+        "trail_mm": -0.43
+      },
+      "rack": 0,
+      "sequential": {
+        "angles": {
+          "_solver_healthy": "healthy",
+          "camber_deg": -2.174,
+          "caster_deg": 5.598,
+          "caster_trail_mm": -26.36,
+          "kpi_deg": 2.174,
+          "scrub_radius_mm": 19.9,
+          "toe_deg": 0.207
+        },
+        "contact_patch": [
+          2.08,
+          610.11,
+          0.0
+        ],
+        "explanation": "sequential baseline",
+        "geometry_residual_mm": 0.06999,
+        "iterations": 88,
+        "residuals_mm": {
+          "kingpin_length": null,
+          "lca_axis": null,
+          "pushrod_length": null,
+          "rigid_up1_up3": null,
+          "rigid_up1_up4": null,
+          "rigid_up1_up5": null,
+          "rigid_up2_up3": null,
+          "rigid_up2_up4": null,
+          "rigid_up2_up5": null,
+          "rigid_up3_up4": null,
+          "rigid_up3_up5": null,
+          "rigid_up4_up5": null,
+          "tie_rod_length": null,
+          "uca_axis": null,
+          "upright_up1_up5": null,
+          "upright_up2_up5": null,
+          "wheel_travel": null
+        },
+        "state": {
+          "CH1": [
+            -90.0,
+            160.0,
+            285.0
+          ],
+          "CH2": [
+            90.0,
+            152.0,
+            295.0
+          ],
+          "CH3": [
+            -110.0,
+            128.0,
+            110.0
+          ],
+          "CH4": [
+            110.0,
+            122.0,
+            115.0
+          ],
+          "CH5": [
+            0.0,
+            135.0,
+            305.0
+          ],
+          "FL1": [
+            -100.0,
+            115.0,
+            200.0
+          ],
+          "UP1": [
+            4.39267779396757,
+            579.1033696887761,
+            292.55817627746853
+          ],
+          "UP2": [
+            -10.222930010062695,
+            584.7644259860446,
+            143.44967748080384
+          ],
+          "UP3": [
+            -89.20871346573448,
+            549.6960367304519,
+            225.20328913090412
+          ],
+          "UP4": [
+            1.605277151390319,
+            575.9140431949137,
+            194.67313608146458
+          ],
+          "UP5": [
+            2.0822405786307545,
+            610.0802752255006,
+            270.098946610542
+          ],
+          "_fallback_root_found": false,
+          "_newton_converged": true,
+          "_used_fallback": false,
+          "corner_weight_n": 700.0,
+          "iterations": 4,
+          "push_rod_length": 454.51049196175666,
+          "steering_theta": 0.06955848095925744,
+          "tie_rod_length": 435.5597570910808,
+          "tire_radius": 260.0,
+          "tire_spring_rate": 150.0,
+          "tire_width": 180.0,
+          "track_width": 1220.0
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -0.0974828707275091,
+          0.037757993140429,
+          -0.9945207005732616
+        ],
+        "timing_ms": 6.812000181525946
+      },
+      "timing_ms": {
+        "coupled": 45.72420008480549,
+        "sequential": 6.812000181525946
+      },
+      "travel": 15
+    },
+    {
+      "coupled": {
+        "angles": {
+          "_solver_healthy": "not_applicable",
+          "camber_deg": -1.928,
+          "caster_deg": 5.953,
+          "caster_trail_mm": -28.87,
+          "kpi_deg": 2.087,
+          "scrub_radius_mm": 27.24,
+          "toe_deg": -1.311
+        },
+        "contact_patch": [
+          -21.2,
+          618.1,
+          0.0
+        ],
+        "explanation": "bounded coupled solve",
+        "geometry_residual_mm": 0.597543890373295,
+        "iterations": 18,
+        "residuals_mm": {
+          "kingpin_length": -0.057542322243023136,
+          "lca_axis": 0.2435126711947646,
+          "pushrod_length": -0.333905008462807,
+          "rigid_up1_up3": -0.0042216355189879096,
+          "rigid_up1_up4": -0.016908660207477055,
+          "rigid_up1_up5": 0.06475341160523129,
+          "rigid_up2_up3": -0.09174265558978334,
+          "rigid_up2_up4": -0.597543890373295,
+          "rigid_up2_up5": 0.3679749136124997,
+          "rigid_up3_up4": 0.12539544404894798,
+          "rigid_up3_up5": -0.061933873509332216,
+          "rigid_up4_up5": -0.5667313205794358,
+          "tie_rod_length": -0.023469317690285152,
+          "uca_axis": 0.10429878870280618,
+          "upright_up1_up5": 0.06475341160523129,
+          "upright_up2_up5": 0.3679749136124997,
+          "wheel_travel": -0.09704959304707472
+        },
+        "state": {
+          "FL1": [
+            -100.0,
+            120.0,
+            200.0
+          ],
+          "UP1": [
+            -19.567525659070835,
+            580.2071848032631,
+            292.49856597248265
+          ],
+          "UP2": [
+            -35.10923294608313,
+            585.6373726536211,
+            143.4626340333674
+          ],
+          "UP3": [
+            -114.85267890201287,
+            554.5056705763797,
+            226.00150253023858
+          ],
+          "UP4": [
+            -23.800051850241967,
+            579.3469015378605,
+            194.63409278057154
+          ],
+          "UP5": [
+            -21.198107509067807,
+            611.3575269257439,
+            270.20295040695294
+          ],
+          "contact_patch": [
+            -21.2,
+            618.1,
+            0.0
+          ],
+          "steering_angle": 0.12699941849329383
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -15.541707287012297,
+          5.430187850358038,
+          -149.03593193911524
+        ],
+        "timing_ms": 40.02090007998049
+      },
+      "delta": {
+        "camber_deg": -0.078,
+        "caster_deg": 0.355,
+        "contact_patch": null,
+        "contact_patch_mm": null,
+        "geometry_residual_mm": 0.527553890373295,
+        "kpi_deg": -0.087,
+        "scrub_radius_mm": -7.19,
+        "steering_axis": null,
+        "steering_axis_unitless": null,
+        "timing_ms": null,
+        "toe_deg": 1.785,
+        "trail_mm": -0.79
+      },
+      "rack": 5,
+      "sequential": {
+        "angles": {
+          "_solver_healthy": "healthy",
+          "camber_deg": -1.85,
+          "caster_deg": 5.598,
+          "caster_trail_mm": -28.08,
+          "kpi_deg": 2.174,
+          "scrub_radius_mm": 34.43,
+          "toe_deg": -3.096
+        },
+        "contact_patch": [
+          3.8,
+          624.64,
+          0.0
+        ],
+        "explanation": "sequential baseline",
+        "geometry_residual_mm": 0.06999,
+        "iterations": 88,
+        "residuals_mm": {
+          "kingpin_length": null,
+          "lca_axis": null,
+          "pushrod_length": null,
+          "rigid_up1_up3": null,
+          "rigid_up1_up4": null,
+          "rigid_up1_up5": null,
+          "rigid_up2_up3": null,
+          "rigid_up2_up4": null,
+          "rigid_up2_up5": null,
+          "rigid_up3_up4": null,
+          "rigid_up3_up5": null,
+          "rigid_up4_up5": null,
+          "tie_rod_length": null,
+          "uca_axis": null,
+          "upright_up1_up5": null,
+          "upright_up2_up5": null,
+          "wheel_travel": null
+        },
+        "state": {
+          "CH1": [
+            -90.0,
+            160.0,
+            285.0
+          ],
+          "CH2": [
+            90.0,
+            152.0,
+            295.0
+          ],
+          "CH3": [
+            -110.0,
+            128.0,
+            110.0
+          ],
+          "CH4": [
+            110.0,
+            122.0,
+            115.0
+          ],
+          "CH5": [
+            0.0,
+            135.0,
+            305.0
+          ],
+          "FL1": [
+            -100.0,
+            120.0,
+            200.0
+          ],
+          "UP1": [
+            4.39267779396757,
+            579.1033696887761,
+            292.55817627746853
+          ],
+          "UP2": [
+            -10.222930010062695,
+            584.7644259860446,
+            143.44967748080384
+          ],
+          "UP3": [
+            -90.8906078764765,
+            554.7137866037675,
+            225.55865233301046
+          ],
+          "UP4": [
+            1.2001386374108707,
+            575.5369038121844,
+            194.69852925743803
+          ],
+          "UP5": [
+            3.8012812965607776,
+            610.036934166107,
+            269.92880083538915
+          ],
+          "_fallback_root_found": false,
+          "_newton_converged": true,
+          "_used_fallback": false,
+          "corner_weight_n": 700.0,
+          "iterations": 4,
+          "push_rod_length": 454.1372241967697,
+          "steering_theta": 0.12696964821732792,
+          "tie_rod_length": 435.5597570910808,
+          "tire_radius": 260.0,
+          "tire_spring_rate": 150.0,
+          "tire_width": 180.0,
+          "track_width": 1220.0
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -0.0974828707275091,
+          0.037757993140429,
+          -0.9945207005732616
+        ],
+        "timing_ms": 6.955800112336874
+      },
+      "timing_ms": {
+        "coupled": 40.02090007998049,
+        "sequential": 6.955800112336874
+      },
+      "travel": 15
+    },
+    {
+      "coupled": {
+        "angles": {
+          "_solver_healthy": "not_applicable",
+          "camber_deg": -2.171,
+          "caster_deg": 6.29,
+          "caster_trail_mm": -29.64,
+          "kpi_deg": 1.833,
+          "scrub_radius_mm": 7.82,
+          "toe_deg": 3.327
+        },
+        "contact_patch": [
+          -21.1,
+          597.43,
+          0.0
+        ],
+        "explanation": "bounded coupled solve",
+        "geometry_residual_mm": 1.272132553469234,
+        "iterations": 18,
+        "residuals_mm": {
+          "kingpin_length": -0.1820188965316447,
+          "lca_axis": 0.44102860279468814,
+          "pushrod_length": -0.6058302994406972,
+          "rigid_up1_up3": -0.020819915069608896,
+          "rigid_up1_up4": 0.052795868477446106,
+          "rigid_up1_up5": 0.11619550743070306,
+          "rigid_up2_up3": -0.20105020791984884,
+          "rigid_up2_up4": -1.2049744788486336,
+          "rigid_up2_up5": 0.7918570410527934,
+          "rigid_up3_up4": 0.27142896709575837,
+          "rigid_up3_up5": -0.12108490671174366,
+          "rigid_up4_up5": -1.272132553469234,
+          "tie_rod_length": -0.0384286464883985,
+          "uca_axis": 0.1915887319934768,
+          "upright_up1_up5": 0.11619550743070306,
+          "upright_up2_up5": 0.7918570410527934,
+          "wheel_travel": -0.1763519315780968
+        },
+        "state": {
+          "FL1": [
+            -100.0,
+            115.0,
+            200.0
+          ],
+          "UP1": [
+            -16.92221347531694,
+            579.7856687256959,
+            306.80662409769616
+          ],
+          "UP2": [
+            -33.32683231379162,
+            584.549753920331,
+            157.9657042035292
+          ],
+          "UP3": [
+            -110.70233321753047,
+            548.4930481811049,
+            240.59636403051098
+          ],
+          "UP4": [
+            -22.56780429153279,
+            582.4506696854971,
+            208.97617952393583
+          ],
+          "UP5": [
+            -21.097298526104698,
+            611.1936568230483,
+            285.1236480684219
+          ],
+          "contact_patch": [
+            -21.1,
+            597.43,
+            0.0
+          ],
+          "steering_angle": 0.1284192815177867
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -16.40461883847468,
+          4.764085194635072,
+          -148.84091989416694
+        ],
+        "timing_ms": 39.54709996469319
+      },
+      "delta": {
+        "camber_deg": -0.342,
+        "caster_deg": -0.23,
+        "contact_patch": null,
+        "contact_patch_mm": null,
+        "geometry_residual_mm": 0.775070553469234,
+        "kpi_deg": 0.047,
+        "scrub_radius_mm": -12.34,
+        "steering_axis": null,
+        "steering_axis_unitless": null,
+        "timing_ms": null,
+        "toe_deg": 2.747,
+        "trail_mm": 2.6
+      },
+      "rack": 0,
+      "sequential": {
+        "angles": {
+          "_solver_healthy": "healthy",
+          "camber_deg": -1.829,
+          "caster_deg": 6.52,
+          "caster_trail_mm": -32.24,
+          "kpi_deg": 1.786,
+          "scrub_radius_mm": 20.16,
+          "toe_deg": 0.58
+        },
+        "contact_patch": [
+          3.9,
+          608.64,
+          0.0
+        ],
+        "explanation": "sequential baseline",
+        "geometry_residual_mm": 0.497062,
+        "iterations": 84,
+        "residuals_mm": {
+          "kingpin_length": null,
+          "lca_axis": null,
+          "pushrod_length": null,
+          "rigid_up1_up3": null,
+          "rigid_up1_up4": null,
+          "rigid_up1_up5": null,
+          "rigid_up2_up3": null,
+          "rigid_up2_up4": null,
+          "rigid_up2_up5": null,
+          "rigid_up3_up4": null,
+          "rigid_up3_up5": null,
+          "rigid_up4_up5": null,
+          "tie_rod_length": null,
+          "uca_axis": null,
+          "upright_up1_up5": null,
+          "upright_up2_up5": null,
+          "wheel_travel": null
+        },
+        "state": {
+          "CH1": [
+            -90.0,
+            160.0,
+            285.0
+          ],
+          "CH2": [
+            90.0,
+            152.0,
+            295.0
+          ],
+          "CH3": [
+            -110.0,
+            128.0,
+            110.0
+          ],
+          "CH4": [
+            110.0,
+            122.0,
+            115.0
+          ],
+          "CH5": [
+            0.0,
+            135.0,
+            305.0
+          ],
+          "FL1": [
+            -100.0,
+            115.0,
+            200.0
+          ],
+          "UP1": [
+            6.747067400931453,
+            578.9007750239475,
+            307.0295746253568
+          ],
+          "UP2": [
+            -10.220932981971869,
+            583.5310829451693,
+            158.5648455523136
+          ],
+          "UP3": [
+            -87.69584530246495,
+            548.4180781169035,
+            241.34826884226553
+          ],
+          "UP4": [
+            2.432195708467207,
+            575.0920691337302,
+            209.2221201971825
+          ],
+          "UP5": [
+            3.902701473895297,
+            610.292092626709,
+            284.8630708943111
+          ],
+          "_fallback_root_found": false,
+          "_newton_converged": true,
+          "_used_fallback": false,
+          "corner_weight_n": 700.0,
+          "iterations": 4,
+          "push_rod_length": 450.4002077596048,
+          "steering_theta": 0.1284192815177867,
+          "tie_rod_length": 435.5597570910808,
+          "tire_radius": 260.0,
+          "tire_spring_rate": 150.0,
+          "tire_width": 180.0,
+          "track_width": 1220.0
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -0.11349609963022209,
+          0.030971350618019592,
+          -0.9930555930105939
+        ],
+        "timing_ms": 5.187200149521232
+      },
+      "timing_ms": {
+        "coupled": 39.54709996469319,
+        "sequential": 5.187200149521232
+      },
+      "travel": 30
+    },
+    {
+      "coupled": {
+        "angles": {
+          "_solver_healthy": "not_applicable",
+          "camber_deg": -1.835,
+          "caster_deg": 6.498,
+          "caster_trail_mm": -32.36,
+          "kpi_deg": 1.835,
+          "scrub_radius_mm": 21.68,
+          "toe_deg": 0.205
+        },
+        "contact_patch": [
+          -19.35,
+          611.28,
+          0.0
+        ],
+        "explanation": "bounded coupled solve",
+        "geometry_residual_mm": 1.332379371523416,
+        "iterations": 16,
+        "residuals_mm": {
+          "kingpin_length": -0.2002257813200572,
+          "lca_axis": 0.43997077131126616,
+          "pushrod_length": -0.6062794924644095,
+          "rigid_up1_up3": -0.0062063876886782054,
+          "rigid_up1_up4": 0.060635319760905304,
+          "rigid_up1_up5": 0.11733551787698104,
+          "rigid_up2_up3": -0.1701705060502121,
+          "rigid_up2_up4": -1.2630357754728152,
+          "rigid_up2_up5": 0.8213109120230513,
+          "rigid_up3_up4": 0.2343529512437641,
+          "rigid_up3_up5": -0.11647761043388982,
+          "rigid_up4_up5": -1.332379371523416,
+          "tie_rod_length": -0.03480296982780828,
+          "uca_axis": 0.18949697770392504,
+          "upright_up1_up5": 0.11733551787698104,
+          "upright_up2_up5": 0.8213109120230513,
+          "wheel_travel": -0.1765693907263426
+        },
+        "state": {
+          "FL1": [
+            -100.0,
+            120.0,
+            200.0
+          ],
+          "UP1": [
+            -16.75169529660288,
+            579.7706653315382,
+            306.9358443318234
+          ],
+          "UP2": [
+            -33.694708481034695,
+            584.5367344160287,
+            158.17364736740126
+          ],
+          "UP3": [
+            -112.538702941679,
+            553.3670401334556,
+            241.44605067829474
+          ],
+          "UP4": [
+            -22.970072832199797,
+            582.4633743319665,
+            209.13303779839566
+          ],
+          "UP5": [
+            -19.346356253076916,
+            611.2606380515111,
+            285.12343060927367
+          ],
+          "contact_patch": [
+            -19.35,
+            611.28,
+            0.0
+          ],
+          "steering_angle": 0.1858729173756085
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -16.943013184431816,
+          4.766069084490482,
+          -148.76219696442212
+        ],
+        "timing_ms": 38.70230005122721
+      },
+      "delta": {
+        "camber_deg": -0.382,
+        "caster_deg": -0.022,
+        "contact_patch": null,
+        "contact_patch_mm": null,
+        "geometry_residual_mm": 0.835317371523416,
+        "kpi_deg": 0.049,
+        "scrub_radius_mm": -13.01,
+        "steering_axis": null,
+        "steering_axis_unitless": null,
+        "timing_ms": null,
+        "toe_deg": 2.937,
+        "trail_mm": 1.63
+      },
+      "rack": 5,
+      "sequential": {
+        "angles": {
+          "_solver_healthy": "healthy",
+          "camber_deg": -1.453,
+          "caster_deg": 6.52,
+          "caster_trail_mm": -33.99,
+          "kpi_deg": 1.786,
+          "scrub_radius_mm": 34.69,
+          "toe_deg": -2.732
+        },
+        "contact_patch": [
+          5.65,
+          623.17,
+          0.0
+        ],
+        "explanation": "sequential baseline",
+        "geometry_residual_mm": 0.497062,
+        "iterations": 84,
+        "residuals_mm": {
+          "kingpin_length": null,
+          "lca_axis": null,
+          "pushrod_length": null,
+          "rigid_up1_up3": null,
+          "rigid_up1_up4": null,
+          "rigid_up1_up5": null,
+          "rigid_up2_up3": null,
+          "rigid_up2_up4": null,
+          "rigid_up2_up5": null,
+          "rigid_up3_up4": null,
+          "rigid_up3_up5": null,
+          "rigid_up4_up5": null,
+          "tie_rod_length": null,
+          "uca_axis": null,
+          "upright_up1_up5": null,
+          "upright_up2_up5": null,
+          "wheel_travel": null
+        },
+        "state": {
+          "CH1": [
+            -90.0,
+            160.0,
+            285.0
+          ],
+          "CH2": [
+            90.0,
+            152.0,
+            295.0
+          ],
+          "CH3": [
+            -110.0,
+            128.0,
+            110.0
+          ],
+          "CH4": [
+            110.0,
+            122.0,
+            115.0
+          ],
+          "CH5": [
+            0.0,
+            135.0,
+            305.0
+          ],
+          "FL1": [
+            -100.0,
+            120.0,
+            200.0
+          ],
+          "UP1": [
+            6.747067400931453,
+            578.9007750239475,
+            307.0295746253568
+          ],
+          "UP2": [
+            -10.220932981971869,
+            583.5310829451693,
+            158.5648455523136
+          ],
+          "UP3": [
+            -89.40909231200128,
+            553.4295945811559,
+            241.700374292644
+          ],
+          "UP4": [
+            2.0299271678001993,
+            574.711955685566,
+            209.25624042542591
+          ],
+          "UP5": [
+            5.653643746923082,
+            610.2592198720546,
+            284.6619308638009
+          ],
+          "_fallback_root_found": false,
+          "_newton_converged": true,
+          "_used_fallback": false,
+          "corner_weight_n": 700.0,
+          "iterations": 4,
+          "push_rod_length": 450.01954632505186,
+          "steering_theta": 0.1858729173756085,
+          "tie_rod_length": 435.5597570910808,
+          "tire_radius": 260.0,
+          "tire_spring_rate": 150.0,
+          "tire_width": 180.0,
+          "track_width": 1220.0
+        },
+        "status": "APPROXIMATE",
+        "steering_axis": [
+          -0.11349609963022209,
+          0.030971350618019592,
+          -0.9930555930105939
+        ],
+        "timing_ms": 5.309100029990077
+      },
+      "timing_ms": {
+        "coupled": 38.70230005122721,
+        "sequential": 5.309100029990077
+      },
+      "travel": 30
+    }
+  ],
+  "hardpoint_fingerprint": "e37007b746ce302e01d83df0060523f593e6a816a19de4c7b38eb0b14b587164",
+  "hardpoint_side": "front_right",
+  "k4_diagnosis": {
+    "cause_summary": {
+      "candidate_status": {
+        "APPROXIMATE": 12,
+        "VALID": 4
+      },
+      "rack_input": "travel-dominant",
+      "travel_direction": "negative"
+    },
+    "negative_travel_max": {
+      "rack": 0,
+      "residual_mm": 0.731417,
+      "travel": -30
+    },
+    "positive_travel_max": {
+      "rack": 0,
+      "residual_mm": 0.497062,
+      "travel": 30
+    }
+  },
+  "rack_grid_mm": [
+    0,
+    5
+  ],
+  "smoothing": "none",
+  "travel_grid_mm": [
+    -30,
+    -15,
+    -5,
+    0,
+    5,
+    10,
+    15,
+    30
+  ]
+}

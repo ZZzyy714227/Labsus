@@ -1,0 +1,22 @@
+{
+  "travel_mm": [-30, -15, -5, 0, 5, 10, 15, 30],
+  "rack_mm": [0, 5],
+  "cases": [
+    {"travel": -30, "rack": 0, "kind": "bump-only"},
+    {"travel": -30, "rack": 5, "kind": "bump+rack"},
+    {"travel": -15, "rack": 0, "kind": "bump-only"},
+    {"travel": -15, "rack": 5, "kind": "bump+rack"},
+    {"travel": -5, "rack": 0, "kind": "bump-only"},
+    {"travel": -5, "rack": 5, "kind": "bump+rack"},
+    {"travel": 0, "rack": 0, "kind": "static"},
+    {"travel": 0, "rack": 5, "kind": "rack-only"},
+    {"travel": 5, "rack": 0, "kind": "bump-only"},
+    {"travel": 5, "rack": 5, "kind": "bump+rack"},
+    {"travel": 10, "rack": 0, "kind": "bump-only"},
+    {"travel": 10, "rack": 5, "kind": "bump+rack"},
+    {"travel": 15, "rack": 0, "kind": "bump-only"},
+    {"travel": 15, "rack": 5, "kind": "bump+rack"},
+    {"travel": 30, "rack": 0, "kind": "bump-only"},
+    {"travel": 30, "rack": 5, "kind": "bump+rack"}
+  ]
+}

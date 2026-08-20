@@ -1,5 +1,12 @@
 # 开发日志
 
+## 2026-08-20 — P1 Task 4 full comparison matrix
+
+- 新增 `tests/fixtures/p1_solver_gate_cases.json`：16 个 front-right travel/rack 工况（travel -30/-15/-5/0/5/10/15/30 mm，rack 0/5 mm），覆盖 static、bump-only、rack-only、bump+rack；fixture 仅保存输入。
+- 扩展 benchmark delta 字段：camber/toe/caster/KPI/scrub/trail/contact patch/steering axis/residual/timing，并保留 sequential/candidate 原始 records；报告明确 `smoothing: none`。
+- 新增 K-4 诊断：负/正行程分别取最大残差，区分 travel direction、rack input 与 candidate status；CLI `--write-report` 生成 `data/reports/p1_solver_gate.json`。
+- 验证：P1 聚焦测试 18 passed；全量 249 passed、33 skipped、4 xfailed，另有 5 failed/23 errors，均为 pytest 临时目录/持久化状态 PermissionError（环境限制），非生产 endpoint 改动。
+
 ## 2026-08-20 — P1 Task 3 review fixes
 
 - 候选残差补齐 CH5/pushrod 约束；selected-side state 明确包含 UP1..UP5、FL1、steering_angle 与 contact_patch，缺失字段不再静默当作有效结果。

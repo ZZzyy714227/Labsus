@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import math
 import time
+from pathlib import Path
 from typing import TypedDict, cast
 
 import numpy as np
@@ -41,6 +43,14 @@ class PathRecord(TypedDict):
 class DeltaRecord(TypedDict):
     camber_deg: NumericOrNone
     toe_deg: NumericOrNone
+    caster_deg: NumericOrNone
+    kpi_deg: NumericOrNone
+    scrub_radius_mm: NumericOrNone
+    trail_mm: NumericOrNone
+    contact_patch_mm: NumericOrNone
+    steering_axis_unitless: NumericOrNone
+    geometry_residual_mm: NumericOrNone
+    timing_ms: NumericOrNone
     contact_patch: list[JsonValue] | None
     steering_axis: list[JsonValue] | None
 
@@ -64,6 +74,8 @@ class Report(TypedDict):
     hardpoint_fingerprint: str
     travel_grid_mm: list[int]
     rack_grid_mm: list[int]
+    smoothing: str
+    k4_diagnosis: dict[str, JsonValue]
     cases: list[CaseRecord]
 
 
@@ -166,6 +178,27 @@ def _coupled_path(hp: dict[str, object], travel: int, rack: int) -> PathRecord:
     }
 
 
+def _scalar_delta(sequential: PathRecord, coupled: PathRecord, key: str) -> float | None:
+    if sequential["angles"] is None or coupled["angles"] is None:
+        return None
+    return round(float(coupled["angles"].get(key, 0.0)) - float(sequential["angles"].get(key, 0.0)), 9)
+
+
+def _diagnose_k4(cases: list[CaseRecord]) -> dict[str, JsonValue]:
+    valid = [r for r in cases if r["sequential"]["geometry_residual_mm"] is not None]
+    def maximum(rows: list[CaseRecord], label: str) -> dict[str, JsonValue]:
+        row = max(rows, key=lambda r: float(r["sequential"]["geometry_residual_mm"] or 0.0)) if rows else None
+        return {"travel": row["travel"], "rack": row["rack"], "residual_mm": float(row["sequential"]["geometry_residual_mm"])} if row else {"travel": 0, "rack": 0, "residual_mm": 0.0}
+    neg = [r for r in valid if r["travel"] < 0]
+    pos = [r for r in valid if r["travel"] > 0]
+    neg_max, pos_max = maximum(neg, "negative"), maximum(pos, "positive")
+    rack_effect = max((float(r["sequential"]["geometry_residual_mm"] or 0.0) for r in valid if r["rack"] == 5), default=0.0) - max((float(r["sequential"]["geometry_residual_mm"] or 0.0) for r in valid if r["rack"] == 0), default=0.0)
+    return {"negative_travel_max": neg_max, "positive_travel_max": pos_max,
+            "cause_summary": {"travel_direction": "negative" if neg_max["residual_mm"] > pos_max["residual_mm"] else "positive" if pos_max["residual_mm"] > neg_max["residual_mm"] else "balanced",
+                               "rack_input": "rack-sensitive" if abs(rack_effect) > 0.02 else "travel-dominant",
+                               "candidate_status": {status: sum(1 for r in cases if r["coupled"]["status"] == status) for status in sorted({r["coupled"]["status"] for r in cases})}}}
+
+
 def compare_solver_paths() -> Report:
     """Evaluate the production sequential baseline over the P1 matrix."""
     hp = dict(DEFAULT_HARDPOINTS)
@@ -174,19 +207,22 @@ def compare_solver_paths() -> Report:
         for rack in RACK_GRID:
             sequential = _sequential_baseline(hp, travel, rack)
             coupled = _coupled_path(hp, travel, rack)
-            cases.append({
-                "travel": travel, "rack": rack, "sequential": sequential,
-                "coupled": coupled,
-                "delta": {"camber_deg": None, "toe_deg": None,
-                           "contact_patch": None, "steering_axis": None},
-                "timing_ms": {"sequential": sequential["timing_ms"],
-                              "coupled": coupled["timing_ms"]},
-            })
+            delta = {"camber_deg": _scalar_delta(sequential, coupled, "camber_deg"), "toe_deg": _scalar_delta(sequential, coupled, "toe_deg"),
+                     "caster_deg": _scalar_delta(sequential, coupled, "caster_deg"), "kpi_deg": _scalar_delta(sequential, coupled, "kpi_deg"),
+                     "scrub_radius_mm": _scalar_delta(sequential, coupled, "scrub_radius_mm"), "trail_mm": _scalar_delta(sequential, coupled, "caster_trail_mm"),
+                     "contact_patch_mm": None, "steering_axis_unitless": None,
+                     "geometry_residual_mm": (None if sequential["geometry_residual_mm"] is None or coupled["geometry_residual_mm"] is None else coupled["geometry_residual_mm"] - sequential["geometry_residual_mm"]),
+                     "timing_ms": None, "contact_patch": None, "steering_axis": None}
+            cases.append({"travel": travel, "rack": rack, "sequential": sequential, "coupled": coupled, "delta": delta,
+                          "timing_ms": {"sequential": sequential["timing_ms"], "coupled": coupled["timing_ms"]}})
+    return {"hardpoint_side": "front_right", "hardpoint_fingerprint": _hardpoint_fingerprint(), "travel_grid_mm": list(TRAVEL_GRID), "rack_grid_mm": list(RACK_GRID), "smoothing": "none", "k4_diagnosis": _diagnose_k4(cases), "cases": cases}
 
-    return {
-        "hardpoint_side": "front_right",
-        "hardpoint_fingerprint": _hardpoint_fingerprint(),
-        "travel_grid_mm": list(TRAVEL_GRID),
-        "rack_grid_mm": list(RACK_GRID),
-        "cases": cases,
-    }
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--write-report", type=Path)
+    args = parser.parse_args()
+    report = compare_solver_paths()
+    if args.write_report:
+        args.write_report.parent.mkdir(parents=True, exist_ok=True)
+        args.write_report.write_text(json.dumps(report, indent=2, allow_nan=False, sort_keys=True) + "\n", encoding="utf-8")
