@@ -1,0 +1,106 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "fsae-suspension"
+version = "0.8.0"
+description = "FSAE double-wishbone suspension kinematics analysis and 3D visualization"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "numpy>=1.24.0",
+    "scipy>=1.10.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.3.0",
+    "mypy>=1.6.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src"]
+
+# ============================================================
+# Ruff — linting + formatting
+# ============================================================
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "W",    # pycodestyle warnings
+    "UP",   # pyupgrade
+]
+ignore = [
+    "E501",    # line-length — handled by formatter
+    "E402",    # module-import-not-at-top — main.py has late imports
+    "N802",    # function name should be lowercase — solver funcs use _
+    "N803",    # argument name should be lowercase
+    "N806",    # variable in function should be lowercase
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = true
+
+# ============================================================
+# mypy — static type checking
+# ============================================================
+[tool.mypy]
+strict = false
+python_version = "3.10"
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_any_unimported = false
+disallow_untyped_defs = false       # ← gradually enable: start loose
+check_untyped_defs = true
+ignore_missing_imports = true
+
+# Start with strictest on smallest modules, loosen for big ones
+[[tool.mypy.overrides]]
+module = [
+    "geometry",
+    "tire",
+    "api_models",
+]
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "config",
+]
+disallow_untyped_defs = false
+ignore_errors = true
+
+# ============================================================
+# pytest — test runner
+# ============================================================
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+
+# ============================================================
+# pyright / Pylance — language server (resolves imports)
+# ============================================================
+[tool.pyright]
+extraPaths = ["src"]
