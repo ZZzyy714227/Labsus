@@ -1,5 +1,37 @@
 # 开发日志
 
+## 2026-08-20 — V1 P0 数据地基完成（规范冻结 + benchmark + 方案/工况/结果模型 + v2 API）
+
+按设计文档 §14 实施阶段完成 P0，实施计划：`docs/superpowers/plans/2026-08-20-v1-p0-data-foundation.md`。
+
+- **规范冻结**（`src/core/convention.py` + `tests/test_convention.py`）：X 前/Y 右/Z 上、原点前轴中心地面；Caster 正 = 主销轴上端后倾（手算探针确认与经典定义一致）；默认硬点黄金值固化（前右静态 camber −2.49 / kpi 2.51 / caster 5.005 / scrub 19.78 / trail −22.36；rack+5mm 平行转向 toe ∓3.3）。
+- **已知规范问题登记（K-1…K-4）**：K-1 左右镜像 scrub 不对称（19.78 vs 17.84，xfail strict 哨兵，P2 修复）；K-2 toe 符号与工程习惯相反；K-3 caster_trail_mm 与经典机械拖距符号相反；K-4 polish 残差在 dz∉[−3,+10]mm 超标（负行程侧最差 −15mm≈0.19mm，分支锚定软项妥协残差，基线已锁定，P1 议程）。
+- **手算 benchmark**（`tests/test_hand_benchmark.py`）：合成硬点解析验证 KPI/caster/scrub/trail 公式；polish 残差基线哨兵。
+- **核心 schema**（`src/core/models.py`）：ChassisDesign（append-only 版本，左右硬点独立实例、镜像仅初始化）、AnalysisCase（四轮轮跳+齿条为唯一几何驱动，heave/roll/pitch 仅派生标签）、AnalysisResult（绑定方案版本+工况版本+求解器）、ResultStatus 七状态（§10）。
+- **JSON 版本化存储**（`src/core/store.py` → `data/store/`，已 gitignore）：原子写、幂等导入。
+- **legacy 导入 + 预置工况**（`src/core/legacy_import.py`）：启动幂等生成 `legacy-import` 方案 v1 + 14 个预置工况（§4.3）。
+- **v2 API 边界**（`src/routes/v2.py`，前缀 `/api/v2`）：designs/cases CRUD + `/api/v2/solve`（直通顺序 bump→steer，显式标 APPROXIMATE + 逐轮残差 + 超阈警告；统一解与否由 P1 误差基准决定）；旧 `/api/*` 零改动。前端迁移随 P4 落地。
+- **测试**：全量 259 passed / 4 xfailed（旧基线 205+3xfail 无回归）；ruff + mypy 新代码全绿；冒烟验证 v2 端点与旧 API 兼容。
+- 另：spec 文档重复章节编号修正（16–19）。
+- **下一步（P1）**：顺序解 vs 统一约束解同工况误差基准，决定求解器重构范围；K-4 残差改进一并处理。
+
+## 2026-08-16 — FSAE 底盘快速迭代工具 V1 总体设计基线
+
+- 重新质问并确认产品定位：这是面向 FSAE 底盘硬点快速迭代的整车准静态几何与轮边受力分析工具，不是整车展示器或单轴动画工具。
+- 明确一级对象为整车底盘方案，分析对象为 AnalysisCase，结果必须绑定方案版本、工况和求解状态。
+- V1 覆盖四轮统一几何、轮跳/转向组合、Camber/Toe/KPI/Caster、Scrub/Trail、IC/RC/Pitch 几何、四轮载荷、摩擦圆、二力杆和球铰受力、残差与 A/B 方案对比。
+- 明确 V1 已有基础、尚未完成事项及 V2/V3 后续范围。
+- 文档：`docs/superpowers/specs/2026-08-16-fsae-chassis-development-tool-v1-design.md`
+- 审查修订：补充服务端方案/工况/结果数据模型与迁移路径、坐标/符号规范、顺序解与统一解误差基准、验证阈值、性能预算、P0–P4 实施依赖；明确 V1 直接轮跳姿态假设、`az` 语义、现有结构力模块需重写，以及 PBR/车架/空力冻结。
+- 左右建模修订：几何模板允许镜像初始化，但左右硬点为独立实例；运动状态独立求解；轮胎载荷、转向、防倾杆和杆件受力通过整车模型耦合，禁止直接镜像物理结果。
+
+## 2026-08-16 — DWB-SIM 完整系统设计解析文档
+
+- 对 `double-wishbone-suspension.html` 完成完整设计复原与方法论分析。
+- 覆盖硬点/机构拓扑、刚性约束、铰链投影、刚体极分解、Gauss-Seidel 迭代、continuation、运动学指标、弹簧/阻尼/轮胎、台架动力学、横向稳定杆、扫掠曲线、Canvas 绘图、四视图、UI、交互、状态刷新和正确性边界。
+- 本轮仅做参考系统完整分析，不包含迁移建议、融合方案或现有代码修改。
+- 文档：`docs/superpowers/specs/2026-08-16-dwb-sim-system-methodology.md`
+
 ## 2026-08-14 — Phase 2 完成：PBR 整车渲染 + 点阵导出（重建目标达成）
 
 - **Task 7**：`car3d/frame.js`（管件 9.5mm 半径、主/前环 25.4mm 连续曲线管）、`suspension.js`（A 臂/立柱板/推拉杆/摇臂三角板随求解角度旋转/减震器+弹簧螺旋）、`steering.js`（齿条随 rack 平移、横拉杆、转向柱、方向盘随 steering_theta×3.5 转）、`wheels.js`（轮胎用求解器 spin 轴+加载半径、轮辋/制动盘/卡钳/接地面片）

@@ -1,0 +1,91 @@
+"""核心 schema 测试：版本结构、姿态派生标签、结果状态枚举。"""
+import pytest
+from pydantic import ValidationError
+
+from core.models import (
+    AnalysisResult,
+    AxleHardpoints,
+    CaseVersion,
+    ChassisDesign,
+    DesignVersion,
+    ResultStatus,
+    WheelTravel,
+)
+
+
+def _axle(y=610.0):
+    return AxleHardpoints(
+        points={
+            "CH1": [0, 400, 350], "CH2": [100, 400, 350],
+            "CH3": [0, 380, 100], "CH4": [100, 380, 100],
+            "CH5": [10, 150, 300], "FL1": [60, 300, 250],
+            "UP1": [0, 500, 400], "UP2": [0, 500, 100],
+            "UP3": [50, 500, 250], "UP4": [0, 500, 150],
+            "UP5": [0, y, 250],
+        },
+        tire={"tire_radius": 260.0, "tire_width": 205.0,
+              "tire_spring_rate": 150.0, "corner_weight_n": 700.0},
+    )
+
+
+class TestDesignVersion:
+    def test_from_right_template_mirrors_left(self):
+        dv = DesignVersion.from_right_template(
+            version=1, front_right=_axle(), rear_right=_axle(y=590.0),
+            vehicle={"mass_kg": 280.0}, name="t")
+        assert dv.front_left.points["UP5"][1] == pytest.approx(-610.0)
+        assert dv.rear_left.points["UP5"][1] == pytest.approx(-590.0)
+        # 镜像只初始化：此后左右是独立实体（字段独立可改）
+        dv.front_left.points["UP5"][1] = -600.0
+        assert dv.front_right.points["UP5"][1] == pytest.approx(610.0)
+
+    def test_convention_embedded(self):
+        dv = DesignVersion.from_right_template(
+            version=1, front_right=_axle(), rear_right=_axle(), vehicle={})
+        assert dv.convention.y_axis == "right"
+
+    def test_point_keys_validated(self):
+        with pytest.raises(ValidationError):
+            AxleHardpoints(points={"BAD_KEY": [0, 0, 0]})
+
+    def test_flat_round_trip_for_solver(self):
+        hp = _axle().flat()
+        assert hp["UP5"] == pytest.approx([0, 610.0, 250])
+        assert hp["tire_radius"] == pytest.approx(260.0)
+
+
+class TestCaseVersion:
+    def test_derived_pose_labels(self):
+        cv = CaseVersion(version=1, travel=WheelTravel(fl=20, fr=-20, rl=20, rr=-20))
+        pose = cv.derived_pose(front_track_mm=1220, rear_track_mm=1180, wheelbase_mm=1550)
+        assert pose["heave_mm"] == pytest.approx(0.0)
+        assert pose["roll_deg"] > 0          # 左侧抬起 → 车身右倾为正
+        assert pose["pitch_deg"] == pytest.approx(0.0)
+
+    def test_heave_label(self):
+        cv = CaseVersion(version=1, travel=WheelTravel(fl=20, fr=20, rl=20, rr=20))
+        pose = cv.derived_pose(1220, 1180, 1550)
+        assert pose["heave_mm"] == pytest.approx(20.0)
+        assert pose["roll_deg"] == pytest.approx(0.0)
+        assert pose["pitch_deg"] == pytest.approx(0.0)
+
+
+class TestAnalysisResult:
+    def test_binds_design_case_and_solver(self):
+        r = AnalysisResult(
+            result_id="r1", design_id="d1", design_version=2,
+            case_id="c1", case_version=1,
+            solver="sequential-bump-steer-v1", status=ResultStatus.APPROXIMATE)
+        assert r.design_version == 2
+        assert r.status == "APPROXIMATE"
+
+    def test_all_statuses_defined(self):
+        names = {s.value for s in ResultStatus}
+        assert names == {"VALID", "APPROXIMATE", "NOT_APPLICABLE", "NOT_IMPLEMENTED",
+                         "SOLVER_FAILED", "EQUILIBRIUM_FAILED", "OUT_OF_RANGE"}
+
+
+class TestContainerDocs:
+    def test_design_latest_tracks_versions(self):
+        d = ChassisDesign(design_id="x", versions=[], latest=0)
+        assert d.latest == 0
