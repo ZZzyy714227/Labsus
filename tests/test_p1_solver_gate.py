@@ -27,6 +27,17 @@ PATH_FIELDS = {
     "geometry_residual_mm",
     "iterations",
     "timing_ms",
+    "residuals_mm",
+    "explanation",
+    "state",
+}
+
+RESIDUAL_KEYS = {
+    "uca_axis", "lca_axis", "kingpin_length", "upright_up1_up5",
+    "upright_up2_up5", "tie_rod_length", "pushrod_length", "wheel_travel",
+    "rigid_up1_up3", "rigid_up1_up4", "rigid_up1_up5", "rigid_up2_up3",
+    "rigid_up2_up4", "rigid_up2_up5", "rigid_up3_up4", "rigid_up3_up5",
+    "rigid_up4_up5",
 }
 
 
@@ -174,14 +185,42 @@ def test_coupled_candidate_is_explicit_when_unavailable():
     candidate = report["cases"][0]["coupled"]
     assert candidate["status"] in {"VALID", "APPROXIMATE", "NOT_IMPLEMENTED", "SOLVER_FAILED"}
     assert "geometry_residual_mm" in candidate
+    assert isinstance(candidate["residuals_mm"], dict)
+    assert isinstance(candidate["explanation"], str)
+    assert isinstance(candidate["state"], dict)
 
 
 def test_candidate_reports_raw_constraint_diagnostics():
     result = solve_coupled_candidate(dict(p1_benchmark.DEFAULT_HARDPOINTS), 0, 0)
     assert result["status"] in {"VALID", "APPROXIMATE", "NOT_IMPLEMENTED", "SOLVER_FAILED"}
     assert "residuals_mm" in result
-    assert isinstance(result["residuals_mm"], dict)
+    assert RESIDUAL_KEYS <= result["residuals_mm"].keys()
     assert "explanation" in result
+    assert {"UP1", "UP2", "UP3", "UP4", "UP5", "FL1", "steering_angle", "contact_patch"} <= result["state"].keys()
+
+
+def test_benchmark_preserves_candidate_raw_diagnostics_and_explanation(monkeypatch):
+    raw = {key: float(index) for index, key in enumerate(RESIDUAL_KEYS)}
+    candidate = {
+        "status": "NOT_IMPLEMENTED", "angles": None, "contact_patch": None,
+        "steering_axis": None, "geometry_residual_mm": None, "iterations": 3,
+        "timing_ms": 1.5, "residuals_mm": raw, "explanation": "rank deficient",
+        "state": {"UP1": [0, 0, 0]},
+    }
+    monkeypatch.setattr(p1_benchmark, "solve_coupled_candidate", lambda *args: candidate)
+    result = p1_benchmark._coupled_path(dict(p1_benchmark.DEFAULT_HARDPOINTS), 0, 0)
+    assert result["residuals_mm"] == raw
+    assert result["explanation"] == "rank deficient"
+
+
+def test_successful_candidate_exposes_geometry_contract(monkeypatch):
+    hp = dict(p1_benchmark.DEFAULT_HARDPOINTS)
+    result = solve_coupled_candidate(hp, 0, 0)
+    if result["status"] in {"VALID", "APPROXIMATE"}:
+        assert result["angles"] is not None
+        assert result["contact_patch"] is not None
+        assert result["steering_axis"] is not None
+        assert result["state"]["steering_angle"] is not None
 
 
 def test_compare_covers_both_travel_directions():

@@ -1,5 +1,12 @@
 # 开发日志
 
+## 2026-08-20 — P1 Task 3 review fixes
+
+- 候选残差补齐 CH5/pushrod 约束；selected-side state 明确包含 UP1..UP5、FL1、steering_angle 与 contact_patch，缺失字段不再静默当作有效结果。
+- 成功候选复用现有 alignment/contact-patch helpers 填充 angles、contact_patch、steering_axis；秩亏仍保留最小化 raw residual evidence，并给出明确 explanation。
+- benchmark path 保留 residuals_mm、state 与 explanation，避免仅暴露直接结果；新增残差键、诊断透传及成功几何契约测试。
+- 验证：聚焦 pytest 14 passed；Ruff、mypy、git diff --check 待提交前复核。
+
 ## 2026-08-20 — P1 Task 3 isolated coupled candidate
 
 - 新增 `src/solver/coupled_candidate.py`：仅供 P1 benchmark 使用的选定前右侧统一约束候选；以 PBD/现有转向结果作分支保持初值，SciPy 可用时执行有界 least_squares。
