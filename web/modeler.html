@@ -208,7 +208,7 @@ canvas.plot.ks{height:62px}
           <div id="forceNote" class="warn" style="padding:3px 8px"></div></div>
       </div>
       <div class="sec"><div class="sh"><b>状态 / 警告</b><span class="tg">—</span></div>
-        <div class="sb"><div id="statusBox" class="ctl"></div></div>
+        <div class="sb"><div id="statusBox" style="font-size:9.5px;line-height:1.7;color:var(--tx)"></div></div>
       </div>
       <div class="sec"><div class="sh"><b>曲线 Curves</b><span class="tg"><span id="curveTitle">前轴 travel</span></span></div>
         <div class="row" style="padding:2px 8px"><b>曲线轴</b>
@@ -293,11 +293,11 @@ const S={
   exc:"sine", excA:18, excF:0.45,
   steerExc:"off", stA:0, stF:0.2,
   travel:0, roll:0, rack:0, ay:0, ax:0,
-  solveEvery:90, lastSolveT:0,
+  solveEvery:78, lastSolveT:0,
   show:{node:1,label:0,rigid:1,face:1,spring:1,wheel:1,disc:1,chassis:1,steer:1,arb:1,dim:1,tirefill:0,mirror:1},
   held:null
 };
-let busy=false, pending=false, dragging=false, sweepTimer=null, solveSeq=0;
+let busy=false, pending=false, dragging=false, sweepTimer=null, solveSeq=0, needsDraw=true;
 let lastH=null, snapA=null, resp=null;
 let prevPose=null, curPose=null, interpF=1;
 let SCENE=[];
@@ -558,7 +558,7 @@ function buildScene(sk){
   if(sh.steer&&sk.front_right&&sk.front_left&&sk.front_right.tpl.FL1&&sk.front_left.tpl.FL1){
     const F=sk.front_right.tpl.FL1,Lf=sk.front_left.tpl.FL1;
     const a=[F[0],Math.abs(F[1])-14,F[2]],b=[Lf[0],-(Math.abs(Lf[1])-14),Lf[2]];
-    cyl(sc,[a[0],a[1],a[2]],[b[0],b[1],b[2]],22,CC.rack,1.1,14);
+    cyl(sc,[a[0],a[1],a[2]],[b[0],b[1],b[2]],22,CC.rack,1.1,12);
     L3(sc,[b[0]+40,b[1],b[2]],[b[0]+40,b[1]+22,b[2]-26],CC.rack,1.3);
     cyl(sc,[b[0]+40,b[1]-6,b[2]],[b[0]+40,b[1]-32,b[2]-16],14,CC.rack,1,10);
     L3(sc,[F[0],Math.abs(F[1])-16,F[2]],F,CC.tie,2,undefined,0.9);
@@ -602,9 +602,9 @@ function buildScene(sk){
     if(sh.spring){
       const u=nrm(sub(P4,H("CH5"))),L=dst(P4,H("CH5"))||1;
       const bodyA=add(H("CH5"),mul(u,L*0.06)),bodyB=add(H("CH5"),mul(u,L*0.5));
-      cyl(sc,bodyA,bodyB,14,CC.rig,1,12);
+      cyl(sc,bodyA,bodyB,14,CC.rig,1,10);
       L3(sc,bodyB,P4,CC.rig,2,undefined,al);
-      PL(sc,springPts(add(H("CH5"),mul(u,L*0.10)),add(P4,mul(u,-L*0.06)),32,7,150),CC.ela,1.6,undefined,undefined,al);
+      PL(sc,springPts(add(H("CH5"),mul(u,L*0.10)),add(P4,mul(u,-L*0.06)),32,7,72),CC.ela,1.6,undefined,undefined,al);
       PL(sc,circPts(add(H("CH5"),mul(u,L*0.06)),u,40,16),CC.ela,1,undefined,undefined,al);
       PL(sc,circPts(add(P4,mul(u,-L*0.05)),u,40,16),CC.ela,1,undefined,undefined,al);
     }
@@ -613,27 +613,27 @@ function buildScene(sk){
       const w=wheelAxis(e,t,d.sx),R=260,W=180;
       const u=nrm(sub([0,0,1],mul(w,dot([0,0,1],w)))),v=cross(w,u);
       const ci=add(P5,mul(w,-W/2)),co=add(P5,mul(w,W/2));
-      if(sh.tirefill)PL(sc,circPts(co,w,R*0.99,40,u,v),CC.tire,1,null,"rgba(12,15,18,0.7)",al);
-      PL(sc,circPts(co,w,R,40,u,v),CC.tire,1.2,undefined,undefined,al);
-      PL(sc,circPts(ci,w,R*0.97,40,u,v),CC.tread,1,undefined,undefined,al);
-      PL(sc,circPts(co,w,R*0.97,40,u,v),CC.tread,1,undefined,undefined,al);
-      for(let k2=0;k2<22;k2++){const an=2*PI*k2/22;
+      if(sh.tirefill)PL(sc,circPts(co,w,R*0.99,26,u,v),CC.tire,1,null,"rgba(12,15,18,0.7)",al);
+      PL(sc,circPts(co,w,R,26,u,v),CC.tire,1.2,undefined,undefined,al);
+      PL(sc,circPts(ci,w,R*0.97,26,u,v),CC.tread,1,undefined,undefined,al);
+      PL(sc,circPts(co,w,R*0.97,26,u,v),CC.tread,1,undefined,undefined,al);
+      for(let k2=0;k2<22;k2++){const an=2*PI*k2/14;
         const o=add(mul(u,R*cos(an)),mul(v,R*sin(an)));
         L3(sc,add(ci,o),add(co,o),CC.tread,0.9,undefined,al);}
       const ri=add(P5,mul(w,-W/2+18)),ro=add(P5,mul(w,W/2-18));
-      PL(sc,circPts(ri,w,168,32,u,v),CC.rim,1.1,undefined,undefined,al);
-      PL(sc,circPts(ro,w,168,32,u,v),CC.rim,1.1,undefined,undefined,al);
-      PL(sc,circPts(ro,w,150,32,u,v),CC.rim,0.9,undefined,undefined,al);
+      PL(sc,circPts(ri,w,168,24,u,v),CC.rim,1.1,undefined,undefined,al);
+      PL(sc,circPts(ro,w,168,24,u,v),CC.rim,1.1,undefined,undefined,al);
+      PL(sc,circPts(ro,w,150,24,u,v),CC.rim,0.9,undefined,undefined,al);
       for(let k2=0;k2<5;k2++){const an=2*PI*k2/5+0.3;
         const o=add(mul(u,150*cos(an)),mul(v,150*sin(an)));
         L3(sc,add(ro,mul(w,-4)),add(ro,o),CC.rim,1.3,undefined,al);}
-      PL(sc,circPts(ro,w,56,20,u,v),CC.rim,1,undefined,undefined,al);
+      PL(sc,circPts(ro,w,56,16,u,v),CC.rim,1,undefined,undefined,al);
       if(sh.disc){
         const d1=add(P5,mul(w,-16)),d2=add(P5,mul(w,4));
-        PL(sc,circPts(d1,w,130,32,u,v),CC.disc,1,undefined,undefined,al);
-        PL(sc,circPts(d2,w,130,32,u,v),CC.disc,1,undefined,undefined,al);
-        PL(sc,circPts(d1,w,80,24,u,v),CC.disc,0.9,undefined,undefined,al);
-        for(let k2=0;k2<16;k2++){const an=2*PI*k2/16;
+        PL(sc,circPts(d1,w,130,24,u,v),CC.disc,1,undefined,undefined,al);
+        PL(sc,circPts(d2,w,130,24,u,v),CC.disc,1,undefined,undefined,al);
+        PL(sc,circPts(d1,w,80,18,u,v),CC.disc,0.9,undefined,undefined,al);
+        for(let k2=0;k2<16;k2++){const an=2*PI*k2/12;
           const o1=add(mul(u,84*cos(an)),mul(v,84*sin(an)));
           const o2=add(mul(u,130*cos(an)),mul(v,130*sin(an)));
           L3(sc,add(d1,o1),add(d1,o2),CC.disc,0.9,undefined,al);}
@@ -654,9 +654,9 @@ function buildScene(sk){
     }
     if(sh.rigid){
       [[P1,10],[P2,12],[P3,8]].forEach(q=>{
-        PL(sc,circPts(q[0],[1,0,0],q[1],12),CC.rig,0.9,undefined,undefined,al);
-        PL(sc,circPts(q[0],[0,1,0],q[1],12),CC.rig,0.9,undefined,undefined,al);
-        PL(sc,circPts(q[0],[0,0,1],q[1],12),CC.rig,0.9,undefined,undefined,al);
+        PL(sc,circPts(q[0],[1,0,0],q[1],10),CC.rig,0.9,undefined,undefined,al);
+        PL(sc,circPts(q[0],[0,1,0],q[1],10),CC.rig,0.9,undefined,undefined,al);
+        PL(sc,circPts(q[0],[0,0,1],q[1],10),CC.rig,0.9,undefined,undefined,al);
       });
     }
     if(sh.node){
@@ -994,7 +994,7 @@ function loop(ts){
   if(S.play&&!dragging&&(ts-S.lastSolveT)>S.solveEvery){
     S.lastSolveT=ts;requestSolve({immediate:false});
   }
-  drawAll();
+  if(S.play||needsDraw){drawAll();needsDraw=false;}
   if(resp&&resp.sweep&&!busy&&!S.play)drawChart(resp.sweep);
   fpsFc++;fpsFt+=dt;
   if(fpsFt>0.4){fpsV=Math.round(fpsFc/fpsFt);fpsFc=0;fpsFt=0;fpsV&&($("tbFps").textContent=fpsV);}
@@ -1096,11 +1096,14 @@ function renderAll(d){
   }else{ft.innerHTML="<tr><td class='na'>载荷不可用</td></tr>";FE.innerHTML="";}
   const sb=$("statusBox");
   const rs=d.residuals||{};
-  let sh="整车 <b class='"+(d.status==="VALID"?"g":d.status==="SOLVER_FAILED"?"r":"a")+"'>"+d.status+"</b> · 残差 ";
-  sh+="FL "+fmt(rs.front_left,4)+" · FR "+fmt(rs.front_right,4)+" · RL "+fmt(rs.rear_left,4)+" · RR "+fmt(rs.rear_right,4);
-  const warnBox=document.createElement("div");warnBox.style.paddingTop="3px";
-  (d.warnings||[]).slice(0,6).forEach(w=>warnBox.innerHTML+="<div class='warn'>· "+w+"</div>");
-  sb.innerHTML=sh+(warnBox.innerHTML?"<div>"+warnBox.innerHTML+"</div>":"");
+  let sh="整车 <b class='"+(d.status==="VALID"?"g":d.status==="SOLVER_FAILED"?"r":"a")+"'>"+d.status+"</b><br>残差 FL "+fmt(rs.front_left,4)+" · FR "+fmt(rs.front_right,4)+" · RL "+fmt(rs.rear_left,4)+" · RR "+fmt(rs.rear_right,4);
+  if(S.play){
+    sb.innerHTML=sh+"<div class='warn' style='line-height:1.7'>播放中：实时求解（暂停后显示完整警告）</div>";
+  }else{
+    const warnBox=document.createElement("div");warnBox.style.paddingTop="3px";
+    (d.warnings||[]).slice(0,6).forEach(w=>warnBox.innerHTML+="<div class='warn' style='line-height:1.7'>· "+w+"</div>");
+    sb.innerHTML=sh+(warnBox.innerHTML?"<div>"+warnBox.innerHTML+"</div>":"");
+  }
   const sbr=$("sbRes");
   if(sbr){
     sbr.innerHTML=["FL "+fmt(rs.front_left,3),"FR "+fmt(rs.front_right,3),"RL "+fmt(rs.rear_left,3),"RR "+fmt(rs.rear_right,3)].join("  ");
@@ -1109,7 +1112,8 @@ function renderAll(d){
   $("sbNode").textContent="44";
   $("sbRig").textContent="36";
   $("sbEla").textContent="4";
-  drawChart(d.sweep||null);
+  needsDraw=true;
+  if(!S.play||d.sweep)drawChart(d.sweep||null);
 }
 function drawChart(sw){
   const cv=$("chart");
