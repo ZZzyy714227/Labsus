@@ -119,8 +119,10 @@ def solve_coupled_candidate(hp: dict[str, Any], travel: int, rack: int) -> dict[
             angles = compute_alignment_angles(state, hp=hp)
             contact = compute_contact_patch(state["UP5"], _upright_y_axis(state), hp)
             state["contact_patch"] = contact["center"]
+            steering_axis = np.asarray(state["UP2"], dtype=float) - np.asarray(state["UP1"], dtype=float)
+            steering_axis /= np.linalg.norm(steering_axis)
             base.update({"angles": angles, "contact_patch": contact["center"],
-                         "steering_axis": (np.asarray(state["UP2"]) - np.asarray(state["UP1"])).tolist()})
+                         "steering_axis": steering_axis.tolist()})
         full_rank = not rank_deficient
         base.update({"status": ("VALID" if maximum <= 0.02 else "APPROXIMATE")
                      if full_rank else "SOLVER_FAILED",

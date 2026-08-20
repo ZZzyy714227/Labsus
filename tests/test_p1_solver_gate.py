@@ -288,6 +288,22 @@ def test_fixture_is_input_only_and_covers_named_case_types():
     assert all(set(case) == {"travel", "rack", "kind"} for case in fixture["cases"])
 
 
+def test_reported_steering_axes_are_unit_vectors_and_deltas_compare_units():
+    report = compare_solver_paths()
+    for row in report["cases"]:
+        for path in (row["sequential"], row["coupled"]):
+            if path["status"] in {"VALID", "APPROXIMATE"}:
+                axis = path["steering_axis"]
+                assert axis is not None
+                assert math.isclose(float(np.linalg.norm(axis)), 1.0, abs_tol=1e-9)
+        sequential = row["sequential"]["steering_axis"]
+        coupled = row["coupled"]["steering_axis"]
+        delta = row["delta"]["steering_axis_unitless"]
+        if sequential is not None and coupled is not None:
+            assert delta == [round(c - s, 9) for s, c in zip(sequential, coupled)]
+            assert all(math.isclose(value, c - s, abs_tol=1e-9) for value, s, c in zip(delta, sequential, coupled))
+
+
 def test_comparison_reports_all_requested_deltas_without_smoothing():
     report = compare_solver_paths()
     expected = {"camber_deg", "toe_deg", "caster_deg", "kpi_deg", "scrub_radius_mm",
