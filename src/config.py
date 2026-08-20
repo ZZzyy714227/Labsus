@@ -527,8 +527,11 @@ VEHICLE_PARAMS = {
     "c_damper_f": 2500.0,          # N·s/m
     "c_damper_r": 3900.0,          # N·s/m
     # ARB sized for roll gradient ~1.0 deg/g with true track (≈350-380 N·m/deg)
-    "k_arb_f": 2.0e7,              # N·mm/rad
+    "k_arb_f": 2.0e7,              # N·mm/rad（兼容；几何参数存在时优先几何）
     "k_arb_r": 2.2e7,              # N·mm/rad
+    # P5 防倾杆几何（扭杆 d/L + 摇臂力臂 → k_arb 由几何材料计算）
+    "arb_f_bar_d_mm": 16.0, "arb_f_bar_length_mm": 550.0, "arb_f_arm_mm": 140.0,
+    "arb_r_bar_d_mm": 16.0, "arb_r_bar_length_mm": 560.0, "arb_r_arm_mm": 140.0,
     "ax_brake": 1.2,               # g
     "ax_accel": 1.0,               # g
     "ay_corner": 1.3,              # g

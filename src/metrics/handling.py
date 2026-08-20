@@ -8,6 +8,8 @@
 """
 from __future__ import annotations
 
+import math
+
 from metrics.tire_model import alpha_for_fy, cornering_stiffness
 
 G = 9.81
@@ -133,3 +135,72 @@ def _loads_with_transfer(vehicle, fz0: dict, ay: float, lateral_transfer=None):
         "fl": fz0["fl"] - d_f / 2.0, "fr": fz0["fr"] + d_f / 2.0,
         "rl": fz0["rl"] - d_r / 2.0, "rr": fz0["rr"] + d_r / 2.0,
     }
+
+# ================= P5 深化 (2)：yaw 线性横摆动力学（二自由度单车模型） =================
+
+def yaw_analysis(vehicle: dict, calpha_f: float, calpha_r: float,
+                 v_m_s: float = 15.0) -> dict:
+    """二自由度单车模型状态空间 [β, r]，给定速度 V 的线性动力学。
+
+    A = [[-(Cf+Cr)/(mV),      -(lf·Cf−lr·Cr)/(mV²)−1],
+         [-(lf·Cf−lr·Cr)/Iz,  −(lf²·Cf+lr²·Cr)/(Iz·V)]]
+    B = [Cf/(mV), lf·Cf/Iz]
+    输出：特征值、固有频率/阻尼比、失稳速度（过转向）、稳态增益、与准静态 K 一致性。
+    """
+    import numpy as np
+
+    m = float(vehicle.get("mass_kg", 0.0))
+    wb_m = float(vehicle.get("wheelbase_mm", 1550.0)) / 1000.0
+    b = float(vehicle.get("rear_axle_frac", 0.5))
+    lf = (1.0 - b) * wb_m         # 前轴到质心（质心偏后 →前轴臂大）
+    lr = b * wb_m
+    # 转动惯量：Iz ≈ m·lf·lr（轿车近似 rcvd）
+    iz = m * lf * lr
+    if m <= 0 or wb_m <= 0 or iz <= 1e-9 or v_m_s <= 0:
+        return {"status": "SOLVER_FAILED", "explanation": "无效 m/wheelbase/Iz/V"}
+    cf = float(calpha_f) * 57.2958      # N/deg -> N/rad
+    cr = float(calpha_r) * 57.2958
+    a11 = -(cf + cr) / (m * v_m_s)
+    a12 = -(lf * cf - lr * cr) / (m * v_m_s * v_m_s) - 1.0
+    a21 = -(lf * cf - lr * cr) / iz
+    a22 = -(lf * lf * cf + lr * lr * cr) / (iz * v_m_s)
+    A = np.array([[a11, a12], [a21, a22]])
+    B = np.array([[cf / (m * v_m_s)], [lf * cf / iz]])
+    vals = np.linalg.eigvals(A)
+    omega_n = float(math.sqrt(max(float(np.linalg.det(A)), 0.0)))
+    zeta = -float(np.trace(A)) / 2.0 / omega_n if omega_n > 1e-9 else 0.0
+    # 失稳速度（过转向）：K_us<0 且车速超 V_crit 失稳。
+    # K_deg_per_g 从第一次调用获得一致性用（传入可选）
+    # 标准 r/δ = V/(L + K_us·V²/g)；用 −A⁻¹B 求稳态 x=[β r]
+    inv = np.linalg.inv(A)
+    x_ss = -inv @ B
+    beta_ss = float(x_ss[0][0])
+    r_ss2 = float(x_ss[1][0])
+    return {
+        "status": "VALID",
+        "v_m_s": round(v_m_s, 2),
+        "eigenvalues": [round(complex(x).real, 5) for x in vals],
+        "omega_n_rad_per_s": round(omega_n, 4),
+        "damping_zeta": round(zeta, 4),
+        "stable": bool(zeta > 0 and complex(vals[0]).real < 0 and complex(vals[1]).real < 0),
+        "beta_ss_deg_per_deg_steer": round(beta_ss, 5),
+        "yaw_rate_gain_1_over_s": round(r_ss2, 5),
+        "yaw_rate_gain_deg_per_s_per_deg": round(math.degrees(r_ss2), 4),
+        "iz_kg_m2": round(iz, 2),
+        "lf_m": round(lf, 3), "lr_m": round(lr, 3),
+    }
+
+
+def yaw_gain_curve(vehicle: dict, calpha_f: float, calpha_r: float,
+                   v_max_m_s: float = 40.0, points: int = 21) -> dict:
+    """yaw rate 增益与阻尼 vs 速度曲线；报告临界失稳速度。"""
+    vs = [v_max_m_s * i / (points - 1) for i in range(points)]
+    rr = []
+    zs = []
+    for v in vs:
+        a = yaw_analysis(vehicle, calpha_f, calpha_r, v)
+        rr.append(a["yaw_rate_gain_1_over_s"] if a["status"] == "VALID" else None)
+        zs.append(a["damping_zeta"] if a["status"] == "VALID" else None)
+    return {"v_m_s": [round(x, 2) for x in vs],
+            "yaw_rate_gain_1_over_s": rr, "damping_zeta": zs}
+
