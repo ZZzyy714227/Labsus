@@ -1,0 +1,2104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DWB-SIM · 双叉臂独立悬架 运动学/动力学仿真台</title>
+<style>
+/* ============================================================
+   DWB-SIM  工业风格界面样式
+   规则：无圆角 / 无阴影 / 无渐变装饰 / 无表情符号
+   ============================================================ */
+:root{
+  --bg:#0e1013;      --bg2:#0a0c0e;
+  --pnl:#15181c;     --pnl2:#1a1e23;   --head:#21262d;   --headhi:#2a3038;
+  --bd:#2c323a;      --bd2:#39414b;    --bd3:#4a545f;
+  --tx:#c3cad2;      --tx2:#8b95a1;    --tx3:#616b77;
+  --acc:#2fa9d6;     --accd:#125a75;
+  --amb:#d9a238;     --red:#d2543f;    --grn:#54a06a;    --mag:#a473c4;
+  --cy2:#43c9c0;
+  --grid:#1c2126;    --grid2:#262d34;
+}
+*{margin:0;padding:0;box-sizing:border-box;border-radius:0!important;outline:none}
+html,body{height:100%;width:100%;overflow:hidden}
+body{
+  background:var(--bg);color:var(--tx);
+  font:11px/1.35 ui-monospace,"Cascadia Mono","DejaVu Sans Mono",Consolas,"Noto Sans Mono CJK SC",monospace;
+  -webkit-font-smoothing:antialiased;user-select:none;cursor:default;
+}
+#app{display:flex;flex-direction:column;height:100%;width:100%}
+
+/* ---------- 标题栏 ---------- */
+#tb{display:flex;align-items:stretch;height:34px;background:var(--head);border-bottom:1px solid var(--bd2);flex:0 0 auto}
+#tb .brand{display:flex;align-items:center;padding:0 10px;border-right:1px solid var(--bd2);background:var(--pnl2)}
+#tb .brand b{color:var(--acc);font-size:13px;letter-spacing:.14em}
+#tb .tt{display:flex;flex-direction:column;justify-content:center;padding:0 12px;border-right:1px solid var(--bd)}
+#tb .tt span:first-child{font-size:11.5px;color:var(--tx);letter-spacing:.04em}
+#tb .tt span:last-child{font-size:8.5px;color:var(--tx3);letter-spacing:.16em;text-transform:uppercase}
+#tb .sp{flex:1}
+#tb .cell{display:flex;flex-direction:column;justify-content:center;padding:0 10px;border-left:1px solid var(--bd);min-width:96px}
+#tb .cell i{font-style:normal;font-size:8.5px;color:var(--tx3);letter-spacing:.12em;text-transform:uppercase}
+#tb .cell b{font-weight:400;font-size:11px;color:var(--tx)}
+#tb .cell b.g{color:var(--grn)}#tb .cell b.a{color:var(--amb)}#tb .cell b.c{color:var(--acc)}
+
+/* ---------- 主体三栏 ---------- */
+#main{flex:1 1 auto;display:flex;min-height:0}
+.pnl{width:300px;flex:0 0 300px;background:var(--pnl);border-right:1px solid var(--bd2);overflow-y:auto;overflow-x:hidden}
+#rp{border-right:none;border-left:1px solid var(--bd2);width:314px;flex:0 0 314px}
+.pnl::-webkit-scrollbar{width:9px;background:var(--bg2)}
+.pnl::-webkit-scrollbar-thumb{background:var(--bd2);border:1px solid var(--bg2)}
+.pnl::-webkit-scrollbar-thumb:hover{background:var(--bd3)}
+
+.sec{border-bottom:1px solid var(--bd)}
+.sh{display:flex;align-items:center;height:20px;background:var(--pnl2);border-bottom:1px solid var(--bd);
+    padding-left:8px;font-size:9.5px;letter-spacing:.14em;color:var(--tx2);text-transform:uppercase;cursor:pointer;position:relative}
+.sh::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--acc)}
+.sh .zh{color:var(--tx);letter-spacing:.02em;font-size:10.5px;margin-right:6px;text-transform:none}
+.sh .tg{margin-left:auto;margin-right:7px;color:var(--tx3);font-size:9px}
+.sb{padding:4px 0 6px}
+.sec.col .sb{display:none}
+.sec.col .sh .tg::after{content:"+"}
+.sec .sh .tg::after{content:"-"}
+
+.ctl{display:grid;grid-template-columns:1fr 48px;grid-template-rows:12px 15px;gap:0 5px;
+     padding:2px 8px 3px;align-items:center}
+.ctl>label{grid-column:1/3;grid-row:1;font-size:9.5px;color:var(--tx);overflow:hidden;
+     white-space:nowrap;text-overflow:ellipsis;letter-spacing:.01em}
+.ctl>label u{text-decoration:none;color:var(--tx3);font-size:8.5px;letter-spacing:.06em}
+.ctl>input[type=range]{grid-column:1;grid-row:2}
+.ctl>input[type=number]{grid-column:2;grid-row:2}
+.ctl>select{grid-column:1/3;grid-row:2}
+.ctl:hover>label{color:var(--acc)}
+
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:12px;background:transparent;cursor:ew-resize}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--bd2);border:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:5px;height:13px;background:var(--tx2);margin-top:-5.5px;border:none}
+input[type=range]:hover::-webkit-slider-thumb{background:var(--acc)}
+input[type=range]:active::-webkit-slider-thumb{background:var(--acc)}
+input[type=range]::-moz-range-track{height:2px;background:var(--bd2)}
+input[type=range]::-moz-range-thumb{width:5px;height:13px;background:var(--tx2);border:none;border-radius:0}
+
+input[type=number],input[type=text],select{
+  background:var(--bg2);border:1px solid var(--bd);color:var(--tx);font:10px/14px inherit;
+  padding:1px 3px;width:100%;height:17px;text-align:right;appearance:none;-webkit-appearance:none}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input:focus,select:focus{border-color:var(--acc);background:#0d1418}
+select{text-align:left;padding-right:2px;cursor:pointer}
+select:hover{border-color:var(--bd3)}
+
+.chk{display:flex;align-items:center;gap:5px;padding:1.5px 8px;cursor:pointer;font-size:10px;color:var(--tx2)}
+.chk:hover{background:var(--pnl2);color:var(--tx)}
+.chk i{width:11px;height:11px;border:1px solid var(--bd3);flex:0 0 11px;position:relative;background:var(--bg2)}
+.chk.on i{background:var(--acc);border-color:var(--acc)}
+.chk.on i::after{content:"";position:absolute;left:2px;top:2px;width:5px;height:5px;background:#0b1418}
+.chk.on{color:var(--tx)}
+.chk s{text-decoration:none;width:8px;height:2px;flex:0 0 8px;margin-left:auto;margin-right:2px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0}
+
+.btnrow{display:flex;gap:4px;padding:4px 8px}
+button{flex:1;background:var(--head);border:1px solid var(--bd2);color:var(--tx2);
+  font:9.5px/1 inherit;letter-spacing:.08em;text-transform:uppercase;padding:5px 3px;cursor:pointer;white-space:nowrap}
+button:hover{background:var(--headhi);color:var(--tx);border-color:var(--bd3)}
+button:active{background:var(--accd)}
+button.on{background:var(--accd);border-color:var(--acc);color:#dff2f9}
+button.wide{flex:1 1 100%}
+button:disabled{color:var(--tx3);background:var(--pnl2);cursor:not-allowed;border-color:var(--bd)}
+
+/* 硬点表 */
+table.hp{width:100%;border-collapse:collapse;font-size:9.5px}
+table.hp th{background:var(--pnl2);color:var(--tx3);font-weight:400;letter-spacing:.1em;text-transform:uppercase;
+  border-bottom:1px solid var(--bd);padding:2px 3px;text-align:right}
+table.hp th:first-child{text-align:left;padding-left:8px}
+table.hp td{border-bottom:1px solid #1d2126;padding:0}
+table.hp td.n{padding-left:8px;color:var(--tx2);font-size:9.5px;white-space:nowrap}
+table.hp td.n b{font-weight:400;color:var(--tx)}
+table.hp tr:hover td.n{color:var(--acc)}
+table.hp tr.sel td.n b{color:var(--amb)}
+table.hp input{border:none;border-left:1px solid #1d2126;background:transparent;height:16px;font-size:9.5px;padding-right:4px}
+table.hp input:hover{background:#0d1114}
+table.hp input:focus{background:#0d1418;border:1px solid var(--acc)}
+table.hp td.fx input{color:var(--red)}
+table.hp td.fr input{color:var(--cy2)}
+
+/* 读数 */
+.ro{display:grid;grid-template-columns:1fr 66px 26px;align-items:center;padding:1px 8px;font-size:10px;min-height:16px}
+.ro:hover{background:var(--pnl2)}
+.ro>span:first-child{color:var(--tx2);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ro>span:first-child u{text-decoration:none;color:var(--tx3);font-size:8.5px;letter-spacing:.06em}
+.ro>b{font-weight:400;text-align:right;color:var(--tx);font-variant-numeric:tabular-nums}
+.ro>i{font-style:normal;color:var(--tx3);font-size:9px;padding-left:4px}
+.ro.hl>b{color:var(--amb)}
+.ro.k>b{color:var(--acc)}
+.ro.warn>b{color:var(--red)}
+.rosep{height:1px;background:var(--bd);margin:3px 0}
+
+/* 曲线图 */
+.plotbox{padding:2px 4px 4px}
+canvas.plot{display:block;width:100%;height:86px;background:var(--bg2);border:1px solid var(--bd)}
+
+/* ---------- 视口 ---------- */
+#vp{flex:1 1 auto;min-width:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;
+    gap:1px;background:var(--bd2)}
+#vp.max0{grid-template-columns:1fr;grid-template-rows:1fr}
+#vp.max0 .vw{display:none}#vp.max0 .vw.mx{display:flex}
+.vw{position:relative;background:var(--bg2);display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
+.vwh{display:flex;align-items:center;height:18px;background:var(--pnl);border-bottom:1px solid var(--bd);
+     padding:0 0 0 7px;font-size:9px;letter-spacing:.1em;color:var(--tx3);text-transform:uppercase;flex:0 0 18px}
+.vwh b{font-weight:400;color:var(--tx2);letter-spacing:.02em;font-size:10px;margin-right:7px;text-transform:none}
+.vwh .vi{margin-left:auto;color:var(--tx3);font-size:9px;padding-right:8px;letter-spacing:.04em}
+.vwh .vb{width:18px;height:17px;line-height:17px;text-align:center;border-left:1px solid var(--bd);color:var(--tx3);cursor:pointer;font-size:9px}
+.vwh .vb:hover{background:var(--headhi);color:var(--acc)}
+.vw canvas{flex:1 1 auto;display:block;width:100%;height:100%;min-height:0}
+.vw.act .vwh{background:var(--head)}
+.vw.act .vwh b{color:var(--acc)}
+
+/* ---------- 状态栏 ---------- */
+#sb{display:flex;height:20px;background:var(--head);border-top:1px solid var(--bd2);flex:0 0 auto;align-items:stretch}
+#sb .c{display:flex;align-items:center;padding:0 9px;border-right:1px solid var(--bd);font-size:9.5px;color:var(--tx2);white-space:nowrap}
+#sb .c u{text-decoration:none;color:var(--tx3);margin-right:5px;font-size:8.5px;letter-spacing:.1em;text-transform:uppercase}
+#sb .c b{font-weight:400;color:var(--tx);font-variant-numeric:tabular-nums}
+#sb .sp{flex:1;border-right:1px solid var(--bd)}
+#sb .c.ok b{color:var(--grn)}#sb .c.bad b{color:var(--red)}#sb .c.hl b{color:var(--amb)}
+
+.legend{padding:3px 8px 5px;display:grid;grid-template-columns:1fr 1fr;gap:1px 8px;font-size:9px;color:var(--tx2)}
+.legend div{display:flex;align-items:center;gap:5px;height:13px}
+.legend s{text-decoration:none;width:14px;height:0;border-top-width:2px;border-top-style:solid;flex:0 0 14px}
+.legend q{quotes:none;width:7px;height:7px;flex:0 0 7px;display:block}
+.note{padding:3px 8px 5px;font-size:9px;color:var(--tx3);line-height:1.45}
+.note b{color:var(--tx2);font-weight:400}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="tb">
+    <div class="brand"><b>DWB-SIM</b></div>
+    <div class="tt"><span>双叉臂独立悬架 · 运动学 / 动力学仿真台</span><span>double wishbone suspension simulator</span></div>
+    <div class="sp"></div>
+    <div class="cell"><i>solver 求解器</i><b class="c" id="tbSolver">刚体投影-GS</b></div>
+    <div class="cell"><i>mode 模式</i><b class="a" id="tbMode">运动学</b></div>
+    <div class="cell"><i>state 状态</i><b class="g" id="tbState">运行</b></div>
+    <div class="cell"><i>fps</i><b id="tbFps">--</b></div>
+  </div>
+  <div id="main">
+    <aside class="pnl" id="lp"></aside>
+    <section id="vp"></section>
+    <aside class="pnl" id="rp"></aside>
+  </div>
+  <div id="sb">
+    <div class="c"><u>node 节点</u><b id="sbNode">-</b></div>
+    <div class="c"><u>rigid 刚性线</u><b id="sbRig">-</b></div>
+    <div class="c"><u>elastic 可形变线</u><b id="sbEla">-</b></div>
+    <div class="c"><u>dof 自由度</u><b id="sbDof">-</b></div>
+    <div class="c ok" id="sbResC"><u>residual 残差</u><b id="sbRes">-</b></div>
+    <div class="c"><u>iter 迭代</u><b id="sbIter">-</b></div>
+    <div class="c"><u>solve</u><b id="sbMs">-</b></div>
+    <div class="sp"></div>
+    <div class="c"><u>cursor</u><b id="sbCur">-</b></div>
+    <div class="c hl"><u>hint</u><b id="sbHint">左键拖拽硬点编辑几何 · 滚轮缩放 · 中键平移 · 等轴测视图左键旋转</b></div>
+  </div>
+</div>
+<script>
+"use strict";
+/* ==================================================================================
+   DWB-SIM · 双叉臂独立悬架运动学/动力学仿真台
+   ----------------------------------------------------------------------------------
+   仿真基础（三种图元）：
+     · 节点   NODE      质点，含位置/速度/质量；固定节点(车身侧)质量无穷
+     · 刚性线 RIGID     等距约束 |Pa-Pb| = L0，柔度 0；构成摆臂/转向节/横拉杆
+     · 可形变线 ELASTIC 弹簧-阻尼元件，力沿线作用；构成螺旋弹簧+减振器、轮胎垂向刚度
+   求解：交替精确投影（铰链簇解析投影 + 自由刚体簇极分解投影 + 距离约束投影 + 驱动约束）
+   坐标系：X+ 指向车辆右侧(外侧)  Y+ 指向车头  Z+ 向上   原点 = 车辆中心线与设计地面交点
+   单位：长度 mm，质量 kg，时间 s，力 N（内部力单位为 1e-3 N 以配合 mm）
+   ================================================================================== */
+
+/* ================================ 0. 数学 ================================ */
+const abs=Math.abs, sqrt=Math.sqrt, sin=Math.sin, cos=Math.cos, atan2=Math.atan2, PI=Math.PI;
+const D2R=PI/180, R2D=180/PI;
+const add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]];
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+const mul=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const len=a=>Math.hypot(a[0],a[1],a[2]);
+const nrm=a=>{const l=Math.hypot(a[0],a[1],a[2])||1;return[a[0]/l,a[1]/l,a[2]/l];};
+const dst=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
+const cpy=a=>[a[0],a[1],a[2]];
+const lerp3=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];
+const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+const mix=(a,b,t)=>a+(b-a)*t;
+/* 与 axis 垂直的单位向量 */
+function perpOf(a){const x=abs(a[0]),y=abs(a[1]),z=abs(a[2]);
+  let t=(x<=y&&x<=z)?[1,0,0]:((y<=z)?[0,1,0]:[0,0,1]);
+  return nrm(cross(a,t));}
+/* 四元数 [x,y,z,w] */
+const qId=()=>[0,0,0,1];
+function qNorm(q){const l=Math.hypot(q[0],q[1],q[2],q[3])||1;return[q[0]/l,q[1]/l,q[2]/l,q[3]/l];}
+function qMul(a,b){return[
+  a[3]*b[0]+a[0]*b[3]+a[1]*b[2]-a[2]*b[1],
+  a[3]*b[1]-a[0]*b[2]+a[1]*b[3]+a[2]*b[0],
+  a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3],
+  a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]];}
+function qAA(ax,an){const h=an*0.5,s=sin(h);return[ax[0]*s,ax[1]*s,ax[2]*s,cos(h)];}
+/* 行主序 3x3 */
+function qM(q){const x=q[0],y=q[1],z=q[2],w=q[3];
+  const x2=x+x,y2=y+y,z2=z+z,xx=x*x2,xy=x*y2,xz=x*z2,yy=y*y2,yz=y*z2,zz=z*z2,wx=w*x2,wy=w*y2,wz=w*z2;
+  return[1-(yy+zz),xy-wz,xz+wy, xy+wz,1-(xx+zz),yz-wx, xz-wy,yz+wx,1-(xx+yy)];}
+const mApply=(M,v)=>[M[0]*v[0]+M[1]*v[1]+M[2]*v[2],M[3]*v[0]+M[4]*v[1]+M[5]*v[2],M[6]*v[0]+M[7]*v[1]+M[8]*v[2]];
+/* 极分解取旋转（Müller 迭代），A 为协方差矩阵，q 为热启动 */
+function polarQ(A,q,it){
+  it=it||16;
+  for(let i=0;i<it;i++){
+    const R=qM(q);
+    const r0=[R[0],R[3],R[6]],r1=[R[1],R[4],R[7]],r2=[R[2],R[5],R[8]];
+    const a0=[A[0],A[3],A[6]],a1=[A[1],A[4],A[7]],a2=[A[2],A[5],A[8]];
+    const n=add(add(cross(r0,a0),cross(r1,a1)),cross(r2,a2));
+    const d=abs(dot(r0,a0)+dot(r1,a1)+dot(r2,a2))+1e-9;
+    const om=mul(n,1/d), w=len(om);
+    if(w<1e-13)break;
+    q=qNorm(qMul(qAA(mul(om,1/w),w),q));
+  }
+  return q;
+}
+const fmt=(v,d)=>(v===null||v===undefined||!isFinite(v))?"--":v.toFixed(d===undefined?2:d);
+const sfmt=(v,d)=>{const s=fmt(v,d);return(isFinite(v)&&v>0)?"+"+s:s;};
+
+/* ================================ 1. 设计数据 ================================ */
+/* 硬点定义：id / 中文名 / 英文名 / 所属 / 是否车身固定 / 集中质量(kg) */
+const HPDEF=[
+ ["LCA_F","下摆臂前铰点","LWR ARM FRT PIVOT","chassis",1, 0],
+ ["LCA_R","下摆臂后铰点","LWR ARM RR PIVOT", "chassis",1, 0],
+ ["LBJ",  "下球头",      "LWR BALL JOINT",   "lca",    0, 2.0],
+ ["SPR_L","减振器下支点","DAMPER LWR MOUNT",  "lca",    0, 1.6],
+ ["UCA_F","上摆臂前铰点","UPR ARM FRT PIVOT","chassis",1, 0],
+ ["UCA_R","上摆臂后铰点","UPR ARM RR PIVOT", "chassis",1, 0],
+ ["UBJ",  "上球头",      "UPR BALL JOINT",   "uca",    0, 1.5],
+ ["WC",   "轮心",        "WHEEL CENTRE",     "knuckle",0,10.4],
+ ["TRO",  "横拉杆外点",  "TIE ROD OUTER",    "knuckle",0, 0.9],
+ ["RACK", "横拉杆内点",  "TIE ROD INNER",    "chassis",1, 0],
+ ["DMP_T","减振器上支点","DAMPER UPR MOUNT",  "chassis",1, 0],
+];
+const HPI={}; HPDEF.forEach((d,i)=>HPI[d[0]]=i);
+
+/* 预设工况几何（右侧，mm） */
+const PRESETS={
+ "SPORT 街道运动型":{
+  hp:{LCA_F:[215,150,152],LCA_R:[215,-150,162],LBJ:[705,8,178],SPR_L:[520,10,205],
+      UCA_F:[395,120,452],UCA_R:[395,-120,456],UBJ:[655,-18,512],
+      WC:[762,0,322],TRO:[660,-150,225],RACK:[250,-175,205],DMP_T:[350,0,660]},
+  tire:{R:322,W:235,rim:228.6,disc:172,label:"235/40R18"},
+  cam0:-0.75,toe0:0.10,mS:340,kS:80,kT:200,cB:6,cR:10,wb:2600,hcg:500
+ },
+ "RACE 赛道低趴型":{
+  hp:{LCA_F:[200,155,118],LCA_R:[200,-155,126],LBJ:[706,8,132],SPR_L:[540,10,150],
+      UCA_F:[420,110,392],UCA_R:[420,-110,396],UBJ:[652,-20,446],
+      WC:[772,0,300],TRO:[652,-142,196],RACK:[248,-168,178],DMP_T:[338,0,612]},
+  tire:{R:300,W:265,rim:228.6,disc:180,label:"265/35R18"},
+  cam0:-3.20,toe0:-0.15,mS:225,kS:120,kT:260,cB:9,cR:14,wb:2450,hcg:290
+ },
+ "SUV 长行程越野型":{
+  hp:{LCA_F:[232,168,205],LCA_R:[232,-168,218],LBJ:[724,10,244],SPR_L:[560,12,272],
+      UCA_F:[392,132,562],UCA_R:[392,-132,568],UBJ:[668,-22,642],
+      WC:[792,0,396],TRO:[676,-162,292],RACK:[262,-188,272],DMP_T:[362,0,796]},
+  tire:{R:396,W:265,rim:216,disc:176,label:"265/65R17"},
+  cam0:-0.30,toe0:0.15,mS:520,kS:60,kT:170,cB:7,cR:12,wb:2790,hcg:720
+ }
+};
+const PRESET_KEYS=Object.keys(PRESETS);
+
+/* 全局状态 */
+const S={
+  preset:PRESET_KEYS[0],
+  hp:{}, tire:null, cam0:0, toe0:0,
+  mode:"kin",                       // kin=运动学  rig=台架动力学
+  play:true,
+  travel:0, roll:0, rack:0, tieTrim:0,
+  exc:"sine", excA:52, excF:0.22,   // 轮跳激励
+  steerExc:"off", stA:45, stF:0.11, // 转向激励
+  kS:80, cB:6, cR:10, kT:200, mS:340, bsU:68, bsD:74, kBS:900,
+  arb:{d:20,dy:60,dz:145,t:0.55,G:79000},
+  road:"none", rA:16, rF:2.0,
+  wb:2600, hcg:500, brkF:0.65,
+  trMin:-80, trMax:80,
+  show:{node:1,label:1,rigid:1,elastic:1,face:1,wheel:1,disc:1,chassis:1,steer:1,ground:1,
+        dim:1,kp:1,kpsw:1,path:1,ic:1,force:0,mirror:1,axis:1,tirefill:0,arb:1},
+  t:0, simT:0, dyn:{on:false,z:0,v:0,load:0,fs:0,fd:0,pen:0,acc:0}
+};
+function loadPreset(k){
+  const P=PRESETS[k]; S.preset=k;
+  S.hp={}; for(const id in P.hp) S.hp[id]=cpy(P.hp[id]);
+  S.tire=Object.assign({},P.tire);
+  S.cam0=P.cam0; S.toe0=P.toe0; S.mS=P.mS; S.kS=P.kS; S.kT=P.kT; S.cB=P.cB; S.cR=P.cR;
+  S.wb=P.wb; S.hcg=P.hcg; S.tieTrim=0;
+}
+loadPreset(S.preset);
+
+/* ================================ 2. 机构建模 ================================ */
+/* 连线定义：[a,b,类型,中文,分组]  类型 R=刚性线 E=可形变线 */
+const LINKDEF=[
+ ["LCA_F","LBJ",  "R","下摆臂前支杆","lca"],
+ ["LCA_R","LBJ",  "R","下摆臂后支杆","lca"],
+ ["LCA_F","LCA_R","R","下摆臂铰轴", "lca"],
+ ["LCA_F","SPR_L","R","下摆臂支座A","lca"],
+ ["LCA_R","SPR_L","R","下摆臂支座B","lca"],
+ ["LBJ",  "SPR_L","R","下摆臂支座C","lca"],
+ ["UCA_F","UBJ",  "R","上摆臂前支杆","uca"],
+ ["UCA_R","UBJ",  "R","上摆臂后支杆","uca"],
+ ["UCA_F","UCA_R","R","上摆臂铰轴", "uca"],
+ ["LBJ",  "UBJ",  "R","主销(转向节柱)","knuckle"],
+ ["LBJ",  "WC",   "R","转向节-轮心下","knuckle"],
+ ["UBJ",  "WC",   "R","转向节-轮心上","knuckle"],
+ ["LBJ",  "TRO",  "R","转向臂下缘",  "knuckle"],
+ ["UBJ",  "TRO",  "R","转向臂上缘",  "knuckle"],
+ ["WC",   "TRO",  "R","转向臂根部",  "knuckle"],
+ ["RACK", "TRO",  "R","转向横拉杆",  "steer"],
+ ["SPR_L","DMP_T","E","螺旋弹簧+减振器","damper"],
+];
+
+function buildMech(){
+  const n=[],i={};
+  HPDEF.forEach((d,k)=>{
+    const p=cpy(S.hp[d[0]]);
+    n.push({id:d[0],zh:d[1],en:d[2],grp:d[3],fix:!!d[4],m:d[5],
+            p:p,p0:cpy(p),pp:cpy(p),v:[0,0,0],w:d[4]?0:(d[5]>0?1/d[5]:0),f:[0,0,0]});
+    i[d[0]]=k;
+  });
+  const L=LINKDEF.map(d=>{
+    const a=i[d[0]],b=i[d[1]];
+    return{a:a,b:b,id:d[0]+"-"+d[1],type:d[2],zh:d[3],grp:d[4],
+           L0:dst(n[a].p,n[b].p),Ld:dst(n[a].p,n[b].p)};
+  });
+  /* 横拉杆长度微调（前束调整） */
+  const tie=L.find(l=>l.grp==="steer"); tie.L0=tie.Ld+S.tieTrim;
+
+  /* 刚体簇 */
+  function hinge(name,zh,axA,axB,members){
+    const o=n[i[axA]].p0;
+    return{kind:"hinge",name:name,zh:zh,axA:i[axA],axB:i[axB],
+           ids:members.map(m=>i[m]),
+           rel:members.map(m=>sub(n[i[m]].p0,o)),
+           wt:members.map(m=>Math.max(n[i[m]].m,1e-3))};
+  }
+  function freeBody(name,zh,members){
+    const ids=members.map(m=>i[m]);
+    const wt=ids.map(k=>Math.max(n[k].m,1e-3));
+    let ws=0,c=[0,0,0];
+    ids.forEach((k,j)=>{ws+=wt[j];c=add(c,mul(n[k].p0,wt[j]));});
+    c=mul(c,1/ws);
+    return{kind:"body",name:name,zh:zh,ids:ids,wt:wt,ws:ws,rc:c,
+           rel:ids.map(k=>sub(n[k].p0,c)),q:qId()};
+  }
+  const cl=[
+    hinge("LCA","下摆臂","LCA_F","LCA_R",["LBJ","SPR_L"]),
+    hinge("UCA","上摆臂","UCA_F","UCA_R",["UBJ"]),
+    freeBody("KNUCKLE","转向节+轮毂总成",["LBJ","UBJ","WC","TRO"])
+  ];
+  /* 轮面法向（自旋轴，指向外侧）在转向节局部坐标下的表达 */
+  const camb=S.cam0*D2R, toe=S.toe0*D2R;
+  const axW=nrm([cos(toe)*cos(camb),sin(toe),-sin(camb)]);
+  const KN=cl[2], R0=qM(KN.q);
+  const M={n:n,i:i,L:L,cl:cl,tie:tie,
+    axL:axW,                          // 设计位形下自旋轴（局部=全局，因 q=I）
+    nFree:n.filter(x=>!x.fix).length,
+    nRig:L.filter(l=>l.type==="R").length,
+    nEla:L.filter(l=>l.type==="E").length,
+    nCons:L.filter(l=>l.type==="R"&&(!n[l.a].fix||!n[l.b].fix)).length,
+    res:0,iter:0,ms:0,ok:true,
+    springL0:0,springF0:0
+  };
+  M.dof=3*M.nFree-M.nCons;
+  const sp=L.find(l=>l.grp==="damper"); M.spring=sp; M.springL0=sp.Ld;
+  return M;
+}
+
+/* -------------------------- 投影算子 -------------------------- */
+/* 距离约束（刚性线）精确投影，按质量加权分配 */
+function projLink(M,l){
+  const A=M.n[l.a],B=M.n[l.b];
+  const wa=A.w,wb=B.w,ws=wa+wb; if(ws<=0)return 0;
+  let dx=B.p[0]-A.p[0],dy=B.p[1]-A.p[1],dz=B.p[2]-A.p[2];
+  const d=Math.hypot(dx,dy,dz)||1e-12,C=d-l.L0,s=C/(d*ws);
+  if(wa>0){A.p[0]+=dx*s*wa;A.p[1]+=dy*s*wa;A.p[2]+=dz*s*wa;}
+  if(wb>0){B.p[0]-=dx*s*wb;B.p[1]-=dy*s*wb;B.p[2]-=dz*s*wb;}
+  return abs(C);
+}
+/* 铰链簇：绕两固定铰点连线做单参数最优旋转（解析解，精确） */
+function projHinge(M,c){
+  const o=M.n[c.axA].p, b=M.n[c.axB].p, ax=nrm(sub(b,o));
+  let sn=0,cs=0;
+  for(let k=0;k<c.ids.length;k++){
+    const r=c.rel[k], rp=dot(r,ax), rq=sub(r,mul(ax,rp));
+    const d=sub(M.n[c.ids[k]].p,o), w=c.wt[k];
+    cs+=w*dot(rq,d); sn+=w*dot(cross(ax,rq),d);
+  }
+  const th=atan2(sn,cs),ct=cos(th),st=sin(th);
+  for(let k=0;k<c.ids.length;k++){
+    const r=c.rel[k], rp=dot(r,ax), rq=sub(r,mul(ax,rp));
+    const q=add(add(mul(ax,rp),mul(rq,ct)),mul(cross(ax,rq),st));
+    const P=M.n[c.ids[k]].p; P[0]=o[0]+q[0];P[1]=o[1]+q[1];P[2]=o[2]+q[2];
+  }
+}
+/* 自由刚体簇：质量加权最优刚体变换（极分解） */
+function projBody(M,c){
+  let cx=0,cy=0,cz=0;
+  for(let k=0;k<c.ids.length;k++){const P=M.n[c.ids[k]].p,w=c.wt[k];cx+=P[0]*w;cy+=P[1]*w;cz+=P[2]*w;}
+  cx/=c.ws;cy/=c.ws;cz/=c.ws;
+  const A=[0,0,0,0,0,0,0,0,0];
+  for(let k=0;k<c.ids.length;k++){
+    const P=M.n[c.ids[k]].p,w=c.wt[k],r=c.rel[k];
+    const px=(P[0]-cx)*w,py=(P[1]-cy)*w,pz=(P[2]-cz)*w;
+    A[0]+=px*r[0];A[1]+=px*r[1];A[2]+=px*r[2];
+    A[3]+=py*r[0];A[4]+=py*r[1];A[5]+=py*r[2];
+    A[6]+=pz*r[0];A[7]+=pz*r[1];A[8]+=pz*r[2];
+  }
+  c.q=polarQ(A,c.q,14);
+  const R=qM(c.q);
+  for(let k=0;k<c.ids.length;k++){
+    const P=M.n[c.ids[k]].p,r=c.rel[k];
+    P[0]=cx+R[0]*r[0]+R[1]*r[1]+R[2]*r[2];
+    P[1]=cy+R[3]*r[0]+R[4]*r[1]+R[5]*r[2];
+    P[2]=cz+R[6]*r[0]+R[7]*r[1]+R[8]*r[2];
+  }
+  c.R=R;c.c=[cx,cy,cz];
+}
+/* 最大约束残差 mm */
+function residual(M,drvZ){
+  let r=0;
+  for(let k=0;k<M.L.length;k++){const l=M.L[k];if(l.type!=="R")continue;
+    const d=abs(dst(M.n[l.a].p,M.n[l.b].p)-l.L0); if(d>r)r=d;}
+  if(drvZ!==null&&drvZ!==undefined) r=Math.max(r,abs(M.n[M.i.WC].p[2]-drvZ));
+  return r;
+}
+/* 一次投影扫描 */
+function sweepProj(M,drvZ){
+  if(drvZ!==null&&drvZ!==undefined) M.n[M.i.WC].p[2]=drvZ;
+  projLink(M,M.tie);
+  projHinge(M,M.cl[0]);
+  projHinge(M,M.cl[1]);
+  projBody(M,M.cl[2]);
+}
+/* 运动学求解：驱动轮心高度至目标，转向齿条位移已写入固定节点 */
+function solveKin(M,drvZ,maxIt,tol){
+  maxIt=maxIt||260; tol=tol||2e-7;
+  const t0=performance.now(); let it=0,res=1;
+  for(;it<maxIt;it++){
+    sweepProj(M,drvZ);
+    if((it&3)===3){res=residual(M,drvZ); if(res<tol){it++;break;}}
+  }
+  res=residual(M,drvZ);
+  M.res=res;M.iter=it;M.ms=performance.now()-t0;M.ok=res<0.02;
+  return res;
+}
+/* 设定车身侧节点（含齿条位移） */
+function setChassis(M,rack){
+  for(const d of HPDEF){ if(!d[4])continue; const N=M.n[M.i[d[0]]];
+    N.p[0]=S.hp[d[0]][0];N.p[1]=S.hp[d[0]][1];N.p[2]=S.hp[d[0]][2];}
+  const R=M.n[M.i.RACK]; R.p[0]-=rack;      // 齿条横向平移（本侧局部坐标，+输入=向右转）
+  M.n[M.i.RACK].pp=cpy(R.p);
+}
+/* 复位到设计位形 */
+function resetMech(M){
+  M.n.forEach(N=>{N.p=cpy(N.p0);N.pp=cpy(N.p0);N.v=[0,0,0];});
+  M.cl.forEach(c=>{if(c.kind==="body")c.q=qId();});
+}
+/* 带步进的稳健求解（大跨度输入时分步逼近，避免机构翻转） */
+function driveTo(M,targetZ,rack){
+  setChassis(M,rack);
+  const cur=M.n[M.i.WC].p[2];
+  const d=targetZ-cur, steps=Math.min(24,Math.max(1,Math.ceil(abs(d)/6)));
+  for(let s=1;s<=steps;s++) solveKin(M,cur+d*s/steps,s===steps?260:40,2e-7);
+  return M.res;
+}
+/* ================================ 3. 运动学指标 ================================ */
+/* 两直线交点（二维） p+t*d */
+function isect2(p1,d1,p2,d2){
+  const den=d1[0]*d2[1]-d1[1]*d2[0];
+  if(abs(den)<1e-12)return null;
+  const t=((p2[0]-p1[0])*d2[1]-(p2[1]-p1[1])*d2[0])/den;
+  return[p1[0]+d1[0]*t,p1[1]+d1[1]*t];
+}
+/* 铰轴与 y=常数 平面的交点：得到该摆臂在正视图中的等效瞬时铰点 */
+function axisAtY(a,b,y){const t=(y-a[1])/((b[1]-a[1])||1e-9);return lerp3(a,b,t);}
+
+/* ---- 横向稳定杆（U 形扭杆）几何：扭杆绕 X 轴，臂端由连杆长度解析定位 ---- */
+function arbGeom(lbj){
+  const F=S.hp.LCA_F,B=S.hp.LBJ,t=S.arb.t;
+  const P0=lerp3(F,B,t);                                  // 设计位形：连杆下端(下摆臂上一点)
+  const xa=P0[0],ay=F[1]+S.arb.dy,az=F[2]+S.arb.dz;
+  const a=ay-P0[1];                                       // 扭杆臂长(力臂)
+  const E0=[xa,ay-a,az];
+  const ldl=dst(E0,P0);                                   // 连杆长度(刚性)
+  const P=lerp3(F,lbj,t);                                 // 当前连杆下端
+  const A=ay-P[1],Bz=az-P[2],R=Math.hypot(A,Bz);
+  const K=(xa-P[0])*(xa-P[0])+A*A+Bz*Bz+a*a-ldl*ldl;
+  const c=clamp(K/(2*a*R||1e-9),-1,1);
+  const f0=atan2(Bz,A),sg=atan2(az-P0[2],ay-P0[1])>=0?1:-1;
+  const psi=f0-sg*Math.acos(c);
+  const E=[xa,ay-a*cos(psi),az-a*sin(psi)];
+  return{xa:xa,ay:ay,az:az,a:a,ldl:ldl,P:P,P0:P0,E:E,psi:psi,ok:abs(K/(2*a*R||1e-9))<=1};
+}
+function arbRate(mrArb){
+  const d=S.arb.d;if(d<=0.5)return{k:0,J:0,kt:0};
+  const J=PI*Math.pow(d,4)/32,g=arbGeom(S.hp.LBJ);
+  const L=2*g.xa;                                          // 扭转段长度(两臂之间)
+  const kt=S.arb.G*J/L;                                    // 扭转刚度 N·mm/rad
+  return{k:kt/(g.a*g.a)*mrArb*mrArb,J:J,kt:kt,a:g.a,L:L};
+}
+function metrics(M){
+  const P=id=>M.n[M.i[id]].p;
+  const KN=M.cl[2], R=KN.R||qM(KN.q);
+  const wc=cpy(P("WC")),lbj=cpy(P("LBJ")),ubj=cpy(P("UBJ")),tro=cpy(P("TRO")),spl=cpy(P("SPR_L"));
+  const ax=nrm(mApply(R,M.axL));                       // 车轮自旋轴（指向外侧）
+  const cam=-Math.asin(clamp(ax[2],-1,1))*R2D;          // 外倾角：负=车轮上缘内倾
+  const toe=atan2(ax[1],ax[0])*R2D;                     // 前束角：正=前束(内八)
+  /* 接地点：轮面内竖直向下 R_tire */
+  const rad=nrm(sub([0,0,1],mul(ax,ax[2])));
+  const cp=sub(wc,mul(rad,S.tire.R));
+  /* 主销（转向轴）几何 */
+  const dz=ubj[2]-lbj[2];
+  const kpi =atan2(-(ubj[0]-lbj[0]),dz)*R2D;            // 主销内倾角 SAI
+  const cast=atan2(-(ubj[1]-lbj[1]),dz)*R2D;            // 主销后倾角 CASTER
+  const t0=(cp[2]-ubj[2])/((lbj[2]-ubj[2])||1e-9);
+  const kg=lerp3(ubj,lbj,t0);                           // 主销轴线与接地平面交点
+  const scrub=cp[0]-kg[0];                              // 主销偏移距(正=接地点在轴线外侧)
+  const trail=kg[1]-cp[1];                              // 主销后倾拖距(正=轴线交点在接地点前方)
+  /* 正视图瞬心 IC 与侧倾中心 */
+  const lp=axisAtY(S.hp.LCA_F,S.hp.LCA_R,wc[1]);
+  const up=axisAtY(S.hp.UCA_F,S.hp.UCA_R,wc[1]);
+  const ic=isect2([lp[0],lp[2]],[lbj[0]-lp[0],lbj[2]-lp[2]],[up[0],up[2]],[ubj[0]-up[0],ubj[2]-up[2]]);
+  let rcH=null;
+  if(ic){const r=isect2([cp[0],cp[2]],[ic[0]-cp[0],ic[1]-cp[2]],[0,0],[0,1]); if(r)rcH=r[1];}
+  /* 侧视图瞬心 SVIC 与抗俯仰 */
+  const ld=[S.hp.LCA_R[1]-S.hp.LCA_F[1],S.hp.LCA_R[2]-S.hp.LCA_F[2]];
+  const ud=[S.hp.UCA_R[1]-S.hp.UCA_F[1],S.hp.UCA_R[2]-S.hp.UCA_F[2]];
+  const svic=isect2([lbj[1],lbj[2]],ld,[ubj[1],ubj[2]],ud);
+  let anti=null;
+  if(svic){const dy=cp[1]-svic[0],dzz=svic[1]-cp[2];
+    if(abs(dy)>1) anti=(dzz/dy)*S.brkF*(S.wb/S.hcg)*100;}
+  const ag=arbGeom(lbj);
+  return{tr:wc[2]-M.n[M.i.WC].p0[2],cam:cam,toe:toe,cast:cast,kpi:kpi,incl:kpi+cam,
+    apsi:ag.psi*R2D,alz:ag.P[2],
+    scrub:scrub,trail:trail,cp:cp,wc:wc,lbj:lbj,ubj:ubj,tro:tro,spl:spl,kg:kg,ax:ax,
+    ic:ic,rcH:rcH,svic:svic,anti:anti,sl:dst(spl,P("DMP_T")),
+    half:cp[0],steer:-toe,R:R};
+}
+
+/* ================================ 4. 扫掠分析 ================================ */
+function findLimits(M,rack){
+  const z0=M.n[M.i.WC].p0[2];let up=0,dn=0;
+  resetMech(M);setChassis(M,rack);
+  for(let t=2;t<=140;t+=2){if(driveTo(M,z0+t,rack)>0.03)break;up=t;}
+  resetMech(M);setChassis(M,rack);
+  for(let t=2;t<=140;t+=2){if(driveTo(M,z0-t,rack)>0.03)break;dn=t;}
+  resetMech(M);setChassis(M,rack);
+  return[-dn+2,up-2];
+}
+function saveState(M){return{p:M.n.map(N=>cpy(N.p)),v:M.n.map(N=>cpy(N.v)),
+  pp:M.n.map(N=>cpy(N.pp)),q:M.cl.map(c=>c.q?c.q.slice():null)};}
+function loadState(M,st){M.n.forEach((N,j)=>{N.p=cpy(st.p[j]);N.v=cpy(st.v[j]);N.pp=cpy(st.pp[j]);});
+  M.cl.forEach((c,j)=>{if(st.q[j])c.q=st.q[j].slice();});}
+function runSweep(M,rack,lim,nS){
+  nS=nS||45;
+  const st=saveState(M);
+  const z0=M.n[M.i.WC].p0[2],a=lim[0],b=lim[1],rows=[];
+  resetMech(M);setChassis(M,rack);driveTo(M,z0+a,rack);
+  for(let k=0;k<nS;k++){
+    const tr=a+(b-a)*k/(nS-1);
+    driveTo(M,z0+tr,rack);
+    const m=metrics(M);m.trq=tr;rows.push(m);
+  }
+  /* 差分导数：速比 / 外倾增益 / 跳动转向 */
+  for(let k=0;k<rows.length;k++){
+    const k0=Math.max(0,k-1),k1=Math.min(rows.length-1,k+1);
+    const dt=rows[k1].tr-rows[k0].tr||1e-9;
+    rows[k].mr=-(rows[k1].sl-rows[k0].sl)/dt;
+    rows[k].cg=(rows[k1].cam-rows[k0].cam)/dt*25;
+    rows[k].bs=(rows[k1].toe-rows[k0].toe)/dt*25;
+    rows[k].kw=S.kS*rows[k].mr*rows[k].mr;
+    rows[k].mra=(rows[k1].alz-rows[k0].alz)/dt;
+  }
+  loadState(M,st);
+  return{rows:rows,min:a,max:b};
+}
+function sampleSweep(sw,tr,key){
+  if(!sw||!sw.rows.length)return null;
+  const R=sw.rows;
+  if(tr<=R[0].tr)return R[0][key];
+  if(tr>=R[R.length-1].tr)return R[R.length-1][key];
+  for(let k=1;k<R.length;k++){
+    if(tr<=R[k].tr){const t=(tr-R[k-1].tr)/((R[k].tr-R[k-1].tr)||1e-9);
+      const a=R[k-1][key],b=R[k][key];
+      return(a===null||b===null)?null:a+(b-a)*t;}
+  }
+  return R[R.length-1][key];
+}
+
+/* ================================ 5. 动力学（台架） ================================ */
+const FS=1000;                                  // N -> 内部力单位
+function unsprungMass(){let s=0;HPDEF.forEach(d=>{if(!d[4])s+=d[5];});return s;}
+function roadSignal(t){
+  const A=S.rA;
+  switch(S.road){
+    case "step":  {const x=(t-0.40)/0.030;return A*0.5*(1+Math.tanh(clamp(x,-6,6)));}
+    case "sine":  return A*sin(2*PI*S.rF*t);
+    case "pulse": {const x=(t-0.5)/0.06;return A*Math.exp(-x*x);}
+    case "chirp": {const f=0.4+ (S.rF)*Math.min(1,t/8);return A*sin(2*PI*f*t);}
+    case "rand":  {let v=0;for(let k=1;k<=5;k++)v+=sin(2*PI*(1.1*k*S.rF*0.55)*t+k*2.399)/k;return A*v*0.45;}
+    default: return 0;
+  }
+}
+function stepDyn(M,dt,rack,tSim){
+  const NS=10,h=dt/NS,g=9810;
+  const kS=S.kS*FS,cB=S.cB*FS,cR=S.cR*FS,kT=S.kT*FS,cT=0.55*FS,kBS=S.kBS*FS;
+  const iW=M.i.WC,iA=M.i.SPR_L,iB=M.i.DMP_T;
+  const z0=M.n[iW].p0[2];
+  let Fs=0,Fd=0,Ft=0,pen=0,accz=0;
+  setChassis(M,rack);
+  for(let s=0;s<NS;s++){
+    const tt=tSim+s*h;
+    const rz=M.roadZ0+roadSignal(tt);
+    const rzv=clamp((roadSignal(tt+2e-4)-roadSignal(tt-2e-4))/4e-4,-4000,4000);
+    for(let k=0;k<M.n.length;k++){const N=M.n[k];N.f[0]=0;N.f[1]=0;N.f[2]=N.w>0?-N.m*g:0;}
+    /* 可形变线：螺旋弹簧 + 减振器 */
+    const A=M.n[iA],B=M.n[iB];
+    const d=sub(B.p,A.p),L=len(d)||1e-9,u=mul(d,1/L);
+    const rel=dot(sub(B.v,A.v),u);
+    const Fk=M.springF0+kS*(M.springL0-L);
+    const Fc=-(rel<0?cB:cR)*rel;
+    let F=Fk+Fc; if(F<0)F=0;
+    A.f=add(A.f,mul(u,-F));
+    Fs=Fk;Fd=Fc;
+    /* 缓冲块 / 限位块（等效作用于轮心） */
+    const tr=M.n[iW].p[2]-z0;
+    if(tr>S.bsU){const x=tr-S.bsU;M.n[iW].f[2]-=kBS*x*x/20;}
+    if(tr<-S.bsD){const x=-S.bsD-tr;M.n[iW].f[2]+=kBS*x*x/20;}
+    /* 可形变线：轮胎垂向刚度 */
+    const mm=metrics(M);
+    pen=rz-mm.cp[2];
+    if(pen>0){
+      const vz=M.n[iW].v[2];
+      let fz=kT*pen+cT*(rzv-vz); if(fz<0)fz=0;
+      M.n[iW].f[2]+=fz; Ft=fz;
+    }else Ft=0;
+    for(let k=0;k<M.n.length;k++){const N=M.n[k];if(N.w<=0)continue;
+      N.v[0]+=N.f[0]*h/N.m;N.v[1]+=N.f[1]*h/N.m;N.v[2]+=N.f[2]*h/N.m;
+      const sp=Math.hypot(N.v[0],N.v[1],N.v[2]);
+      if(sp>2e4){const q=2e4/sp;N.v[0]*=q;N.v[1]*=q;N.v[2]*=q;}
+      N.pp[0]=N.p[0];N.pp[1]=N.p[1];N.pp[2]=N.p[2];
+      N.p[0]+=N.v[0]*h;N.p[1]+=N.v[1]*h;N.p[2]+=N.v[2]*h;
+    }
+    for(let it=0;it<12;it++)sweepProj(M,null);
+    for(let k=0;k<M.n.length;k++){const N=M.n[k];if(N.w<=0)continue;
+      const nv=[(N.p[0]-N.pp[0])/h,(N.p[1]-N.pp[1])/h,(N.p[2]-N.pp[2])/h];
+      if(k===iW)accz=(nv[2]-N.v[2])/h;
+      N.v[0]=nv[0]*0.99995;N.v[1]=nv[1]*0.99995;N.v[2]=nv[2]*0.99995;
+    }
+  }
+  M.res=residual(M,null);M.iter=12*NS;
+  return{load:Ft/FS,fs:Fs/FS,fd:Fd/FS,pen:pen,acc:accz/1000,road:roadSignal(tSim)};
+}
+
+/* ================================ 6. 仿真管理 ================================ */
+const SIM={R:null,L:null,mR:null,mL:null,swR:null,swL:null,limR:[-80,80],geo:null,
+  dirtyGeom:true,dirtySweep:true,lastSweep:0,rc2:null,trace:[],mrRef:0.6};
+function rebuild(){
+  SIM.R=buildMech();SIM.L=buildMech();
+  SIM.dirtyGeom=true;SIM.dirtySweep=true;SIM.trace=[];
+  refreshDerived(true);
+}
+/* 重算行程极限、静态速比、弹簧预载、路面基准 */
+function refreshDerived(full){
+  const M=SIM.R,stR=saveState(SIM.R),stL=saveState(SIM.L);
+  if(full||!SIM.geo)SIM.geo=findLimits(M,0);
+  /* 工作行程 = 几何极限 与 缓冲块行程 取交集 */
+  S.trMax=Math.min(SIM.geo[1],S.bsU+12);
+  S.trMin=Math.max(SIM.geo[0],-(S.bsD+12));
+  SIM.limR=[S.trMin,S.trMax];
+  S.travel=clamp(S.travel,S.trMin,S.trMax);
+  const sw=runSweep(M,S.rack,SIM.limR,45);
+  SIM.swR=sw;
+  SIM.mrRef=Math.max(0.05,sampleSweep(sw,0,"mr")||0.6);
+  const mU=unsprungMass();
+  const sprN=S.mS*9.81, corN=(S.mS+mU)*9.81;
+  [SIM.R,SIM.L].forEach(m=>{
+    m.springF0=sprN/SIM.mrRef*FS;
+    m.springL0=m.spring.Ld;
+  });
+  resetMech(M);setChassis(M,0);driveTo(M,M.n[M.i.WC].p0[2],0);
+  const m0=metrics(M);
+  const rz=m0.cp[2]+corN/S.kT;
+  SIM.R.roadZ0=rz;SIM.L.roadZ0=rz;
+  SIM.corN=corN;SIM.sprN=sprN;SIM.mU=mU;
+  loadState(SIM.R,stR);loadState(SIM.L,stL);
+  SIM.dirtySweep=true;
+}
+function rollOffset(){return (SIM.half||762)*Math.tan(S.roll*D2R);}
+function travelR(){return clamp(S.travel+rollOffset(),S.trMin,S.trMax);}
+function travelL(){return clamp(S.travel-rollOffset(),S.trMin,S.trMax);}
+
+function simulate(dt){
+  const M=SIM.R,N=SIM.L;
+  if(S.mode==="kin"){
+    const z0=M.n[M.i.WC].p0[2];
+    driveTo(M,z0+travelR(),S.rack);
+    SIM.mR=metrics(M);
+    if(S.show.mirror){driveTo(N,z0+travelL(),-S.rack);SIM.mL=metrics(N);}else SIM.mL=null;
+    S.dyn.on=false;
+  }else{
+    const r=stepDyn(M,dt,S.rack,S.simT);
+    SIM.mR=metrics(M);
+    S.dyn={on:true,load:r.load,fs:r.fs,fd:r.fd,pen:r.pen,acc:r.acc,road:r.road,z:SIM.mR.tr};
+    if(S.show.mirror){
+      stepDyn(N,dt,-S.rack,S.simT);
+      SIM.mL=metrics(N);
+    }else SIM.mL=null;
+    SIM.trace.push({t:S.simT,tr:SIM.mR.tr,load:r.load,fs:r.fs,fd:r.fd,road:r.road});
+    if(SIM.trace.length>1400)SIM.trace.shift();
+  }
+  SIM.half=SIM.mR?abs(SIM.mR.cp[0]):762;
+  /* 双侧侧倾中心：两侧 接地点→瞬心 连线交点 */
+  SIM.rc2=null;
+  if(SIM.mR&&SIM.mL&&SIM.mR.ic&&SIM.mL.ic){
+    const a=[SIM.mR.cp[0],SIM.mR.cp[2]],ad=[SIM.mR.ic[0]-a[0],SIM.mR.ic[1]-a[1]];
+    const b=[-SIM.mL.cp[0],SIM.mL.cp[2]],bd=[-SIM.mL.ic[0]-b[0],SIM.mL.ic[1]-b[1]];
+    SIM.rc2=isect2(a,ad,b,bd);
+  }
+}
+/* ================================ 7. 颜色与图元 ================================ */
+const C={
+  bg:"#0a0c0e",grid:"#161b20",grid2:"#20262d",axis:"#2a323a",
+  rig:"#8d9caa",rigArm:"#aab9c7",arm:"rgba(150,166,182,0.055)",
+  ela:"#d9a238",elaF:"rgba(217,162,56,0.10)",
+  node:"#2fa9d6",nodeFix:"#d2543f",nodeSel:"#f0e6c8",
+  knu:"#43c9c0",knuF:"rgba(67,201,192,0.075)",
+  tire:"#5f6a76",tread:"#3d454d",rim:"#7c8894",disc:"#6a747f",cal:"#8a5a3a",
+  kp:"#e0603f",kpsw:"rgba(224,96,63,0.20)",kpg:"#e0603f",
+  tie:"#43c9c0",rack:"#4f5b68",
+  chas:"#414b56",chas2:"#333c46",
+  gnd:"#3a424b",
+  path:"#a473c4",pathC:"#54a06a",pathK:"#e0603f",
+  ic:"#d9a238",rc:"#54a06a",dim:"#78848f",dimT:"#9aa6b2",
+  arb:"#c07ad0",frc:"#d2543f",txt:"#c3cad2",txt2:"#8b95a1",txt3:"#5c6672"
+};
+const L3=(sc,a,b,c,w,d,al)=>sc.push({k:"l",a:a,b:b,c:c,w:w||1,d:d,al:al});
+const PL=(sc,pts,c,w,d,f,al)=>sc.push({k:"p",pts:pts,c:c,w:w||1,d:d,f:f,al:al});
+const TX=(sc,p,s,c,dx,dy,sz)=>sc.push({k:"t",p:p,s:s,c:c,dx:dx||0,dy:dy||0,sz:sz||9});
+const ND=(sc,p,fix,id,zh,sx)=>sc.push({k:"n",p:p,fix:fix,id:id,zh:zh,sx:sx||1});
+
+function circPts(c,ax,r,n,e1,e2){
+  const u=e1||perpOf(ax),v=e2||cross(nrm(ax),u),o=[];
+  for(let k=0;k<=n;k++){const a=2*PI*k/n;o.push(add(c,add(mul(u,r*cos(a)),mul(v,r*sin(a)))));}
+  return o;
+}
+function cylinder(sc,a,b,r,col,w,nseg){
+  const ax=nrm(sub(b,a)),u=perpOf(ax),v=cross(ax,u);
+  PL(sc,circPts(a,ax,r,nseg||20,u,v),col,w||1);
+  PL(sc,circPts(b,ax,r,nseg||20,u,v),col,w||1);
+  for(let k=0;k<4;k++){const an=PI/4+k*PI/2;
+    const o=add(mul(u,r*cos(an)),mul(v,r*sin(an)));
+    L3(sc,add(a,o),add(b,o),col,w||1);}
+}
+/* 螺旋弹簧 */
+function springPts(a,b,r,turns,seg){
+  const d=sub(b,a),L=len(d)||1,u=mul(d,1/L);
+  let ref=[0,1,0]; if(abs(dot(ref,u))>0.9)ref=[1,0,0];
+  const e1=nrm(sub(ref,mul(u,dot(ref,u)))),e2=cross(u,e1);
+  const pts=[a];
+  const t0=0.09,t1=0.91;
+  for(let k=0;k<=seg;k++){
+    const t=t0+(t1-t0)*k/seg,an=2*PI*turns*(k/seg);
+    pts.push(add(add(a,mul(u,L*t)),add(mul(e1,r*cos(an)),mul(e2,r*sin(an)))));
+  }
+  pts.push(b);
+  return pts;
+}
+
+/* ================================ 8. 场景构建 ================================ */
+function buildScene(){
+  const sc=[];
+  addShared(sc);
+  addInstance(sc,SIM.R,SIM.mR,SIM.swR,1);
+  if(S.show.mirror&&SIM.mL)addInstance(sc,SIM.L,SIM.mL,SIM.swL||SIM.swR,-1);
+  return sc;
+}
+/* ---- 车身/副车架/转向机（左右共用） ---- */
+function addShared(sc){
+  const h=S.hp,mir=S.show.mirror;
+  const bx=Math.min(h.LCA_F[0],h.UCA_F[0])-28;
+  const x0=mir?-bx:0,x1=bx;
+  const y1=Math.max(abs(h.LCA_F[1]),abs(h.UCA_F[1]))+55,y0=-y1;
+  const z0=Math.min(h.LCA_F[2],h.LCA_R[2])-52,z1=Math.max(h.UCA_F[2],h.UCA_R[2])+34;
+  if(S.show.chassis){
+    const box=[[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]];
+    const E=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+    E.forEach(e=>L3(sc,box[e[0]],box[e[1]],C.chas,1));
+    /* 中间横隔板 */
+    L3(sc,[x0,0,z0],[x1,0,z0],C.chas2,1,[3,3]);
+    L3(sc,[x0,0,z1],[x1,0,z1],C.chas2,1,[3,3]);
+    /* 减振器塔 */
+    const sgn=[1].concat(mir?[-1]:[]);
+    sgn.forEach(s=>{
+      const T=[h.DMP_T[0]*s,h.DMP_T[1],h.DMP_T[2]];
+      const tw=62,tl=78,tz=T[2]+16;
+      const top=[[T[0]-tw,T[1]-tl,tz],[T[0]+tw,T[1]-tl,tz],[T[0]+tw,T[1]+tl,tz],[T[0]-tw,T[1]+tl,tz]];
+      PL(sc,top.concat([top[0]]),C.chas,1.2);
+      const base=[[s*Math.min(bx,abs(T[0])+tw),T[1]-tl,z1],[s*Math.min(bx,abs(T[0])+tw),T[1]+tl,z1]];
+      L3(sc,top[0],[s*bx,T[1]-tl,z1],C.chas,1);
+      L3(sc,top[1],[s*bx,T[1]-tl,z1],C.chas,1);
+      L3(sc,top[2],[s*bx,T[1]+tl,z1],C.chas,1);
+      L3(sc,top[3],[s*bx,T[1]+tl,z1],C.chas,1);
+      L3(sc,[s*bx,T[1]-tl,z1],[s*bx,T[1]+tl,z1],C.chas,1);
+      /* 上支点座 */
+      cylinder(sc,[T[0],T[1],T[2]-10],[T[0],T[1],T[2]+10],34,C.chas,1,14);
+    });
+    /* 车身侧铰点支架 */
+    const brk=["LCA_F","LCA_R","UCA_F","UCA_R"];
+    sgn.forEach(s=>brk.forEach(id=>{
+      const p=[h[id][0]*s,h[id][1],h[id][2]];
+      L3(sc,p,[s*bx,p[1],p[2]],C.chas2,1);
+      /* 衬套 */
+      const other=id.slice(0,-1)+(id.endsWith("F")?"R":"F");
+      const ax=nrm(sub([h[other][0]*s,h[other][1],h[other][2]],p));
+      cylinder(sc,sub(p,mul(ax,17)),add(p,mul(ax,17)),15,C.rig,1,12);
+    }));
+  }
+  if(S.show.arb&&S.arb.d>0.5&&SIM.mR){
+    const g=arbGeom(SIM.mR.lbj);
+    const bxa=Math.max(60,bx-26);
+    const x0a=mir?-g.xa:0;
+    L3(sc,[x0a,g.ay,g.az],[g.xa,g.ay,g.az],C.arb,3.2);
+    [1].concat(mir?[-1]:[]).forEach(sg=>{
+      const bp=[sg*bxa,g.ay,g.az];
+      cylinder(sc,[bp[0]-sg*16,g.ay,g.az],[bp[0]+sg*16,g.ay,g.az],17,C.chas,1,10);
+      L3(sc,bp,[sg*Math.min(bx,bxa),g.ay,z0+30],C.chas2,1);
+    });
+  }
+  if(S.show.steer){
+    /* 转向机壳体 */
+    const R=h.RACK,rl=mir?abs(R[0])-14:0;
+    const a=[mir?-(abs(R[0])-14):16,R[1],R[2]],b=[abs(R[0])-14,R[1],R[2]];
+    cylinder(sc,a,b,23,C.rack,1.1,16);
+    /* 输入小齿轮 */
+    L3(sc,[b[0]-60,R[1],R[2]],[b[0]-60,R[1]-70,R[2]+52],C.rack,1.4);
+    cylinder(sc,[b[0]-60,R[1]-6,R[2]],[b[0]-60,R[1]-40,R[2]+26],17,C.rack,1,10);
+    /* 齿条轴（随转向平移） */
+    const sgn=[1].concat(mir?[-1]:[]);
+    sgn.forEach(s=>{
+      const P=[SIM.R.n[SIM.R.i.RACK].p[0]*s,R[1],R[2]];
+      L3(sc,[s*(abs(R[0])-16),R[1],R[2]],P,C.tie,2.2);
+      cylinder(sc,P,[P[0]-s*22,R[1],R[2]],11,C.tie,1,10);
+    });
+  }
+}
+/* ---- 单侧悬架总成 ---- */
+function addInstance(sc,M,m,sw,sx){
+  const T=p=>[p[0]*sx,p[1],p[2]];
+  const N=id=>T(M.n[M.i[id]].p);
+  const LBJ=N("LBJ"),UBJ=N("UBJ"),WC=N("WC"),TRO=N("TRO"),SPL=N("SPR_L"),DMT=N("DMP_T");
+  const LAF=N("LCA_F"),LAR=N("LCA_R"),UAF=N("UCA_F"),UAR=N("UCA_R"),RCK=N("RACK");
+  const ax=nrm([m.ax[0]*sx,m.ax[1],m.ax[2]]);
+  const cp=T(m.cp),kg=T(m.kg);
+  const tR=S.tire.R,tW=S.tire.W,rimR=S.tire.rim,dR=S.tire.disc;
+  /* 轮面内的稳定基向量 */
+  const eU=nrm(sub([0,0,1],mul(ax,dot([0,0,1],ax)))),eV=cross(ax,eU);
+
+  /* --- 摆臂实体（三角面 + 支杆） --- */
+  if(S.show.face){
+    PL(sc,[LAF,LBJ,LAR,LAF],C.rigArm,1,null,C.arm);
+    PL(sc,[UAF,UBJ,UAR,UAF],C.rigArm,1,null,C.arm);
+    PL(sc,[LBJ,UBJ,WC,LBJ],C.knu,1,null,C.knuF);
+    PL(sc,[LBJ,UBJ,TRO,LBJ],C.knu,1,null,C.knuF);
+    PL(sc,[LBJ,WC,TRO,LBJ],C.knu,1,null,C.knuF);
+    PL(sc,[UBJ,WC,TRO,UBJ],C.knu,1,null,C.knuF);
+    PL(sc,[LAF,SPL,LAR,LAF],C.rigArm,1,null,C.arm);
+  }
+  /* --- 球头 --- */
+  [[LBJ,15],[UBJ,13],[TRO,10]].forEach(q=>{
+    PL(sc,circPts(q[0],[1,0,0],q[1],14),C.rig,1);
+    PL(sc,circPts(q[0],[0,1,0],q[1],14),C.rig,1);
+    PL(sc,circPts(q[0],[0,0,1],q[1],14),C.rig,1);
+  });
+  /* --- 车轮总成 --- */
+  if(S.show.wheel){
+    const ci=add(WC,mul(ax,-tW/2)),co=add(WC,mul(ax,tW/2));
+    const ri=add(WC,mul(ax,-tW/2+16)),ro=add(WC,mul(ax,tW/2-16));
+    if(S.show.tirefill)PL(sc,circPts(co,ax,tR,40,eU,eV),C.tire,1,null,"rgba(12,15,18,0.72)");
+    PL(sc,circPts(ci,ax,tR,44,eU,eV),C.tire,1.3);
+    PL(sc,circPts(co,ax,tR,44,eU,eV),C.tire,1.3);
+    PL(sc,circPts(ci,ax,tR*0.965,44,eU,eV),C.tread,1);
+    PL(sc,circPts(co,ax,tR*0.965,44,eU,eV),C.tread,1);
+    for(let k=0;k<24;k++){const an=2*PI*k/24;
+      const o=add(mul(eU,tR*cos(an)),mul(eV,tR*sin(an)));
+      L3(sc,add(ci,o),add(co,o),C.tread,1);}
+    /* 轮辋 */
+    PL(sc,circPts(ri,ax,rimR,36,eU,eV),C.rim,1.1);
+    PL(sc,circPts(ro,ax,rimR,36,eU,eV),C.rim,1.1);
+    PL(sc,circPts(ro,ax,rimR*0.90,36,eU,eV),C.rim,1);
+    for(let k=0;k<5;k++){const an=2*PI*k/5+0.31;
+      const o=add(mul(eU,rimR*0.92*cos(an)),mul(eV,rimR*0.92*sin(an)));
+      L3(sc,add(ro,mul(ax,-4)),add(ro,o),C.rim,1.4);}
+    PL(sc,circPts(ro,ax,58,20,eU,eV),C.rim,1);
+    for(let k=0;k<4;k++){const an=2*PI*k/4;
+      const o=add(mul(eU,74*cos(an)),mul(eV,74*sin(an)));
+      L3(sc,add(ro,o),add(ro,mul(o,1.02)),C.rim,2);}
+  }
+  /* --- 制动盘 + 卡钳 --- */
+  if(S.show.disc){
+    const d1=add(WC,mul(ax,-16)),d2=add(WC,mul(ax,4));
+    PL(sc,circPts(d1,ax,dR,32,eU,eV),C.disc,1.1);
+    PL(sc,circPts(d2,ax,dR,32,eU,eV),C.disc,1.1);
+    PL(sc,circPts(d1,ax,dR*0.62,24,eU,eV),C.disc,1);
+    for(let k=0;k<16;k++){const an=2*PI*k/16;
+      const o1=add(mul(eU,dR*0.64*cos(an)),mul(eV,dR*0.64*sin(an)));
+      const o2=add(mul(eU,dR*cos(an)),mul(eV,dR*sin(an)));
+      L3(sc,add(d1,o1),add(d1,o2),C.disc,1);}
+    cylinder(sc,add(WC,mul(ax,-26)),add(WC,mul(ax,26)),44,C.rim,1,14);
+    /* 卡钳（后置） */
+    const ang=-2.1,ca=add(mul(eU,cos(ang)),mul(eV,sin(ang)));
+    const cb=cross(ax,ca);
+    const cc=add(WC,mul(ca,dR*0.93));
+    const bp=[];
+    for(let i=-1;i<=1;i+=2)for(let j=-1;j<=1;j+=2)for(let k2=-1;k2<=1;k2+=2)
+      bp.push(add(add(cc,mul(ca,i*36)),add(mul(cb,j*54),mul(ax,k2*30))));
+    const be=[[0,1],[0,2],[1,3],[2,3],[4,5],[4,6],[5,7],[6,7],[0,4],[1,5],[2,6],[3,7]];
+    be.forEach(e=>L3(sc,bp[e[0]],bp[e[1]],C.cal,1));
+  }
+  /* --- 弹簧 / 减振器（可形变线） --- */
+  if(S.show.elastic){
+    const u=nrm(sub(DMT,SPL)),L=dst(SPL,DMT);
+    const bodyA=add(SPL,mul(u,L*0.06)),bodyB=add(SPL,mul(u,L*0.52));
+    cylinder(sc,bodyA,bodyB,27,C.rig,1,14);
+    L3(sc,bodyB,DMT,C.rig,2.2);
+    cylinder(sc,add(SPL,mul(u,-6)),bodyA,15,C.rig,1,10);
+    PL(sc,springPts(add(SPL,mul(u,L*0.10)),add(DMT,mul(u,-L*0.055)),52,7.5,190),C.ela,1.7);
+    /* 弹簧座 */
+    PL(sc,circPts(add(SPL,mul(u,L*0.09)),u,60,22),C.ela,1.2);
+    PL(sc,circPts(add(DMT,mul(u,-L*0.05)),u,60,22),C.ela,1.2);
+  }
+  /* --- 稳定杆臂与连杆 --- */
+  if(S.show.arb&&S.arb.d>0.5){
+    const g=arbGeom(m.lbj);
+    const A0=T([g.xa,g.ay,g.az]),E=T(g.E),Pd=T(g.P);
+    L3(sc,A0,E,C.arb,3.0);
+    cylinder(sc,E,Pd,7,C.arb,1,8);
+    PL(sc,circPts(Pd,[1,0,0],9,10),C.arb,1);
+    PL(sc,circPts(E,[1,0,0],9,10),C.arb,1);
+    if(!g.ok)TX(sc,E,"稳定杆连杆超程",C.frc,6,-6,9);
+  }
+  /* --- 横拉杆 --- */
+  if(S.show.steer){
+    cylinder(sc,RCK,TRO,9,C.tie,1.2,10);
+    L3(sc,RCK,TRO,C.tie,1.6);
+  }
+  /* --- 主销轴线及其接地交点 --- */
+  if(S.show.kp){
+    const d=nrm(sub(LBJ,UBJ));
+    const a=add(UBJ,mul(d,-90)),b=add(UBJ,mul(d,dst(UBJ,LBJ)+dst(LBJ,kg)+16));
+    L3(sc,a,b,C.kp,1.5,[7,4]);
+    L3(sc,UBJ,LBJ,C.kp,2.2);
+    PL(sc,circPts(kg,[0,0,1],17,20),C.kpg,1.4);
+    L3(sc,[kg[0]-26,kg[1],kg[2]],[kg[0]+26,kg[1],kg[2]],C.kpg,1.2);
+    L3(sc,[kg[0],kg[1]-26,kg[2]],[kg[0],kg[1]+26,kg[2]],C.kpg,1.2);
+  }
+  /* --- 主销扫掠面（跳动全行程主销轴线族） --- */
+  if(S.show.kpsw&&sw){
+    const R=sw.rows,st=Math.max(1,Math.round(R.length/17));
+    for(let k=0;k<R.length;k+=st){
+      const A=[R[k].ubj[0]*sx,R[k].ubj[1],R[k].ubj[2]];
+      const B=[R[k].kg[0]*sx,R[k].kg[1],R[k].kg[2]];
+      L3(sc,A,B,C.kpsw,1);
+    }
+  }
+  /* --- 运动轨迹 --- */
+  if(S.show.path&&sw){
+    const R=sw.rows;
+    const P=(key)=>R.map(r=>[r[key][0]*sx,r[key][1],r[key][2]]);
+    PL(sc,P("wc"),C.path,1.3,[5,3]);
+    PL(sc,P("cp"),C.pathC,1.3);
+    PL(sc,P("lbj"),C.path,1);
+    PL(sc,P("ubj"),C.path,1);
+    PL(sc,P("tro"),C.tie,1,[4,3]);
+    PL(sc,P("kg"),C.pathK,1.6);
+  }
+  /* --- 刚性线 / 可形变线 --- */
+  M.L.forEach(l=>{
+    const a=T(M.n[l.a].p),b=T(M.n[l.b].p);
+    if(l.type==="R"){if(S.show.rigid)L3(sc,a,b,l.grp==="steer"?C.tie:C.rig,1.15);}
+    else if(S.show.elastic)L3(sc,a,b,C.ela,1,[6,4]);
+  });
+  /* --- 节点 --- */
+  if(S.show.node)M.n.forEach(n=>ND(sc,T(n.p),n.fix,n.id,n.zh,sx));
+  /* --- 力矢量 --- */
+  if(S.show.force&&S.dyn.on&&sx>0){
+    const s=0.055;
+    L3(sc,cp,add(cp,[0,0,S.dyn.load*s]),C.frc,2.4);
+    PL(sc,[add(cp,[0,0,S.dyn.load*s]),add(cp,[9,0,S.dyn.load*s-22]),add(cp,[-9,0,S.dyn.load*s-22])],C.frc,1,null,C.frc);
+    const u=nrm(sub(DMT,SPL));
+    L3(sc,SPL,add(SPL,mul(u,-S.dyn.fs*s*0.5)),C.frc,2);
+  }
+  /* --- 转向节局部标注 --- */
+  if(S.show.label){
+    TX(sc,WC," WC",C.txt2,6,-3);
+    TX(sc,cp,"CP",C.pathC,6,10);
+  }
+}
+
+/* ================================ 9. 视图与投影 ================================ */
+const VDEF=[
+  {key:"front",zh:"正视图",en:"FRONT ELEVATION",ax:"X-Z",bx:[1,0,0],by:[0,0,1],type:"o",note:"+Y⊗车头  +X→外侧"},
+  {key:"top",  zh:"俯视图",en:"PLAN VIEW",      ax:"X-Y",bx:[1,0,0],by:[0,1,0],type:"o",note:"+Z⊙向上  ↑车头"},
+  {key:"side", zh:"侧视图",en:"SIDE ELEVATION", ax:"Y-Z",bx:[0,1,0],by:[0,0,1],type:"o",note:"+X⊙外侧  →车头"},
+  {key:"iso",  zh:"等轴测",en:"ISOMETRIC 3D",   ax:"3D", type:"p",note:"左键旋转 · Shift平移"}
+];
+const VW=[];
+function initViews(){
+  const vp=document.getElementById("vp");
+  VDEF.forEach((d,i)=>{
+    const w=document.createElement("div");w.className="vw";w.dataset.k=d.key;
+    w.innerHTML='<div class="vwh"><b>'+d.zh+'</b>'+d.en+' <span style="color:#4a545f">['+d.ax+']</span>'+
+      '<span class="vi">'+d.note+'</span><span class="vb" title="适应窗口">F</span><span class="vb" title="最大化">M</span></div>'+
+      '<canvas></canvas>';
+    vp.appendChild(w);
+    const v=Object.assign({},d,{el:w,cv:w.querySelector("canvas"),w:10,h:10,dpr:1,
+      s:0.5,cx:0,cy:0,az:-38*D2R,elv:22*D2R,dist:3400,tgt:[380,0,330],mx:false});
+    v.ctx=v.cv.getContext("2d");
+    VW.push(v);
+    const bts=w.querySelectorAll(".vb");
+    bts[0].onclick=e=>{e.stopPropagation();fitView(v);};
+    bts[1].onclick=e=>{e.stopPropagation();toggleMax(v);};
+    hookView(v);
+    w.addEventListener("mouseenter",()=>{VW.forEach(q=>q.el.classList.remove("act"));w.classList.add("act");});
+  });
+  const ro=new ResizeObserver(()=>{VW.forEach(sizeView);});
+  ro.observe(vp);
+  VW.forEach(sizeView);
+}
+function sizeView(v){
+  const r=v.cv.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1);
+  const w=Math.max(10,Math.round(r.width)),h=Math.max(10,Math.round(r.height));
+  if(v.w!==w||v.h!==h||v.dpr!==dpr){
+    v.w=w;v.h=h;v.dpr=dpr;v.cv.width=w*dpr;v.cv.height=h*dpr;
+    v.ctx.setTransform(dpr,0,0,dpr,0,0);
+    if(!v.inited){fitView(v);v.inited=true;}
+  }
+}
+function toggleMax(v){
+  const vp=document.getElementById("vp");
+  const on=!v.mx;VW.forEach(q=>{q.mx=false;q.el.classList.remove("mx");});
+  if(on){v.mx=true;v.el.classList.add("mx");vp.classList.add("max0");}else vp.classList.remove("max0");
+  setTimeout(()=>VW.forEach(sizeView),0);
+}
+function camIso(v){
+  const ce=cos(v.elv),se=sin(v.elv);
+  const dir=[ce*cos(v.az),ce*sin(v.az),se];
+  v.eye=add(v.tgt,mul(dir,v.dist));
+  v.fw=nrm(sub(v.tgt,v.eye));
+  v.rt=nrm(cross(v.fw,[0,0,1]));
+  v.up=cross(v.rt,v.fw);
+}
+function P2(v,p){
+  if(v.type==="o"){
+    return[v.w/2+(dot(p,v.bx)-v.cx)*v.s, v.h/2-(dot(p,v.by)-v.cy)*v.s];
+  }
+  const q=sub(p,v.eye),z=dot(q,v.fw);
+  if(z<80)return null;
+  const f=v.dist/z;
+  return[v.w/2+dot(q,v.rt)*f*v.s, v.h/2-dot(q,v.up)*f*v.s];
+}
+/* 屏幕 -> 世界（正交视图，给定平面外坐标） */
+function S2W(v,sx,sy,base){
+  const a=(sx-v.w/2)/v.s+v.cx, b=-(sy-v.h/2)/v.s+v.cy;
+  const out=cpy(base);
+  for(let k=0;k<3;k++)out[k]=base[k]+v.bx[k]*(a-dot(base,v.bx))+v.by[k]*(b-dot(base,v.by));
+  return out;
+}
+function fitPoints(){
+  const pts=[];
+  if(!SIM.R)return[[0,0,0],[900,-400,760],[-900,400,0]];
+  const inst=[[SIM.R,1]];if(S.show.mirror&&SIM.mL)inst.push([SIM.L,-1]);
+  inst.forEach(q=>{const M=q[0],sx=q[1];
+    M.n.forEach(n=>pts.push([n.p[0]*sx,n.p[1],n.p[2]]));
+    const m=(sx>0?SIM.mR:SIM.mL);if(!m)return;
+    const w=[m.wc[0]*sx,m.wc[1],m.wc[2]],R=S.tire.R,W=S.tire.W/2;
+    [[R,0,0],[-R,0,0],[0,R,0],[0,-R,0],[0,0,R],[0,0,-R]].forEach(o=>pts.push(add(w,o)));
+    pts.push([w[0]+sx*W,w[1],w[2]-R]);pts.push([w[0]-sx*W,w[1],w[2]+R]);
+  });
+  pts.push([0,0,0]);
+  return pts;
+}
+function fitView(v){
+  const pts=fitPoints();
+  if(v.type==="o"){
+    let a0=1e9,a1=-1e9,b0=1e9,b1=-1e9;
+    pts.forEach(p=>{const a=dot(p,v.bx),b=dot(p,v.by);
+      if(a<a0)a0=a;if(a>a1)a1=a;if(b<b0)b0=b;if(b>b1)b1=b;});
+    v.cx=(a0+a1)/2;v.cy=(b0+b1)/2;
+    v.s=Math.min((v.w-26)/Math.max(1,a1-a0),(v.h-30)/Math.max(1,b1-b0));
+  }else{
+    let c=[0,0,0];pts.forEach(p=>c=add(c,p));c=mul(c,1/pts.length);
+    let r=1;pts.forEach(p=>r=Math.max(r,dst(p,c)));
+    v.tgt=c;v.dist=Math.max(2800,r*4.5);v.s=Math.min(v.w,v.h)/(r*2.4);
+    for(let it=0;it<5;it++){
+      camIso(v);
+      let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+      pts.forEach(p=>{const q=P2(v,p);if(!q)return;
+        if(q[0]<x0)x0=q[0];if(q[0]>x1)x1=q[0];if(q[1]<y0)y0=q[1];if(q[1]>y1)y1=q[1];});
+      if(x1<=x0||y1<=y0)break;
+      const dx=(v.w/2-(x0+x1)/2)/v.s,dy=(v.h/2-(y0+y1)/2)/v.s;
+      v.tgt=add(v.tgt,add(mul(v.rt,-dx),mul(v.up,dy)));
+      v.s*=clamp(Math.min((v.w-30)/(x1-x0),(v.h-34)/(y1-y0)),0.35,2.6);
+    }
+    camIso(v);
+  }
+}
+
+/* ================================ 10. 绘制 ================================ */
+function dash(ctx,d){ctx.setLineDash(d||[]);}
+function drawAll(){
+  const sc=buildScene();
+  PICK.length=0;
+  VW.forEach(v=>{if(document.getElementById("vp").classList.contains("max0")&&!v.mx)return;drawView(v,sc);});
+}
+function lblOK(v,x,y,w){
+  for(let i=0;i<v._lbl.length;i++){const r=v._lbl[i];
+    if(abs(r[0]-x)<(r[2]+w)*0.5+3&&abs(r[1]-y)<9)return false;}
+  v._lbl.push([x,y,w]);return true;
+}
+function drawView(v,sc){
+  const ctx=v.ctx;v._lbl=[];
+  if(v.type==="p")camIso(v);
+  ctx.save();
+  ctx.fillStyle=C.bg;ctx.fillRect(0,0,v.w,v.h);
+  ctx.lineJoin="round";ctx.lineCap="butt";
+  drawGrid(v);
+  drawGround(v);
+  /* 图元 */
+  for(let i=0;i<sc.length;i++){
+    const o=sc[i];
+    if(o.k==="l"){
+      const A=P2(v,o.a),B=P2(v,o.b);if(!A||!B)continue;
+      ctx.beginPath();dash(ctx,o.d);ctx.strokeStyle=o.c;ctx.lineWidth=o.w;
+      if(o.al!==undefined)ctx.globalAlpha=o.al;
+      ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();ctx.globalAlpha=1;
+    }else if(o.k==="p"){
+      ctx.beginPath();dash(ctx,o.d);let st=false;
+      for(let j=0;j<o.pts.length;j++){const Q=P2(v,o.pts[j]);
+        if(!Q){st=false;continue;}
+        if(!st){ctx.moveTo(Q[0],Q[1]);st=true;}else ctx.lineTo(Q[0],Q[1]);}
+      if(o.f){ctx.fillStyle=o.f;ctx.fill();}
+      ctx.strokeStyle=o.c;ctx.lineWidth=o.w;ctx.stroke();
+    }else if(o.k==="n"){
+      const A=P2(v,o.p);if(!A)continue;
+      PICK.push({x:A[0],y:A[1],id:o.id,v:v,p:o.p,sx:o.sx||1});
+      const sel=(UI.hover===o.id||UI.selHP===o.id);
+      dash(ctx,[]);
+      ctx.fillStyle=C.bg;ctx.strokeStyle=sel?C.nodeSel:(o.fix?C.nodeFix:C.node);ctx.lineWidth=sel?1.8:1.3;
+      if(o.fix){ctx.beginPath();ctx.rect(A[0]-3.6,A[1]-3.6,7.2,7.2);ctx.fill();ctx.stroke();}
+      else{ctx.beginPath();ctx.arc(A[0],A[1],3.4,0,6.2832);ctx.fill();ctx.stroke();}
+      if(sel){ctx.beginPath();ctx.rect(A[0]-6.5,A[1]-6.5,13,13);ctx.strokeStyle=C.nodeSel;ctx.lineWidth=1;ctx.stroke();}
+      if(S.show.label){
+        const w=o.id.length*5.1;
+        if(sel||lblOK(v,A[0]+6+w/2,A[1]-9,w)){
+          ctx.fillStyle=sel?C.nodeSel:C.txt3;ctx.font="8.5px ui-monospace,monospace";ctx.textAlign="left";
+          ctx.fillText(o.id,A[0]+6,A[1]-5);
+        }
+      }
+    }else if(o.k==="t"){
+      const A=P2(v,o.p);if(!A)continue;
+      if(!lblOK(v,A[0]+o.dx+o.s.length*2.6,A[1]+o.dy-4,o.s.length*5.2))continue;
+      dash(ctx,[]);ctx.fillStyle=o.c;ctx.font=o.sz+"px ui-monospace,monospace";ctx.textAlign="left";
+      ctx.fillText(o.s,A[0]+o.dx,A[1]+o.dy);
+    }
+  }
+  dash(ctx,[]);
+  drawOverlay(v);
+  drawHUD(v);
+  ctx.restore();
+}
+function drawGrid(v){
+  const ctx=v.ctx;
+  if(v.type==="p"){drawGrid3(v);return;}
+  const step=100,maj=500;
+  const a0=v.cx-v.w/2/v.s,a1=v.cx+v.w/2/v.s,b0=v.cy-v.h/2/v.s,b1=v.cy+v.h/2/v.s;
+  if((a1-a0)/step>260)return;
+  ctx.lineWidth=1;dash(ctx,[]);
+  for(let a=Math.ceil(a0/step)*step;a<=a1;a+=step){
+    const x=Math.round(v.w/2+(a-v.cx)*v.s)+.5;
+    ctx.beginPath();ctx.strokeStyle=(a%maj===0)?C.grid2:C.grid;
+    ctx.moveTo(x,0);ctx.lineTo(x,v.h);ctx.stroke();
+  }
+  for(let b=Math.ceil(b0/step)*step;b<=b1;b+=step){
+    const y=Math.round(v.h/2-(b-v.cy)*v.s)+.5;
+    ctx.beginPath();ctx.strokeStyle=(b%maj===0)?C.grid2:C.grid;
+    ctx.moveTo(0,y);ctx.lineTo(v.w,y);ctx.stroke();
+  }
+  /* 原点轴 */
+  ctx.strokeStyle=C.axis;ctx.lineWidth=1;
+  const ox=v.w/2+(0-v.cx)*v.s,oy=v.h/2-(0-v.cy)*v.s;
+  ctx.beginPath();ctx.moveTo(Math.round(ox)+.5,0);ctx.lineTo(Math.round(ox)+.5,v.h);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,Math.round(oy)+.5);ctx.lineTo(v.w,Math.round(oy)+.5);ctx.stroke();
+  /* 刻度标注 */
+  ctx.fillStyle=C.txt3;ctx.font="8px ui-monospace,monospace";ctx.textAlign="left";
+  for(let a=Math.ceil(a0/maj)*maj;a<=a1;a+=maj){
+    if(a===0)continue;const x=v.w/2+(a-v.cx)*v.s;ctx.fillText(a,x+2,v.h-3);}
+  for(let b=Math.ceil(b0/maj)*maj;b<=b1;b+=maj){
+    if(b===0)continue;const y=v.h/2-(b-v.cy)*v.s;ctx.fillText(b,2,y-2);}
+}
+function drawGrid3(v){
+  const ctx=v.ctx,gz=groundZ(),ext=1500,step=250;
+  ctx.lineWidth=1;dash(ctx,[]);
+  const x0=S.show.mirror?-ext:-200,x1=ext;
+  for(let x=Math.ceil(x0/step)*step;x<=x1;x+=step){
+    const A=P2(v,[x,-ext,gz]),B=P2(v,[x,ext,gz]);if(!A||!B)continue;
+    ctx.beginPath();ctx.strokeStyle=(x===0)?C.axis:C.grid;ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();
+  }
+  for(let y=-ext;y<=ext;y+=step){
+    const A=P2(v,[x0,y,gz]),B=P2(v,[x1,y,gz]);if(!A||!B)continue;
+    ctx.beginPath();ctx.strokeStyle=(y===0)?C.axis:C.grid;ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();
+  }
+}
+function groundZ(){
+  if(S.mode==="rig")return (SIM.R.roadZ0||0)+(S.dyn.road||0);
+  return SIM.mR?SIM.mR.cp[2]:0;
+}
+function drawGround(v){
+  if(!S.show.ground||v.type==="p")return;
+  const ctx=v.ctx,gz=groundZ();
+  if(v.key==="top"){
+    /* 俯视图：车桥线与中心线 */
+    dash(ctx,[6,4]);ctx.strokeStyle=C.gnd;ctx.lineWidth=1;
+    const A=P2(v,[0,-1600,0]),B=P2(v,[0,1600,0]);
+    ctx.beginPath();ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();
+    dash(ctx,[]);return;
+  }
+  /* 正/侧视：地面线 + 剖面线 */
+  let gA,gB;
+  if(v.key==="front"&&S.show.mirror&&SIM.mL){
+    gA=[-SIM.mL.cp[0],0,SIM.mL.cp[2]];gB=[SIM.mR.cp[0],0,SIM.mR.cp[2]];
+    const d=sub(gB,gA);gA=sub(gA,mul(d,0.55));gB=add(gB,mul(d,0.55));
+  }else{
+    const w=3000/v.s>1?3000:3000;
+    gA=[-w,-w,gz];gB=[w,w,gz];
+    if(v.key==="front"){gA=[-3000,0,gz];gB=[3000,0,gz];}else{gA=[0,-3000,gz];gB=[0,3000,gz];}
+  }
+  const A=P2(v,gA),B=P2(v,gB);if(!A||!B)return;
+  ctx.strokeStyle=C.gnd;ctx.lineWidth=1.6;dash(ctx,[]);
+  ctx.beginPath();ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();
+  /* 剖面线 */
+  const dx=B[0]-A[0],dy=B[1]-A[1],L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L;
+  ctx.strokeStyle="#242b32";ctx.lineWidth=1;
+  ctx.beginPath();
+  for(let t=0;t<L;t+=9){
+    const x=A[0]+ux*t,y=A[1]+uy*t;
+    ctx.moveTo(x,y);ctx.lineTo(x-7*ux+7*uy,y-7*uy-7*ux);
+  }
+  ctx.stroke();
+  /* 设计地面 Z=0 */
+  if(abs(gz)>0.6){
+    const A0=P2(v,v.key==="front"?[-3000,0,0]:[0,-3000,0]),B0=P2(v,v.key==="front"?[3000,0,0]:[0,3000,0]);
+    dash(ctx,[2,5]);ctx.strokeStyle="#2b333b";ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(A0[0],A0[1]);ctx.lineTo(B0[0],B0[1]);ctx.stroke();dash(ctx,[]);
+  }
+}
+/* ---- 尺寸标注 ---- */
+function dimLine(ctx,A,B,txt,off,col){
+  const dx=B[0]-A[0],dy=B[1]-A[1],L=Math.hypot(dx,dy);
+  if(L<1)return;
+  const nx=-dy/L,ny=dx/L;
+  const a=[A[0]+nx*off,A[1]+ny*off],b=[B[0]+nx*off,B[1]+ny*off];
+  ctx.strokeStyle=col||C.dim;ctx.lineWidth=1;dash(ctx,[]);
+  ctx.beginPath();
+  ctx.moveTo(A[0]+nx*(off>0?4:-4),A[1]+ny*(off>0?4:-4));ctx.lineTo(a[0]+nx*5,a[1]+ny*5);
+  ctx.moveTo(B[0]+nx*(off>0?4:-4),B[1]+ny*(off>0?4:-4));ctx.lineTo(b[0]+nx*5,b[1]+ny*5);
+  ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);
+  const ux=dx/L,uy=dy/L,t=4.5;
+  ctx.moveTo(a[0]-ux*t+nx*t,a[1]-uy*t+ny*t);ctx.lineTo(a[0]+ux*t-nx*t,a[1]+uy*t-ny*t);
+  ctx.moveTo(b[0]-ux*t+nx*t,b[1]-uy*t+ny*t);ctx.lineTo(b[0]+ux*t-nx*t,b[1]+uy*t-ny*t);
+  ctx.stroke();
+  const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;
+  ctx.font="8.5px ui-monospace,monospace";ctx.textAlign="center";ctx.textBaseline="middle";
+  const w=ctx.measureText(txt).width+5;
+  ctx.fillStyle=C.bg;ctx.fillRect(mx-w/2,my-6,w,11);
+  ctx.fillStyle=C.dimT;ctx.fillText(txt,mx,my);
+  ctx.textAlign="left";ctx.textBaseline="alphabetic";
+}
+function angArc(ctx,O,r,a0,a1,txt,col){
+  ctx.strokeStyle=col||C.dim;ctx.lineWidth=1;dash(ctx,[3,2]);
+  ctx.beginPath();ctx.arc(O[0],O[1],r,Math.min(a0,a1),Math.max(a0,a1));ctx.stroke();dash(ctx,[]);
+  const am=(a0+a1)/2;
+  ctx.font="8.5px ui-monospace,monospace";ctx.fillStyle=col||C.dimT;ctx.textAlign="left";
+  ctx.fillText(txt,O[0]+cos(am)*(r+5),O[1]+sin(am)*(r+5));
+}
+function drawOverlay(v){
+  const ctx=v.ctx,m=SIM.mR;if(!m)return;
+  /* ---- 正视图：瞬心 / 侧倾中心 / 主销偏移距 / 轮距 ---- */
+  if(v.key==="front"){
+    if(S.show.ic&&m.ic){
+      const cpS=P2(v,[m.cp[0],0,m.cp[2]]),icS=P2(v,[m.ic[0],0,m.ic[1]]);
+      const lp=axisAtY(S.hp.LCA_F,S.hp.LCA_R,m.wc[1]),up=axisAtY(S.hp.UCA_F,S.hp.UCA_R,m.wc[1]);
+      const l1=P2(v,[lp[0],0,lp[2]]),l2=P2(v,[m.lbj[0],0,m.lbj[2]]);
+      const u1=P2(v,[up[0],0,up[2]]),u2=P2(v,[m.ubj[0],0,m.ubj[2]]);
+      dash(ctx,[6,3]);ctx.lineWidth=1;ctx.strokeStyle=C.ic;
+      ctx.beginPath();ctx.moveTo(l1[0],l1[1]);ctx.lineTo(icS[0],icS[1]);
+      ctx.moveTo(u1[0],u1[1]);ctx.lineTo(icS[0],icS[1]);
+      ctx.moveTo(cpS[0],cpS[1]);ctx.lineTo(icS[0],icS[1]);ctx.stroke();dash(ctx,[]);
+      ctx.strokeStyle=C.ic;ctx.lineWidth=1.2;
+      ctx.beginPath();ctx.moveTo(icS[0]-6,icS[1]);ctx.lineTo(icS[0]+6,icS[1]);
+      ctx.moveTo(icS[0],icS[1]-6);ctx.lineTo(icS[0],icS[1]+6);ctx.stroke();
+      ctx.fillStyle=C.ic;ctx.font="8.5px ui-monospace,monospace";
+      ctx.fillText("IC 瞬心",icS[0]+8,icS[1]-4);
+      /* 侧倾中心 */
+      const rc=SIM.rc2?SIM.rc2:(m.rcH!==null?[0,m.rcH]:null);
+      if(rc){
+        const rS=P2(v,[rc[0],0,rc[1]]);
+        if(SIM.mL&&SIM.mL.ic){
+          const cl=P2(v,[-SIM.mL.cp[0],0,SIM.mL.cp[2]]);
+          dash(ctx,[6,3]);ctx.strokeStyle=C.ic;ctx.beginPath();
+          ctx.moveTo(cl[0],cl[1]);ctx.lineTo(rS[0],rS[1]);ctx.stroke();dash(ctx,[]);
+        }
+        ctx.strokeStyle=C.rc;ctx.lineWidth=1.4;
+        ctx.beginPath();ctx.arc(rS[0],rS[1],4.5,0,6.2832);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(rS[0]-9,rS[1]);ctx.lineTo(rS[0]+9,rS[1]);
+        ctx.moveTo(rS[0],rS[1]-9);ctx.lineTo(rS[0],rS[1]+9);ctx.stroke();
+        ctx.fillStyle=C.rc;ctx.fillText("RC 侧倾中心 "+fmt(rc[1],1)+"mm",rS[0]+11,rS[1]-4);
+      }
+    }
+    if(S.show.dim){
+      const gz=groundZ();
+      const O=P2(v,[0,0,gz]),Cp=P2(v,[m.cp[0],0,m.cp[2]]);
+      dimLine(ctx,O,Cp,"轮距半宽 "+fmt(m.cp[0],1),34,C.dim);
+      const K=P2(v,[m.kg[0],0,m.kg[2]]);
+      dimLine(ctx,K,Cp,"主销偏移距 "+fmt(m.scrub,1),-30,C.kpg);
+      const W0=P2(v,[m.wc[0],0,SIM.R.n[SIM.R.i.WC].p0[2]]),W1=P2(v,[m.wc[0],0,m.wc[2]]);
+      if(abs(m.tr)>0.5)dimLine(ctx,W0,W1,"轮跳 "+sfmt(m.tr,1),46,C.path);
+      /* 主销内倾角 */
+      const kb=P2(v,[m.lbj[0],0,m.lbj[2]]),kt=P2(v,[m.ubj[0],0,m.ubj[2]]);
+      const a0=atan2(kt[1]-kb[1],kt[0]-kb[0]);
+      angArc(ctx,kb,54,-PI/2,a0,"KPI "+fmt(m.kpi,2)+"°",C.kp);
+      /* 外倾角 */
+      const wcS=P2(v,[m.wc[0],0,m.wc[2]]);
+      const up=[-m.ax[2],m.ax[0]];
+      const a1=atan2(-up[1],up[0]);
+      angArc(ctx,wcS,S.tire.R*v.s*0.72,-PI/2,a1,"γ "+fmt(m.cam,2)+"°",C.knu);
+    }
+  }
+  /* ---- 侧视图：主销后倾 / 拖距 / 侧倾轴 ---- */
+  if(v.key==="side"&&S.show.dim){
+    const kb=P2(v,[0,m.lbj[1],m.lbj[2]]),kt=P2(v,[0,m.ubj[1],m.ubj[2]]);
+    const a0=atan2(kt[1]-kb[1],kt[0]-kb[0]);
+    angArc(ctx,kb,58,-PI/2,a0,"后倾 "+fmt(m.cast,2)+"°",C.kp);
+    const K=P2(v,[0,m.kg[1],m.kg[2]]),Cp=P2(v,[0,m.cp[1],m.cp[2]]);
+    dimLine(ctx,Cp,K,"拖距 "+fmt(m.trail,1),-26,C.kpg);
+    if(m.svic){
+      const A=P2(v,[0,m.cp[1],m.cp[2]]),B=P2(v,[0,m.svic[0],m.svic[1]]);
+      dash(ctx,[6,3]);ctx.strokeStyle=C.ic;ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();dash(ctx,[]);
+      ctx.fillStyle=C.ic;ctx.font="8.5px ui-monospace,monospace";
+      ctx.fillText("→侧视瞬心 抗俯仰 "+(m.anti===null?"--":fmt(m.anti,0)+"%"),A[0]+14,A[1]-8);
+    }
+  }
+  /* ---- 俯视图：转向角 / 前束 / 阿克曼 ---- */
+  if(v.key==="top"){
+    const drawSteer=(mm,sx)=>{
+      if(!mm)return;
+      const wc=[mm.wc[0]*sx,mm.wc[1],mm.wc[2]];
+      const f=nrm([-mm.ax[1]*sx,mm.ax[0],0]);
+      const A=P2(v,sub(wc,mul(f,520))),B=P2(v,add(wc,mul(f,520)));
+      dash(ctx,[7,4]);ctx.strokeStyle=C.knu;ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();
+      const A2=P2(v,[wc[0],wc[1]-520,wc[2]]),B2=P2(v,[wc[0],wc[1]+520,wc[2]]);
+      ctx.strokeStyle=C.axis;ctx.beginPath();ctx.moveTo(A2[0],A2[1]);ctx.lineTo(B2[0],B2[1]);ctx.stroke();
+      dash(ctx,[]);
+      const O=P2(v,wc);
+      const aa=atan2(B2[1]-O[1],B2[0]-O[0]),bb=atan2(B[1]-O[1],B[0]-O[0]);
+      angArc(ctx,O,S.tire.R*v.s*0.95,aa,bb,(sx>0?"R 右轮":"L 左轮")+" "+fmt(sx>0?-mm.toe:mm.toe,2)+"°",C.knu);
+    };
+    drawSteer(SIM.mR,1);
+    if(S.show.mirror)drawSteer(SIM.mL,-1);
+    if(S.show.dim&&SIM.mL&&abs(S.rack)>2){
+      const R=UI.ack;
+      if(R&&R.icr){
+        const P=P2(v,[R.icr[0],R.icr[1],0]);
+        if(P&&P[0]>-4000&&P[0]<8000){
+          ctx.strokeStyle=C.ic;ctx.lineWidth=1;dash(ctx,[4,3]);
+          const a=P2(v,[SIM.mR.cp[0],SIM.mR.cp[1],0]),b=P2(v,[-SIM.mL.cp[0],SIM.mL.cp[1],0]);
+          ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(P[0],P[1]);
+          ctx.moveTo(b[0],b[1]);ctx.lineTo(P[0],P[1]);ctx.stroke();dash(ctx,[]);
+          ctx.strokeStyle=C.ic;ctx.beginPath();ctx.moveTo(P[0]-6,P[1]);ctx.lineTo(P[0]+6,P[1]);
+          ctx.moveTo(P[0],P[1]-6);ctx.lineTo(P[0],P[1]+6);ctx.stroke();
+          ctx.fillStyle=C.ic;ctx.fillText("转向中心",P[0]+8,P[1]-4);
+        }
+      }
+    }
+  }
+}
+function drawHUD(v){
+  const ctx=v.ctx;
+  /* 坐标轴三角标 */
+  if(S.show.axis){
+    const ox=52,oy=v.h-30,L0=26;
+    const A=[["X",[1,0,0],"#d2543f"],["Y",[0,1,0],"#54a06a"],["Z",[0,0,1],"#2fa9d6"]];
+    ctx.font="8.5px ui-monospace,monospace";
+    A.forEach(a=>{
+      let dx,dy;
+      if(v.type==="o"){dx=dot(a[1],v.bx);dy=-dot(a[1],v.by);}
+      else{const q=a[1];dx=dot(q,v.rt);dy=-dot(q,v.up);}
+      const L=Math.hypot(dx,dy);
+      ctx.strokeStyle=a[2];ctx.lineWidth=1.3;ctx.beginPath();
+      ctx.moveTo(ox,oy);
+      if(L<0.12){ctx.arc(ox,oy,3,0,6.2832);ctx.stroke();
+        ctx.fillStyle=a[2];ctx.fillText(a[0],ox+5,oy-5);return;}
+      ctx.lineTo(ox+dx*L0,oy+dy*L0);ctx.stroke();
+      ctx.fillStyle=a[2];ctx.fillText(a[0],ox+dx*L0*1.28-2,oy+dy*L0*1.28+3);
+    });
+  }
+  /* 比例尺 */
+  const target=Math.min(120,v.w*0.24);
+  let unit=1;const cand=[10,20,50,100,200,500,1000];
+  for(const c of cand){if(c*v.s<=target)unit=c;}
+  const px=unit*v.s;
+  const x0=v.w-18-px,y0=v.h-18;
+  ctx.strokeStyle=C.txt3;ctx.lineWidth=1;dash(ctx,[]);
+  ctx.beginPath();ctx.moveTo(x0,y0-4);ctx.lineTo(x0,y0);ctx.lineTo(x0+px,y0);ctx.lineTo(x0+px,y0-4);ctx.stroke();
+  ctx.fillStyle=C.txt3;ctx.font="8.5px ui-monospace,monospace";ctx.textAlign="center";
+  ctx.fillText(unit+" mm",x0+px/2,y0-6);ctx.textAlign="left";
+  /* 缩放比 */
+  ctx.fillStyle=C.txt3;ctx.fillText("1:"+fmt(1/v.s,1),8,14);
+  if(v.type==="p"){
+    ctx.fillText("AZ "+fmt(v.az*R2D,0)+"°  EL "+fmt(v.elv*R2D,0)+"°",8,26);
+  }
+}
+/* ================================ 11. UI 构建 ================================ */
+const PICK=[];
+const UI={hover:null,selHP:null,drag:null,ack:null,ro:{},sync:[],plots:[],busy:false};
+function E(t,c,h){const e=document.createElement(t);if(c)e.className=c;if(h!==undefined)e.innerHTML=h;return e;}
+function sec(host,zh,en,col){
+  const s=E("div","sec"+(col?" col":""));
+  const h=E("div","sh",'<span class="zh">'+zh+'</span>'+en+'<span class="tg"></span>');
+  const b=E("div","sb");
+  h.onclick=()=>s.classList.toggle("col");
+  s.appendChild(h);s.appendChild(b);host.appendChild(s);return b;
+}
+function rowSlider(b,zh,en,unit,min,max,step,get,set,dec){
+  const r=E("div","ctl");
+  r.appendChild(E("label",null,zh+' <u>'+en+(unit?" ["+unit+"]":"")+'</u>'));
+  const sl=E("input");sl.type="range";sl.min=min;sl.max=max;sl.step=step;
+  const nb=E("input");nb.type="number";nb.step=step;
+  r.appendChild(sl);r.appendChild(nb);b.appendChild(r);
+  const push=v=>{set(clamp(parseFloat(v),parseFloat(sl.min),parseFloat(sl.max)));};
+  sl.oninput=()=>push(sl.value);
+  nb.onchange=()=>push(nb.value);
+  nb.oninput=()=>{if(nb.value!=="")push(nb.value);};
+  UI.sync.push(()=>{
+    const v=get();
+    sl.min=typeof min==="function"?min():min;sl.max=typeof max==="function"?max():max;
+    if(document.activeElement!==sl)sl.value=v;
+    if(document.activeElement!==nb)nb.value=fmt(v,dec===undefined?1:dec);
+  });
+  return r;
+}
+function rowSelect(b,zh,en,opts,get,set){
+  const r=E("div","ctl w2");
+  r.appendChild(E("label",null,zh+' <u>'+en+'</u>'));
+  const s=E("select");
+  opts.forEach(o=>{const op=E("option",null,o[1]);op.value=o[0];s.appendChild(op);});
+  s.onchange=()=>set(s.value);
+  r.appendChild(s);b.appendChild(r);
+  UI.sync.push(()=>{if(document.activeElement!==s)s.value=get();});
+  return s;
+}
+function rowBtns(b,list){
+  const r=E("div","btnrow");
+  list.forEach(it=>{const bt=E("button",null,it[0]);bt.onclick=it[1];
+    if(it[2])UI.sync.push(()=>bt.classList.toggle("on",!!it[2]()));
+    if(it[3])bt.title=it[3];r.appendChild(bt);});
+  b.appendChild(r);return r;
+}
+function chkList(b,items){
+  const g=E("div","grid2");
+  items.forEach(it=>{
+    const c=E("div","chk",'<i></i><span>'+it[1]+'</span>');
+    c.onclick=()=>{S.show[it[0]]=S.show[it[0]]?0:1;if(it[0]==="mirror"){SIM.dirtySweep=true;}};
+    g.appendChild(c);
+    UI.sync.push(()=>c.classList.toggle("on",!!S.show[it[0]]));
+  });
+  b.appendChild(g);
+}
+function ro(b,zh,en,unit,id,cls){
+  const r=E("div","ro"+(cls?" "+cls:""));
+  r.appendChild(E("span",null,zh+' <u>'+en+'</u>'));
+  const v=E("b",null,"--");r.appendChild(v);
+  r.appendChild(E("i",null,unit||""));
+  b.appendChild(r);UI.ro[id]=v;return v;
+}
+function sep(b){b.appendChild(E("div","rosep"));}
+function setRO(id,txt,warn){const e=UI.ro[id];if(!e)return;e.textContent=txt;
+  e.parentElement.classList.toggle("warn",!!warn);}
+
+function buildLeft(){
+  const host=document.getElementById("lp");
+  /* --- 仿真 --- */
+  let b=sec(host,"仿真控制","SIMULATION");
+  rowBtns(b,[["运动学 KIN",()=>setMode("kin"),()=>S.mode==="kin","准静态运动学求解：驱动轮心行程"],
+             ["台架动力学 RIG",()=>setMode("rig"),()=>S.mode==="rig","四立柱台架：弹簧-阻尼-轮胎显式积分"]]);
+  rowBtns(b,[["运行 / 暂停",()=>{S.play=!S.play;},()=>S.play],
+             ["复位 RESET",()=>{doReset();}]]);
+  rowSelect(b,"跳动激励","EXCITATION",[["off","静态 STATIC"],["sine","正弦 SINE"],["tri","三角扫掠 TRIANGLE"]],
+    ()=>S.exc,v=>{S.exc=v;});
+  rowSlider(b,"激励幅值","AMPL","mm",0,90,1,()=>S.excA,v=>S.excA=v,0);
+  rowSlider(b,"激励频率","FREQ","Hz",0.02,1.2,0.01,()=>S.excF,v=>S.excF=v,2);
+  rowSelect(b,"转向激励","STEER EXC",[["off","静态 STATIC"],["sine","正弦 SINE"],["tri","三角 TRIANGLE"]],
+    ()=>S.steerExc,v=>{S.steerExc=v;});
+  rowSlider(b,"转向幅值","AMPL","mm",0,70,1,()=>S.stA,v=>S.stA=v,0);
+  rowSlider(b,"转向频率","FREQ","Hz",0.02,0.8,0.01,()=>S.stF,v=>S.stF=v,2);
+
+  /* --- 输入 --- */
+  b=sec(host,"输入量","INPUT VARIABLES");
+  rowSlider(b,"轮跳行程","WHEEL TRAVEL","mm",()=>S.trMin,()=>S.trMax,0.5,()=>S.travel,
+    v=>{S.travel=v;S.exc="off";},1);
+  rowSlider(b,"车身侧倾","BODY ROLL","°",-6,6,0.1,()=>S.roll,v=>S.roll=v,2);
+  rowSlider(b,"齿条位移","RACK TRAVEL","mm",-70,70,0.5,()=>S.rack,
+    v=>{S.rack=v;S.steerExc="off";SIM.dirtySweep=true;},1);
+  rowSlider(b,"横拉杆微调","TIE ROD TRIM","mm",-16,16,0.1,()=>S.tieTrim,
+    v=>{S.tieTrim=v;rebuildLight();},2);
+  rowBtns(b,[["前束调零 ZERO TOE",()=>zeroToe(),null,"二分求解横拉杆长度使静态前束为 0"],
+             ["输入归零",()=>{S.travel=0;S.roll=0;S.rack=0;S.exc="off";S.steerExc="off";SIM.dirtySweep=true;}]]);
+  rowBtns(b,[["最小跳动转向优化",()=>optRack(),null,"扫掠转向机高度，最小化全行程跳动转向 RMS"]]);
+
+  /* --- 弹性元件 --- */
+  b=sec(host,"可形变线 · 弹性元件","ELASTIC ELEMENTS");
+  rowSlider(b,"弹簧刚度","SPRING K","N/mm",20,180,1,()=>S.kS,v=>{S.kS=v;refreshDerived(false);},0);
+  rowSlider(b,"压缩阻尼","DAMP BUMP","N·s/mm",0,30,0.5,()=>S.cB,v=>S.cB=v,1);
+  rowSlider(b,"复原阻尼","DAMP REB","N·s/mm",0,40,0.5,()=>S.cR,v=>S.cR=v,1);
+  rowSlider(b,"轮胎垂向刚度","TIRE K","N/mm",80,400,5,()=>S.kT,v=>{S.kT=v;refreshDerived(false);},0);
+  rowSlider(b,"簧上质量(角)","SPRUNG M","kg",120,700,5,()=>S.mS,v=>{S.mS=v;refreshDerived(false);},0);
+  rowSlider(b,"稳定杆直径 (0=拆除)","ARB DIA","mm",0,34,0.5,()=>S.arb.d,v=>S.arb.d=v,1);
+  rowSlider(b,"稳定杆连杆位置比","ARB LINK POS","-",0.25,0.92,0.01,()=>S.arb.t,v=>{S.arb.t=v;SIM.dirtySweep=true;},2);
+  rowSlider(b,"稳定杆纵向偏置","ARB OFFSET Y","mm",-60,180,2,()=>S.arb.dy,v=>{S.arb.dy=v;SIM.dirtySweep=true;},0);
+  rowSlider(b,"稳定杆高度偏置","ARB OFFSET Z","mm",40,300,2,()=>S.arb.dz,v=>{S.arb.dz=v;SIM.dirtySweep=true;},0);
+  rowSlider(b,"压缩缓冲块","BUMP STOP","mm",20,130,1,()=>S.bsU,v=>{S.bsU=v;refreshDerived(false);},0);
+  rowSlider(b,"复原限位块","REB STOP","mm",20,130,1,()=>S.bsD,v=>{S.bsD=v;refreshDerived(false);},0);
+
+  /* --- 路面 --- */
+  b=sec(host,"路面激励 (台架)","ROAD INPUT");
+  rowSelect(b,"波形","WAVE",[["none","无 NONE"],["step","阶跃 STEP"],["sine","正弦 SINE"],
+    ["pulse","单脉冲 PULSE"],["chirp","扫频 CHIRP"],["rand","随机 RANDOM"]],()=>S.road,v=>{S.road=v;S.simT=0;});
+  rowSlider(b,"路面幅值","AMPL","mm",0,80,1,()=>S.rA,v=>S.rA=v,0);
+  rowSlider(b,"路面频率","FREQ","Hz",0.2,20,0.1,()=>S.rF,v=>S.rF=v,1);
+  rowBtns(b,[["触发 / 重播",()=>{S.simT=0;S.mode="rig";}],["清空轨迹",()=>SIM.trace=[]]]);
+
+  /* --- 硬点 --- */
+  b=sec(host,"硬点坐标","HARDPOINTS  [mm]");
+  const sel=rowSelect(b,"几何预设","PRESET",PRESET_KEYS.map(k=>[k,k]),()=>S.preset,
+    v=>{loadPreset(v);rebuild();VW.forEach(fitView);});
+  const tb=E("table","hp");
+  tb.innerHTML="<thead><tr><th>点 ID</th><th>X 横向</th><th>Y 纵向</th><th>Z 垂向</th></tr></thead>";
+  const tbody=E("tbody");
+  HPDEF.forEach(d=>{
+    const tr=E("tr");tr.dataset.id=d[0];
+    const td=E("td","n",'<b>'+d[0]+'</b> '+d[1]);td.title=d[2];tr.appendChild(td);
+    for(let k=0;k<3;k++){
+      const c=E("td",d[4]?"fx":"fr");
+      const inp=E("input");inp.type="number";inp.step="1";
+      inp.oninput=()=>{const v=parseFloat(inp.value);if(isFinite(v)){S.hp[d[0]][k]=v;rebuildLight();}};
+      inp.onchange=()=>{refreshDerived(true);};
+      inp.onfocus=()=>{UI.selHP=d[0];};
+      c.appendChild(inp);tr.appendChild(c);
+      UI.sync.push(()=>{if(document.activeElement!==inp)inp.value=fmt(S.hp[d[0]][k],1);});
+    }
+    tr.onclick=()=>{UI.selHP=d[0];};
+    UI.sync.push(()=>tr.classList.toggle("sel",UI.selHP===d[0]));
+    tbody.appendChild(tr);
+  });
+  tb.appendChild(tbody);b.appendChild(tb);
+  b.appendChild(E("div","note",'<b>红色</b>=车身固定节点 · <b>青色</b>=自由节点 · 可在正/俯/侧视图中直接拖拽节点修改几何'));
+  rowBtns(b,[["恢复预设几何",()=>{loadPreset(S.preset);rebuild();}]]);
+
+  /* --- 显示 --- */
+  b=sec(host,"显示控制","DISPLAY");
+  chkList(b,[["node","节点"],["label","节点编号"],["rigid","刚性线"],["elastic","可形变线"],
+    ["face","刚体面"],["wheel","车轮总成"],["disc","制动盘/卡钳"],["chassis","车身副车架"],
+    ["steer","转向系统"],["ground","地面"],["kp","主销轴线"],["kpsw","主销扫掠"],
+    ["path","运动轨迹"],["ic","瞬心/侧倾中心"],["dim","尺寸标注"],["force","力矢量"],
+    ["mirror","对侧悬架"],["axis","坐标轴"],["tirefill","轮胎遮罩"],["arb","横向稳定杆"]]);
+  b.appendChild(E("div","legend",
+    '<div><s style="border-color:'+C.rig+'"></s>刚性线 RIGID</div>'+
+    '<div><s style="border-color:'+C.ela+'"></s>可形变线 ELASTIC</div>'+
+    '<div><q style="background:'+C.nodeFix+'"></q>固定节点</div>'+
+    '<div><q style="background:'+C.node+';border-radius:50%!important"></q>自由节点</div>'+
+    '<div><s style="border-color:'+C.kp+'"></s>主销轴线</div>'+
+    '<div><s style="border-color:'+C.pathK+'"></s>主销接地轨迹</div>'+
+    '<div><s style="border-color:'+C.path+'"></s>轮心/球头轨迹</div>'+
+    '<div><s style="border-color:'+C.pathC+'"></s>接地点轨迹</div>'+
+    '<div><s style="border-color:'+C.ic+'"></s>瞬心构造线</div>'+
+    '<div><s style="border-color:'+C.tie+'"></s>转向拉杆</div>'+
+    '<div><s style="border-color:'+C.arb+'"></s>横向稳定杆</div>'));
+
+  /* --- 视图 --- */
+  b=sec(host,"视图","VIEW");
+  rowBtns(b,[["全部适应 FIT",()=>VW.forEach(fitView)],["还原视角",()=>{VW.forEach(v=>{v.az=-38*D2R;v.elv=22*D2R;fitView(v);});}]]);
+  rowSlider(b,"等轴测方位","AZIMUTH","°",-180,180,1,()=>VW[3]?VW[3].az*R2D:0,v=>{if(VW[3])VW[3].az=v*D2R;},0);
+  rowSlider(b,"等轴测仰角","ELEVATION","°",-85,85,1,()=>VW[3]?VW[3].elv*R2D:0,v=>{if(VW[3])VW[3].elv=v*D2R;},0);
+  b.appendChild(E("div","note","快捷键：<b>空格</b>运行/暂停 · <b>←→</b>轮跳 · <b>Shift+←→</b>转向 · <b>F</b>适应 · <b>1-4</b>视图最大化 · <b>0</b>四视图"));
+}
+
+function buildRight(){
+  const host=document.getElementById("rp");
+  let b=sec(host,"车轮定位参数","WHEEL ALIGNMENT");
+  ro(b,"车轮外倾角","CAMBER","°","cam","k");
+  ro(b,"车轮前束角","TOE","°","toe","k");
+  ro(b,"主销后倾角","CASTER","°","cast");
+  ro(b,"主销内倾角","SAI / KPI","°","kpi");
+  ro(b,"包容角","INCLUDED ANG","°","incl");
+  ro(b,"主销偏移距","SCRUB RADIUS","mm","scrub","hl");
+  ro(b,"主销后倾拖距","MECH TRAIL","mm","trail","hl");
+  ro(b,"主销接地点 X","KP GND X","mm","kgx");
+  ro(b,"主销接地点 Y","KP GND Y","mm","kgy");
+
+  b=sec(host,"悬架运动学","SUSPENSION KINEMATICS");
+  ro(b,"轮心跳动量","WHEEL TRAVEL","mm","tr","k");
+  ro(b,"工作行程 压缩/伸张","TRAVEL LIMIT","mm","lim");
+  ro(b,"几何极限 压缩/伸张","GEOM LIMIT","mm","glim");
+  ro(b,"外倾增益","CAMBER GAIN","°/25","cg","hl");
+  ro(b,"跳动转向","BUMP STEER","°/25","bs","hl");
+  ro(b,"轮距半宽","HALF TRACK","mm","half");
+  ro(b,"轮距变化","TRACK CHG","mm","dtrk");
+  ro(b,"正视瞬心 X","IC X","mm","icx");
+  ro(b,"正视瞬心 Z","IC Z","mm","icz");
+  ro(b,"等效摆臂长","SWING ARM","mm","swl");
+  ro(b,"侧倾中心高","ROLL CTR H","mm","rc","k");
+  ro(b,"抗俯仰率","ANTI-DIVE","%","anti");
+
+  b=sec(host,"弹性元件 / 刚度","ELASTIC & RATES");
+  ro(b,"弹簧-减振器长度","DAMPER LEN","mm","sl");
+  ro(b,"压缩量","DEFLECTION","mm","dsl");
+  ro(b,"运动速比","MOTION RATIO","-","mr","k");
+  ro(b,"轮心垂向刚度","WHEEL RATE","N/mm","wr","k");
+  ro(b,"簧载固有频率","RIDE FREQ","Hz","frq");
+  ro(b,"阻尼比","DAMPING RATIO","-","zeta");
+  ro(b,"车轮跳动频率","HOP FREQ","Hz","hop");
+  sep(b);
+  ro(b,"弹簧力","SPRING FORCE","N","fs");
+  ro(b,"阻尼力","DAMPER FORCE","N","fd");
+  ro(b,"轮胎垂向力","TIRE LOAD","N","ft");
+  ro(b,"轮胎压缩量","TIRE DEFL","mm","tdf");
+  ro(b,"非簧载加速度","UNSPRUNG ACC","g","acc");
+
+  b=sec(host,"侧倾刚度 / 稳定杆","ROLL STIFFNESS & ARB");
+  ro(b,"稳定杆扭转刚度","ARB TORSION","N·m/°","atk");
+  ro(b,"稳定杆轮心刚度","ARB WHEEL RATE","N/mm","awr","k");
+  ro(b,"稳定杆连杆速比","ARB LINK RATIO","-","amr");
+  ro(b,"扭杆相对扭转角","ARB TWIST","°","atw");
+  ro(b,"稳定杆连杆力","ARB LINK FORCE","N","alf");
+  ro(b,"弹簧侧倾刚度","SPRING ROLL K","N·m/°","krs");
+  ro(b,"稳定杆侧倾刚度","ARB ROLL K","N·m/°","kra");
+  ro(b,"轴总侧倾刚度","AXLE ROLL K","N·m/°","krt","k");
+  ro(b,"稳定杆占比","ARB SHARE","%","ash");
+  ro(b,"当前侧倾力矩","ROLL MOMENT","N·m","rmm");
+
+  b=sec(host,"转向系统","STEERING");
+  ro(b,"齿条位移","RACK","mm","rk");
+  ro(b,"右轮转角","STEER R","°","sr","k");
+  ro(b,"左轮转角","STEER L","°","slft","k");
+  ro(b,"阿克曼率","ACKERMANN","%","ack","hl");
+  ro(b,"转弯半径","TURN RADIUS","m","trad");
+  ro(b,"转向臂力臂","STEER ARM","mm","sarm");
+  ro(b,"齿条-转角比","RATIO","mm/°","srat");
+  ro(b,"横拉杆长度","TIE ROD LEN","mm","tlen");
+
+  b=sec(host,"曲线 (随轮跳)","CHARACTERISTIC CURVES");
+  const pb=E("div","plotbox");
+  for(let i=0;i<5;i++){const cv=E("canvas","plot");pb.appendChild(cv);UI.plots.push(cv);
+    if(i<4)pb.appendChild(E("div",null,'<div style="height:3px"></div>'));}
+  b.appendChild(pb);
+
+  b=sec(host,"模型 / 求解器","MODEL & SOLVER",true);
+  ro(b,"节点数","NODES","","mNode");
+  ro(b,"刚性线 / 有效约束","RIGID","","mRig");
+  ro(b,"可形变线","ELASTIC","","mEla");
+  ro(b,"机构自由度","DOF","","mDof");
+  ro(b,"最大约束残差","RESIDUAL","mm","mRes");
+  ro(b,"迭代次数","ITER","","mIter");
+  ro(b,"单帧求解耗时","SOLVE","ms","mMs");
+  ro(b,"非簧载质量","UNSPRUNG","kg","mU");
+  ro(b,"静态轮荷","CORNER LOAD","N","mCor");
+  ro(b,"弹簧静态预载","PRELOAD","N","mPre");
+  b.appendChild(E("div","note",
+    "求解算法：铰链簇解析投影（摆臂绕车身铰轴单参数最优旋转）+ 自由刚体簇极分解投影（转向节四节点）"+
+    "+ 距离约束投影（横拉杆）+ 驱动约束（轮心高度），交替精确投影迭代至残差收敛。"));
+}
+
+/* ================================ 12. 工程工具 ================================ */
+function setMode(m){
+  if(m===S.mode)return;
+  S.mode=m;S.simT=0;SIM.trace=[];
+  if(m==="rig"){
+    resetMech(SIM.R);resetMech(SIM.L);
+    setChassis(SIM.R,S.rack);setChassis(SIM.L,-S.rack);
+    driveTo(SIM.R,SIM.R.n[SIM.R.i.WC].p0[2],S.rack);
+    driveTo(SIM.L,SIM.L.n[SIM.L.i.WC].p0[2],-S.rack);
+    SIM.R.n.forEach(n=>{n.v=[0,0,0];n.pp=cpy(n.p);});
+    SIM.L.n.forEach(n=>{n.v=[0,0,0];n.pp=cpy(n.p);});
+  }else{S.travel=0;}
+}
+function doReset(){
+  S.travel=0;S.roll=0;S.rack=0;S.tieTrim=0;S.simT=0;S.t=0;S.exc="off";S.steerExc="off";
+  SIM.trace=[];rebuild();
+}
+function rebuildLight(){
+  const tr=S.travel;
+  SIM.R=buildMech();SIM.L=buildMech();
+  refreshDerived(false);S.travel=clamp(tr,S.trMin,S.trMax);
+  SIM.dirtySweep=true;
+}
+function zeroToe(){
+  const z0=()=>SIM.R.n[SIM.R.i.WC].p0[2];
+  const f=t=>{S.tieTrim=t;SIM.R=buildMech();resetMech(SIM.R);
+    driveTo(SIM.R,z0(),S.rack);return metrics(SIM.R).toe;};
+  let a=-16,b=16,fa=f(a),fb=f(b);
+  if(fa*fb<0){for(let k=0;k<40;k++){const m=(a+b)/2,fm=f(m);
+    if(fa*fm<=0){b=m;fb=fm;}else{a=m;fa=fm;}}S.tieTrim=(a+b)/2;}
+  else S.tieTrim=0;
+  S.tieTrim=Math.round(S.tieTrim*100)/100;
+  rebuildLight();
+}
+function optRack(){
+  const z=S.hp.RACK[2],best={v:1e9,z:z};
+  for(let dz=-70;dz<=70;dz+=3.5){
+    S.hp.RACK[2]=z+dz;
+    const M=buildMech();
+    const sw=runSweep(M,S.rack,[Math.max(S.trMin,-70),Math.min(S.trMax,70)],21);
+    let s=0,n=0;sw.rows.forEach(r=>{if(isFinite(r.bs)){s+=r.bs*r.bs;n++;}});
+    const rms=sqrt(s/Math.max(1,n));
+    if(rms<best.v){best.v=rms;best.z=z+dz;}
+  }
+  S.hp.RACK[2]=Math.round(best.z*10)/10;
+  rebuild();
+}
+function ackermann(){
+  const R=SIM.mR,L=SIM.mL;if(!R)return null;
+  /* 全局转角约定：+ = 向右转。右侧 δ=-前束角，左侧因镜像 δ=+前束角 */
+  const dR=-R.toe,dL=L?L.toe:null;
+  const track=abs(R.cp[0])*(L?2:2);
+  let pct=null,rad=null,icr=null;
+  if(L){
+    const inner=dR>0?dR:dL,outer=dR>0?dL:dR;
+    if(abs(inner)>0.8&&abs(outer)>0.8&&inner*outer>0){
+      const d=1/Math.tan(abs(outer)*D2R)-1/Math.tan(abs(inner)*D2R);
+      pct=d/((abs(R.cp[0])+abs(L.cp[0]))/S.wb)*100;
+      rad=S.wb/Math.tan((abs(inner)+abs(outer))/2*D2R)/1000;
+    }
+    const pR=[R.cp[0],R.cp[1]],aR=[R.ax[0],R.ax[1]];
+    const pL=[-L.cp[0],L.cp[1]],aL=[-L.ax[0],L.ax[1]];
+    icr=isect2(pR,aR,pL,aL);
+  }
+  return{dR:dR,dL:dL,pct:pct,R:rad,icr:icr,track:track};
+}
+/* 转向臂有效力臂：TRO 到主销轴线的垂距 */
+function steerArm(m){
+  const d=nrm(sub(m.ubj,m.lbj)),v=sub(m.tro,m.lbj);
+  return len(sub(v,mul(d,dot(v,d))));
+}
+
+/* ================================ 13. 读数刷新 ================================ */
+function updateReadouts(){
+  const m=SIM.mR;if(!m)return;
+  const sw=SIM.swR,M=SIM.R;
+  const mr=sampleSweep(sw,m.tr,"mr")||SIM.mrRef;
+  const cg=sampleSweep(sw,m.tr,"cg"),bs=sampleSweep(sw,m.tr,"bs");
+  const wr=S.kS*mr*mr;
+  const frq=sqrt(wr*1000/S.mS)/(2*PI);
+  const cAvg=(S.cB+S.cR)/2*mr*mr*1000;
+  const zeta=cAvg/(2*sqrt(wr*1000*S.mS));
+  const hop=sqrt((wr+S.kT)*1000/Math.max(1,SIM.mU))/(2*PI);
+  setRO("cam",fmt(m.cam,2));setRO("toe",sfmt(m.toe,3));setRO("cast",fmt(m.cast,2));
+  setRO("kpi",fmt(m.kpi,2));setRO("incl",fmt(m.incl,2));
+  setRO("scrub",sfmt(m.scrub,1));setRO("trail",sfmt(m.trail,1));
+  setRO("kgx",fmt(m.kg[0],1));setRO("kgy",fmt(m.kg[1],1));
+  setRO("tr",sfmt(m.tr,1));
+  setRO("lim",sfmt(S.trMax,0)+" / "+fmt(S.trMin,0));
+  setRO("glim",SIM.geo?(sfmt(SIM.geo[1],0)+" / "+fmt(SIM.geo[0],0)):"--");
+  setRO("cg",cg===null?"--":sfmt(cg,3));setRO("bs",bs===null?"--":sfmt(bs,3));
+  setRO("half",fmt(m.cp[0],1));
+  setRO("dtrk",sfmt(m.cp[0]-(sampleSweep(sw,0,"half")||m.cp[0]),2));
+  setRO("icx",m.ic?fmt(m.ic[0],0):"--");setRO("icz",m.ic?fmt(m.ic[1],0):"--");
+  setRO("swl",m.ic?fmt(abs(m.cp[0]-m.ic[0]),0):"--");
+  const rcv=SIM.rc2?SIM.rc2[1]:m.rcH;
+  setRO("rc",rcv===null?"--":fmt(rcv,1));
+  setRO("anti",m.anti===null?"--":fmt(m.anti,1));
+  setRO("sl",fmt(m.sl,1));setRO("dsl",sfmt(M.springL0-m.sl,1));
+  setRO("mr",fmt(mr,3));setRO("wr",fmt(wr,1));setRO("frq",fmt(frq,2));
+  setRO("zeta",fmt(zeta,2));setRO("hop",fmt(hop,1));
+  if(S.dyn.on){
+    setRO("fs",fmt(S.dyn.fs,0));setRO("fd",sfmt(S.dyn.fd,0));
+    setRO("ft",fmt(S.dyn.load,0),S.dyn.load<=1);
+    setRO("tdf",fmt(Math.max(0,S.dyn.pen),1));setRO("acc",sfmt(S.dyn.acc/9.81,2));
+  }else{
+    setRO("fs",fmt(M.springF0/FS+S.kS*(M.springL0-m.sl),0));
+    setRO("fd","0");setRO("ft",fmt(SIM.corN||0,0));
+    setRO("tdf",fmt((SIM.corN||0)/S.kT,1));setRO("acc","--");
+  }
+  /* 稳定杆与侧倾刚度 */
+  const mra=sampleSweep(sw,m.tr,"mra")||0.55;
+  const ar=arbRate(mra),track=abs(m.cp[0])*2;
+  const psiL=sampleSweep(sw,travelL(),"apsi");
+  const dpsi=(psiL===null?0:m.apsi-psiL);
+  const kRoll=q=>q*track*track/2/1e6*PI/180*1000;
+  const Ks=kRoll(wr),Ka=kRoll(ar.k);
+  setRO("atk",ar.kt?fmt(ar.kt*D2R/1000,1):"0");
+  setRO("awr",fmt(ar.k,2));setRO("amr",fmt(mra,3));
+  setRO("atw",sfmt(dpsi,2));
+  setRO("alf",ar.kt?sfmt(ar.kt*dpsi*D2R/ar.a,0):"0");
+  setRO("krs",fmt(Ks,0));setRO("kra",fmt(Ka,0));setRO("krt",fmt(Ks+Ka,0));
+  setRO("ash",fmt(100*Ka/Math.max(1e-6,Ks+Ka),0));
+  setRO("rmm",fmt((Ks+Ka)*abs(S.roll),0));
+  const ak=UI.ack=ackermann();
+  setRO("rk",sfmt(S.rack,1));
+  setRO("sr",sfmt(ak?ak.dR:0,2));setRO("slft",ak&&ak.dL!==null?sfmt(ak.dL,2):"--");
+  setRO("ack",ak&&ak.pct!==null?fmt(ak.pct,0):"--");
+  setRO("trad",ak&&ak.R!==null?fmt(abs(ak.R),2):"--");
+  setRO("sarm",fmt(steerArm(m),1));
+  setRO("srat",abs(ak&&ak.dR)>0.05?fmt(abs(S.rack/ak.dR),2):"--");
+  setRO("tlen",fmt(M.tie.L0,1));
+  setRO("mNode",M.n.length+"  ("+M.nFree+" 自由)");
+  setRO("mRig",M.nRig+" / "+M.nCons);setRO("mEla",""+M.nEla);setRO("mDof",""+M.dof);
+  setRO("mRes",M.res<1e-4?M.res.toExponential(1):fmt(M.res,5),M.res>0.02);
+  setRO("mIter",""+M.iter);setRO("mMs",fmt(M.ms,2));
+  setRO("mU",fmt(SIM.mU,1));setRO("mCor",fmt(SIM.corN,0));setRO("mPre",fmt(M.springF0/FS,0));
+  /* 状态栏 */
+  document.getElementById("sbNode").textContent=M.n.length;
+  document.getElementById("sbRig").textContent=M.nRig;
+  document.getElementById("sbEla").textContent=M.nEla;
+  document.getElementById("sbDof").textContent=M.dof;
+  document.getElementById("sbRes").textContent=M.res<1e-4?M.res.toExponential(1):fmt(M.res,4);
+  document.getElementById("sbResC").className="c "+(M.res<0.001?"ok":(M.res<0.05?"hl":"bad"));
+  document.getElementById("sbIter").textContent=M.iter;
+  document.getElementById("sbMs").textContent=fmt(M.ms,2)+" ms";
+  document.getElementById("tbMode").textContent=S.mode==="kin"?"运动学":"台架动力学";
+  document.getElementById("tbState").textContent=S.play?"运行":"暂停";
+  document.getElementById("tbState").className=S.play?"g":"a";
+}
+/* ---- 曲线 ---- */
+function plotXY(cv,title,unit,series,xr,yforce,curx){
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const w=cv.clientWidth||300,h=cv.clientHeight||86;
+  if(cv.width!==w*dpr||cv.height!==h*dpr){cv.width=w*dpr;cv.height=h*dpr;}
+  const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);ctx.fillStyle="#0a0c0e";ctx.fillRect(0,0,w,h);
+  const ml=34,mr=6,mt=13,mb=11,pw=w-ml-mr,ph=h-mt-mb;
+  let y0=1e9,y1=-1e9;
+  series.forEach(s=>s.pts.forEach(p=>{if(p[1]===null||!isFinite(p[1]))return;
+    if(p[1]<y0)y0=p[1];if(p[1]>y1)y1=p[1];}));
+  if(y0>y1){y0=0;y1=1;}
+  if(yforce){y0=Math.min(y0,yforce[0]);y1=Math.max(y1,yforce[1]);}
+  let pad=(y1-y0)*0.14;if(pad<1e-6)pad=Math.max(0.5,abs(y1)*0.1+0.01);
+  y0-=pad;y1+=pad;
+  const X=x=>ml+(x-xr[0])/((xr[1]-xr[0])||1)*pw;
+  const Y=y=>mt+ph-(y-y0)/((y1-y0)||1)*ph;
+  /* 网格 */
+  ctx.strokeStyle="#181d22";ctx.lineWidth=1;ctx.setLineDash([]);
+  for(let i=0;i<=4;i++){const y=mt+ph*i/4;ctx.beginPath();ctx.moveTo(ml,y);ctx.lineTo(ml+pw,y);ctx.stroke();}
+  for(let i=0;i<=6;i++){const x=ml+pw*i/6;ctx.beginPath();ctx.moveTo(x,mt);ctx.lineTo(x,mt+ph);ctx.stroke();}
+  /* 零线 */
+  if(y0<0&&y1>0){ctx.strokeStyle="#2c343c";ctx.beginPath();ctx.moveTo(ml,Y(0));ctx.lineTo(ml+pw,Y(0));ctx.stroke();}
+  if(xr[0]<0&&xr[1]>0){ctx.strokeStyle="#2c343c";ctx.beginPath();ctx.moveTo(X(0),mt);ctx.lineTo(X(0),mt+ph);ctx.stroke();}
+  /* 曲线 */
+  series.forEach(s=>{
+    ctx.strokeStyle=s.c;ctx.lineWidth=s.w||1.4;ctx.beginPath();let st=false;
+    s.pts.forEach(p=>{if(p[1]===null||!isFinite(p[1])){st=false;return;}
+      const x=X(p[0]),y=Y(p[1]);if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y);});
+    ctx.stroke();
+  });
+  /* 当前点 */
+  if(curx!==null&&curx!==undefined&&series[0]){
+    const x=X(curx);
+    ctx.strokeStyle="#4d5763";ctx.setLineDash([2,2]);
+    ctx.beginPath();ctx.moveTo(x,mt);ctx.lineTo(x,mt+ph);ctx.stroke();ctx.setLineDash([]);
+    let cy=null;const P=series[0].pts;
+    for(let i=1;i<P.length;i++){
+      if(P[i-1][0]<=curx&&curx<=P[i][0]&&P[i][1]!==null&&P[i-1][1]!==null){
+        const t=(curx-P[i-1][0])/((P[i][0]-P[i-1][0])||1);cy=P[i-1][1]+(P[i][1]-P[i-1][1])*t;break;}
+    }
+    if(cy!==null){ctx.fillStyle=series[0].c;ctx.fillRect(x-2.5,Y(cy)-2.5,5,5);
+      ctx.fillStyle="#c3cad2";ctx.font="8.5px ui-monospace,monospace";ctx.textAlign="right";
+      ctx.fillText(fmt(cy,2),ml+pw-2,mt+9);ctx.textAlign="left";}
+  }
+  /* 边框与标注 */
+  ctx.strokeStyle="#2c333b";ctx.lineWidth=1;ctx.strokeRect(ml+.5,mt+.5,pw,ph);
+  ctx.fillStyle="#8b95a1";ctx.font="8.5px ui-monospace,monospace";ctx.textAlign="left";
+  ctx.fillText(title,ml+1,mt-3.5);
+  ctx.fillStyle="#5c6672";ctx.textAlign="right";
+  ctx.fillText(fmt(y1,abs(y1)>50?0:2),ml-3,mt+7);
+  ctx.fillText(fmt(y0,abs(y0)>50?0:2),ml-3,mt+ph-1);
+  ctx.fillText(unit,ml-3,mt+ph/2+3);
+  ctx.textAlign="center";
+  ctx.fillText(fmt(xr[0],0),ml+8,h-2);ctx.fillText(fmt(xr[1],0),ml+pw-8,h-2);
+  ctx.textAlign="left";
+}
+function drawPlots(){
+  const sw=SIM.swR;if(!sw)return;
+  const xr=[sw.min,sw.max],cur=SIM.mR?SIM.mR.tr:0;
+  if(S.mode==="kin"){
+    const S1=k=>({pts:sw.rows.map(r=>[r.tr,r[k]]),c:null});
+    const P=[["外倾角 CAMBER","°","cam",C.knu],["前束角 TOE (跳动转向)","°","toe",C.tie],
+      ["侧倾中心高 ROLL CENTRE","mm","rcH",C.rc],["运动速比 MOTION RATIO","-","mr",C.ela],
+      ["主销偏移距 SCRUB RADIUS","mm","scrub",C.kpg]];
+    P.forEach((p,i)=>{
+      const s=S1(p[2]);s.c=p[3];
+      plotXY(UI.plots[i],p[0]+"  ← 轮跳 [mm] →",p[1],[s],xr,null,cur);
+    });
+  }else{
+    const T=SIM.trace;if(!T.length)return;
+    const t0=T[0].t,t1=Math.max(T[T.length-1].t,t0+0.5),xr2=[t0,t1];
+    plotXY(UI.plots[0],"路面输入(黄) / 轮跳(青)  ← 时间 [s] →","mm",
+      [{pts:T.map(r=>[r.t,r.tr]),c:C.node},{pts:T.map(r=>[r.t,r.road]),c:C.ela}],xr2,null,null);
+    plotXY(UI.plots[1],"轮胎垂向力 TIRE LOAD","N",[{pts:T.map(r=>[r.t,r.load]),c:C.pathC}],xr2,[0,0],null);
+    plotXY(UI.plots[2],"弹簧力 SPRING FORCE","N",[{pts:T.map(r=>[r.t,r.fs]),c:C.ela}],xr2,null,null);
+    plotXY(UI.plots[3],"阻尼力 DAMPER FORCE","N",[{pts:T.map(r=>[r.t,r.fd]),c:C.frc}],xr2,null,null);
+    const s=SIM.swR;
+    plotXY(UI.plots[4],"外倾角 CAMBER  ← 轮跳 [mm] →","°",
+      [{pts:s.rows.map(r=>[r.tr,r.cam]),c:C.knu}],[s.min,s.max],null,cur);
+  }
+}
+
+/* ================================ 14. 交互 ================================ */
+function hookView(v){
+  const cv=v.cv;
+  cv.addEventListener("mousedown",e=>{
+    cv.focus();
+    const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+    const hit=pickNode(v,mx,my);
+    if(e.button===0&&hit&&v.type==="o"){
+      UI.selHP=hit.id;
+      UI.drag={mode:"hp",v:v,id:hit.id,sx:hit.sx,x0:e.clientX,y0:e.clientY,base:cpy(S.hp[hit.id])};
+    }else if(e.button===0&&v.type==="p"&&!e.shiftKey){
+      UI.drag={mode:"orb",v:v,x0:e.clientX,y0:e.clientY,az:v.az,el:v.elv};
+    }else{
+      UI.drag={mode:"pan",v:v,x0:e.clientX,y0:e.clientY,cx:v.cx,cy:v.cy,tgt:cpy(v.tgt)};
+    }
+    e.preventDefault();
+  });
+  cv.addEventListener("mousemove",e=>{
+    const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+    if(!UI.drag){
+      const hit=pickNode(v,mx,my);
+      UI.hover=hit?hit.id:null;
+      cv.style.cursor=hit?"crosshair":"default";
+      let txt;
+      if(v.type==="o"){
+        const a=(mx-v.w/2)/v.s+v.cx,b=-(my-v.h/2)/v.s+v.cy;
+        const la=v.bx[0]?"X":(v.bx[1]?"Y":"Z"),lb=v.by[2]?"Z":(v.by[1]?"Y":"X");
+        txt=la+" "+fmt(a,1)+"  "+lb+" "+fmt(b,1);
+      }else txt="等轴测";
+      if(hit){const n=HPDEF[HPI[hit.id]];
+        txt=hit.id+" "+n[1]+"  ["+fmt(S.hp[hit.id][0],1)+", "+fmt(S.hp[hit.id][1],1)+", "+fmt(S.hp[hit.id][2],1)+"]";}
+      document.getElementById("sbCur").textContent=txt;
+    }
+  });
+  cv.addEventListener("wheel",e=>{
+    e.preventDefault();
+    const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+    const f=Math.pow(1.0016,-e.deltaY);
+    if(v.type==="o"){
+      const ax=(mx-v.w/2)/v.s+v.cx,by=-(my-v.h/2)/v.s+v.cy;
+      v.s=clamp(v.s*f,0.02,14);
+      v.cx=ax-(mx-v.w/2)/v.s;v.cy=by+(my-v.h/2)/v.s;
+    }else v.s=clamp(v.s*f,0.02,14);
+  },{passive:false});
+  cv.addEventListener("dblclick",()=>fitView(v));
+  cv.addEventListener("contextmenu",e=>e.preventDefault());
+}
+function pickNode(v,mx,my){
+  let best=null,bd=90;
+  for(let i=0;i<PICK.length;i++){const p=PICK[i];if(p.v!==v)continue;
+    const d=(p.x-mx)*(p.x-mx)+(p.y-my)*(p.y-my);
+    if(d<bd){bd=d;best=p;}}
+  return best;
+}
+window.addEventListener("mousemove",e=>{
+  const d=UI.drag;if(!d)return;
+  const v=d.v;
+  if(d.mode==="hp"){
+    const da=(e.clientX-d.x0)/v.s,db=-(e.clientY-d.y0)/v.s;
+    let w=[v.bx[0]*da+v.by[0]*db,v.bx[1]*da+v.by[1]*db,v.bx[2]*da+v.by[2]*db];
+    if(d.sx<0)w[0]=-w[0];
+    const snap=e.shiftKey?0.1:1;
+    for(let k=0;k<3;k++)S.hp[d.id][k]=Math.round((d.base[k]+w[k])/snap)*snap;
+    rebuildLight();
+  }else if(d.mode==="orb"){
+    v.az=d.az-(e.clientX-d.x0)*0.006;
+    v.elv=clamp(d.el+(e.clientY-d.y0)*0.005,-85*D2R,85*D2R);
+  }else{
+    if(v.type==="o"){v.cx=d.cx-(e.clientX-d.x0)/v.s;v.cy=d.cy+(e.clientY-d.y0)/v.s;}
+    else{camIso(v);
+      const k=1/v.s;
+      v.tgt=add(d.tgt,add(mul(v.rt,-(e.clientX-d.x0)*k),mul(v.up,(e.clientY-d.y0)*k)));}
+  }
+});
+window.addEventListener("mouseup",()=>{
+  if(UI.drag&&UI.drag.mode==="hp")refreshDerived(true);
+  UI.drag=null;
+});
+window.addEventListener("keydown",e=>{
+  const tag=(e.target.tagName||"").toLowerCase();
+  if(tag==="input"||tag==="select")return;
+  const k=e.key;
+  if(k===" "){S.play=!S.play;e.preventDefault();}
+  else if(k==="ArrowLeft"||k==="ArrowRight"){
+    const s=(k==="ArrowRight"?1:-1)*(e.altKey?0.5:3);
+    if(e.shiftKey){S.rack=clamp(S.rack+s,-70,70);S.steerExc="off";SIM.dirtySweep=true;}
+    else{S.travel=clamp(S.travel+s,S.trMin,S.trMax);S.exc="off";}
+    e.preventDefault();
+  }
+  else if(k==="f"||k==="F")VW.forEach(fitView);
+  else if(k>="1"&&k<="4")toggleMax(VW[+k-1]);
+  else if(k==="0"){document.getElementById("vp").classList.remove("max0");
+    VW.forEach(q=>{q.mx=false;q.el.classList.remove("mx");});setTimeout(()=>VW.forEach(sizeView),0);}
+});
+
+/* ================================ 15. 主循环 ================================ */
+function updateSweeps(){
+  if(!SIM.dirtySweep)return;
+  const now=performance.now();
+  if(now-SIM.lastSweep<130)return;
+  SIM.lastSweep=now;SIM.dirtySweep=false;
+  SIM.swR=runSweep(SIM.R,S.rack,SIM.limR,45);
+  SIM.swL=S.show.mirror?runSweep(SIM.L,-S.rack,SIM.limR,45):null;
+  SIM.mrRef=Math.max(0.05,sampleSweep(SIM.swR,0,"mr")||0.6);
+}
+let _last=0,_fps=0,_fc=0,_ft=0;
+function loop(ts){
+  const dt=Math.min(0.045,_last?(ts-_last)/1000:0.016);_last=ts;
+  if(S.play){
+    S.t+=dt;
+    if(S.mode==="rig")S.simT+=dt;
+    if(S.mode==="kin"&&S.exc!=="off"){
+      const ph=2*PI*S.excF*S.t;
+      const u=S.exc==="sine"?sin(ph):(2/PI)*Math.asin(sin(ph));
+      S.travel=clamp(S.excA*u,S.trMin,S.trMax);
+    }
+    if(S.steerExc!=="off"){
+      const ph=2*PI*S.stF*S.t;
+      const u=S.steerExc==="sine"?sin(ph):(2/PI)*Math.asin(sin(ph));
+      S.rack=clamp(S.stA*u,-70,70);SIM.dirtySweep=true;
+    }
+  }
+  updateSweeps();
+  try{simulate(dt);}catch(err){console.error(err);S.play=false;}
+  drawAll();updateReadouts();drawPlots();
+  UI.sync.forEach(f=>f());
+  _fc++;_ft+=dt;
+  if(_ft>0.4){_fps=_fc/_ft;_fc=0;_ft=0;document.getElementById("tbFps").textContent=fmt(_fps,0);}
+  requestAnimationFrame(loop);
+}
+/* ================================ 16. 启动 ================================ */
+buildLeft();buildRight();
+rebuild();
+initViews();
+simulate(0.016);simulate(0.016);
+S.exc="sine";S.travel=0;
+VW.forEach(v=>{sizeView(v);fitView(v);});
+requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>
