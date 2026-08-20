@@ -87,3 +87,9 @@ class VehicleResult(BaseModel):
     solver_status: dict[str, str] = Field(default_factory=dict)
     pose_labels: dict[str, float] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
+    loads: dict[str, dict] = Field(
+        default_factory=dict,
+        description="P3 载荷层：每轮 {tire_force, transfers, friction_util, "
+                    "off_ground, wheel_end{...}, jacking_force_n, status}。"
+                    "仅当工况 options.compute_wheel_forces 时填充。",
+    )

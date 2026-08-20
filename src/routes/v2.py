@@ -15,6 +15,8 @@ VALID / APPROXIMATE / OUT_OF_RANGE，单轮异常隔离为 SOLVER_FAILED。
 """
 from __future__ import annotations
 
+import math
+
 import numpy as np
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -46,7 +48,9 @@ from metrics.kinematics import (
     svic_point,
     wheelbase_change,
 )
-from metrics.roll import compute_instant_center
+from metrics.loads import arb_droplink_force, solve_upright_forces
+from metrics.roll import compute_instant_center, compute_roll_stiffness_suspension
+from metrics.wheel_loads import distribute_vehicle_loads
 from routes.solve import DEFAULT_FRAME_NODES, _rear_rocker_frame_nodes, _solve_axle
 
 router = APIRouter(prefix="/api/v2")
@@ -239,6 +243,133 @@ def _solve_corner(axle_hp, travel: float, rack: float, track: float) -> dict:
         "status": status, "pose": pose, "cp": ax.get("contact_patch_right"),
         "rocker": ax.get("rocker_right"),
     }
+
+
+def _hp_for_corner(name: str, dv) -> dict:
+    """取角对应的扁平 hp dict（含 CH1..CH5/UP1..UP5/FL1 设计坐标）。"""
+    axle = {"front_right": dv.front_right, "front_left": dv.front_left,
+            "rear_right": dv.rear_right, "rear_left": dv.rear_left}[name]
+    hp = axle.flat()
+    track = dv.vehicle.get("front_track_mm" if name.startswith("front")
+                           else "rear_track_mm", 0.0)
+    hp.setdefault("track_width", track)
+    return hp
+
+
+def _axle_motion_ratio(axle_hp, travel: float, rack: float, track: float,
+                       frame_nodes) -> float | None:
+    """几何 Motion Ratio：±2.5mm rocker mini-sweep 的 |Δdamper/Δwheel|。"""
+    try:
+        hp = axle_hp.flat()
+        hp.setdefault("track_width", track)
+        a0 = _solve_axle(hp, travel - 2.5, rack, mirror=False, polish=True,
+                         frame_nodes=frame_nodes)
+        a1 = _solve_axle(hp, travel + 2.5, rack, mirror=False, polish=True,
+                         frame_nodes=frame_nodes)
+        d0 = a0.get("rocker_right", {}).get("damper_travel")
+        d1 = a1.get("rocker_right", {}).get("damper_travel")
+        if d0 is None or d1 is None:
+            return None
+        return abs(float(d1) - float(d0)) / 5.0
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _compute_vehicle_loads(dv, cv, sols: dict, veh: dict, roll_deg: float) -> dict:
+    """P3 载荷层：整车分配 + 每轮轮边受力 + Jacking。
+
+    sols: {corner: _solve_corner 结果}；veh: 整车参数。
+    返回 {} 表示载荷不可用（MR/轮距缺失等），调用方应如实标记。
+    """
+    tr_f = float(veh.get("front_track_mm", 0.0))
+    tr_r = float(veh.get("rear_track_mm", 0.0))
+    k_spring_f = float(veh.get("k_spring_f", 0.0))
+    k_spring_r = float(veh.get("k_spring_r", 0.0))
+    k_arb_f = float(veh.get("k_arb_f", 0.0))
+    k_arb_r = float(veh.get("k_arb_r", 0.0))
+
+    mr_f = _axle_motion_ratio(dv.front_right, cv.travel.fr, cv.rack_displacement,
+                              tr_f, DEFAULT_FRAME_NODES)
+    mr_r = _axle_motion_ratio(dv.rear_right, cv.travel.rr, cv.rack_displacement,
+                              tr_r, _rear_rocker_frame_nodes())
+    if mr_f is None or mr_r is None or tr_f <= 0 or tr_r <= 0:
+        return {}
+    k_f = compute_roll_stiffness_suspension(k_spring_f, mr_f, tr_f) + k_arb_f
+    k_r = compute_roll_stiffness_suspension(k_spring_r, mr_r, tr_r) + k_arb_r
+
+    # 有效滚转角：行程派生（kinematic） + ay 平衡滚转（φ = ay·m_s·g·(h−rc)/k_total）
+    m_total = float(veh.get("mass_kg", 0.0))
+    h_cg = float(veh.get("cg_height_mm", 300.0))
+    unsprung = float(veh.get("unsprung_kg", 20.0))
+    m_s = max(m_total - unsprung * 4.0, 1e-6)
+
+    def axle_rc_z(r_name, l_name):
+        sol_r, sol_l = sols[r_name], sols[l_name]
+        hp_r = _hp_for_corner(r_name, dv)
+        hp_l = _hp_for_corner(l_name, dv)
+        ic_r = compute_instant_center(hp_r, sol_r["result"])
+        ic_l = compute_instant_center(hp_l, sol_l["result"])
+        cp_r = sol_r["cp"]["center"] if sol_r["cp"] else None
+        cp_l = sol_l["cp"]["center"] if sol_l["cp"] else None
+        if ic_r is None or cp_r is None or cp_l is None:
+            return 0.0
+        m = roll_center_height(
+            (float(ic_r[0]), float(ic_r[1])),
+            (float(ic_l[0]), float(ic_l[1])) if ic_l is not None else None,
+            (float(cp_r[1]), 0.0), (float(cp_l[1]), 0.0))
+        return float(m.value) if m.value is not None else 0.0
+
+    rc_f = axle_rc_z("front_right", "front_left")
+    rc_r = axle_rc_z("rear_right", "rear_left")
+
+    # ay 平衡滚转（rad）：φ = ay·m_s·g·(h_cg − rc_avg) / (k_f + k_r)
+    phi_ay = 0.0
+    if float(cv.loads.ay_g) != 0.0 and k_f + k_r > 1e-9:
+        rc_avg = (rc_f + rc_r) / 2.0
+        phi_ay = (float(cv.loads.ay_g) * m_s * 9.81 * (h_cg - rc_avg)
+                  / (k_f + k_r))
+    roll_deg_eff = float(roll_deg) + math.degrees(phi_ay)
+
+    try:
+        dist = distribute_vehicle_loads(veh, cv.loads, k_f, k_r, rc_f, rc_r, roll_deg_eff)
+    except (ValueError, TypeError, ZeroDivisionError):
+        return {}
+
+    loads_out: dict[str, dict] = {}
+    corners = [
+        ("front_right", tr_f, k_arb_f, True),
+        ("front_left", tr_f, k_arb_f, False),
+        ("rear_right", tr_r, k_arb_r, True),
+        ("rear_left", tr_r, k_arb_r, False),
+    ]
+    for name, track, k_arb, right_side in corners:
+        sol = sols[name]
+        d = dict(dist[name])
+        f_tire = np.array([d["fx_n"], d["fy_n"], d["fz_n"]], dtype=float)
+        f_drop = (arb_droplink_force(k_arb, roll_deg_eff, track, right_side)
+                  if cv.options.arb_enabled else np.zeros(3))
+        cp = sol["cp"]["center"] if sol["cp"] else None
+        hp = _hp_for_corner(name, dv)
+        try:
+            we = solve_upright_forces(hp, sol["result"], f_tire,
+                                      f_drop=f_drop, contact_patch=cp)
+        except Exception as exc:  # noqa: BLE001
+            we = {"status": "SOLVER_FAILED", "explanation": str(type(exc).__name__),
+                  "member_forces": None, "ball_joints": None,
+                  "chassis_reactions": None, "force_residual_n": None,
+                  "moment_residual_nmm": None}
+        jacking_n = None
+        if we.get("status") != "SOLVER_FAILED":
+            ic = compute_instant_center(hp, sol["result"])
+            if ic is not None:
+                dy = float(ic[0]) - float(sol["result"]["UP5"][1])
+                if abs(dy) > 1e-9:
+                    jacking_n = round(d["fy_n"] * (float(ic[1]) - 0.0) / dy, 3)
+        d["wheel_end"] = we
+        d["jacking_force_n"] = jacking_n
+        d["status"] = we.get("status", ResultStatus.SOLVER_FAILED.value)
+        loads_out[name] = d
+    return loads_out
 
 
 class SweepV2Request(BaseModel):
@@ -504,6 +635,7 @@ def solve_v2(req: SolveV2Request):
     residuals: dict[str, float | None] = {}
     reports: dict[str, WheelReport] = {}
     geometry: dict[str, WheelPose | None] = {}
+    sols: dict[str, dict] = {}
 
     corners = [
         ("front_right", dv.front_right, t.fr, veh.get("front_track_mm", 0.0)),
@@ -518,6 +650,7 @@ def solve_v2(req: SolveV2Request):
             residual = sol["residual"]
             status = sol["status"]
             pose = sol["pose"]
+            sols[name] = sol
         except Exception as exc:  # noqa: BLE001 — 逐轮隔离，保留整请求
             angles = None
             residual = None
@@ -537,6 +670,21 @@ def solve_v2(req: SolveV2Request):
         )
         geometry[name] = pose
 
+    # P3 载荷层（工况启用 compute_wheel_forces 且四轮几何齐备时）
+    loads: dict[str, dict] = {}
+    pose_labels = cv.derived_pose(veh.get("front_track_mm", 1200.0),
+                                  veh.get("rear_track_mm", 1200.0),
+                                  veh.get("wheelbase_mm", 1550.0))
+    if cv.options.compute_wheel_forces and len(sols) == 4:
+        try:
+            loads = _compute_vehicle_loads(dv, cv, sols, veh,
+                                           float(pose_labels.get("roll_deg", 0.0)))
+        except Exception as exc:  # noqa: BLE001
+            warnings.append(f"载荷计算不可用: {type(exc).__name__}")
+        if not loads:
+            warnings.append("载荷计算不可用：几何 Motion Ratio/轮距缺失，"
+                            "每轮载荷未计算（显式非 None 空白）")
+
     result = VehicleResult(
         design_id=req.design_id, design_version=dv.version,
         case_id=req.case_id, case_version=cv.version,
@@ -547,9 +695,8 @@ def solve_v2(req: SolveV2Request):
         per_wheel_geometry=geometry,
         residuals=residuals,
         solver_status={name: reports[name].status.value for name in reports},
-        pose_labels=cv.derived_pose(veh.get("front_track_mm", 1200.0),
-                                    veh.get("rear_track_mm", 1200.0),
-                                    veh.get("wheelbase_mm", 1550.0)),
+        pose_labels=pose_labels,
         warnings=warnings,
+        loads=loads,
     )
     return result.model_dump()

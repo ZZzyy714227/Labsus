@@ -148,6 +148,51 @@ class TestSolve:
         assert r.status_code == 404
 
 
+class TestP3Loads:
+    """P3 载荷层：四轮 Fx/Fy/Fz + 轮边受力 + 左右独立（禁止镜像）。"""
+
+    def _solve(self, client, case_id):
+        r = client.post("/api/v2/solve",
+                        json={"design_id": "legacy-import", "case_id": case_id})
+        assert r.status_code == 200
+        return r.json()
+
+    def test_static_loads_layer(self, client):
+        body = self._solve(client, "static")
+        assert set(body["loads"]) == {"front_right", "front_left",
+                                      "rear_right", "rear_left"}
+        fr = body["loads"]["front_right"]
+        assert fr["fz_n"] == pytest.approx(280.0 * 9.81 / 4.0, abs=0.01)
+        assert fr["fx_n"] == 0.0 and fr["fy_n"] == 0.0
+        assert fr["off_ground"] is False
+        we = fr["wheel_end"]
+        assert we["status"] == "VALID"
+        assert set(we["member_forces"]) == {
+            "uca_front_n", "uca_rear_n", "lca_front_n", "lca_rear_n",
+            "pushrod_n", "tie_rod_n"}
+        assert we["force_residual_n"] < 1e-6
+        assert len(we["ball_joints"]["ubj"]) == 3
+        assert set(we["chassis_reactions"]) == {
+            "ch1", "ch2", "ch3", "ch4", "ch5", "fl1"}
+
+    def test_lateral_loads_not_mirrored(self, client):
+        """1.3g 侧向：左右 Fz 不对称，禁止镜像受力（P3 要求）。"""
+        body = self._solve(client, "lat-1p3g")
+        fr, fl = body["loads"]["front_right"], body["loads"]["front_left"]
+        assert abs(fr["fz_n"] - fl["fz_n"]) > 100.0
+        assert fr["fz_n"] != pytest.approx(fl["fz_n"], abs=1e-6)
+        # 轮边受力同样不镜像（球头反力分量不同）
+        assert fr["wheel_end"]["ball_joints"]["ubj"] !=             pytest.approx(fl["wheel_end"]["ball_joints"]["ubj"], abs=1e-6)
+        # 摩擦圆一致（Fy 与 Fz 同比例）
+        assert fr["friction_util"] == pytest.approx(fl["friction_util"], abs=1e-3)
+
+    def test_brake_case_loads(self, client):
+        """预置 lat-1p3g 的 loads 为 0（该工况无纵向/侧向输入），载荷层仍有效。"""
+        body = self._solve(client, "lat-1p3g")
+        for name, d in body["loads"].items():
+            assert d["wheel_end"]["status"] == "VALID"
+
+
 _STATES = {"VALID", "APPROXIMATE", "NOT_APPLICABLE", "NOT_IMPLEMENTED",
           "SOLVER_FAILED", "EQUILIBRIUM_FAILED", "OUT_OF_RANGE"}
 _VALUE_STATES = {"VALID", "APPROXIMATE", "OUT_OF_RANGE"}
