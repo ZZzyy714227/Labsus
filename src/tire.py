@@ -68,20 +68,30 @@ def compute_contact_patch(UP5, upright_y_axis, hp):
         }
     y_axis = y_axis / y_norm
 
-    # Camber from wheel spin axis: -atan2(x, hypot(y,z))
-    # X=up after axis swap. Negative camber → top of wheel inward → bottom outward.
-    camber_rad = -math.atan2(float(y_axis[0]),
-                              float(math.hypot(y_axis[1], y_axis[2])))
+    # Camber from wheel spin axis (Z component): negative = top of wheel
+    # inward.  Same formula for both sides — the spin axis mirrors as
+    # (x, -y, z), so the Z component is mirror-invariant (K-1 fix).
+    camber_rad = -math.atan2(float(y_axis[2]),
+                              float(math.hypot(y_axis[0], y_axis[1])))
     camber_deg = math.degrees(camber_rad)
 
-    # Contact patch position: bottom of loaded tire, shifted by camber.
-    # Coordinate system: X=forward, Y=right, Z=up.
-    # Z pinned to the ground plane (suspension analysis assumes a fixed
-    # road surface; wheel travel moves the wheel, not the road).
-    # Lateral (Y) shift due to camber: negative camber → bottom outward
-    x_cp = float(UP5_np[0])                     # no longitudinal shift
-    y_cp = float(UP5_np[1]) - R_load * math.sin(camber_rad)
-    z_cp = 0.0                                  # ground plane (fixed)
+    # Contact patch: project the world-vertical onto the wheel plane
+    # (plane normal = spin axis), then step one loaded radius down from
+    # the wheel centre.  This is mirror-symmetric by construction: for a
+    # left wheel the projected direction flips with the spin axis, so
+    # negative camber always shifts the patch toward the vehicle's
+    # outboard side (K-1 fix; replaces the legacy "X=up" camber shift).
+    # Coordinate system: X=forward, Y=right, Z=up. Z is pinned to the
+    # ground plane (suspension analysis assumes a fixed road surface;
+    # wheel travel moves the wheel, not the road).
+    rad = np.array([0.0, 0.0, 1.0]) - y_axis * float(y_axis[2])
+    rad_norm = float(np.linalg.norm(rad))
+    if rad_norm < 1e-12:
+        rad = np.array([0.0, 0.0, 1.0])
+    else:
+        rad = rad / rad_norm
+    cp = UP5_np - rad * R_load
+    x_cp, y_cp, z_cp = float(cp[0]), float(cp[1]), 0.0
 
     return {
         "center": [round(x_cp, 2), round(y_cp, 2), round(z_cp, 2)],

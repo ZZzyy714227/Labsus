@@ -28,8 +28,11 @@ def derive_hardpoints(axle_params, prefix=""):
     kp_len = p["kingpin_length"]
 
     # Kingpin direction: tilt backward (caster around Y), outward at bottom (KPI around X)
-    # UP1→UP2 vector: forward tilt = -sin(caster), outboard tilt = sin(KPI), downward = -cos(caster)*cos(KPI)
-    z_local = np.array([-math.sin(ca), math.sin(kp), -math.cos(ca) * math.cos(kp)])
+    # UP1→UP2 vector with +X forward: top rearward (classic positive caster) means
+    # the axis points forward going down => +sin(caster); outboard tilt = sin(KPI);
+    # downward = -cos(caster)*cos(KPI).  (P2-0: sign of the X component corrected so
+    # caster: 5.0 deg produces classic positive caster instead of anti-caster.)
+    z_local = np.array([math.sin(ca), math.sin(kp), -math.cos(ca) * math.cos(kp)])
     z_local = z_local / np.linalg.norm(z_local)
 
     # Wheel center Y offset from kingpin axis. Positive = wheel center outboard of kingpin

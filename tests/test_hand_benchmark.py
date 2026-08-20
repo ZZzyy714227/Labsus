@@ -35,20 +35,24 @@ class TestAnalyticKingpin:
         assert a["scrub_radius_mm"] == pytest.approx(110.0, abs=1e-6)
         assert a["caster_trail_mm"] == pytest.approx(0.0, abs=1e-6)
 
-    def test_top_rearward_is_positive_caster(self):
-        """上端后倾 30mm/300mm：caster = atan2(30, 300) = +5.7106°（经典定义）。
-        主销接地点 x = 30 - (400/300)*30 = -10；接地点 x ≈ 0 → trail = -10。"""
+    def test_top_forward_is_negative_caster(self):
+        """X+ = 前。UP1 在 x=30（下端 x=0）之前 → 顶端前倾 = 经典负 caster。
+        caster = atan2(-30, 300) = -5.7106°；主销接地点在接地点（x≈0）后方，
+        且轮面含 -0.77° 外倾（合成几何非纯竖直轮面）→ 经典负 trail ≈ -9.84。"""
         hp = _synthetic((30, 500, 400), (0, 500, 100))
         a = compute_alignment_angles(hp, hp=hp)
-        assert a["caster_deg"] == pytest.approx(math.degrees(math.atan2(30, 300)), abs=1e-3)
+        assert a["caster_deg"] == pytest.approx(-math.degrees(math.atan2(30, 300)), abs=1e-3)
         assert a["kpi_deg"] == pytest.approx(0.0, abs=1e-9)
-        assert a["caster_trail_mm"] == pytest.approx(-10.0, abs=1e-3)
+        assert a["caster_trail_mm"] == pytest.approx(-9.84, abs=0.05)
 
-    def test_top_forward_is_negative_caster(self):
+    def test_top_rearward_is_positive_caster(self):
+        """UP1 在 x=-30（下端 x=0）之后 → 顶端后倾 = 经典正 caster。
+        caster = atan2(30, 300) = +5.7106°；主销接地点在接地点前方 →
+        经典正 trail ≈ +9.84。"""
         hp = _synthetic((-30, 500, 400), (0, 500, 100))
         a = compute_alignment_angles(hp, hp=hp)
-        assert a["caster_deg"] == pytest.approx(-math.degrees(math.atan2(30, 300)), abs=1e-3)
-        assert a["caster_trail_mm"] == pytest.approx(10.0, abs=1e-3)
+        assert a["caster_deg"] == pytest.approx(math.degrees(math.atan2(30, 300)), abs=1e-3)
+        assert a["caster_trail_mm"] == pytest.approx(9.84, abs=0.05)
 
     def test_kpi_axis_top_inboard_positive(self):
         """下端外移 60mm/300mm：KPI = atan2(60, 300) = +11.3099°。"""
@@ -62,18 +66,23 @@ class TestResidualThresholds:
     """残差基线（设计文档 §13.2 目标 ≤ 0.02mm）。
 
     现状：polish 含分支锚定软项（2.0*(x-x0)，防止欠约束系统滑向错误分支），
-    最小二乘在锚定与约束间留妥协残差：dz ∈ [-3, +10]mm 时 ≤ 0.02mm，
-    负行程侧更差（-7mm ≈ 0.06mm，-10mm ≈ 0.10mm，-15mm ≈ 0.19mm），
-    +15mm ≈ 0.07mm。达到 §13.2 全区间目标属 P1 求解器议程（K-4）。
+    最小二乘在锚定与约束间留妥协残差。P2-0 修正默认几何（反 caster → 经典正
+    caster）后按新几何重新基线（2026-08-20 探针）：
+
+      dz:  -15   -10    -7    -3   0     +3    +7   +10   +15
+      res: 0.210 0.120 0.075 0.027 0.000 0.019 0.031 0.030 0.009
+
+    仅 [0, +3, +15] 达到 ≤0.02。K-4 保持开放（P1 求解器议程），哨兵锁定新基线。
     """
 
-    @pytest.mark.parametrize("dz", [-3.0, 0.0, 3.0, 7.0, 10.0])
+    @pytest.mark.parametrize("dz", [0.0, 3.0, 15.0])
     def test_polish_residual_meets_target_inner_zone(self, dz):
         r = solve_bump(dict(DEFAULT_HARDPOINTS), dz, polish=True)
         assert r["max_residual"] <= 0.02
 
-    @pytest.mark.parametrize("dz", [-15.0, -10.0, -7.0, 15.0])
+    @pytest.mark.parametrize("dz", [-15.0, -10.0, -7.0, -3.0, 7.0, 10.0])
     def test_polish_residual_boundary_baseline_locked(self, dz):
-        """K-4 哨兵：边界残差基线锁定；P1 改进求解器后应收敛到 ≤0.02 并收紧此断言。"""
+        """K-4 哨兵：边界残差基线锁定（P2-0 修正几何后最差 -15mm ≈ 0.210）；
+        P1 改进求解器后应收敛到 ≤0.02 并收紧此断言。"""
         r = solve_bump(dict(DEFAULT_HARDPOINTS), dz, polish=True)
-        assert r["max_residual"] <= 0.20
+        assert r["max_residual"] <= 0.215

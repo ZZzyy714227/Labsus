@@ -27,7 +27,7 @@ from hardpoints import (
     strip_prefix,
 )
 from persistence import _save_frame_node
-from solver.angles import compute_alignment_angles, fix_left_angles as _fix_left_angles
+from solver.angles import compute_alignment_angles
 from tire import _upright_y_axis, compute_contact_patch
 
 router = APIRouter()
@@ -39,16 +39,14 @@ async def get_defaults():
     hp_right_f = dict(DEFAULT_HARDPOINTS)
     hp_left_f = mirror_left(hp_right_f)
     angles_right_f = compute_alignment_angles(hp_right_f, hp=hp_right_f)
-    angles_left_raw_f = compute_alignment_angles(hp_left_f, hp=hp_left_f)
-    angles_left_f = _fix_left_angles(angles_left_raw_f, angles_right_f)
+    angles_left_f = compute_alignment_angles(hp_left_f, hp=hp_left_f)
 
     hp_right_r = dict(DEFAULT_REAR_HARDPOINTS)
     hp_left_r = mirror_left(hp_right_r)
     hp_right_stripped = strip_prefix(hp_right_r, REAR_PREFIX)
     hp_left_stripped = strip_prefix(hp_left_r, REAR_PREFIX)
     angles_right_r = compute_alignment_angles(hp_right_stripped, hp=hp_right_stripped)
-    angles_left_raw_r = compute_alignment_angles(hp_left_stripped, hp=hp_left_stripped)
-    angles_left_r = _fix_left_angles(angles_left_raw_r, angles_right_r)
+    angles_left_r = compute_alignment_angles(hp_left_stripped, hp=hp_left_stripped)
 
     cp_fr = compute_contact_patch(hp_right_f["UP5"], _upright_y_axis(hp_right_f), hp_right_f)
     cp_fl = compute_contact_patch(hp_left_f["UP5"], _upright_y_axis(hp_left_f), hp_left_f)

@@ -2,7 +2,19 @@
 Alignment angle computation from solver results.
 
 Computes camber, toe, caster, KPI, scrub radius, and caster trail
-from upright positions.
+from upright positions, in the V1 frozen sign conventions (P2-0):
+
+    Camber:  negative = top of wheel inward (both sides)
+    Toe:     positive = toe-in (front of wheel toward centreline, both sides)
+    KPI/SAI: positive = kingpin axis top inboard (both sides)
+    Caster:  positive = kingpin axis top rearward (classic, both sides)
+    Scrub:   positive = contact patch outboard of kingpin ground (both sides)
+    Trail:   positive = kingpin ground ahead of contact patch (classic, both sides)
+
+The side (left/right) is auto-detected from the wheel centre Y coordinate
+(UP5[1] > 0 => right, side=+1; UP5[1] < 0 => left, side=-1).  Output is
+vehicle-global: the same formulas are convention-correct for BOTH sides,
+so no post-processing sign flips (fix_left_angles) are required.
 """
 import math
 
@@ -10,6 +22,11 @@ import numpy as np
 
 from geometry import vec3
 from tire import compute_contact_patch
+
+
+def _side_sign_from_up5(up5_y):
+    """+1 for a right-side wheel, -1 for a left-side wheel (UP5[1] sign)."""
+    return 1.0 if up5_y >= 0.0 else -1.0
 
 
 def compute_alignment_angles(result_dict, chassis_points=None, hp=None):
@@ -21,6 +38,7 @@ def compute_alignment_angles(result_dict, chassis_points=None, hp=None):
     UP1 = np.array(result_dict["UP1"])
     UP2 = np.array(result_dict["UP2"])
     UP5 = np.array(result_dict["UP5"])
+    side = _side_sign_from_up5(float(UP5[1]))
 
     # Kingpin axis: UP1 (upper) -> UP2 (lower)
     kp_vec = UP2 - UP1
@@ -46,7 +64,10 @@ def compute_alignment_angles(result_dict, chassis_points=None, hp=None):
             upright_frame_valid = True
 
     # ---- KPI ----
-    kpi_rad = math.atan2(kp_vec[1], -kp_vec[2])
+    # Positive = axis top inboard.  The raw atan2 is right-wheel oriented
+    # (upper inboard of lower => kp_vec[1] > 0); multiply by side so the
+    # left wheel reports the same sign.
+    kpi_rad = side * math.atan2(kp_vec[1], -kp_vec[2])
     kpi_deg = math.degrees(kpi_rad)
 
     # ---- Camber ----
@@ -58,13 +79,29 @@ def compute_alignment_angles(result_dict, chassis_points=None, hp=None):
         camber_deg = 0.0
 
     # ---- Caster ----
-    caster_rad = math.atan2(-kp_vec[0], -kp_vec[2])
+    # Positive = axis top rearward (classic).  X does not flip under Y
+    # mirroring, so one formula serves both sides.
+    caster_rad = math.atan2(kp_vec[0], -kp_vec[2])
     caster_deg = math.degrees(caster_rad)
 
     # ---- Toe ----
+    # Wheel-plane horizontal trace, oriented toward +X (vehicle forward).
+    # x_axis_u is perpendicular to the kingpin and to UP1->UP5 (wheel
+    # centre bearing); its X component flips under Y mirroring, so the
+    # forward-pointing orientation is restored here.  Positive = toe-in
+    # (front of the wheel toward the vehicle centreline), which is the
+    # opposite lateral direction for the two wheels — hence the side
+    # factor makes toe-in positive on both sides.
     if upright_frame_valid:
-        wheel_fwd_xy = np.array([-x_axis_u[0], -x_axis_u[1]])
-        toe_rad = math.atan2(wheel_fwd_xy[1], wheel_fwd_xy[0])
+        fwd = np.array([x_axis_u[0], x_axis_u[1]])
+        fwd_n = float(np.linalg.norm(fwd))
+        if fwd_n > 1e-9:
+            fwd = fwd / fwd_n
+            if fwd[0] < 0.0:
+                fwd = -fwd
+            toe_rad = -side * math.atan2(fwd[1], fwd[0])
+        else:
+            toe_rad = 0.0
         toe_deg = math.degrees(toe_rad)
     else:
         toe_deg = 0.0
@@ -85,7 +122,12 @@ def compute_alignment_angles(result_dict, chassis_points=None, hp=None):
         t = -UP1[2] / kp_dir[2]
         kp_ground_y = UP1[1] + t * kp_dir[1]
         kp_ground_x = UP1[0] + t * kp_dir[0]
-        scrub = contact_y - kp_ground_y
+        # Positive scrub = contact patch outboard of the kingpin ground
+        # point.  The raw difference is right-wheel oriented; multiply by
+        # side so the left wheel reports the same (positive) sign.
+        scrub = side * (contact_y - kp_ground_y)
+        # Positive trail = kingpin ground ahead of the contact patch
+        # (classic).  X does not flip under Y mirroring: one formula.
         trail = kp_ground_x - contact_x
     else:
         scrub = 0.0
@@ -109,16 +151,4 @@ def compute_alignment_angles(result_dict, chassis_points=None, hp=None):
         "scrub_radius_mm": round(scrub, 2),
         "caster_trail_mm": round(trail, 2),
         "_solver_healthy": solver_healthy,
-    }
-
-
-def fix_left_angles(angles_left_raw, angles_right):
-    """Fix sign conventions for left-side angles (mirrored Y)."""
-    return {
-        "camber_deg": -angles_left_raw["camber_deg"],
-        "kpi_deg": -angles_left_raw["kpi_deg"],
-        "caster_deg": angles_left_raw["caster_deg"],
-        "toe_deg": -angles_left_raw["toe_deg"] if abs(angles_left_raw["toe_deg"]) < 90 else angles_right["toe_deg"],
-        "scrub_radius_mm": -angles_left_raw["scrub_radius_mm"],
-        "caster_trail_mm": angles_left_raw["caster_trail_mm"],
     }
