@@ -1,5 +1,25 @@
 # 开发日志
 
+## 2026-08-20 — P5 轮胎模型 + 稳态转向 + 整车调平
+
+- **P5-1 简化魔毯方程轮胎模型**（src/metrics/tire_model.py）：Pacejka MF 魔改——
+  Fy(α,γ,Fz) 纯侧偏、Fx(κ,Fz) 纵向、Cα 随 Fz 非线性硬化（Fz^0.8）、Cγ 外倾线化项（clamp）、
+  摩擦圆钳制；B 由拐点刚度反算保证 B·C·D=Cα；alpha_for_fy 单调二分反解。参数入
+  config.VEHICLE_PARAMS（tire_mu_peak_y/x、tire_calpha=350N/deg@1000N、tire_cgamma=60、
+  tire_mf_c=1.3、tire_mf_e=0 等 FSAE 默认）。手算验证：拐点=BCD、Fy(0)=0、峰值=D（14°）、Cγ 项。
+- **P5-2 稳态转向动力学**（src/metrics/handling.py + /api/v2/handling）：自行车模型+
+  载荷敏感——四轮 Fz（含转移）每轮按 Fz 份额分配侧向力、每轮 MF 反解 α、轴平均；
+  understeer gradient K=(αf−αr)/ay（>0 欠转向）、转向角 δ=L/R+K·ay、K(ay) 曲线（载荷敏感转向）。
+  手算：对称车 K=0（中性）、前重 UNDER +0.26、后重 OVER −0.26。
+- **P5-3 整车调平**（src/metrics/ride.py + handling 端点）：四轮静载 + k_spring·MR² 轮率
+  静平衡 → 每角预载/弹簧力（=静载）与 ride height 偏移、roll/pitch 姿态、自洽残差（Σspring=ΣFz）。
+  手算：ride=0 预载=静载、伸张+10mm 预载增 kw·10、压缩−10mm 预载减 kw·10。
+- v2 handling 端点：understeer 单点（可带外倾/偏心载荷）+ K(ay) 13 点曲线 + ride 调平，
+  MR 缺省 rocker mini-sweep 几何值。
+- 验证：新增 15 项手算/镜像/失效测试；全量非 e2e 364 passed / 3 xfailed（F1 既有）；ruff/mypy 干净。
+  P5 使工具从「几何+静力引擎」升为「可回答这台车会如何转向/如何调平」的整车底盘分析工具。
+
+
 ## 2026-08-20 — 交互建模原型（DWB-SIM 式拖拽模型器 / modeler.html + 内联求解端点）
 
 - **新增 /api/v2/solve/hardpoints**：交互建模专用内联求解端点——请求内直接携带四角硬点 + 工况，
