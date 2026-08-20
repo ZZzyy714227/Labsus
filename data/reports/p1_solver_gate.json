@@ -82,19 +82,27 @@
           6.056325216810137,
           -145.56818200214832
         ],
-        "timing_ms": 49.824299989268184
+        "timing_ms": 46.96230008266866
       },
       "delta": {
         "camber_deg": 0.615,
         "caster_deg": -19.229,
         "contact_patch": null,
-        "contact_patch_mm": null,
+        "contact_patch_mm": [
+          -16.85,
+          -1.75,
+          0.0
+        ],
         "geometry_residual_mm": 0.8406733523490719,
         "kpi_deg": -0.728,
         "scrub_radius_mm": 0.82,
         "steering_axis": null,
-        "steering_axis_unitless": null,
-        "timing_ms": null,
+        "steering_axis_unitless": [
+          35.81478574,
+          6.002310691,
+          -144.574142154
+        ],
+        "timing_ms": 42.053400073,
         "toe_deg": -0.874,
         "trail_mm": 76.43
       },
@@ -211,11 +219,11 @@
           0.054014525469590326,
           -0.9940398480933694
         ],
-        "timing_ms": 5.089799873530865
+        "timing_ms": 4.908900009468198
       },
       "timing_ms": {
-        "coupled": 49.824299989268184,
-        "sequential": 5.089799873530865
+        "coupled": 46.96230008266866,
+        "sequential": 4.908900009468198
       },
       "travel": -30
     },
@@ -301,19 +309,27 @@
           9.67217767476302,
           -141.9190040915183
         ],
-        "timing_ms": 47.456600004807115
+        "timing_ms": 42.50809992663562
       },
       "delta": {
         "camber_deg": 1.558,
         "caster_deg": 13.16,
         "contact_patch": null,
-        "contact_patch_mm": null,
+        "contact_patch_mm": [
+          21.44,
+          15.2,
+          0.0
+        ],
         "geometry_residual_mm": 0.7848080326828257,
         "kpi_deg": 0.789,
         "scrub_radius_mm": 13.77,
         "steering_axis": null,
-        "steering_axis_unitless": null,
-        "timing_ms": null,
+        "steering_axis_unitless": [
+          -47.672657991,
+          9.618163149,
+          -140.924964243
+        ],
+        "timing_ms": 37.600700045,
         "toe_deg": -4.168,
         "trail_mm": -56.44
       },
@@ -430,11 +446,11 @@
           0.054014525469590326,
           -0.9940398480933694
         ],
-        "timing_ms": 5.0154998898506165
+        "timing_ms": 4.907399881631136
       },
       "timing_ms": {
-        "coupled": 47.456600004807115,
-        "sequential": 5.0154998898506165
+        "coupled": 42.50809992663562,
+        "sequential": 4.907399881631136
       },
       "travel": -30
     },
@@ -520,19 +536,27 @@
           5.469433281846364,
           -145.82056621726878
         ],
-        "timing_ms": 50.03809998743236
+        "timing_ms": 49.13920001126826
       },
       "delta": {
         "camber_deg": 0.725,
         "caster_deg": -18.412,
         "contact_patch": null,
-        "contact_patch_mm": null,
+        "contact_patch_mm": [
+          -15.5,
+          -2.99,
+          0.0
+        ],
         "geometry_residual_mm": 0.43344869042000034,
         "kpi_deg": -0.675,
         "scrub_radius_mm": -0.76,
         "steering_axis": null,
-        "steering_axis_unitless": null,
-        "timing_ms": null,
+        "steering_axis_unitless": [
+          34.894171445,
+          5.420370905,
+          -144.825550816
+        ],
+        "timing_ms": 42.078100145,
         "toe_deg": -0.091,
         "trail_mm": 78.33
       },
@@ -649,11 +673,11 @@
           0.04906237634677974,
           -0.9950154011737259
         ],
-        "timing_ms": 7.6211001724004745
+        "timing_ms": 7.061099866405129
       },
       "timing_ms": {
-        "coupled": 50.03809998743236,
-        "sequential": 7.6211001724004745
+        "coupled": 49.13920001126826,
+        "sequential": 7.061099866405129
       },
       "travel": -15
     },
@@ -739,19 +763,27 @@
           8.768595793480472,
           -141.48626411589902
         ],
-        "timing_ms": 46.95170000195503
+        "timing_ms": 46.763500198721886
       },
       "delta": {
         "camber_deg": 0.835,
         "caster_deg": 14.164,
         "contact_patch": null,
-        "contact_patch_mm": null,
+        "contact_patch_mm": [
+          20.03,
+          5.88,
+          0.0
+        ],
         "geometry_residual_mm": 0.388348100910356,
         "kpi_deg": 0.723,
         "scrub_radius_mm": 4.07,
         "steering_axis": null,
-        "steering_axis_unitless": null,
-        "timing_ms": null,
+        "steering_axis_unitless": [
+          -49.049419614,
+          8.719533417,
+          -140.491248715
+        ],
+        "timing_ms": 39.899300318,
         "toe_deg": -1.415,
         "trail_mm": -63.21
       },
@@ -868,11 +900,11 @@
           0.04906237634677974,
           -0.9950154011737259
         ],
-        "timing_ms": 6.987200118601322
+        "timing_ms": 6.864199880510569
       },
       "timing_ms": {
-        "coupled": 46.95170000195503,
-        "sequential": 6.987200118601322
+        "coupled": 46.763500198721886,
+        "sequential": 6.864199880510569
       },
       "travel": -15
     },
@@ -958,19 +990,27 @@
           5.071878799906472,
           -146.0726723001526
         ],
-        "timing_ms": 70.88000001385808
+        "timing_ms": 70.39369991980493
       },
       "delta": {
         "camber_deg": 0.78,
         "caster_deg": -17.943,
         "contact_patch": null,
-        "contact_patch_mm": null,
+        "contact_patch_mm": [
+          -14.77,
+          -3.95,
+          0.0
+        ],
         "geometry_residual_mm": 0.015958716275766976,
         "kpi_deg": -0.627,
         "scrub_radius_mm": -1.92,
         "steering_axis": null,
-        "steering_axis_unitless": null,
-        "timing_ms": null,
+        "steering_axis_unitless": [
+          33.817545451,
+          5.026411014,
+          -145.077417676
+        ],
+        "timing_ms": 63.75500001,
         "toe_deg": 0.377,
         "trail_mm": 79.65
       },
@@ -1087,11 +1127,11 @@
           0.04546778629821071,
           -0.9952546238655541
         ],
-        "timing_ms": 7.310600019991398
+        "timing_ms": 6.638699909672141
       },
       "timing_ms": {
-        "coupled": 70.88000001385808,
-        "sequential": 7.310600019991398
+        "coupled": 70.39369991980493,
+        "sequential": 6.638699909672141
       },
       "travel": -5
     },
@@ -1177,19 +1217,27 @@
           8.144175033289685,
           -141.05497106755078
         ],
-        "timing_ms": 65.01210015267134
+        "timing_ms": 62.65809992328286
       },
       "delta": {
         "camber_deg": 0.346,
         "caster_deg": 14.712,
         "contact_patch": null,
-        "contact_patch_mm": null,
+        "contact_patch_mm": [
+          19.16,
+          -0.14,
+          0.0
+        ],
         "geometry_residual_mm": -0.03178631245493521,
         "kpi_deg": 0.688,
         "scrub_radius_mm": -2.13,
         "steering_axis": null,
-        "steering_axis_unitless": null,
-        "timing_ms": null,
+        "steering_axis_unitless": [
+          -50.28559333,
+          8.098707247,
+          -140.059716444
+        ],
+        "timing_ms": 56.086699944,
         "toe_deg": 0.283,
         "trail_mm": -67.61
       },
@@ -1306,11 +1354,11 @@
           0.04546778629821071,
           -0.9952546238655541
         ],
-        "timing_ms": 7.5599998235702515
+        "timing_ms": 6.571399979293346
       },
       "timing_ms": {
-        "coupled": 65.01210015267134,
-        "sequential": 7.5599998235702515
+        "coupled": 62.65809992328286,
+        "sequential": 6.571399979293346
       },
       "travel": -5
     },
@@ -1396,19 +1444,27 @@
           6.5428608237347134,
           -149.28590242804654
         ],
-        "timing_ms": 2.5830999948084354
+        "timing_ms": 2.5185998529195786
       },
       "delta": {
         "camber_deg": 0.0,
         "caster_deg": 0.0,
         "contact_patch": null,
-        "contact_patch_mm": null,
+        "contact_patch_mm": [
+          0.0,
+          0.0,
+          0.0
+        ],
         "geometry_residual_mm": 0.0,
         "kpi_deg": 0.0,
         "scrub_radius_mm": 0.0,
         "steering_axis": null,
-        "steering_axis_unitless": null,
-        "timing_ms": null,
+        "steering_axis_unitless": [
+          -12.986111827,
+          6.499241752,
+          -148.290663079
+        ],
+        "timing_ms": 2.010399941,
         "toe_deg": 0.0,
         "trail_mm": 0.0
       },
@@ -1525,11 +1581,11 @@
           0.04361907215823142,
           -0.9952393495203102
         ],
-        "timing_ms": 0.5622000899165869
+        "timing_ms": 0.5081999115645885
       },
       "timing_ms": {
-        "coupled": 2.5830999948084354,
-        "sequential": 0.5622000899165869
+        "coupled": 2.5185998529195786,
+        "sequential": 0.5081999115645885
       },
       "travel": 0
     },
@@ -1615,19 +1671,27 @@
           6.463499898998521,
           -148.94629852564435
         ],
-        "timing_ms": 19.77070001885295
+        "timing_ms": 19.195600179955363
       },
       "delta": {
         "camber_deg": 0.088,
         "caster_deg": 1.328,
         "contact_patch": null,
-        "contact_patch_mm": null,
+        "contact_patch_mm": [
+          -8.3,
+          -0.35,
+          0.0
+        ],
         "geometry_residual_mm": 0.0,
         "kpi_deg": -0.025,
         "scrub_radius_mm": -0.59,
         "steering_axis": null,
-        "steering_axis_unitless": null,
-        "timing_ms": null,
+        "steering_axis_unitless": [
+          -16.442313256,
+          6.419880827,
+          -147.951059176
+        ],
+        "timing_ms": 18.632300198,
         "toe_deg": 0.199,
         "trail_mm": -5.88
       },
@@ -1744,11 +1808,11 @@
           0.04361907215823142,
           -0.9952393495203102
         ],
-        "timing_ms": 0.5483999848365784
+        "timing_ms": 0.5632999818772078
       },
       "timing_ms": {
-        "coupled": 19.77070001885295,
-        "sequential": 0.5483999848365784
+        "coupled": 19.195600179955363,
+        "sequential": 0.5632999818772078
       },
       "travel": 0
     },
@@ -1834,19 +1898,27 @@
           5.8096226041762975,
           -149.20476210920097
         ],
-        "timing_ms": 46.40830005519092
+        "timing_ms": 44.65509997680783
       },
       "delta": {
         "camber_deg": 0.108,
         "caster_deg": 0.339,
         "contact_patch": null,
-        "contact_patch_mm": null,
+        "contact_patch_mm": [
+          -24.61,
+          -2.01,
+          0.0
+        ],
         "geometry_residual_mm": -0.009016999999886314,
         "kpi_deg": -0.172,
         "scrub_radius_mm": -2.26,
         "steering_axis": null,
-        "steering_axis_unitless": null,
-        "timing_ms": null,
+        "steering_axis_unitless": [
+          -14.200033803,
+          5.767874013,
+          -148.209639563
+        ],
+        "timing_ms": 39.546099957,
         "toe_deg": 0.688,
         "trail_mm": -1.21
       },
@@ -1963,11 +2035,11 @@
           0.04174859133475062,
           -0.9951225461283772
         ],
-        "timing_ms": 5.627899896353483
+        "timing_ms": 5.109000019729137
       },
       "timing_ms": {
-        "coupled": 46.40830005519092,
-        "sequential": 5.627899896353483
+        "coupled": 44.65509997680783,
+        "sequential": 5.109000019729137
       },
       "travel": 5
     },
@@ -2053,19 +2125,27 @@
           5.806775441047876,
           -149.2332399916492
         ],
-        "timing_ms": 31.185000203549862
+        "timing_ms": 31.28549992106855
       },
       "delta": {
         "camber_deg": 0.104,
         "caster_deg": 0.204,
         "contact_patch": null,
-        "contact_patch_mm": null,
+        "contact_patch_mm": [
+          -25.0,
+          -2.74,
+          0.0
+        ],
         "geometry_residual_mm": 0.06269264710881833,
         "kpi_deg": -0.174,
         "scrub_radius_mm": -3.02,
         "steering_axis": null,
-        "steering_axis_unitless": null,
-        "timing_ms": null,
+        "steering_axis_unitless": [
+          -13.850163343,
+          5.76502685,
+          -148.238117446
+        ],
+        "timing_ms": 26.197999949,
         "toe_deg": 0.867,
         "trail_mm": -0.51
       },
@@ -2182,11 +2262,11 @@
           0.04174859133475062,
           -0.9951225461283772
         ],
-        "timing_ms": 4.979700082913041
+        "timing_ms": 5.087499972432852
       },
       "timing_ms": {
-        "coupled": 31.185000203549862,
-        "sequential": 4.979700082913041
+        "coupled": 31.28549992106855,
+        "sequential": 5.087499972432852
       },
       "travel": 5
     },
@@ -2272,19 +2352,27 @@
           5.608858728532823,
           -149.16036338169994
         ],
-        "timing_ms": 32.644799910485744
+        "timing_ms": 33.85859983973205
       },
       "delta": {
         "camber_deg": 0.026,
         "caster_deg": 0.265,
         "contact_patch": null,
-        "contact_patch_mm": null,
+        "contact_patch_mm": [
+          -25.0,
+          -3.86,
+          0.0
+        ],
         "geometry_residual_mm": 0.25938440331671636,
         "kpi_deg": -0.137,
         "scrub_radius_mm": -4.3,
         "steering_axis": null,
-        "steering_axis_unitless": null,
-        "timing_ms": null,
+        "steering_axis_unitless": [
+          -14.528666193,
+          5.569078367,
+          -148.165481092
+        ],
+        "timing_ms": 23.402599851,
         "toe_deg": 1.138,
         "trail_mm": -0.65
       },
@@ -2401,11 +2489,11 @@
           0.0397803615392433,
           -0.9948822893860121
         ],
-        "timing_ms": 6.986099993810058
+        "timing_ms": 10.455999989062548
       },
       "timing_ms": {
-        "coupled": 32.644799910485744,
-        "sequential": 6.986099993810058
+        "coupled": 33.85859983973205,
+        "sequential": 10.455999989062548
       },
       "travel": 10
     },
@@ -2491,19 +2579,27 @@
           5.621612089960763,
           -149.14279804274497
         ],
-        "timing_ms": 30.744000105187297
+        "timing_ms": 29.147200053557754
       },
       "delta": {
         "camber_deg": 0.018,
         "caster_deg": 0.302,
         "contact_patch": null,
-        "contact_patch_mm": null,
+        "contact_patch_mm": [
+          -25.0,
+          -4.57,
+          0.0
+        ],
         "geometry_residual_mm": 0.3326701978049021,
         "kpi_deg": -0.131,
         "scrub_radius_mm": -5.04,
         "steering_axis": null,
-        "steering_axis_unitless": null,
-        "timing_ms": null,
+        "steering_axis_unitless": [
+          -14.625251694,
+          5.581831728,
+          -148.147915753
+        ],
+        "timing_ms": 22.399100242,
         "toe_deg": 1.319,
         "trail_mm": -0.75
       },
@@ -2620,11 +2716,11 @@
           0.0397803615392433,
           -0.9948822893860121
         ],
-        "timing_ms": 6.799000082537532
+        "timing_ms": 6.748099811375141
       },
       "timing_ms": {
-        "coupled": 30.744000105187297,
-        "sequential": 6.799000082537532
+        "coupled": 29.147200053557754,
+        "sequential": 6.748099811375141
       },
       "travel": 10
     },
@@ -2710,19 +2806,27 @@
           5.419087922432482,
           -149.07099421330705
         ],
-        "timing_ms": 45.72420008480549
+        "timing_ms": 40.45210010372102
       },
       "delta": {
         "camber_deg": -0.069,
         "caster_deg": 0.264,
         "contact_patch": null,
-        "contact_patch_mm": null,
+        "contact_patch_mm": [
+          -25.0,
+          -5.83,
+          0.0
+        ],
         "geometry_residual_mm": 0.45651387474301397,
         "kpi_deg": -0.092,
         "scrub_radius_mm": -6.46,
         "steering_axis": null,
-        "steering_axis_unitless": null,
-        "timing_ms": null,
+        "steering_axis_unitless": [
+          -15.208310577,
+          5.381329929,
+          -148.076473513
+        ],
+        "timing_ms": 33.958100015,
         "toe_deg": 1.599,
         "trail_mm": -0.43
       },
@@ -2839,11 +2943,11 @@
           0.037757993140429,
           -0.9945207005732616
         ],
-        "timing_ms": 6.812000181525946
+        "timing_ms": 6.4940000884234905
       },
       "timing_ms": {
-        "coupled": 45.72420008480549,
-        "sequential": 6.812000181525946
+        "coupled": 40.45210010372102,
+        "sequential": 6.4940000884234905
       },
       "travel": 15
     },
@@ -2929,19 +3033,27 @@
           5.430187850358038,
           -149.03593193911524
         ],
-        "timing_ms": 40.02090007998049
+        "timing_ms": 37.75519994087517
       },
       "delta": {
         "camber_deg": -0.078,
         "caster_deg": 0.355,
         "contact_patch": null,
-        "contact_patch_mm": null,
+        "contact_patch_mm": [
+          -25.0,
+          -6.54,
+          0.0
+        ],
         "geometry_residual_mm": 0.527553890373295,
         "kpi_deg": -0.087,
         "scrub_radius_mm": -7.19,
         "steering_axis": null,
-        "steering_axis_unitless": null,
-        "timing_ms": null,
+        "steering_axis_unitless": [
+          -15.444224416,
+          5.392429857,
+          -148.041411239
+        ],
+        "timing_ms": 31.462799991,
         "toe_deg": 1.785,
         "trail_mm": -0.79
       },
@@ -3058,11 +3170,11 @@
           0.037757993140429,
           -0.9945207005732616
         ],
-        "timing_ms": 6.955800112336874
+        "timing_ms": 6.292399950325489
       },
       "timing_ms": {
-        "coupled": 40.02090007998049,
-        "sequential": 6.955800112336874
+        "coupled": 37.75519994087517,
+        "sequential": 6.292399950325489
       },
       "travel": 15
     },
@@ -3148,19 +3260,27 @@
           4.764085194635072,
           -148.84091989416694
         ],
-        "timing_ms": 39.54709996469319
+        "timing_ms": 38.62000000663102
       },
       "delta": {
         "camber_deg": -0.342,
         "caster_deg": -0.23,
         "contact_patch": null,
-        "contact_patch_mm": null,
+        "contact_patch_mm": [
+          -25.0,
+          -11.21,
+          0.0
+        ],
         "geometry_residual_mm": 0.775070553469234,
         "kpi_deg": 0.047,
         "scrub_radius_mm": -12.34,
         "steering_axis": null,
-        "steering_axis_unitless": null,
-        "timing_ms": null,
+        "steering_axis_unitless": [
+          -16.291122739,
+          4.733113844,
+          -147.847864301
+        ],
+        "timing_ms": 33.769000089,
         "toe_deg": 2.747,
         "trail_mm": 2.6
       },
@@ -3277,11 +3397,11 @@
           0.030971350618019592,
           -0.9930555930105939
         ],
-        "timing_ms": 5.187200149521232
+        "timing_ms": 4.850999917834997
       },
       "timing_ms": {
-        "coupled": 39.54709996469319,
-        "sequential": 5.187200149521232
+        "coupled": 38.62000000663102,
+        "sequential": 4.850999917834997
       },
       "travel": 30
     },
@@ -3367,19 +3487,27 @@
           4.766069084490482,
           -148.76219696442212
         ],
-        "timing_ms": 38.70230005122721
+        "timing_ms": 33.668499905616045
       },
       "delta": {
         "camber_deg": -0.382,
         "caster_deg": -0.022,
         "contact_patch": null,
-        "contact_patch_mm": null,
+        "contact_patch_mm": [
+          -25.0,
+          -11.89,
+          0.0
+        ],
         "geometry_residual_mm": 0.835317371523416,
         "kpi_deg": 0.049,
         "scrub_radius_mm": -13.01,
         "steering_axis": null,
-        "steering_axis_unitless": null,
-        "timing_ms": null,
+        "steering_axis_unitless": [
+          -16.829517085,
+          4.735097734,
+          -147.769141371
+        ],
+        "timing_ms": 28.797799954,
         "toe_deg": 2.937,
         "trail_mm": 1.63
       },
@@ -3496,11 +3624,11 @@
           0.030971350618019592,
           -0.9930555930105939
         ],
-        "timing_ms": 5.309100029990077
+        "timing_ms": 4.870699951425195
       },
       "timing_ms": {
-        "coupled": 38.70230005122721,
-        "sequential": 5.309100029990077
+        "coupled": 33.668499905616045,
+        "sequential": 4.870699951425195
       },
       "travel": 30
     }
@@ -3532,6 +3660,7 @@
     5
   ],
   "smoothing": "none",
+  "timing_note": "Measured timing is environment-dependent and should not be used for deterministic comparisons.",
   "travel_grid_mm": [
     -30,
     -15,

@@ -3,9 +3,9 @@
 ## 2026-08-20 — P1 Task 4 full comparison matrix
 
 - 新增 `tests/fixtures/p1_solver_gate_cases.json`：16 个 front-right travel/rack 工况（travel -30/-15/-5/0/5/10/15/30 mm，rack 0/5 mm），覆盖 static、bump-only、rack-only、bump+rack；fixture 仅保存输入。
-- 扩展 benchmark delta 字段：camber/toe/caster/KPI/scrub/trail/contact patch/steering axis/residual/timing，并保留 sequential/candidate 原始 records；报告明确 `smoothing: none`。
-- 新增 K-4 诊断：负/正行程分别取最大残差，区分 travel direction、rack input 与 candidate status；CLI `--write-report` 生成 `data/reports/p1_solver_gate.json`。
-- 验证：P1 聚焦测试 18 passed；全量 249 passed、33 skipped、4 xfailed，另有 5 failed/23 errors，均为 pytest 临时目录/持久化状态 PermissionError（环境限制），非生产 endpoint 改动。
+- 扩展 benchmark delta 字段：标量定位角/半径、contact-patch 三维向量、steering-axis 三维向量、几何残差与 candidate−sequential timing；两条路径有有效几何时不再把向量 delta 留为 `None`。报告明确 `smoothing: none`，并标注 timing 为 environment-dependent measured data。
+- CLI `python -m src.solver.p1_benchmark --write-report ...` 从仓库根目录可直接运行，使用与仓库一致的 `src` import root；生产 endpoint 未修改。
+- 新增向量/timing delta 与 CLI 子进程报告创建测试。验证状态以本轮命令输出为准；全量测试仍可能受 pytest 临时目录/持久化状态 PermissionError 环境限制，不宣称全量 clean。
 
 ## 2026-08-20 — P1 Task 3 review fixes
 
