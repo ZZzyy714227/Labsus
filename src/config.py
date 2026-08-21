@@ -55,6 +55,9 @@ DESIGN_PARAMS = {
         "pushrod_ch5_y": 135.0,
         "pushrod_ch5_z": 305.0,
 
+        # PRO 拓扑：推杆外端在 LCA 上的比例位置（t=0 在 LCA 铰轴中点，1 在 LBJ）
+        "strut_out_t_lca": 0.35,
+
         # Tire model
         "tire_spring_rate": 150.0,      # N/mm, vertical stiffness
         "corner_weight_n": 700.0,       # N, static load per wheel (280kg / 4)
@@ -97,6 +100,9 @@ DESIGN_PARAMS = {
         "pushrod_ch5_y": 125.0,
         "pushrod_ch5_z": 105.0,
 
+        # PRO 拓扑：拉杆外端在 UCA 上的比例位置（t=0 在 UCA 铰轴中点，1 在 UBJ）
+        "strut_out_t_uca": 0.35,
+
         # Tire model
         "tire_spring_rate": 150.0,
         "corner_weight_n": 700.0,
@@ -124,6 +130,16 @@ DEFAULT_FRAME_NODES = {
     "R_RK_PIVOT_L":        [-1550.0, -95.0, 155.0],
     "R_RK_DAMPER_L":       [-1550.0, -60.0, 200.0],
     "R_DAMPER_CHASSIS_RL": [-1550.0, -40.0, 95.0],
+
+    # PRO 拓扑：摇臂转轴两点（前=右，后=右；L 侧镜像）
+    "RCK_AX_A_R":  [0.0, 120.0, 310.0],
+    "RCK_AX_B_R":  [0.0, 80.0, 310.0],
+    "RCK_AX_A_L":  [0.0, -120.0, 310.0],
+    "RCK_AX_B_L":  [0.0, -80.0, 310.0],
+    "R_RCK_AX_A_R":  [-1550.0, 120.0, 140.0],
+    "R_RCK_AX_B_R":  [-1550.0, 80.0, 140.0],
+    "R_RCK_AX_A_L":  [-1550.0, -120.0, 140.0],
+    "R_RCK_AX_B_L":  [-1550.0, -80.0, 140.0],
 
     # === Front bulkhead (X=+420; rules 3.21: ≥3 members/side back to front hoop) ===
     "FB_TOP_R": [420.0, 200.0, 380.0],

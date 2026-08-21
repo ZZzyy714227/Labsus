@@ -253,3 +253,15 @@ class TestPhysicalConsistency:
         mid_in = np.array([5.0, 0.0, 0.0])
         mid_out = (np.array(p1) + np.array(p2)) / 2.0
         assert np.linalg.norm(mid_out - mid_in) < 1e-10
+
+
+# ============================================================
+# PRO topology — STRUT_OUT hardpoint derivation
+# ============================================================
+
+def test_strut_out_derived_on_arm_plane():
+    from hardpoints import DEFAULT_HARDPOINTS, DEFAULT_REAR_HARDPOINTS
+    f = DEFAULT_HARDPOINTS
+    assert "STRUT_OUT" in f          # 前轴推杆：LCA 三角面内
+    r = DEFAULT_REAR_HARDPOINTS
+    assert "R_STRUT_OUT" in r        # 后轴拉杆：UCA 三角面内
