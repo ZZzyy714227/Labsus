@@ -1,5 +1,15 @@
 # 开发日志
 
+## 2026-08-21 — Task 2 几何源：STRUT_OUT 派生 + 摇臂转轴车架节点（DWB-SIM PRO）
+- 需求：为新「推/拉杆悬架」拓扑（DWB-SIM PRO）在几何派生层加入 STRUT_OUT 硬点与摇臂转轴框架节点。
+- 变更（`src/config.py` / `src/hardpoints.py` / `tests/test_geometry.py`）：
+  - `DESIGN_PARAMS` front 追加 `strut_out_t_lca=0.35`、rear 追加 `strut_out_t_uca=0.35`（比例参数，t=0 铰轴中点 / t=1 球头）。
+  - `DEFAULT_FRAME_NODES` 摇臂区块追加 `RCK_AX_A/B_R/L` 与 `R_RCK_AX_A/B_R/L` 八节点（占位值，后续任务覆盖）。
+  - `derive_hardpoints` 在 CH5 之后插入 STRUT_OUT：前轴（prefix=""）在 LCA 三角面内取 LBJ(UP2)↔LCA 铰轴中点比例点；后轴（prefix="R_"）在 UCA 三角面内取 UBJ(UP1)↔UCA 铰轴中点比例点；result 增加 `{prefix}STRUT_OUT` 键。
+- 验证（TDD）：新增 `test_strut_out_derived_on_arm_plane` 先红后绿；`tests/test_geometry.py` + `tests/test_legacy_import.py` 回归 42 passed（legacy 导入 `_split_hp` 对 3 元素 list 容纳入 points，无破坏）。
+- 实际坐标：前 `STRUT_OUT = [3.89, 286.20, 118.07]`（LCA 面内，Y 在 CH3/4=128/122 与 LBJ≈580 之间）；后 `R_STRUT_OUT = [-1550.69, 294.78, 285.69]`（UCA 面内，Y 在 CH1/2≈155/150 与 UBJ≈559 之间）。
+- 提交：`3598b42`（feat(geometry): STRUT_OUT derived on LCA(front)/UCA(rear) + rocker axis frame nodes (placeholder)）。
+
 ## 2026-08-21 — FSR-06 前推后拉正式构建 · 全量交付（dwb-mod）
 - 需求：用户批准 spec/plan 后按 subagent-driven 流程执行 7 任务（T1 HPDEF+FSR-06 默认预设 → T2 显式推/拉杆分支+簇过滤 → T3 metrics.sl 端点 → T4 泪滴/摇臂/Heim 渲染 → T5 水平减振器支架 → T6 harness 断言+行程调参 → T7 文档）。
 - 关键发现：HPDEF 扩 16 节点后旧预设索引错位崩溃（buildMech i[d[0]]=ni++ 修复）；FSR-06 前轴伸张死点根因 = RK_B 设计位形在摇臂圆最低点（圆不可达），非迭代不足；按 spec §4 授权调整 RK_PIVOT(600→640)/RK_B(505→[320,−107,567])，前轴几何极限 [−8,138]→[−88,138]（超 ±60 验收），推杆角 44.3°。
