@@ -448,9 +448,10 @@ function addPushrodMode(M){
   /* 前轴=推杆（LCA 外端 PR_L→RK_B）; 后轴=拉杆（UCA 外端 PR_U→RK_B） */
   const rodFrom=M.axleKey==="rear"?"PR_U":"PR_L";
   if(i[rodFrom]===undefined) return;               // 旧预设/旧存档无推拉杆点 → 退回纯叉臂
-  m_L_push(M,rodFrom,i,n);
+  addRodRocker(M,rodFrom);
 }
-function m_L_push(M,rodFrom,i,n){
+function addRodRocker(M,rodFrom){
+  const i=M.i,n=M.n;
   const n0=n[i[rodFrom]],n1=n[i["RK_B"]];
   M.L.push({a:i[rodFrom],b:i["RK_B"],id:rodFrom+"_rod",type:"R",
     zh:M.axleKey==="rear"?"拉杆":"推杆",grp:"rod",
