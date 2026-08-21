@@ -1,5 +1,20 @@
 # 开发日志
 
+## 2026-08-20 — 曲线丝滑化：常驻曲线 + 实时位移游标 + 后台静默重扫（对齐参考）
+
+- 用户：参考的曲线展示很丝滑，几何/轮跳一动曲线就对应变化；我们的有问题（播放中曲线被清空成占位、无游标、几何变化曲线不跟）。
+- 逐段研学参考 drawPlots/updateSweeps/loop：曲线常驻 SIM.swR、后台≥130ms 节流重扫、游标 cur 随当前轮跳滑动、每帧 drawPlots。
+- 后端（v2.py）：_sweep_curves/_sweep_metrics 增加 absolute 参数；内联 /solve/hardpoints 的扫描改为「绝对行程」基准（travel_r=axis_val，不再叠架工况轮跳），这样曲线 x 轴即绝对轮跳，游标才能随位移滑动；standalone /sweep 不变。回归 43 passed。
+- 前端（modeler.html）：
+  1. sweepCache 常驻 —— 播放中曲线不再消失，每帧从缓存绘制。
+  2. 实时游标：当前轮跳(或 rack) 竖线 + 顶标 + 状态读数（tr/cam/toe 实时值）滑过曲线；轴级曲线(axChart)也加游标。
+  3. 后台静默重扫：播放时每 ~500ms requestSolve({sweep,silent,immediate:false})，几何/齿条/行程变化时曲线跟随更新；silent 跳过面板重渲染。
+  4. drawChart 重写：camber/toe 双线 + 网格/0 线 + 游标 + 读数；播放先扫空时显示"运行后自动生成"。
+- 验证：strict-ctx mock（逐帧微任务排空）2.9s 内 47 次显示解算 + 6 次后台重扫、sweepCache 常驻、错误 0；真实 Edge 无头 —— t=27.3s 动画推进、tr=18.0 位移、sw=14 条曲线常驻、err=0、8 画布、solve 跑通。live 200。
+- 提交：src/routes/v2.py + web/modeler.html + DEVLOG。
+
+# 开发日志
+
 ## 2026-08-20 — UI 细节打磨 + 补齐「计算全部呈现」（整车指标面板/轴级曲线/主销接地点）
 
 - 用户：面板功能不如参考丰富？计算是否都被合适呈现？UI 细节再优化一轮。

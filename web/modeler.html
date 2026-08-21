@@ -316,7 +316,7 @@ const S={
   held:null
 };
 let busy=false, pending=false, dragging=false, sweepTimer=null, solveSeq=0, needsDraw=true;
-let lastH=null, snapA=null, resp=null;
+let lastH=null, snapA=null, resp=null, sweepCache=null;
 let prevPose=null, curPose=null, interpF=1;
 let SCENE=[];
 let VW=[], UI={drag:null,hover:null,sel:null}, PICK=[];
@@ -989,7 +989,7 @@ document.addEventListener("keydown",e=>{
   else if(e.key>="1"&&e.key<="4"){toggleMax(VW[+e.key-1]);}
 });
 /* ================================ 仿真动画 ================================ */
-let lastTs=0,fpsFc=0,fpsFt=0,fpsV=0;
+let lastTs=0,fpsFc=0,fpsFt=0,fpsV=0,lastSweepT=0;
 function loop(ts){
   requestAnimationFrame(loop);
   const dt=Math.min(0.045,lastTs?(ts-lastTs)/1000:0.016);lastTs=ts;
@@ -1013,7 +1013,8 @@ function loop(ts){
     S.lastSolveT=ts;requestSolve({immediate:false});
   }
   if(S.play||needsDraw){drawAll();needsDraw=false;}
-  if(resp&&resp.sweep&&!busy&&!S.play)drawChart(resp.sweep);
+  if(sweepCache){drawChart(sweepCache);drawAxChart(sweepCache);}
+  if(S.play&&!dragging&&(ts-lastSweepT)>500){lastSweepT=ts;requestSolve({sweep:true,silent:true,immediate:false});}
   fpsFc++;fpsFt+=dt;
   if(fpsFt>0.4){fpsV=Math.round(fpsFc/fpsFt);fpsFc=0;fpsFt=0;fpsV&&($("tbFps").textContent=fpsV);}
 }
@@ -1051,9 +1052,9 @@ function requestSolve(opts){
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify(casePayload(withSweep))})
     .then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
-    .then(d=>{if(seq!==solveSeq)return;S.vp=d;resp=d;
+    .then(d=>{if(seq!==solveSeq)return;S.vp=d;resp=d;if(d.sweep)sweepCache=d.sweep;
       loadPose(d,opts.immediate===false?false:true);
-      renderAll(d);
+      if(!opts.silent)renderAll(d);
       if(opts.handling)fetchHandling();
     })
     .catch(e=>{if(seq===solveSeq)setStatus("r","求解失败: "+e.message);})
@@ -1139,36 +1140,60 @@ function renderAll(d){
   $("sbRig").textContent="36";
   $("sbEla").textContent="4";
   needsDraw=true;
-  if(!S.play||d.sweep){drawChart(d.sweep||null);drawAxChart(d.sweep||null);}
+  if(d.sweep)sweepCache=d.sweep;
+  if(sweepCache){drawChart(sweepCache);drawAxChart(sweepCache);}
   renderMetrics(d);
 }
+function currentRightTravel(){
+  const roll=clamp(S.roll||0,-6,6);
+  const v=S.curveAxle==="front"?(S.travel||0)+(610*sin(roll*D2R)):(S.travel||0)+(590*sin(roll*D2R));
+  return clamp(v,-60,60);
+}
 function drawChart(sw){
-  const cv=$("chart");
-  if(!sw||!sw.curves){const ctx=cv.getContext("2d");ctx.clearRect(0,0,cv.width,cv.height);ctx.fillStyle=CC.txt3;ctx.font="9px monospace";ctx.fillText("无扫掠（暂停后自动补）",8,14);return;}
+  const cv=$("chart");if(!cv)return;
+  const ctx=cv.getContext("2d");ctx.clearRect(0,0,cv.width,cv.height);
+  if(!sw||!sw.curves||!sw.values||!sw.values.length||!sw.values[sw.values.length-1]){
+    ctx.fillStyle=CC.txt3;ctx.font="9px monospace";ctx.fillText("运行后自动生成扫掠曲线…",8,14);return;
+  }
   const X=sw.values||[],cam=sw.curves.right_camber_deg||[],toe=sw.curves.right_toe_deg||[];
-  const scr=sw.curves.right_scrub_radius_mm||[],trl=sw.curves.right_caster_trail_mm||[];
-  const series=[["#54a06a","camber",cam],["#2fa9d6","toe",toe],["#c07ad0","scrub",scr],["#d9a238","trail",trl]];
-  let y0=0,y1=0;
-  for(const s of series)for(const v of s[2]){if(v==null)continue;y0=Math.min(y0,v);y1=Math.max(y1,v);}
-  if(y1===y0)y1=y0+1;
-  const pad=22,W=cv.width,H=cv.height;
-  const sx=v=>pad+(v-X[0])/((X[X.length-1]-X[0])||1)*(W-pad*2);
-  const sy=v=>H-pad-(v-y0)/(y1-y0)*(H-pad*2);
-  const ctx=cv.getContext("2d");ctx.clearRect(0,0,W,H);
-  ctx.font="9px monospace";ctx.fillStyle=CC.txt3;
-  ctx.fillText(S.curveAxis==="rack"?"rack mm":"travel mm",W-52,H-4);ctx.fillText("0",4,sy(0)+3);
-  for(const s of series){
-    ctx.strokeStyle=s[0];ctx.lineWidth=1.4;ctx.beginPath();let started=false;
-    for(let i=0;i<s[2].length;i++){
-      if(s[2][i]==null){started=false;continue;}
-      const x=sx(X[i]),y=sy(s[2][i]);
-      if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+  const pad=20,W=cv.width,H=cv.height;
+  let y0=1e9,y1=-1e9;
+  for(const arr of [cam,toe])for(const v of arr)if(v!=null){y0=Math.min(y0,+v);y1=Math.max(y1,+v);}
+  if(y0===1e9){y0=-1;y1=1;}
+  if(y1===y0){y0-=0.5;y1+=0.5;}
+  const sx=v=>pad+(+v-(+X[0]))/((+X[X.length-1]- +X[0])||1)*(W-pad*2);
+  const sy=v=>H-pad-(+v-y0)/(y1-y0)*(H-2*pad);
+  const x0=X[0],x1=X[X.length-1];
+  ctx.strokeStyle=CC.grid;ctx.lineWidth=1;ctx.beginPath();
+  const yStep=(Math.ceil(Math.max(1,(y1-y0)/4)*10))/10;
+  for(let g=Math.ceil(y0/yStep)*yStep;g<=y1;g+=yStep){const y=sy(g);ctx.moveTo(pad,y);ctx.lineTo(W-2,y);}
+  for(let g=Math.round(x0/25)*25;g<=x1;g+=25){const x=sx(g);ctx.moveTo(x,0);ctx.lineTo(x,H);}
+  ctx.stroke();
+  ctx.strokeStyle=CC.grid2;ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(pad,sy(0));ctx.lineTo(W-2,sy(0));ctx.stroke();ctx.setLineDash([]);
+  const lines=[];
+  const series=[["camber",cam,CC.pathC],["toe",toe,CC.tie]];
+  for(const [name,arr,col] of series){
+    ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.beginPath();let st=false;
+    for(let i=0;i<arr.length;i++){
+      if(arr[i]==null){st=false;continue;}
+      const x=sx(X[i]),y=sy(+arr[i]);
+      if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y);
     }
     ctx.stroke();
-    ctx.fillStyle=s[0];ctx.fillText(s[1],s[1]==="camber"?8:44,10);
+    ctx.fillStyle=col;ctx.font="8.5px monospace";
+    ctx.fillText(name+" °",pad+4,10+(name==="camber"?0:11));
+    lines.push([name,col]);
   }
-  ctx.strokeStyle=CC.grid;ctx.setLineDash([4,4]);
-  const yz=sy(0);ctx.beginPath();ctx.moveTo(pad,yz);ctx.lineTo(W-pad,yz);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle=CC.txt3;ctx.font="8px monospace";
+  ctx.fillText(S.curveAxis==="rack"?"rack mm":"travel mm",W-40,H-3);
+  /* 实时游标：当前位置竖线 + 顶标 + 状态读数 */
+  const c=S.curveAxis==="rack"?clamp(S.rack||0,x0,x1):clamp(currentRightTravel(),x0,x1);
+  const cx=sx(c);
+  ctx.strokeStyle=CC.acc;ctx.setLineDash([2,3]);ctx.beginPath();ctx.moveTo(cx,pad-8);ctx.lineTo(cx,H-6);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle=CC.acc;ctx.beginPath();ctx.moveTo(cx,H-2);ctx.lineTo(cx-4,H-9);ctx.lineTo(cx+4,H-9);ctx.closePath();ctx.fill();
+  const rc=resp&&resp[S.curveAxle==="front"?"front":"rear"]&&resp[S.curveAxle==="front"?"front":"rear"].right&&resp[S.curveAxle==="front"?"front":"rear"].right.angles;
+  ctx.fillStyle=CC.acc;ctx.font="8.5px monospace";
+  ctx.fillText((S.curveAxis==="rack"?"rack ":"tr ")+fmt(c,1)+" · cam "+fmt(rc&&rc.camber_deg,2)+"° · toe "+fmt(rc&&rc.toe_deg,2)+"°",pad+4,H-3);
 }
 
 /* ================================ 整车指标 ================================ */
@@ -1232,6 +1257,10 @@ function drawAxChart(sw){
   };
   if(S.curveAxis==="rack"){ norm(ack,CC.arb,"Ackermann %","l"); }
   else { norm(rc,CC.ic,"RC mm","l"); norm(trk,CC.tie,"TrackΔ mm","r"); }
+  const c=clamp((S.curveAxis==="rack"?(S.rack||0):currentRightTravel()),+X[0],+X[X.length-1]);
+  const cxs=sx(+c);
+  ctx.strokeStyle=CC.acc;ctx.setLineDash([2,3]);ctx.beginPath();ctx.moveTo(cxs,0);ctx.lineTo(cxs,H-4);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle=CC.acc;ctx.font="8.5px monospace";ctx.fillText(S.curveAxis==="rack"?"rack "+fmt(c,1):"tr "+fmt(c,1),cxs+4,9);
 }
 
 function renderHandling(d){
