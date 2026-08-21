@@ -861,7 +861,7 @@ const C={
 const L3=(sc,a,b,c,w,d,al)=>sc.push({k:"l",a:a,b:b,c:c,w:w||1,d:d,al:al});
 const PL=(sc,pts,c,w,d,f,al)=>sc.push({k:"p",pts:pts,c:c,w:w||1,d:d,f:f,al:al});
 const TX=(sc,p,s,c,dx,dy,sz)=>sc.push({k:"t",p:p,s:s,c:c,dx:dx||0,dy:dy||0,sz:sz||9});
-const ND=(sc,p,fix,id,zh,sx)=>sc.push({k:"n",p:p,fix:fix,id:id,zh:zh,sx:sx||1});
+const ND=(sc,p,fix,id,zh,sx,ax)=>sc.push({k:"n",p:p,fix:fix,id:id,zh:zh,sx:sx||1,ax:ax});
 
 function circPts(c,ax,r,n,e1,e2){
   const u=e1||perpOf(ax),v=e2||cross(nrm(ax),u),o=[];
@@ -901,8 +901,9 @@ function buildScene(){
     if(S.show.mirror&&SIM.mL)addInstance(sc,SIM.L,SIM.mL,SIM.swL||SIM.swR,-1,0);
   }
   if(view!=="front"){
-    addInstance(sc,SIM.RR,SIM.mRR,SIM.swRR,1,-S.wb);
-    if(S.show.mirror&&SIM.mRL)addInstance(sc,SIM.RL,SIM.mRL,SIM.swRL||SIM.swRR,-1,-S.wb);
+    /* 后轴硬点已含 Y−wb 真车坐标 → 渲染不再叠加偏移（避免双重平移） */
+    addInstance(sc,SIM.RR,SIM.mRR,SIM.swRR,1,0);
+    if(S.show.mirror&&SIM.mRL)addInstance(sc,SIM.RL,SIM.mRL,SIM.swRL||SIM.swRR,-1,0);
   }
   return sc;
 }
@@ -1114,7 +1115,7 @@ function addInstance(sc,M,m,sw,sx,dy){
     else if(S.show.elastic)L3(sc,a,b,C.ela,1,[6,4]);
   });
   /* --- 节点 --- */
-  if(S.show.node)M.n.forEach(n=>ND(sc,T(n.p),n.fix,n.id,n.zh,sx));
+  if(S.show.node)M.n.forEach(n=>ND(sc,T(n.p),n.fix,n.id,n.zh,sx,M.axleKey));
   /* --- 力矢量 --- */
   if(S.show.force&&S.dyn.on&&sx>0){
     const s=0.055;
@@ -1202,25 +1203,19 @@ function S2W(v,sx,sy,base){
 function fitPoints(){
   const pts=[];
   if(!SIM.R)return[[0,0,0],[900,-400,760],[-900,400,0]];
-  const view=S.axleView;
-  const inst=[[SIM.R,1,0,SIM.mR]];if(S.show.mirror&&SIM.mL)inst.push([SIM.L,-1,0,SIM.mL]);
+  const view=S.axleView,inst=[];
+  if(view!=="rear"){
+    inst.push([SIM.R,1,SIM.mR]);
+    if(S.show.mirror&&SIM.mL)inst.push([SIM.L,-1,SIM.mL]);
+  }
   if(view!=="front"){
-    inst.push([SIM.RR,1,-S.wb,SIM.mRR]);
-    if(S.show.mirror&&SIM.mRL)inst.push([SIM.RL,-1,-S.wb,SIM.mRL]);
+    inst.push([SIM.RR,1,SIM.mRR]);
+    if(S.show.mirror&&SIM.mRL)inst.push([SIM.RL,-1,SIM.mRL]);
   }
-  if(view==="rear")inst.length=0;             // 只看后轴
-  if(view==="rear"){
-    inst.push([SIM.RR,1,-S.wb,SIM.mRR]);
-    if(S.show.mirror&&SIM.mRL)inst.push([SIM.RL,-1,-S.wb,SIM.mRL]);
-  }else if(view==="front"){
-    inst.length=0;
-    inst.push([SIM.R,1,0,SIM.mR]);
-    if(S.show.mirror&&SIM.mL)inst.push([SIM.L,-1,0,SIM.mL]);
-  }
-  inst.forEach(q=>{const M=q[0],sx=q[1],dy=q[2],m=q[3];
-    M.n.forEach(n=>pts.push([n.p[0]*sx,n.p[1]+dy,n.p[2]]));
+  inst.forEach(q=>{const M=q[0],sx=q[1],m=q[2];
+    M.n.forEach(n=>pts.push([n.p[0]*sx,n.p[1],n.p[2]]));
     if(!m)return;
-    const w=[m.wc[0]*sx,m.wc[1]+dy,m.wc[2]],R=S.tire.R,W=S.tire.W/2;
+    const w=[m.wc[0]*sx,m.wc[1],m.wc[2]],R=S.tire.R,W=S.tire.W/2;
     [[R,0,0],[-R,0,0],[0,R,0],[0,-R,0],[0,0,R],[0,0,-R]].forEach(o=>pts.push(add(w,o)));
     pts.push([w[0]+sx*W,w[1],w[2]-R]);pts.push([w[0]-sx*W,w[1],w[2]+R]);
   });
@@ -2133,7 +2128,8 @@ function hookView(v){
     const hit=pickNode(v,mx,my);
     if(e.button===0&&hit&&v.type==="o"){
       UI.selHP=hit.id;
-      UI.drag={mode:"hp",v:v,id:hit.id,sx:hit.sx,x0:e.clientX,y0:e.clientY,base:cpy(S.hp[hit.id])};
+      const HPH=hit.ax==="rear"?(S.axles.rear.hp||S.hp):S.hp;   // 全底盘：按轴落盘
+      UI.drag={mode:"hp",v:v,id:hit.id,sx:hit.sx,ax:hit.ax,x0:e.clientX,y0:e.clientY,base:cpy(HPH[hit.id])};
     }else if(e.button===0&&v.type==="p"&&!e.shiftKey){
       UI.drag={mode:"orb",v:v,x0:e.clientX,y0:e.clientY,az:v.az,el:v.elv};
     }else{
@@ -2154,7 +2150,8 @@ function hookView(v){
         txt=la+" "+fmt(a,1)+"  "+lb+" "+fmt(b,1);
       }else txt="等轴测";
       if(hit){const n=HPDEF[HPI[hit.id]];
-        txt=hit.id+" "+n[1]+"  ["+fmt(S.hp[hit.id][0],1)+", "+fmt(S.hp[hit.id][1],1)+", "+fmt(S.hp[hit.id][2],1)+"]";}
+        const HPH=hit.ax==="rear"?(S.axles.rear.hp||S.hp):S.hp;
+        txt=hit.id+" "+n[1]+"  ["+fmt(HPH[hit.id][0],1)+", "+fmt(HPH[hit.id][1],1)+", "+fmt(HPH[hit.id][2],1)+"]";}
       document.getElementById("sbCur").textContent=txt;
     }
   });
@@ -2186,7 +2183,8 @@ window.addEventListener("mousemove",e=>{
     let w=[v.bx[0]*da+v.by[0]*db,v.bx[1]*da+v.by[1]*db,v.bx[2]*da+v.by[2]*db];
     if(d.sx<0)w[0]=-w[0];
     const snap=e.shiftKey?0.1:1;
-    for(let k=0;k<3;k++)S.hp[d.id][k]=Math.round((d.base[k]+w[k])/snap)*snap;
+    const HPH=d.ax==="rear"?(S.axles.rear.hp||S.hp):S.hp;
+    for(let k=0;k<3;k++)HPH[d.id][k]=Math.round((d.base[k]+w[k])/snap)*snap;
     rebuildLight();
   }else if(d.mode==="orb"){
     v.az=d.az-(e.clientX-d.x0)*0.006;
