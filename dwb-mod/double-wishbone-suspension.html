@@ -276,9 +276,6 @@ const HPDEF=[
  ["TRO",  "横拉杆外点",  "TIE ROD OUTER",    "knuckle",0, 0.9],
  ["RACK", "横拉杆内点",  "TIE ROD INNER",    "chassis",1, 0],
  ["DMP_T","减振器上支点","DAMPER UPR MOUNT",  "chassis",1, 0],
- ["RK_PIV","摇臂枢轴",  "ROCKER PIVOT",     "chassis",1, 0],
- ["RK_A",  "摇臂减振端","ROCKER DAMPER ATTACH","rocker",0, 0],
- ["RK_B",  "摇臂连杆端","ROCKER ROD ATTACH", "rocker",0, 0],
 ];
 const HPI={}; HPDEF.forEach((d,i)=>HPI[d[0]]=i);
 
@@ -304,15 +301,6 @@ const PRESETS={
       WC:[792,0,396],TRO:[676,-162,292],RACK:[262,-188,272],DMP_T:[362,0,796]},
   tire:{R:396,W:265,rim:216,disc:176,label:"265/65R17"},
   cam0:-0.30,toe0:0.15,mS:520,kS:60,kT:170,cB:7,cR:12,wb:2790,hcg:720
- },
- "PROD 前推后拉（FSAE）":{
-   hp:{LCA_F:[180,145,110],LCA_R:[180,-145,118],LBJ:[680,5,145],SPR_L:[480,8,180],
-       UCA_F:[380,115,395],UCA_R:[380,-115,400],UBJ:[650,-15,445],
-       WC:[760,0,300],TRO:[650,-145,195],RACK:[245,-170,185],DMP_T:[340,0,590],
-       RK_PIVOT:[280,0,460],RK_A:[320,0,410],RK_B:[350,0,350]},
-   rearRk:{RK_PIVOT:[280,0,260],RK_A:[320,0,310],RK_B:[350,0,430]},
-   tire:{R:300,W:245,rim:215.9,disc:170,label:"245/40R17"},
-   cam0:-0.80,toe0:0.08,mS:230,kS:95,kT:230,cB:7,cR:12,wb:1550,hcg:290
  }
 };
 const PRESET_KEYS=Object.keys(PRESETS);
@@ -352,8 +340,6 @@ function loadPreset(k){
   S.axles.rear.hp={}; for(const id in S.hp)
     S.axles.rear.hp[id]=[S.hp[id][0],S.hp[id][1]-S.wb,S.hp[id][2]];
   S.axles.rear.tire=Object.assign({},S.tire);
-  /* 前推后拉（第 4 预设）：后轴摇臂 Z 由 rearRk 覆写（前推杆 vs 后拉杆 Z 位置不同） */
-  if(P.rearRk) for(const k in P.rearRk) S.axles.rear.hp[k]=cpy(P.rearRk[k]);
 }
 loadPreset(S.preset);
 
@@ -425,37 +411,13 @@ const LINKDEF=[
  ["SPR_L","DMP_T","E","螺旋弹簧+减振器","damper"],
 ];
 
-/* ---- 推杆/拉杆/摇臂（前推后拉模式）：当 RK_PIVOT 存在时条件启用 ---- */
-function addPushrodMode(m){
-  if(!m.n["RK_PIVOT"]||!m.n["RK_A"]||!m.n["RK_B"]) return; // 非推杆模式（RK 未载入）
-  const i=m.i,n=m.n;
-  /* 判断推杆(LBJ→RK_B)或拉杆(UBJ→RK_B)：RK_B 离谁近就连谁 */
-  const dLBJ=dst(n[i.RK_B].p,n[i.LBJ].p), dUBJ=dst(n[i.RK_B].p,n[i.UBJ].p);
-  const rodFrom=dLBJ<dUBJ?"LBJ":"UBJ";
-  /* 添加推杆/拉杆刚线 */
-  m.links.push({a:i[rodFrom],b:i["RK_B"],id:rodFrom+"_rod",type:"R",
-    zh:dLBJ<dUBJ?"推杆":"拉杆",grp:"rod",
-    L0:dst(n[i[rodFrom]].p,n[i["RK_B"]].p),Ld:dst(n[i[rodFrom]].p,n[i["RK_B"]].p)});
-  /* 弹簧减振器弹性线从 SPR_L→DMP_T 改为 RK_A→DMP_T */
-  const di=m.links.findIndex(l=>l.grp==="damper");
-  if(di>=0){m.links[di].a=i["RK_A"];m.links[di].b=i["DMP_T"];
-    m.links[di].L0=dst(n[i["RK_A"]].p,n[i["DMP_T"]].p);m.links[di].Ld=m.links[di].L0;}
-  /* 摇臂簇：RK_A + RK_B 绕 RK_PIVOT 轴旋转（轴=车架 X） */
-  m.cl.push({kind:"hinge",name:"ROCKER",zh:"摇臂",
-    axA:i["RK_PIVOT"],axB:i["RK_PIVOT"],  // 同一点 → projHinge 默认 X 轴
-    ids:[i["RK_A"],i["RK_B"]],
-    rel:[sub(n[i["RK_A"]].p0,n[i["RK_PIVOT"]].p0),sub(n[i["RK_B"]].p0,n[i["RK_PIVOT"]].p0)],
-    wt:[Math.max(n[i["RK_A"]].m,1e-3),Math.max(n[i["RK_B"]].m,1e-3)]});
-}
 function buildMech(axleKey){
   axleKey=axleKey||"front";
   /* 前轴编辑面=S.hp（拖拽/硬点表写它）；后轴=S.axles.rear.hp（真车坐标，含 Y−wb） */
   const HP=axleKey==="rear"?((S.axles.rear&&S.axles.rear.hp)||S.hp):S.hp;
   const n=[],i={};
   HPDEF.forEach((d,k)=>{
-    const raw=HP[d[0]];
-    if(!raw)return;                       // 预设不含此点（推杆模式外的 RK 点）→ 跳过
-    const p=cpy(raw);
+    const p=cpy(HP[d[0]]);
     n.push({id:d[0],zh:d[1],en:d[2],grp:d[3],fix:!!d[4],m:d[5],
             p:p,p0:cpy(p),pp:cpy(p),v:[0,0,0],w:d[4]?0:(d[5]>0?1/d[5]:0),f:[0,0,0]});
     i[d[0]]=k;
@@ -506,7 +468,6 @@ function buildMech(axleKey){
   };
   M.dof=3*M.nFree-M.nCons;
   const sp=L.find(l=>l.grp==="damper"); M.spring=sp; M.springL0=sp.Ld;
-  addPushrodMode(M);
   return M;
 }
 
@@ -591,7 +552,9 @@ function solveKin(M,drvZ,maxIt,tol){
 /* 设定车身侧节点（含齿条位移）；前轴用 S.hp 活源、后轴用 S.axles.rear.hp */
 function setChassis(M,rack){
   const HP=M.axleKey==="rear"?((S.axles.rear&&S.axles.rear.hp)||S.hp):S.hp;
-  for(const d of HPDEF){ if(!d[4])continue; const N=M.n[M.i[d[0]]];
+  for(const d of HPDEF){ if(!d[4])continue;
+    const idx=M.i[d[0]]; if(idx===undefined||!M.n[idx])continue;
+    const N=M.n[idx];
     N.p[0]=HP[d[0]][0];N.p[1]=HP[d[0]][1];N.p[2]=HP[d[0]][2];}
   const R=M.n[M.i.RACK]; R.p[0]-=rack;      // 齿条横向平移（本侧局部坐标，+输入=向右转）
   M.n[M.i.RACK].pp=cpy(R.p);
@@ -1043,10 +1006,7 @@ function addInstance(sc,M,m,sw,sx,dy){
   dy=dy||0;                                 // 全底盘（T4）：后轴纵向平移 −wb
   const T=p=>[p[0]*sx,p[1]+dy,p[2]];
   const N=id=>T(M.n[M.i[id]].p);
-  const LBJ=N("LBJ"),UBJ=N("UBJ"),WC=N("WC"),TRO=N("TRO");
-  /* 推杆模式：弹簧减振器从 RK_A（摇臂减振端）→ DMP_T；否则 SPR_L → DMP_T */
-  const SPL=M.cl.find(c=>c.name==="ROCKER")?N("RK_A"):N("SPR_L");
-  const DMT=N("DMP_T");
+  const LBJ=N("LBJ"),UBJ=N("UBJ"),WC=N("WC"),TRO=N("TRO"),SPL=N("SPR_L"),DMT=N("DMP_T");
   const LAF=N("LCA_F"),LAR=N("LCA_R"),UAF=N("UCA_F"),UAR=N("UCA_R"),RCK=N("RACK");
   const ax=nrm([m.ax[0]*sx,m.ax[1],m.ax[2]]);
   const cp=T(m.cp),kg=T(m.kg);
@@ -1126,24 +1086,6 @@ function addInstance(sc,M,m,sw,sx,dy){
     /* 弹簧座 */
     PL(sc,circPts(add(SPL,mul(u,L*0.09)),u,60,22),C.ela,1.2);
     PL(sc,circPts(add(DMT,mul(u,-L*0.05)),u,60,22),C.ela,1.2);
-  }
-  /* --- 推杆/拉杆 + 摇臂（前推后拉模式） --- */
-  if(M.cl.find(c=>c.name==="ROCKER")){
-    const i=M.i;
-    const piv=T(M.n[i.RK_PIVOT].p), rkA=T(M.n[i.RK_A].p), rkB=T(M.n[i.RK_B].p);
-    /* 摇臂臂杆 */
-    cylinder(sc,piv,rkA,7,C.rig,1,8);
-    cylinder(sc,piv,rkB,5,C.rig,1,6);
-    L3(sc,rkA,rkB,C.rig,1.0);
-    /* 推杆/拉杆（刚线） */
-    const rod=M.links.find(l=>l.grp==="rod");
-    if(rod){
-      const rA=T(M.n[rod.a].p),rB=T(M.n[rod.b].p);
-      cylinder(sc,rA,rB,8,C.tie,1.2,10);
-      L3(sc,rA,rB,C.tie,2.2);
-    }
-    /* 摇臂枢轴座 */
-    cylinder(sc,sub(piv,[0,0,12]),add(piv,[0,0,12]),12,C.chas,1,8);
   }
   /* --- 稳定杆臂与连杆（全底盘：按机构轴取硬点） --- */
   if(S.show.arb&&S.arb.d>0.5){
