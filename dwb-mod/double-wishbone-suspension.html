@@ -572,9 +572,14 @@ function residual(M,drvZ){
 function sweepProj(M,drvZ){
   if(drvZ!==null&&drvZ!==undefined) M.n[M.i.WC].p[2]=drvZ;
   projLink(M,M.tie);
-  projHinge(M,M.cl[0]);
-  projHinge(M,M.cl[1]);
-  projBody(M,M.cl[2]);
+  projHinge(M,M.cl[0]);      // LCA 铰链
+  projHinge(M,M.cl[1]);      // UCA 铰链
+  projBody(M,M.cl[2]);       // 转向节刚体
+  /* 推杆/摇臂约束（前推后拉模式）：约束加入 GS 扫描以保证收敛 */
+  const rodLink=M.L.find(l=>l.grp==="rod");
+  if(rodLink) projLink(M,rodLink);           // 推杆/拉杆刚线
+  const rocker=M.cl.find(c=>c.name==="ROCKER");
+  if(rocker) projHinge(M,rocker);             // 摇臂绕枢轴旋转
 }
 /* 运动学求解：驱动轮心高度至目标，转向齿条位移已写入固定节点 */
 function solveKin(M,drvZ,maxIt,tol){
