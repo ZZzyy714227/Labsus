@@ -718,7 +718,8 @@ function metrics(M,hpSrc){
   return{tr:wc[2]-M.n[M.i.WC].p0[2],cam:cam,toe:toe,cast:cast,kpi:kpi,incl:kpi+cam,
     apsi:ag.psi*R2D,alz:ag.P[2],
     scrub:scrub,trail:trail,cp:cp,wc:wc,lbj:lbj,ubj:ubj,tro:tro,spl:spl,kg:kg,ax:ax,
-    ic:ic,rcH:rcH,svic:svic,anti:anti,sl:dst(spl,P("DMP_T")),
+    ic:ic,rcH:rcH,svic:svic,anti:anti,
+    sl:(M.spring?dst(M.n[M.spring.a].p,M.n[M.spring.b].p):dst(spl,P("DMP_T"))),
     half:cp[0],steer:-toe,R:R};
 }
 
