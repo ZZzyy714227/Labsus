@@ -105,7 +105,10 @@ class CornerLoadsResult:
 
 
 def _chassis_end(l: LinkForce, hub: np.ndarray) -> np.ndarray:
-    """识别杆的车身端：距 hub_point 较远的一侧。"""
+    """识别杆的车身端：距 hub_point 较远的一侧。
+
+    退化情况：若两端等距（杆中点恰在 hub），默认返回 l.b；实际悬架不会出现。
+    """
     da = float(np.linalg.norm(l.a - hub))
     db = float(np.linalg.norm(l.b - hub))
     return l.a if da > db else l.b
@@ -135,8 +138,12 @@ def corner_to_anchor_loads(
 
     Returns:
         CornerLoadsResult：锚点合力字典 + 残差。
+
+    T8 集成约定：anchor_loads 值为杆件施加在车身锚点上的力（即 solve_compliance
+    中 f_ext 的 loads[n]），符号无需翻转，直接传入。
     """
     f_cp = np.array([q.fx, q.fy, q.fz], float)
+    _ = cp_rel  # 预留：S2 力矩/力臂折算
     A = np.column_stack([l.unit() for l in links])
     m, resid = solve_linear(A, -f_cp)
     for i, l in enumerate(links):
