@@ -940,7 +940,8 @@ const C={
   gnd:"#3a424b",
   path:"#a473c4",pathC:"#54a06a",pathK:"#e0603f",
   ic:"#d9a238",rc:"#54a06a",dim:"#78848f",dimT:"#9aa6b2",
-  arb:"#c07ad0",frc:"#d2543f",txt:"#c3cad2",txt2:"#8b95a1",txt3:"#5c6672"
+  arb:"#c07ad0",frc:"#d2543f",txt:"#c3cad2",txt2:"#8b95a1",txt3:"#5c6672",
+  carbon:"#23282e",rocker:"#b9c2c9"
 };
 const L3=(sc,a,b,c,w,d,al)=>sc.push({k:"l",a:a,b:b,c:c,w:w||1,d:d,al:al});
 const PL=(sc,pts,c,w,d,f,al)=>sc.push({k:"p",pts:pts,c:c,w:w||1,d:d,f:f,al:al});
@@ -959,6 +960,27 @@ function cylinder(sc,a,b,r,col,w,nseg){
   for(let k=0;k<4;k++){const an=PI/4+k*PI/2;
     const o=add(mul(u,r*cos(an)),mul(v,r*sin(an)));
     L3(sc,add(a,o),add(b,o),col,w||1);}
+}
+/* 泪滴形杆体轮廓：a=外端(圆钝半圆) → b=内端(收尖)；w=最大宽度；供 PL() 使用 */
+function teardropPts(a,b,w){
+  const d=sub(b,a),L=len(d)||1,u=mul(d,1/L);
+  let ref=[0,1,0]; if(abs(dot(ref,u))>0.9)ref=[1,0,0];
+  const v=nrm(sub(ref,mul(u,dot(ref,u)))), R=w*0.5, pts=[];
+  const N=8;
+  for(let k=0;k<=N;k++){
+    const an=-PI/2+PI*k/N;
+    pts.push([a[0]+u[0]*R*Math.cos(an)+v[0]*R*Math.sin(an),
+              a[1]+u[1]*R*Math.cos(an)+v[1]*R*Math.sin(an),
+              a[2]+u[2]*R*Math.cos(an)+v[2]*R*Math.sin(an)]);
+  }
+  const T=14;
+  for(let k=1;k<=T;k++){
+    const t=k/T, x=R+(L-R)*t, ww=R*(1-t);
+    pts.push([a[0]+u[0]*x+v[0]*ww,
+              a[1]+u[1]*x+v[1]*ww,
+              a[2]+u[2]*x+v[2]*ww]);
+  }
+  return pts;   // 注意：调用方需自行闭合（push 首点）—— 见 Step 3
 }
 /* 螺旋弹簧 */
 function springPts(a,b,r,turns,seg){
@@ -1085,10 +1107,14 @@ function addInstance(sc,M,m,sw,sx,dy){
   /* 轮面内的稳定基向量 */
   const eU=nrm(sub([0,0,1],mul(ax,dot([0,0,1],ax)))),eV=cross(ax,eU);
 
-  /* --- 摆臂实体（三角面 + 支杆） --- */
+  /* --- 摆臂实体（泪滴面片 + 支杆） --- */
   if(S.show.face){
-    PL(sc,[LAF,LBJ,LAR,LAF],C.rigArm,1,null,C.arm);
-    PL(sc,[UAF,UBJ,UAR,UAF],C.rigArm,1,null,C.arm);
+    const tear=(A,B,w)=>{
+      const P=teardropPts(A,B,w); P.push(P[0]);
+      PL(sc,P,C.carbon,1.15,null,"rgba(35,40,46,0.45)");
+    };
+    tear(LAF,LBJ,34); tear(LAR,LBJ,34);
+    tear(UAF,UBJ,30); tear(UAR,UBJ,30);
     PL(sc,[LBJ,UBJ,WC,LBJ],C.knu,1,null,C.knuF);
     PL(sc,[LBJ,UBJ,TRO,LBJ],C.knu,1,null,C.knuF);
     PL(sc,[LBJ,WC,TRO,LBJ],C.knu,1,null,C.knuF);
@@ -1162,16 +1188,21 @@ function addInstance(sc,M,m,sw,sx,dy){
   if(M.cl.find(c=>c.name==="ROCKER")){
     const i=M.i;
     const piv=T(M.n[i.RK_PIVOT].p), rkA=T(M.n[i.RK_A].p), rkB=T(M.n[i.RK_B].p);
-    /* 摇臂臂杆 */
-    cylinder(sc,piv,rkA,7,C.rig,1,8);
-    cylinder(sc,piv,rkB,5,C.rig,1,6);
-    L3(sc,rkA,rkB,C.rig,1.0);
-    /* 推杆/拉杆（刚线） */
+    /* 摇臂本体（钛银）：枢轴→两臂端多边形 + 臂杆 */
+    PL(sc,[piv,rkA,piv,rkB,piv],C.rocker,1.1,null,"rgba(185,194,201,0.35)");
+    cylinder(sc,piv,rkA,7,C.rocker,1,8);
+    cylinder(sc,piv,rkB,5,C.rocker,1,6);
+    /* 推杆/拉杆（碳纤黑圆柱 + Heim 球头） */
     const rod=M.L.find(l=>l.grp==="rod");
     if(rod){
       const rA=T(M.n[rod.a].p),rB=T(M.n[rod.b].p);
-      cylinder(sc,rA,rB,8,C.tie,1.2,10);
-      L3(sc,rA,rB,C.tie,2.2);
+      cylinder(sc,rA,rB,8,C.carbon,1.2,10);
+      L3(sc,rA,rB,C.carbon,2.2);
+      [[rA,12],[rB,12]].forEach(q=>{
+        PL(sc,circPts(q[0],[1,0,0],q[1],12),C.rig,1);
+        PL(sc,circPts(q[0],[0,1,0],q[1],12),C.rig,1);
+        PL(sc,circPts(q[0],[0,0,1],q[1],12),C.rig,1);
+      });
     }
     /* 摇臂枢轴座 */
     cylinder(sc,sub(piv,[0,0,12]),add(piv,[0,0,12]),12,C.chas,1,8);
