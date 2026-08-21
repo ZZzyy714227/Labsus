@@ -278,7 +278,7 @@ const HPDEF=[
  ["DMP_T","减振器上支点","DAMPER UPR MOUNT",  "chassis",1, 0],
  ["RK_PIVOT","摇臂枢轴","ROCKER PIVOT",       "chassis",1, 0],
  ["RK_A",  "摇臂减振端","ROCKER DAMPER ATTACH","rocker",0, 0],
- ["RK_B",  "摇臂连杆端","ROCKER ROD ATTACH", "rocker",0, 0],
+ ["RK_B",  "摇臂连杆端","ROCKER ROD ATTACH", "rocker",0, 0.005],
 ];
 const HPI={}; HPDEF.forEach((d,i)=>HPI[d[0]]=i);
 
@@ -523,7 +523,9 @@ function projLink(M,l){
 }
 /* 铰链簇：绕两固定铰点连线做单参数最优旋转（解析解，精确） */
 function projHinge(M,c){
-  const o=M.n[c.axA].p, b=M.n[c.axB].p, ax=nrm(sub(b,o));
+  const o=M.n[c.axA].p, b=M.n[c.axB].p, ab=sub(b,o);
+  /* 单点枢轴（axA==axB，如摇臂）或退化轴：默认绕车架 X 轴（侧倾轴方向） */
+  const ax=(c.axA===c.axB||len(ab)<1e-9)?[1,0,0]:nrm(ab);
   let sn=0,cs=0;
   for(let k=0;k<c.ids.length;k++){
     const r=c.rel[k], rp=dot(r,ax), rq=sub(r,mul(ax,rp));
@@ -575,15 +577,17 @@ function sweepProj(M,drvZ){
   projHinge(M,M.cl[0]);      // LCA 铰链
   projHinge(M,M.cl[1]);      // UCA 铰链
   projBody(M,M.cl[2]);       // 转向节刚体
-  /* 推杆/摇臂约束（前推后拉模式）：约束加入 GS 扫描以保证收敛 */
-  const rodLink=M.L.find(l=>l.grp==="rod");
-  if(rodLink) projLink(M,rodLink);           // 推杆/拉杆刚线
+  /* 推杆/摇臂约束（前推后拉模式）：摇臂+推杆构成局部 1-DOF 回路，
+     每次扫描内多轮交替投影解紧该回路，否则全局 GS 收缩率极低（数千次不收敛） */
   const rocker=M.cl.find(c=>c.name==="ROCKER");
-  if(rocker) projHinge(M,rocker);             // 摇臂绕枢轴旋转
+  const rodLink=M.L.find(l=>l.grp==="rod");
+  if(rocker){
+    for(let k=0;k<12;k++){ projHinge(M,rocker); if(rodLink)projLink(M,rodLink); }
+  }
 }
 /* 运动学求解：驱动轮心高度至目标，转向齿条位移已写入固定节点 */
 function solveKin(M,drvZ,maxIt,tol){
-  maxIt=maxIt||260; tol=tol||2e-7;
+  maxIt=maxIt||900; tol=tol||2e-7;
   const t0=performance.now(); let it=0,res=1;
   for(;it<maxIt;it++){
     sweepProj(M,drvZ);
@@ -613,7 +617,7 @@ function driveTo(M,targetZ,rack){
   setChassis(M,rack);
   const cur=M.n[M.i.WC].p[2];
   const d=targetZ-cur, steps=Math.min(24,Math.max(1,Math.ceil(abs(d)/6)));
-  for(let s=1;s<=steps;s++) solveKin(M,cur+d*s/steps,s===steps?260:40,2e-7);
+  for(let s=1;s<=steps;s++) solveKin(M,cur+d*s/steps,s===steps?900:60,2e-7);
   return M.res;
 }
 /* ================================ 3. 运动学指标 ================================ */
@@ -1807,11 +1811,14 @@ function buildLeft(){
     for(let k=0;k<3;k++){
       const c=E("td",d[4]?"fx":"fr");
       const inp=E("input");inp.type="number";inp.step="1";
-      inp.oninput=()=>{const v=parseFloat(inp.value);if(isFinite(v)){S.hp[d[0]][k]=v;rebuildLight();}};
+      inp.oninput=()=>{const hp=S.hp[d[0]];if(!hp)return;
+        const v=parseFloat(inp.value);if(isFinite(v)){hp[k]=v;rebuildLight();}};
       inp.onchange=()=>{refreshDerived(true);};
       inp.onfocus=()=>{UI.selHP=d[0];};
       c.appendChild(inp);tr.appendChild(c);
-      UI.sync.push(()=>{if(document.activeElement!==inp)inp.value=fmt(S.hp[d[0]][k],1);});
+      /* 预设可能不含此硬点（如非推杆模式无 RK_* 点）：禁用并留空，避免 undefined 崩溃 */
+      UI.sync.push(()=>{const hp=S.hp[d[0]];inp.disabled=!hp;
+        if(document.activeElement!==inp)inp.value=hp?fmt(hp[k],1):"";});
     }
     tr.onclick=()=>{UI.selHP=d[0];};
     UI.sync.push(()=>tr.classList.toggle("sel",UI.selHP===d[0]));
