@@ -1,5 +1,13 @@
 # 开发日志
 
+## 2026-08-21 — 修复 dwb-mod 打开即卡死（首帧 TypeError 杀死 rAF 循环）+ PROD 前推后拉收敛性根治
+- 用户反馈：`dwb-mod/double-wishbone-suspension.html` 浏览器打开无运动模拟、页面卡住。
+- 根因①（卡死主因，所有非 PROD 预设必现）：`e37e372` 给 HPDEF 增加 RK_PIVOT/RK_A/RK_B 后，硬点表为全部 14 点注册 `UI.sync` 回调 `fmt(S.hp[d[0]][k])`；SPORT/RACE/SUV 的 `S.hp` 无 RK_* 键 → 首帧 `loop()` 内回调读 `undefined[0]` 抛 TypeError；`requestAnimationFrame(loop)` 位于 loop 末尾 → 循环出生即死。修复：表行回调对缺失点禁用输入框并留空（随预设切换动态生效）。
+- 根因②（PROD 行程锁 ±2mm）：a) `addPushrodMode` 摇臂簇 axA==axB → `projHinge` 得零轴 → 摇臂投影空操作（注释声称"默认 X 轴"但从未实现）；b) RK_B 质量 0 → projLink 视为不动点，推杆修正 100% 砸向 UBJ，与摇臂/刚体投影互相打架成死锁平台（残差恒 3.34mm 不动）。修复：projHinge 单点枢轴默认 X 轴；RK_B 质量 0.005kg（轻端沿摇臂圆滑动）；sweepProj 对摇臂+推杆局部回路内迭代 12 次（GS 收缩率极差，实测 K=12 较 K=1 快 ~5 倍）；solveKin 上限 260→900。
+- 实证（Node24 + DOM 桩 harness，`.workbuddy/tmp/dwb_harness.mjs`，可复现）：fresh/prod/sport-rear 三场景各 300 帧零异常；PROD 前轴几何极限 [0,0]→[-138,138]、轮跳 ±51mm 正弦满摆、残差 0、ok=true、iter=204；SPORT 行为与修复前逐位一致（iter=108，未受影响）。
+- 已知边界：PROD 后轴 geoRR=[-8,138]（伸张端 -8mm 即止，属 rearRk 预设摇臂几何数据问题，非求解器问题）；PROD 帧均耗时约为 SPORT 2 倍（54ms vs 27ms，桩环境），后续可做自适应 K 优化。
+- 提交：dwb-mod/double-wishbone-suspension.html + DEVLOG。
+
 ## 2026-08-21 — 双版本文件区分：魔改 DWB 归位 dwb-mod/，截图类 PNG 全删
 
 - 需求：用户要求把「魔改 DWB」与「自研系统」在本地文件层面彻底分开。
