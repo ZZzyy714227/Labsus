@@ -13,6 +13,7 @@ def test_linear_force_and_jac():
     d = np.array([0.01, -0.02, 0.005, 0.001, 0.0, -0.002])
     f = bush_force(b, d)
     assert np.allclose(f[:3], [0.5, -1.0, 0.25], atol=1e-9)
+    assert np.allclose(f[3:], [2000*0.001, 0.0, 2000*(-0.002)], atol=1e-9)  # [2.0, 0.0, -4.0]
     J = bush_force_jac(b, d)          # 解析（样条/线性）导数
     fd = np.zeros((6, 6))
     h = 1e-7
