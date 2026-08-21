@@ -587,7 +587,12 @@ function arbGeom(lbj,hpSrc){
   const HP=hpSrc||S.hp;
   const F=HP.LCA_F,B=HP.LBJ,t=S.arb.t;
   const P0=lerp3(F,B,t);                                  // 设计位形：连杆下端(下摆臂上一点)
-  const xa=P0[0],ay=F[1]+S.arb.dy,az=F[2]+S.arb.dz;
+  const xa=P0[0];
+  /* Y偏置方向：前轴（F.y>0）杆体在LCA前方(+dy)；后轴（F.y<0）杆体在LCA后方(-dy)
+     → 两个方向都是"远离车辆中心"，机械上正确 */
+  const dySign=(F[1]>=0)?1:-1;
+  const ay=F[1]+S.arb.dy*dySign;
+  const az=F[2]+S.arb.dz;
   const a=ay-P0[1];                                       // 扭杆臂长(力臂)
   const E0=[xa,ay-a,az];
   const ldl=dst(E0,P0);                                   // 连杆长度(刚性)
