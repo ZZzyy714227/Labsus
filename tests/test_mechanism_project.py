@@ -1,7 +1,14 @@
 import numpy as np
 
 from solver.mechanism.models import Node
-from solver.mechanism.project import project_distance, project_hinge
+from solver.mechanism.project import (
+    polar_q,
+    project_body,
+    project_distance,
+    project_hinge,
+    q_axis_angle,
+    q_mat,
+)
 
 
 def mk(ids, p0, fix=False, mass=1.0):
@@ -55,3 +62,41 @@ def test_hinge_pulls_perturbed_member_onto_circle():
     assert abs(float(np.linalg.norm(n["M"].pos)) - 100.0) < 1e-9
     assert abs(float(n["M"].pos[2])) < 1e-9
     assert err > 0.0  # 确实发生了位移（≈15.3）
+
+
+def test_polar_q_closed_form():
+    th = np.deg2rad(40.0)
+    pts = np.array(
+        [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 1.0], [-1.0, 2.0, -3.0]], dtype=float
+    )
+    c = pts.mean(axis=0)
+    rel = pts - c
+    q_true = q_axis_angle(np.array([0.0, 0.0, 1.0]), th)
+    r_true = q_mat(q_true)
+    moved = (r_true @ rel.T).T + c
+    a_cov = sum(np.outer(moved[i] - c, rel[i]) for i in range(4))
+    q = polar_q(a_cov, np.array([0.0, 0.0, 0.0, 1.0]), 40)
+    r = q_mat(q)
+    assert np.allclose(r @ rel[0], r_true @ rel[0], atol=1e-6)
+    assert q.shape == (4,)
+
+
+def test_body_rigid_reconstruction():
+    pts0 = np.array(
+        [[0.0, 0.0, 0.0], [50.0, 0.0, 0.0], [0.0, 60.0, 0.0], [10.0, 20.0, 30.0]], dtype=float
+    )
+    ids = ["A", "B", "C", "D"]
+    wt = [1.0, 1.0, 1.0, 1.0]
+    ws = 4.0
+    n = mk(ids, pts0)
+    c0 = np.mean(pts0, axis=0)
+    rel = [pts0[j] - c0 for j in range(4)]
+    rng = np.random.default_rng(3)
+    for j, name in enumerate(ids):
+        n[name].pos = pts0[j] + rng.normal(size=3)
+    project_body(n, ids, rel, wt, ws)
+    for i in range(4):
+        for j in range(i + 1, 4):
+            d0 = float(np.linalg.norm(pts0[i] - pts0[j]))
+            d1 = float(np.linalg.norm(n[ids[i]].pos - n[ids[j]].pos))
+            assert abs(d1 - d0) < 1e-9, f"{ids[i]}-{ids[j]}: {d1 - d0}"
