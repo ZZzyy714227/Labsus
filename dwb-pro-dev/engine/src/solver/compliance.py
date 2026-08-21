@@ -1,11 +1,11 @@
 """K&C 两层迭代求解器（S1 引擎内核·分水岭）。
 
 内层：衬套位移 δ 写入锚点（小角刚体变换）→ solve_pose（现有 least_squares TRF 机构投影）。
-外层：δ 上力平衡 r(δ) = f_ext − bush_force(δ)（TRF + 数值雅可比）。
+外层：δ 上力平衡 r(δ) = f_ext − bush_force(δ)（TRF + 数值雅可比 + Anderson 兜底）。
 状态机：VALID / APPROXIMATE（最小范数超静定）/ COMPLIANCE_DIVERGED / SOLVER_FAILED。
 
 符号约定（load 与 δ 的关系）：
-    load: 作用于衬套锚点的外载荷向量（N，全局坐标 3 分量）。
+    load: 作用于衬套锚点的外载荷向量（N，全局坐标3分量）。
     δ: 衬套 6DOF 位移 [dx, dy, dz, rx, ry, rz]（mm / rad）。
     平衡方程: r(δ) = f_ext − bush_force(δ) = 0
     bush_force(δ)[i] = k[i] * δ[i]（线性刚度，S1 阶段无耦合/预紧简化）。
@@ -13,8 +13,10 @@
     向下力 load_z = −500 → δz = −500/k_z（衬套负向位移，成员相对锚点下移/压缩）。
     测试断言若需验证位移 magnitude，使用 abs(δ) 以避免符号歧义。
 
-T4 载荷模型：单锚点直承外载（S1 阶段简化）。
+S1 载荷模型：单锚点直承外载（简化）。
 T5 将对接 T2 静力层（接地点外载 → 二力杆 → 锚点合力）替换 load。
+
+返回后 mech 处于最终一致姿态；result.anchors 为最终锚点位置。
 """
 from __future__ import annotations
 
@@ -28,10 +30,24 @@ from src.components.bushing import Bushing6DOF, bush_force
 from src.solver.mechanism.solver import solve_pose
 from src.solver.compliance_transform import apply_bushing_to_anchors
 
+# ── 状态判定阈值（模块常量） ──
+COST_VALID = 1e-6         # 外层代价函数低于此值 → VALID
+COST_DIVERGED = 1e-3      # 外层代价函数高于此值且未收敛 → COMPLIANCE_DIVERGED
+KIN_TOL = 1e-10           # 内层运动学求解器公差
+KIN_MAX_NFEV = 200        # 内层最大函数评估次数
+ANDERSON_BETA = 0.5       # Anderson 混合系数（简单不动点步长）
+ANDERSON_MEM = 3          # Anderson 历史深度
+ANDERSON_MAX_ITER = 40    # Anderson 最大迭代
+ANDERSON_TOL = 1e-6       # Anderson 收敛阈值
+ANDERSON_MAX_STEP = 5.0   # Anderson 单步最大位移（mm）
+
 
 @dataclass
 class ComplianceSolverResult:
-    """K&C 求解结果。"""
+    """K&C 求解结果。
+
+    返回后 mech 处于最终一致姿态；anchors 为最终锚点位置。
+    """
     status: str                               # VALID | APPROXIMATE | COMPLIANCE_DIVERGED | SOLVER_FAILED
     delta: dict[str, np.ndarray] = field(default_factory=dict)   # {衬套名: 6-DOF 位移}
     kin_residual: float = 0.0                 # 内层运动学最大残差（mm）
@@ -42,11 +58,58 @@ class ComplianceSolverResult:
     bush_loads: dict[str, np.ndarray] = field(default_factory=dict)  # {衬套名: 6-抗力}
 
 
+# ── Anderson 加速不动点迭代（C1: TRF 失败后的兜底） ──
+def _anderson(residual_fun, x0, *, beta: float = ANDERSON_BETA,
+              m: int = ANDERSON_MEM, max_iter: int = ANDERSON_MAX_ITER,
+              tol: float = ANDERSON_TOL) -> tuple[np.ndarray, float, bool]:
+    """Anderson-M 加速不动点迭代 δ_{k+1} = δ_k + r(δ_k)。
+
+    无雅可比，仅使用历史差商做最小二乘外推。
+    返回 (x, residual_norm, converged)。
+    """
+    x = np.asarray(x0, float).copy()
+    xs: list[np.ndarray] = []
+    fs: list[np.ndarray] = []
+
+    for _ in range(max_iter):
+        r = np.asarray(residual_fun(x), float)
+        rnorm = float(np.linalg.norm(r))
+        if rnorm < tol:
+            return x, rnorm, True
+
+        xs.append(x.copy())
+        fs.append(r.copy())
+        if len(xs) > m:
+            xs.pop(0)
+            fs.pop(0)
+
+        if len(xs) > 1:
+            # 最小化 ||F(x)+F'(x)dx|| 的最小二乘外推（无雅可比，使用历史差商）
+            DX = np.column_stack([xs[k] - xs[k - 1] for k in range(1, len(xs))])
+            DF = np.column_stack([fs[k] - fs[k - 1] for k in range(1, len(fs))])
+            g, *_ = np.linalg.lstsq(DF, -fs[-1], rcond=None)
+            x_new = xs[-1] + DX @ g
+        else:
+            x_new = x + beta * r
+
+        # 限制步长
+        step = np.linalg.norm(x_new - xs[-1])
+        if step > ANDERSON_MAX_STEP:
+            x_new = xs[-1] + (x_new - xs[-1]) * (ANDERSON_MAX_STEP / step)
+        x = x_new
+
+    # 最终评估
+    r = np.asarray(residual_fun(x), float)
+    rnorm = float(np.linalg.norm(r))
+    return x, rnorm, rnorm < tol
+
+
 def solve_compliance(
     mech,
     *,
     bushings: dict[str, Bushing6DOF],
     load: np.ndarray,
+    loads: dict[str, np.ndarray] | None = None,
     travel: float,
     rack: float,
     applied_at: dict[str, str] | None = None,
@@ -62,11 +125,13 @@ def solve_compliance(
     bushings : dict
         {衬套名: Bushing6DOF} 衬套集合。空字典 → 纯运动学回退。
     load : np.ndarray, shape (3,)
-        作用于衬套锚点的外载荷向量（N，全局坐标）。单锚点直承模型。
+        默认外载荷向量（N，全局坐标），广播到所有衬套。
+    loads : dict, optional
+        {衬套名: np.ndarray(3,)} 各衬套独立外载荷。提供时覆盖 load 广播。
     travel, rack : float
         轮跳 / 齿条位移（mm），传入内层 solve_pose。
     applied_at : dict, optional
-        {衬套名: 节点名} 载荷作用点映射。默认取各衬套 member_nodes[0]。
+        {衬套名: 节点名} 载荷作用点映射（保留参数，T5 扩展用）。
     max_disp_step : float
         外层 TRF 变量缩放（mm），控制最大步长。
     max_nfev : int
@@ -75,6 +140,7 @@ def solve_compliance(
     Returns
     -------
     ComplianceSolverResult
+        返回后 mech 处于最终一致姿态；anchors 为最终锚点位置。
     """
     t0 = time.perf_counter()
     names = list(bushings.keys())
@@ -91,72 +157,110 @@ def solve_compliance(
             ms=(time.perf_counter() - t0) * 1000.0,
         )
 
-    # 载荷作用点映射
-    at = applied_at or {n: next(iter(b.member_nodes)) for n, b in bushings.items()}
-
-    # ── 辅助：打包/解包 δ 向量 ──
-    def _pack(d: dict[str, np.ndarray]) -> np.ndarray:
-        return np.concatenate([np.asarray(d[n], float) for n in names])
+    # 载荷映射：per-bushing loads 优先，否则广播 load
+    load_broadcast = np.asarray(load, float)
+    bush_ext: dict[str, np.ndarray] = {}
+    for n in names:
+        if loads is not None and n in loads:
+            bush_ext[n] = np.asarray(loads[n], float)[:3].copy()
+        else:
+            bush_ext[n] = load_broadcast[:3].copy()
 
     def _unpack(x: np.ndarray) -> dict[str, np.ndarray]:
         return {n: x[6 * k: 6 * k + 6] for k, n in enumerate(names)}
 
     # ── 外层残差：力平衡 r(δ) = f_ext − bush_force(δ) ──
-    kin_last = [0.0]  # closure for kin_residual
+    # kin_last 通过结果赋值回传（M2: 避免 mutable closure）
+    _kin_last = 0.0
 
     def _residual(x: np.ndarray) -> np.ndarray:
+        nonlocal _kin_last
         d = _unpack(x)
         # 1) 内层：衬套位移 → 锚点变换 → 机构重解
         anchors = apply_bushing_to_anchors(bushings, d)
         for node, pos in anchors.items():
             mech.nodes[node].pos = pos.copy()
-        rep = solve_pose(mech, travel, rack, max_nfev=200, tol=1e-10)
-        kin_last[0] = rep.residual
+        rep = solve_pose(mech, travel, rack, max_nfev=KIN_MAX_NFEV, tol=KIN_TOL)
+        _kin_last = rep.residual
 
         # 2) 外层：力平衡残差
+        # S1: 外载仅作用于平移 DOF（3分量）；旋转 DOF 无外部力矩（M5 注释），
+        # 因为 K&C 测试中衬套仅传递平移力，旋转约束由机构铰链承担。
         r = np.zeros(6 * nd)
-        f_ext = np.zeros(6)
-        f_ext[:3] = load
         for k, n in enumerate(names):
+            f_ext = np.zeros(6)
+            f_ext[:3] = bush_ext[n]   # S1: 仅平移外载；旋转 DOF 无外部力矩
             r[6 * k: 6 * k + 6] = f_ext - bush_force(bushings[n], d[n])
         return r
 
     # ── 外层求解：scipy TRF ──
     x0 = np.zeros(6 * nd)
+    trf_nfev = 0
     try:
         res = least_squares(
             _residual, x0, method="trf", max_nfev=max_nfev,
             xtol=1e-8, ftol=1e-8, gtol=1e-8,
             x_scale=np.ones(6 * nd) * max_disp_step,
         )
+        trf_nfev = int(res.nfev)
     except Exception:
-        return ComplianceSolverResult(
-            status="SOLVER_FAILED",
-            kin_residual=kin_last[0],
-            iterations=0,
-            ms=(time.perf_counter() - t0) * 1000.0,
-        )
+        # TRF 异常 → 尝试 Anderson 兜底
+        res = None
 
-    d = _unpack(res.x)
+    # ── C1: Anderson 固定点回退 ──
+    anderson_ok = False
+    anderson_rnorm = float("inf")
+    if res is None or (not res.success and res.cost > COST_DIVERGED):
+        anderson_x, anderson_rnorm, anderson_ok = _anderson(_residual, x0)
+        anderson_nfev = ANDERSON_MAX_ITER  # 估算
+        if res is None:
+            # TRF 完全失败 → 用 Anderson 结果
+            res_x = anderson_x
+            final_nfev = anderson_nfev
+        else:
+            # TRF 和 Anderson 都跑了 → 选更好的
+            trf_rnorm = float(np.sqrt(2 * res.cost))
+            if anderson_rnorm < trf_rnorm:
+                res_x = anderson_x
+                final_nfev = trf_nfev + anderson_nfev
+            else:
+                res_x = res.x
+                final_nfev = trf_nfev
+    else:
+        res_x = res.x
+        final_nfev = trf_nfev
+
+    d = _unpack(res_x)
 
     # ── 状态判定 ──
-    if res.cost < 1e-6:
+    # 重新评估最终残差以获取精确代价
+    final_r = np.asarray(_residual(res_x), float)
+    final_rnorm = float(np.linalg.norm(final_r))
+    final_cost = 0.5 * final_rnorm ** 2
+
+    if final_cost < COST_VALID:
         status = "VALID"
-    elif not res.success and res.cost > 1e-3:
+    elif anderson_ok:
+        # Anderson 收敛（即使 TRF 没收敛）→ VALID
+        status = "VALID"
+    elif final_cost > COST_DIVERGED:
         status = "COMPLIANCE_DIVERGED"
     else:
         status = "APPROXIMATE"
 
-    # ── 组装结果 ──
-    # 重新应用最优解以获取最终锚点位置
+    # ── C2: 最终一致性写回 ──
+    # 将最优 δ 的锚点位置写入 mech.nodes，并运行最终 solve_pose 确保机构一致
     final_anchors = apply_bushing_to_anchors(bushings, d)
+    for node, pos in final_anchors.items():
+        mech.nodes[node].pos = pos.copy()
+    solve_pose(mech, travel, rack, max_nfev=KIN_MAX_NFEV, tol=KIN_TOL)
 
     return ComplianceSolverResult(
         status=status,
         delta=d,
-        kin_residual=kin_last[0],
-        force_balance_residual=float(np.sqrt(2 * res.cost)),
-        iterations=int(res.nfev),
+        kin_residual=_kin_last,
+        force_balance_residual=final_rnorm,
+        iterations=final_nfev,
         ms=(time.perf_counter() - t0) * 1000.0,
         anchors=final_anchors,
         bush_loads={n: bush_force(bushings[n], d[n]) for n in names},
