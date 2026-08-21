@@ -269,6 +269,8 @@ const HPDEF=[
  ["LCA_R","下摆臂后铰点","LWR ARM RR PIVOT", "chassis",1, 0],
  ["LBJ",  "下球头",      "LWR BALL JOINT",   "lca",    0, 2.0],
  ["SPR_L","减振器下支点","DAMPER LWR MOUNT",  "lca",    0, 1.6],
+ ["PR_L", "推杆下点",    "PUSHROD LWR END",   "lca",    0, 0.6],
+ ["PR_U", "拉杆上点",    "PULLROD UPR END",   "uca",    0, 0.6],
  ["UCA_F","上摆臂前铰点","UPR ARM FRT PIVOT","chassis",1, 0],
  ["UCA_R","上摆臂后铰点","UPR ARM RR PIVOT", "chassis",1, 0],
  ["UBJ",  "上球头",      "UPR BALL JOINT",   "uca",    0, 1.5],
@@ -284,6 +286,18 @@ const HPI={}; HPDEF.forEach((d,i)=>HPI[d[0]]=i);
 
 /* 预设工况几何（右侧，mm） */
 const PRESETS={
+ "FSR-06 前推后拉正式版":{
+  hp:{LCA_F:[250,165,130],LCA_R:[250,-165,138],LBJ:[745,10,165],SPR_L:[600,12,180],
+      PR_L:[700,12,178],
+      UCA_F:[430,120,435],UCA_R:[430,-120,440],UBJ:[690,-5,480],
+      WC:[800,0,318],TRO:[680,-150,240],RACK:[270,-180,245],
+      RK_PIVOT:[320,0,600],RK_A:[360,240,598],RK_B:[300,0,505],DMP_T:[360,-260,598]},
+  rearRk:{PR_U:[695,-1505,495],
+          RK_PIVOT:[280,-1500,110],RK_A:[360,-1260,110],
+          RK_B:[280,-1500,290],DMP_T:[360,-1230,108]},
+  tire:{R:318,W:245,rim:215.9,disc:170,label:"245/40R17"},
+  cam0:-3.0,toe0:0.05,mS:300,kS:95,kT:240,cB:8,cR:12,wb:3000,hcg:300
+ },
  "SPORT 街道运动型":{
   hp:{LCA_F:[215,150,152],LCA_R:[215,-150,162],LBJ:[705,8,178],SPR_L:[520,10,205],
       UCA_F:[395,120,452],UCA_R:[395,-120,456],UBJ:[655,-18,512],
@@ -451,14 +465,14 @@ function buildMech(axleKey){
   axleKey=axleKey||"front";
   /* 前轴编辑面=S.hp（拖拽/硬点表写它）；后轴=S.axles.rear.hp（真车坐标，含 Y−wb） */
   const HP=axleKey==="rear"?((S.axles.rear&&S.axles.rear.hp)||S.hp):S.hp;
-  const n=[],i={};
+  const n=[],i={}; let ni=0;
   HPDEF.forEach((d,k)=>{
     const raw=HP[d[0]];
     if(!raw)return;                       // 预设不含此点（推杆模式外的 RK 点）→ 跳过
     const p=cpy(raw);
     n.push({id:d[0],zh:d[1],en:d[2],grp:d[3],fix:!!d[4],m:d[5],
             p:p,p0:cpy(p),pp:cpy(p),v:[0,0,0],w:d[4]?0:(d[5]>0?1/d[5]:0),f:[0,0,0]});
-    i[d[0]]=k;
+    i[d[0]]=ni++;
   });
   const L=LINKDEF.map(d=>{
     const a=i[d[0]],b=i[d[1]];
