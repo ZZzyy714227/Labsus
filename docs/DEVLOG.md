@@ -1,5 +1,104 @@
 # 开发日志
 
+## 2026-08-21 — 决策：按 DWB 建模升级 · 子阶段①（机构级投影运动学求解器）设计规格
+
+- 需求：用户判定参考 DWB-SIM（double-wishbone-suspension.html）建模优于产品，要求「按它的建模做一轮完整升级」。
+- 决策（用户拍板 ×3）：① 后端 Python 重写 DWB 式建模（modeler 继续 /api/v2）；② 整轮=四子阶段推进（①机构运动学求解器 → ②机制级台架动力学 → ③指标/曲线一致性 → ④可视化部件），每子阶段独立 spec→plan→实施→验收；③ 新求解器「并行验证→达标切主」，顺序解回退。
+- 产出：`docs/superpowers/specs/2026-08-21-dwb-mechanism-solver-design.md` —— 机构拓扑（UCA/LCA 铰链簇 + 转向节 5 节点刚体簇 + 摇臂铰链簇 + 横拉杆/推杆刚线）、DWB 投影原语 Python 映射（project_distance/hinge/body/rocker + polar_q + continuation 热启动）、DOF=2（轮跳+转向）、G1–G4 验收门、基准矩阵（P1 16 例 + 14 工况 + 镜像），坐标全程按 convention.py 不搬 DWB 轴。
+- 依据：深度研究报告 `docs/research/2026-08-21-dwb-sim-deep-research/`（DWB 实测 ±30mm 残差 1.5e-7mm vs 产品顺序解 K-4 0.731mm）。
+- 下一步：用户审阅 spec → writing-plans 拆实施计划。
+
+## 2026-08-21 — 深入研学参考 DWB-SIM：深度研究分析报告（deep-research）
+
+- 需求：用户指令"深入学习 double-wishbone-suspension.html（DWB-SIM）"+ /deep-research，产出可引用、可复核的深度研究报告。
+- 产出（`docs/research/2026-08-21-dwb-sim-deep-research/`）：
+  - `research_report_20260821_dwb_sim.md`（主报告，7 大 Finding + 综合 + 局限 + 建议 + 参考文献 23 条）
+  - `research_report_20260821_dwb_sim.html`（McKinsey 模板成品版）
+  - `sources.jsonl`(23) / `evidence.jsonl`(39) / `claims.jsonl`(14) / `run_manifest.json`
+- 核心结论：
+  1. DWB-SIM = 产品"设计语法"参考原型（PROJECT_MAP 佐证），产品已 3 轮移植其交互/渲染/台架特性。
+  2. 求解器是 GS 交替精确投影（projLink/projHinge/projBody + continuation + 四元数热启动），属 PBD/形状匹配家族。
+  3. **第一手实测（Node24 复现原文件）**：±30mm 行程最大残差约 1.5e-7mm（0.02–0.66ms/姿态，DOF=1）；产品顺序解 K-4 残差最高 0.731mm → 强烈对照。
+  4. 高优先级警示：DWB-SIM 坐标 X=外侧/Y=向前 vs 产品标准 X=向前/Y=右侧，跨系统取数必须先换算（见报告 Finding 7.1 映射表）。
+- 待办（报告内的建议，本次未改任何代码）：① DWB-SIM 归档 ref/ 并写坐标映射声明；② 顺序解外包 continuation 修 K-4；③ 模型器补"几何极限 vs 缓冲块行程"分开展示。
+- 验证：validate_report.py 全项通过（Executive/Required/Citations/Bibliography/WordCount/SourceCount 等）；verify_citations 7/23 URL 可达（项目内本地文献 [1]-[10] 无 URL，已如实标注）；verify_html 的 "emojis" 报错为其检测器对 CJK 的误报（报告无 emoji）。
+- 提交：docs/research/2026-08-21-dwb-sim-deep-research/* + DEVLOG。
+
+## 2026-08-21 — 项目全量梳理：三代产物共存盘点 + 项目地图文档
+
+- 需求：项目经历多代大版本，内部较杂，需要一次全量梳理。
+- 产出：新增 `docs/PROJECT_MAP.md` —— 演进时间线（2026-06 V1–V9 → 2026-08-12 V10 → 2026-08 起 V1 重造 P0–P6）、当前运行链、全量文件库存清单（活跃/兼容/遗留/备份/参考/垃圾分层）、杂乱点登记（两套前端、两套主题、新旧 /api 并存、config 备份在 src 内、DEVLOG/PLAN 重复标题、roll.py 疑似死代码等）、分档清理方案（A 安全 / B 归档 / C 需拍板 / D 长期）。
+- 验证：全量 pytest 388 passed / 33 skipped / 3 xfailed；线上服务 `/` → /modeler.html 正常。
+- 待办：已列出三项待用户拍板（前端单轨化？旧 /api 去留？清理激进程度？）。
+- 提交：docs/PROJECT_MAP.md + DEVLOG。
+
+## 2026-08-21 — 节点双侧可拖（左右独立）+ 智能捕捉
+
+- 需求：1) 模型节点拖动之前只允许右侧（镜像侧 sx>0 被禁），要能拖两侧；2) 节点位置智能捕捉，默认开启、按住 Shift 解锁。
+- modeler.html：
+  1. 左右独立：S 增 frontL/rearL（null=沿用镜像）。buildSkeleton 左侧优先取 S[axis]L 独立，未独立时镜像右侧；mousedown 拖动左侧首次从右侧镜像初始化独立硬点，之后左右各自独立；casePayload 把独立 front_left/rear_left 传给后端 /api/v2/solve/hardpoints（null 则后端镜像）；硬点「重置」同时清除该轴左侧独立几何恢复镜像。
+  2. 智能捕捉：S.snap=true（默认开）、snapPx=9px。拖动时非 Shift 走 1mm 步进 + snapNode 吸附——当前拖动点在屏幕上与任一其它节点距离< snapPx 即 3D 对齐到该节点；按住 Shift = 解锁捕捉 + 0.1mm 微调。
+- 边界：硬点面板仍编辑右前/右后模板；左侧独立仅通过正交视图拖动生成（不在面板体现）。AB 对比/导出以右侧模板为准。
+- 撤销修订：上一轮加的「左右独立 frontL/rearL」与「节点智能捕捉 snapNode/snap」按用户要求回退——左右保持镜像（只两侧都能拖、都在右侧模板上改）、捕捉删除。
+- 转向核查：浏览器实测 rack 0→20，FR 前束 0.12°→12.99°、左右反向对转（阿克曼），iso 下轮胎圆盘随主销偏转、外倾联动——后端求解与 iso 渲染向随转向正常；待用户确认是在哪个视口/何种条件下看到"轮胎不跟"。
+- 提交：web/modeler.html + DEVLOG。
+
+## 2026-08-21 — 补建模缺口：四轮时域台架（7-DOF）+ P1 呈现补全
+
+> 背景：审核参考 double-wishbone-suspension.html 后，确认最大建模缺口是「时域动力学台架」（参考有弹簧分离阻尼/缓冲块/轮胎垂向瞬态/路面谱的积分，我们的 dynamics.py 只有频域）。用户否决单轮，要求四轮全车。
+
+- 后端 metrics/bounce.py：
+  - 全车 7-DOF（车身 垂向 z_c + 侧倾 φ + 俯仰 θ 刚体，× 四角簧下 1 DOF）。
+  - 悬架在轮端 lump：k_w=k_spring·MR²；减振器 压缩/拉伸分离阻尼（c_comp/c_reb）；缓冲块（压缩超行程 二次力 k·x²/20）；轮胎垂向 k_t+c_t + 路面渗透；防倾杆滚刚度作用于车身侧倾。
+  - 路面激励 step/sine/pulse（road_signal）；半隐式(辛)积分，内子步 NS 保证轮胎刚度稳定。
+  - 静平衡基准：q0/d0 使弹簧预载与轮胎承载×1000 与重力 9810 相消（无输入即静止）。
+- 后端 v2.py：新增 `POST /api/v2/rig`（输入四轮硬点 + vehicle 覆盖 + 激励；运动比缺省由几何 rocker mini-sweep，可显式覆盖），返回 time 序列 + 四轮 Fs/Fd/Ft/pen/dzu/acc + 车身 heave/roll/pitch。
+- 测试：tests/test_bounce.py（无输入稳定 / 轮胎力=总重 / 单轮激励→四轮耦合 / 对称阶跃同向 / MR 助手）+ test_v2_api.py::TestRig；全量回归 387 passed。
+- 前端 modeler：新增「台架 Rig · 四轮时域」面板（激励类型 step/sine/pulse、轮位 全轮/单轮、幅值/频率/时长），调 /api/v2/rig 绘四轮 Fs/Ft 曲线 + 车身 heave/roll 响应。
+- P1 呈现（零后端改动，正确引用 loads 字段）：「轮边受力」note 增强展示 ARB droplink、UBJ/LBJ 球头反力、车架支点 max 反力、力/力矩残差。
+- P1 呈现续补（本轮完成）：
+  - v2 新增 `_p1_metrics`，在 `/solve/hardpoints` 响应附加 `body.p1`：侧倾刚度（前后弹簧+ARB、总刚、前轴占比）、载荷转移分解（几何/弹性/非簧载/纵向/总横向，复用 distribute transfers）、瞬心坐标（侧视 SVIC x/z + 主销 YZ IC y/z，来自当前姿态球头）、ride 频率/阻尼比/频比（复用 dynamics.ride_frequency/damping_ratio、ride.sprung_mass_per_corner）、目标带评估（ride_freq/damping/motion_ratio/load_transfer，复用 targets.TARGET_BANDS）。
+  - modeler 新增「侧倾/动力学/目标带 Roll&Ride」面板（renderP1）：显示刚度/转移/瞬心/ride + 目标带绿黄红状态；renderAll 末尾调用。
+  - 测试：test_v2_api.py::TestInlineSolve::test_p1_side_metrics_present；相关 51 passed。
+- 待续 P1：无（P1 已完结）。
+- 提交：src/metrics/bounce.py + src/routes/v2.py + tests/test_bounce.py + tests/test_v2_api.py + web/modeler.html + DEVLOG。
+
+## 2026-08-21 — F1 2026 十二款配色预设（11 车队 + 综合版）
+
+- 需求：把 2026 赛季 11 支 F1 车队配色做成配色编辑器预设，另加一款综合版（共 12 款）；每款为「多色映射」而非单色。
+- 做法（modeler.html）：
+  1. 新增 `PRESETS`（mcLaren/ferrari/redBull/mercedes/astonMartin/alpine/williams/racingBulls/haas/audi/cadillac/composite），每款把车队配色映射到多个槽位：主强调 acc、次强调 purple、3D 部件色（主销 kp/立柱横拉杆 knu/弹簧 ela/摆臂 rig/车架 chas/轮 rim/卡钳 cal/节点 node/nodeFix/转向机 rack）。
+  2. 配色面板顶部新增「F1 2026 预置主题」按钮行，点击即把该款覆盖合并进当前主题、保存到 localStorage 并实时应用+刷新色块。
+  3. 综合版取自多家代表色拼合（RB 蓝/Ferrari 红/McLaren 木瓜橙/Mercedes 青/Aston 青柠/Alpine 粉）。
+- 设计取舍：语义红/绿（通过/警告/失败）与暗色界面壳保留默认，保证工程可读性，预设只改品牌强调色与 3D 部件配色。
+- 面板多色：新增 `PANEL_COLORS`（13 色）×`paintPanels()`，给左右栏 13 个面板（仿真/输入/视图/硬点/快照/定位角/受力/状态/整车指标/曲线/操稳/敏感性/导出）各自的标识色——左竖条 + 面板标题着色，与 3D 模型配色联动呈现（综合版下面板区也多彩）。`applyTheme` 每次应用都重绘面板上色。
+- 面板分隔线改银：`.sec`/`.sh` 底部分隔线与面板头基线由黑 `var(--bd3)` 改为新增的银色变量 `--psep:#AEB6C0`；结构外框（左右栏 3px 黑边、视口网格线）保留黑。
+- 修复：配色浮层 `#themeOverlay` 的 ID 选择器优先级盖过 `.hidden`，导致启动即显示且关不掉；新增 `#themeOverlay.hidden{display:none}` 修复。
+- 提交：web/modeler.html + DEVLOG。
+
+## 2026-08-21 — 统一配色入口（修正：落在真实的 modeler.html）
+
+> 补充：上文原来做的配色入口落在旧版 index.html；用户实际使用的是自包含单文件版 modeler.html，故配色入口迁到此页重做。
+
+- modeler.html 为单个自包含 HTML，颜色散落在 :root CSS 变量（界面）+ `CC` 调色板对象（3D 画布）。新增单一调色板数据源 `PAL`（数组，每项可同时绑 CSS 变量 + CC 字段），一处改色全局生效。
+- 结构：`PAL`（界面/强调/画布三组 30 项）→ `loadPal`(合并 localStorage)/`applyTheme`(写 :root CSS 变量 + CC 字段 + legend + 重绘)/`updateLegend`。
+- 入口：顶栏新增「🎨 配色」按钮 → 浮层编辑器，颜色选择器实时改色+本地持久化；⤓ 导出 JSON；↺ 重置。底色/强调/语义色/3D 车、悬架各部件颜色均可改。
+- 校验：DOM 中无多余类冲突，`hidden`/面板样式已加；`bind()` 首行应用已存配色。
+- 提交：web/modeler.html + DEVLOG。
+
+## 2026-08-21 — 统一配色入口：单一数据源同时驱动 UI 主题 + 3D 材质
+
+- 需求：一个统一的前端配色修改入口，方便快速改色。
+- 现状：颜色散落多处——style.css :root（UI 主题）、car3d/materials.js MAT（3D 材质）、scene3d.js 场景背景、main/history/dashboard 里硬编码的 good/warn/bad。
+- 做法：新增 web/js/theme.js 作为单一数据源（defaults: ui 界面 / semantic 状态色 / mat 车身材料），并清洗硬编码：
+  1. theme.js —— loadTheme(合并 localStorage)/saveTheme/resetTheme/get(key)；applyUI(写 :root CSS 变量，teal/purple/silver 的派生亮色自动计算)；apply3D(遍历 MAT 更新共享材质颜色，改色即时作用于所有网格)；sceneBackgroundHex(3D 背景绑定 UI.paper)。
+  2. 顶栏新增「🎨 配色」按钮 → 浮层编辑器（分组：UI 界面 / 状态语义色 / 3D 车身材料），颜色选择器实时改色、自动持久化本机；导出 JSON 分享；重置默认。
+  3. 语义色去重：main.js 徽章、history.js worstColor、dashboard.js lightColor 改为统一读 theme.get('good'/'warn'/'bad')。
+  4. scene3d.js 新增 setSceneBackground(hex)，3D 背景/雾与面板底色联动。
+- 说明：整车涂装（车身面/空力 color 来自后端 config）属"涂装"独立维度，暂不纳入本入口，保持最小改动。
+- 验证：npm run build 通过（27 模块无 import/语法错误）。
+- 提交：web/js/theme.js + index.html + style.css + main.js + history.js + dashboard.js + scene3d.js + DEVLOG。
+
 ## 2026-08-20 — 曲线丝滑化：常驻曲线 + 实时位移游标 + 后台静默重扫（对齐参考）
 
 - 用户：参考的曲线展示很丝滑，几何/轮跳一动曲线就对应变化；我们的有问题（播放中曲线被清空成占位、无游标、几何变化曲线不跟）。
@@ -12,8 +111,6 @@
   4. drawChart 重写：camber/toe 双线 + 网格/0 线 + 游标 + 读数；播放先扫空时显示"运行后自动生成"。
 - 验证：strict-ctx mock（逐帧微任务排空）2.9s 内 47 次显示解算 + 6 次后台重扫、sweepCache 常驻、错误 0；真实 Edge 无头 —— t=27.3s 动画推进、tr=18.0 位移、sw=14 条曲线常驻、err=0、8 画布、solve 跑通。live 200。
 - 提交：src/routes/v2.py + web/modeler.html + DEVLOG。
-
-# 开发日志
 
 ## 2026-08-20 — UI 细节打磨 + 补齐「计算全部呈现」（整车指标面板/轴级曲线/主销接地点）
 
@@ -28,8 +125,6 @@
 - 验证：strict-ctx mock 指标面板/主销接地/动画全绿、错误 0；真实 Edge 无头 — 8 画布、求解跑、指标面板显示 运动速比·抗俯仰、主销接地 Y、可折叠、非加载中。live 200。
 - 提交：后端 v2.py + 前端 modeler.html + DEVLOG。
 
-# 开发日志
-
 ## 2026-08-20 — 动画流畅度 + 右侧黄色提示闪烁修复
 
 - 用户：① 最右侧黄色提示反复闪、重叠看不清；② 动画帧率偏低、卡顿。
@@ -37,8 +132,6 @@
 - 修复：statusBox 改为普通块(行高1.7)不重叠；**播放中只显示一行"播放中：实时求解"、警告压缩到暂停后显示**；图表在播放中不再反复清空(无 sweep 时不重绘)。
 - 帧率：后端求解节流 90→78ms；每帧场景重建成本大幅下降 — 螺旋弹簧 150→72 段、车轮/轮胎圆 40→26、轮辋/制动盘 32→24、辐条毂 22~16、球头 12→10、盘辐 16→12、胎带 22→14、转向机壳体 14→12；暂停空闲时不再每帧重绘(needsDraw 节流)。
 - 验证：strict-ctx mock(setLineDash 非数组即抛) 全绿、动画 travel 自走、四角点正确、错误 0；真实 Edge 无头 — 7 画布、求解跑起来、状态显示"播放中"(无警告闪)、非"加载中"。live 200。
-
-# 开发日志
 
 ## 2026-08-20 — 完整交互 + 动画仿真 + 建模细节对齐参考（DWB-SIM）
 
@@ -51,8 +144,6 @@
 - 验证：strict-ctx mock(setLineDash 非数组即抛) 全流程无错 — id 全存在、脚本可跑、动画 travel 自 0→17.88mm、四角 UP5 正确、VALD；真实 Edge 无头 — errs=0、动画心跳 t 0→2.17s、scene=565 图元、7 画布、状态 APPROXIMATE(非零行程解算的诚实状态)；live 200。
 - 注意：播放中后端按角求解(DWB 风格准静态)；暂停后自动补扫掠曲线。
 
-# 开发日志
-
 ## 2026-08-20 — 真实浏览器白屏修复（mock 漏检的真实运行错误）
 
 - 症状：界面完整但四个 canvas 全空白。此前 mock DOM 测试"通过"但因 ctx 桩过宽 / 未走真实画布而漏报。
@@ -62,8 +153,6 @@
   3. 若干 PL(...) 把半透明 al 或填充色 CC.knuF 误放进第 6 位 dash 槽 → 真实 ctx.setLineDash(字符串) 抛 "cannot be converted to a sequence"，drawView 中断 → 白屏。
 - 修复：补 `let SCENE=[];`、补 gamma/tbCase 元素、把 8 处 PL 调用的 alpha/填充移回正确实参位。
 - 验证（真实浏览器）：headless Edge 全流程 errs=0；tbState 显示 `VALID · sequential-bump-steer-v1 · modeler`；solver 栏就位；canvas×7；scene=314 图元/44 节点。提交 fd4bee2。
-
-# 开发日志
 
 ## 2026-08-20 — 建模器重构：整车底盘（前+后轴同屏）+ 3D 车轮 + 交互 + 全结果展示
 

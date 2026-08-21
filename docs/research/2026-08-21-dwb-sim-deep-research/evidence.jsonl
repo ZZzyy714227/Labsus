@@ -1,0 +1,39 @@
+{"source_id":"s-dwbsim-src","quote":"刚体投影-GS 求解器；交替精确投影（铰链簇解析投影 + 自由刚体簇极分解投影 + 距离约束投影 + 驱动约束）","evidence_type":"code","locator":"L177 头栏 + L413-510"}
+{"source_id":"s-dwbsim-src","quote":"坐标：X+ 指向车辆右侧(外侧) Y+ 指向车头 Z+ 向上","evidence_type":"code","locator":"L210 文件头注释"}
+{"source_id":"s-dwbsim-src","quote":"projHinge：绕两固定铰点连线做单参数最优旋转（解析解，精确），th=atan2(sn,cs)","evidence_type":"code","locator":"L424-439"}
+{"source_id":"s-dwbsim-src","quote":"projBody：质量加权最优刚体变换（极分解），c.q=polarQ(A,c.q,14)","evidence_type":"code","locator":"L440-462"}
+{"source_id":"s-dwbsim-src","quote":"polarQ：极分解取旋转（Müller 迭代），A 为协方差矩阵，q 为热启动","evidence_type":"code","locator":"L247-261"}
+{"source_id":"s-dwbsim-src","quote":"solveKin：默认最多 260 次迭代，tol 2e-7；M.ok=res<0.02","evidence_type":"code","locator":"L480-490"}
+{"source_id":"s-dwbsim-src","quote":"driveTo：大跨度输入时分步逼近（步长 ≤6mm、≤24 步），避免机构翻转","evidence_type":"code","locator":"L503-510"}
+{"source_id":"s-dwbsim-src","quote":"sweepProj 顺序：设轮心Z→投影横拉杆→投影下摆臂→投影上摆臂→投影转向节刚体","evidence_type":"code","locator":"L471-478"}
+{"source_id":"s-dwbsim-src","quote":"metrics：cam=-asin(ax[2])，toe=atan2(ax[1],ax[0])，kpi/cast 由主销上下端点差分，scrub/trail 由主销接地交点","evidence_type":"code","locator":"L546-583"}
+{"source_id":"s-dwbsim-src","quote":"外倾增益/跳动转向按相邻样本差分再归一化到每 25mm 行程","evidence_type":"code","locator":"L609-618"}
+{"source_id":"s-dwbsim-src","quote":"stepDyn：每帧分 10 子步，半隐式速度更新→位置→12 次投影→投影后位置差回写速度(0.99995 阻尼)","evidence_type":"code","locator":"L649-698"}
+{"source_id":"s-dwbsim-src","quote":"弹簧力 F=F0+kS(L0-L)，负值截断为零；压缩/复原分离阻尼(Fc=-(rel<0?cB:cR)*rel)","evidence_type":"code","locator":"L665-669"}
+{"source_id":"s-dwbsim-src","quote":"缓冲块 等效作用于轮心 F∝x²/20；轮胎 kT*pen+cT*(rzv-vz)，pen=road-cp.z","evidence_type":"code","locator":"L671-681"}
+{"source_id":"s-dwbsim-src","quote":"arbGeom：稳定杆臂角 psi 在 yz 平面解析求解；超程标记 ok=acos 参数≤1","evidence_type":"code","locator":"L522-538"}
+{"source_id":"s-dwbsim-src","quote":"arbRate：J=πd⁴/32，kt=G·J/L，k=kt/a²·mrArb²","evidence_type":"code","locator":"L539-545"}
+{"source_id":"s-dwbsim-src","quote":"双侧侧倾中心：两侧 接地点→瞬心 连线交点 SIM.rc2","evidence_type":"code","locator":"L758-764"}
+{"source_id":"s-dwbsim-src","quote":"runSweep 保存/恢复状态避免污染当前姿态；dirtySweep+130ms 节流","evidence_type":"code","locator":"L595-633, L2059-2067"}
+{"source_id":"s-dwbsim-src","quote":"zeroToe 二分 40 次；optRack 扫掠 RACK z ±70 步 3.5，最小化全行程跳动转向 RMS","evidence_type":"code","locator":"L1753-1776"}
+{"source_id":"s-dwbsim-spec","quote":"交替投影是近似迭代，不等同严格的全局非线性方程求解；仅显示最大刚性残差","evidence_type":"quote","locator":"§19 设计局限 1-2"}
+{"source_id":"s-dwbsim-spec","quote":"动力学是实时台架近似，不是完整多体动力学；质量集中在节点、无转向节力矩平衡","evidence_type":"quote","locator":"§9 台架动力学"}
+{"source_id":"s-dwbsim-spec","quote":"几何约束正确与工程模型正确需分开阅读；单位换算分散在动力学、刚度和读数代码","evidence_type":"quote","locator":"§1/§16.5"}
+{"source_id":"s-project-map","quote":"根 double-wishbone-suspension.html | 参考原型 | 参考对象（DWB-SIM），产品反复研习它，不是运行代码，应归档到 ref/","evidence_type":"quote","locator":"§3.2 前端"}
+{"source_id":"s-devlog","quote":"审核参考 double-wishbone-suspension.html 后，确认最大建模缺口是「时域动力学台架」……否决单轮，要求四轮全车","evidence_type":"quote","locator":"2026-08-21 四轮时域台架条目"}
+{"source_id":"s-devlog","quote":"再次研习参考 drawPlots/updateSweeps/loop：曲线常驻 SIM.swR、后台≥130ms 节流重扫、游标随轮跳滑动","evidence_type":"quote","locator":"2026-08-20 曲线丝滑化条目"}
+{"source_id":"s-devlog","quote":"按用户要求重新研读示例 double-wishbone-suspension.html（DWB-SIM）……渲染/交互架构移植 DWB-SIM 的 P2 投影/camIso/fitView/orbit/circPts 图元管线","evidence_type":"quote","locator":"2026-08-20 建模器重构条目"}
+{"source_id":"s-convention","quote":"X：车辆前方（+X=前）；Y：车辆右侧（+Y=右）；Z：垂直向上","evidence_type":"quote","locator":"L8"}
+{"source_id":"s-p1-gate","quote":"顺序解残差 0.000000–0.731417 mm（均值 0.193736），-30mm 最大；阈值 0.02mm；耦合候选 0–1.572mm（均值 0.548）；12/16 APPROXIMATE","evidence_type":"quote","locator":"Measured results/K-4"}
+{"source_id":"s-bump-solver","quote":"Bump kinematics solver — double-wishbone geometry with PBD + scipy LS","evidence_type":"quote","locator":"模块 docstring"}
+{"source_id":"s-claude-md","quote":"技术路线：先 Web+Three.js 原型验证，再 PySide6 桌面版，对比后选一条走到底","evidence_type":"quote","locator":"技术路线"}
+{"source_id":"w-muller2007","quote":"Position Based Dynamics 直接以位置为对象迭代修正约束（位置求解，非力/加速度）","evidence_type":"quote","locator":"SCA 2007 摘要"}
+{"source_id":"w-ngs-hyper","quote":"position-based nonlinear Gauss-Seidel 逐个约束非线性迭代求解，稳定性好、收敛性强","evidence_type":"quote","locator":"arXiv 2306.09021"}
+{"source_id":"w-fsa-camber25","quote":"suspension design might require the wheels to camber one degree per 25mm of droop","evidence_type":"quote","locator":"scispace 转引"}
+{"source_id":"w-ufsc-kin","quote":"按瞬时轴定义，侧倾轴是车身相对地面转动所绕的轴（roll axis 定义）","evidence_type":"quote","locator":"UFSC AVI ARIEL 2021"}
+{"source_id":"w-hpa-bumpsteer","quote":"Bump steer: 车轮上下跳动引起的前束变化（定义）","evidence_type":"quote","locator":"HP Academy 术语"}
+{"source_id":"node-verify-1","quote":"实测(SPORT 预设)：DOF=1, nodes=11, free=5, rigid=16, cons=14; 几何行程极限 [-138,+138]mm","evidence_type":"measurement","locator":"Node24 harness"}
+{"source_id":"node-verify-2","quote":"实测：travel=+30 残差 1.591e-7mm(124 迭代,0.66ms)；travel=0 残差 5.7e-14mm(4 迭代,0.02ms)；travel=-30 残差 1.495e-7mm(120 迭代,0.60ms)","evidence_type":"measurement","locator":"Node24 harness"}
+{"source_id":"node-verify-3","quote":"实测设计位形(0mm)：cam=-0.750°, toe=+0.100°, cast=4.45°, kpi=8.51°, scrub=34.57mm, trail=21.85mm, half=766.2mm","evidence_type":"measurement","locator":"Node24 harness"}
+{"source_id":"node-verify-4","quote":"实测扫掠@0：mr=0.599, 外倾增益=-0.732°/25mm, 跳动转向=+0.168°/25mm；rack=20 → toe=-7.594°","evidence_type":"measurement","locator":"Node24 harness"}
+{"source_id":"node-verify-5","quote":"实测动力学单步(正弦路面20mm/2Hz)：Ft=3879.6N, Fs=5582.1N(≈预载 5836N 量级), Fd=315.9N, pen=18.95mm","evidence_type":"measurement","locator":"Node24 harness"}
