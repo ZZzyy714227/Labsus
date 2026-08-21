@@ -961,7 +961,8 @@ function cylinder(sc,a,b,r,col,w,nseg){
     const o=add(mul(u,r*cos(an)),mul(v,r*sin(an)));
     L3(sc,add(a,o),add(b,o),col,w||1);}
 }
-/* 泪滴形杆体轮廓：a=外端(圆钝半圆) → b=内端(收尖)；w=最大宽度；供 PL() 使用 */
+/* 泪滴形杆体轮廓：a=外端圆钝(半圆圆心在 a，平背式) → b=内端收尖；w=最大宽度；供 PL() 使用 */
+/* 注：T=14 锥形段从半圆端沿 u 外推收缩，半圆→锥段衔接处有极微小折角（L>>R 时不可见，属有意简化） */
 function teardropPts(a,b,w){
   const d=sub(b,a),L=len(d)||1,u=mul(d,1/L);
   let ref=[0,1,0]; if(abs(dot(ref,u))>0.9)ref=[1,0,0];
@@ -1189,6 +1190,7 @@ function addInstance(sc,M,m,sw,sx,dy){
     const i=M.i;
     const piv=T(M.n[i.RK_PIVOT].p), rkA=T(M.n[i.RK_A].p), rkB=T(M.n[i.RK_B].p);
     /* 摇臂本体（钛银）：枢轴→两臂端多边形 + 臂杆 */
+    /* 摇臂 V 形双臂填充（piv 重复两次形成两三角，自交由 nonzero 环绕规则处理） */
     PL(sc,[piv,rkA,piv,rkB,piv],C.rocker,1.1,null,"rgba(185,194,201,0.35)");
     cylinder(sc,piv,rkA,7,C.rocker,1,8);
     cylinder(sc,piv,rkB,5,C.rocker,1,6);
