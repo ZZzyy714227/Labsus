@@ -1,4 +1,6 @@
 """6DOF 橡胶衬套元件：逐自由度刚度/阻尼曲线 + 耦合项 + 预紧（S1 首批线性/查表/样条）。"""
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 import numpy as np
 from scipy.interpolate import PchipInterpolator
@@ -16,8 +18,13 @@ class Curve:
             return lambda x: self.k * x, lambda x: np.full_like(np.asarray(x, float), self.k)
         if self.kind in ("table", "spline"):
             x = np.asarray(self.xs, float); y = np.asarray(self.ys, float)
+            if len(x) < 2:
+                raise ValueError(f"table/spline curve requires >=2 points, got {len(x)}")
+            lo, hi = float(x[0]), float(x[-1])
             p = PchipInterpolator(x, y)
-            return p, p.derivative()
+            def _f(v): return p(np.clip(np.asarray(v, float), lo, hi))
+            def _d(v): return p.derivative()(np.clip(np.asarray(v, float), lo, hi))
+            return _f, _d
         raise ValueError(f"unknown curve kind {self.kind}")
 
 
@@ -31,8 +38,21 @@ class Bushing6DOF:
     cR: list[float]
     preload: np.ndarray             # 6 预紧力/矩
     coupled: np.ndarray | None = None  # 6x6 耦合刚度（可选）
+    member_nodes: list[str] = field(default_factory=list)            # 装配期：{衬套名: 节点名} 由求解器填入
+    member_p0: dict[str, np.ndarray] = field(default_factory=dict)   # {节点名: 设计位置}
 
     def __post_init__(self):
+        if len(self.kT) != 3:
+            raise ValueError(f"kT must have length 3, got {len(self.kT)}")
+        if len(self.kR) != 3:
+            raise ValueError(f"kR must have length 3, got {len(self.kR)}")
+        preload = np.asarray(self.preload, float)
+        if preload.shape != (6,):
+            raise ValueError(f"preload must have shape (6,), got {preload.shape}")
+        if self.coupled is not None:
+            coupled = np.asarray(self.coupled, float)
+            if coupled.shape != (6, 6):
+                raise ValueError(f"coupled must have shape (6,6), got {coupled.shape}")
         self._fT = [c.build() for c in self.kT]
         self._fR = [c.build() for c in self.kR]
 
