@@ -1,23 +1,32 @@
-# dwb-mod —— 魔改 DWB（参考原型 · 独立版本）
+# dwb-mod —— DWB-SIM 单文件系列版本库
 
-> 本目录承载 **`double-wishbone-suspension.html` 的魔改演进版**（git 历史中以
-> `dwb` / `dwb-modeling` 前缀提交标注），与自研系统**完全独立、互不引用**。
+> 本目录承载 **DWB-SIM 单文件悬架仿真台的全部开发版本**（git 历史中以
+> `dwb` / `dwb-modeling` 前缀提交标注），与自研系统（`web/` + `src/`）**完全独立、互不引用**。
 
 ## 这是什么
 
-- 单文件双叉臂悬架运动学/动力学仿真台（DWB-SIM）的魔改版：在原始参考原型上持续加入
-  后轴、双轴同屏、逐角拖拽、逐角行程/俯仰滑块、轴距滑块、后轴 ARB、轴视图 T6/T7 读数等。
-- 相比自研系统，它是一套**浏览器内自足**的实验/可视化版本：无后端、无构建、双击即开。
+浏览器内自足的单文件悬架运动学/动力学仿真台系列：无后端、无构建、双击即开。
+所有大版本归档在 `versions/`，每个文件即一个完整可运行的开发版本。
+
+## 版本索引
+
+| 文件 | 定位 | 说明 |
+|---|---|---|
+| `versions/v4-dwb-pro-fullchassis.html` | **当前主力** | PRO 闭式求解器 · 前推杆+后拉杆全车 · 每轴独立弹性参数 · 四轮独立行程/俯仰/轴距 · 轴视图过滤 · 四轮定位表 · 激励/路面/持久化全功能 |
+| `versions/v3-dwb-pro-chassis.html` | 整车化第一版 | PRO 求解器四机构同屏（全局弹性参数，较 v4 功能少） |
+| `versions/v2-dwb-fullchassis-fsr06.html` | 投影 GS 正式版 | 原 `double-wishbone-suspension.html`：全底盘 T1-T6 · FSR-06 前推后拉预设 · 首帧卡死修复后状态 |
+| `versions/v1-dwb-fullchassis-fsr06-early.html` | FSR-06 早期快照 | FSR-06 预设已加入、泪滴渲染尚未落地的中间态（2396 行） |
+| `web/versions/v1-dwb-web-simview.html` | 自研线历史版 | 从 git 历史恢复的自包含 sim-view 版（曾因模块化重构被删除） |
 
 ## 运行
 
 ```
-直接用浏览器打开 double-wishbone-suspension.html
+直接用浏览器打开 versions/v4-dwb-pro-fullchassis.html   （推荐，当前主力）
 ```
 
 ## 边界（重要）
 
-- **坐标系与自研系统不同**：本文件 X=外侧(右) / Y=向前 / Z=向上；
+- **坐标系与自研系统不同**：本系列 X=外侧(右) / Y=向前 / Z=向上；
   自研系统（`src/core/convention.py`）为 X=向前 / Y=右侧 / Z=向上。
   两边的硬点/指标数值**不可直接互引**，跨边取数必须先换算。
 - 本目录文件**不参与**自研系统运行链（`run.py` → `src/` → `web/modeler.html`）。
@@ -32,3 +41,4 @@
 
 - 对本目录做修改时，提交信息沿用 `dwb(...)` / `fix(dwb-modeling): ...` 前缀，
   与自研系统（`feat(v2)/fix(...)` 等）在 git 历史中可一眼区分。
+- 新版本落版时：复制当前主力 → 修改 → 稳定后以 `v<N+1>` 纳入 `versions/` 并更新本表。
