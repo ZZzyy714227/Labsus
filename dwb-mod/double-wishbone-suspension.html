@@ -1032,18 +1032,28 @@ function addShared(sc){
     const sgn=[1].concat(mir?[-1]:[]);
     const axHps=[h];if(S.axles&&S.axles.rear&&S.axles.rear.hp)axHps.push(S.axles.rear.hp);
     sgn.forEach(s=>axHps.forEach(hpA=>{
-      const T=[hpA.DMP_T[0]*s,hpA.DMP_T[1],hpA.DMP_T[2]];
-      const tw=62,tl=78,tz=T[2]+16;
-      const top=[[T[0]-tw,T[1]-tl,tz],[T[0]+tw,T[1]-tl,tz],[T[0]+tw,T[1]+tl,tz],[T[0]-tw,T[1]+tl,tz]];
-      PL(sc,top.concat([top[0]]),C.chas,1.2);
-      const base=[[s*Math.min(bx,abs(T[0])+tw),T[1]-tl,z1],[s*Math.min(bx,abs(T[0])+tw),T[1]+tl,z1]];
-      L3(sc,top[0],[s*bx,T[1]-tl,z1],C.chas,1);
-      L3(sc,top[1],[s*bx,T[1]-tl,z1],C.chas,1);
-      L3(sc,top[2],[s*bx,T[1]+tl,z1],C.chas,1);
-      L3(sc,top[3],[s*bx,T[1]+tl,z1],C.chas,1);
-      L3(sc,[s*bx,T[1]-tl,z1],[s*bx,T[1]+tl,z1],C.chas,1);
-      /* 上支点座 */
-      cylinder(sc,[T[0],T[1],T[2]-10],[T[0],T[1],T[2]+10],34,C.chas,1,14);
+      if(hpA.RK_A&&hpA.DMP_T){
+        /* 水平减振器支架（前高后低按轴数据） */
+        const A=[hpA.RK_A[0]*s,hpA.RK_A[1],hpA.RK_A[2]];
+        const B=[hpA.DMP_T[0]*s,hpA.DMP_T[1],hpA.DMP_T[2]];
+        cylinder(sc,A,B,14,C.chas,1,10);                        /* 水平筒体 */
+        cylinder(sc,sub(A,[0,0,10]),add(A,[0,0,10]),20,C.chas,1,8);  /* 摇臂端支承 */
+        cylinder(sc,sub(B,[0,0,10]),add(B,[0,0,10]),20,C.chas,1,8);  /* 支架端支承 */
+        L3(sc,B,[B[0],B[1],0],C.chas2,1,[4,4]);                 /* 落地立柱 */
+      }else{
+        /* 旧预设：原垂直塔（逐字保留原代码） */
+        const T=[hpA.DMP_T[0]*s,hpA.DMP_T[1],hpA.DMP_T[2]];
+        const tw=62,tl=78,tz=T[2]+16;
+        const top=[[T[0]-tw,T[1]-tl,tz],[T[0]+tw,T[1]-tl,tz],[T[0]+tw,T[1]+tl,tz],[T[0]-tw,T[1]+tl,tz]];
+        PL(sc,top.concat([top[0]]),C.chas,1.2);
+        L3(sc,top[0],[s*bx,T[1]-tl,z1],C.chas,1);
+        L3(sc,top[1],[s*bx,T[1]-tl,z1],C.chas,1);
+        L3(sc,top[2],[s*bx,T[1]+tl,z1],C.chas,1);
+        L3(sc,top[3],[s*bx,T[1]+tl,z1],C.chas,1);
+        L3(sc,[s*bx,T[1]-tl,z1],[s*bx,T[1]+tl,z1],C.chas,1);
+        /* 上支点座 */
+        cylinder(sc,[T[0],T[1],T[2]-10],[T[0],T[1],T[2]+10],34,C.chas,1,14);
+      }
     }));
     /* 车身侧铰点支架（全底盘：前/后轴各绘） */
     const brk=["LCA_F","LCA_R","UCA_F","UCA_R"];
