@@ -397,7 +397,7 @@ def _axle_pair(dv, axle: str):
 
 
 def _sweep_curves(dv, cv, axle: str, axis: str, _min: float, _max: float,
-                  points: int) -> dict:
+                  points: int, absolute: bool = False) -> dict:
     """轴级扫掠曲线（sweep 端点与 compare 共用）。
 
     返回 {values, curves, warnings}；不抛 HTTP 异常（参数校验由调用方完成）。
@@ -414,8 +414,10 @@ def _sweep_curves(dv, cv, axle: str, axis: str, _min: float, _max: float,
             travel_l = t.fl if axle == "front" else t.rl
             rack = axis_val
         else:
-            travel_r = (t.fr if axle == "front" else t.rr) + axis_val
-            travel_l = (t.fl if axle == "front" else t.rl) + axis_val
+            base_r = 0.0 if absolute else (t.fr if axle == "front" else t.rr)
+            base_l = 0.0 if absolute else (t.fl if axle == "front" else t.rl)
+            travel_r = base_r + axis_val
+            travel_l = base_l + axis_val
             rack = cv.rack_displacement
         sol_r = _solve_corner(r_hp, travel_r, rack, track)
         sol_l = _solve_corner(l_hp, travel_l, rack, track)
@@ -487,7 +489,8 @@ def _sweep_curves(dv, cv, axle: str, axis: str, _min: float, _max: float,
     return {"values": [round(float(v), 3) for v in axis_vals],
             "curves": curves, "warnings": warnings}
 
-def _sweep_metrics(dv, cv, axle: str, axis: str, sw: dict) -> dict:
+def _sweep_metrics(dv, cv, axle: str, axis: str, sw: dict,
+                   absolute: bool = False) -> dict:
     """从一条轴级扫掠({values,curves})派生静态点整车指标（sweep 与内联建模共用）。
 
     axle: front|rear；axis: travel|rack。返回 metrics dict（值 + 状态 + 单位）。
@@ -505,8 +508,10 @@ def _sweep_metrics(dv, cv, axle: str, axis: str, sw: dict) -> dict:
             travel_l = t.fl if axle == "front" else t.rl
             rack = axis_val
         else:
-            travel_r = (t.fr if axle == "front" else t.rr) + axis_val
-            travel_l = (t.fl if axle == "front" else t.rl) + axis_val
+            base_r = 0.0 if absolute else (t.fr if axle == "front" else t.rr)
+            base_l = 0.0 if absolute else (t.fl if axle == "front" else t.rl)
+            travel_r = base_r + axis_val
+            travel_l = base_l + axis_val
             rack = cv.rack_displacement
         sol_r = _solve_corner(r_hp, travel_r, rack, track)
         sol_l = _solve_corner(l_hp, travel_l, rack, track)
@@ -740,8 +745,10 @@ def solve_hardpoints_v2(req: SolveInlineRequest):
            req.sweep.axis not in ("travel", "rack"):
             raise HTTPException(status_code=422, detail="sweep axle|axis bad")
         sw = _sweep_curves(dv, cv, req.sweep.axle, req.sweep.axis,
-                           req.sweep.min, req.sweep.max, req.sweep.points)
-        sw["metrics"] = _sweep_metrics(dv, cv, req.sweep.axle, req.sweep.axis, sw)
+                           req.sweep.min, req.sweep.max, req.sweep.points,
+                           absolute=True)
+        sw["metrics"] = _sweep_metrics(dv, cv, req.sweep.axle, req.sweep.axis, sw,
+                                       absolute=True)
         body["sweep"] = sw
     return body
 
