@@ -920,10 +920,11 @@ function addShared(sc){
     /* 中间横隔板 */
     L3(sc,[x0,0,z0],[x1,0,z0],C.chas2,1,[3,3]);
     L3(sc,[x0,0,z1],[x1,0,z1],C.chas2,1,[3,3]);
-    /* 减振器塔 */
+    /* 减振器塔（全底盘：前/后轴各绘） */
     const sgn=[1].concat(mir?[-1]:[]);
-    sgn.forEach(s=>{
-      const T=[h.DMP_T[0]*s,h.DMP_T[1],h.DMP_T[2]];
+    const axHps=[h];if(S.axles&&S.axles.rear&&S.axles.rear.hp)axHps.push(S.axles.rear.hp);
+    sgn.forEach(s=>axHps.forEach(hpA=>{
+      const T=[hpA.DMP_T[0]*s,hpA.DMP_T[1],hpA.DMP_T[2]];
       const tw=62,tl=78,tz=T[2]+16;
       const top=[[T[0]-tw,T[1]-tl,tz],[T[0]+tw,T[1]-tl,tz],[T[0]+tw,T[1]+tl,tz],[T[0]-tw,T[1]+tl,tz]];
       PL(sc,top.concat([top[0]]),C.chas,1.2);
@@ -935,7 +936,7 @@ function addShared(sc){
       L3(sc,[s*bx,T[1]-tl,z1],[s*bx,T[1]+tl,z1],C.chas,1);
       /* 上支点座 */
       cylinder(sc,[T[0],T[1],T[2]-10],[T[0],T[1],T[2]+10],34,C.chas,1,14);
-    });
+    }));
     /* 车身侧铰点支架 */
     const brk=["LCA_F","LCA_R","UCA_F","UCA_R"];
     sgn.forEach(s=>brk.forEach(id=>{
@@ -1656,6 +1657,12 @@ function buildLeft(){
   b=sec(host,"输入量","INPUT VARIABLES");
   rowSlider(b,"轮跳行程","WHEEL TRAVEL","mm",()=>S.trMin,()=>S.trMax,0.5,()=>S.travel,
     v=>{S.travel=v;S.exc="off";},1);
+  /* 全底盘（T2）：四轮独立轮跳 + 整车俯仰 */
+  rowSlider(b,"轮跳 FR","TRAVEL FR","mm",()=>S.trMin,()=>S.trMax,0.5,()=>S.trFR,v=>{S.trFR=v;S.exc="off";},1);
+  rowSlider(b,"轮跳 FL","TRAVEL FL","mm",()=>S.trMin,()=>S.trMax,0.5,()=>S.trFL,v=>{S.trFL=v;S.exc="off";},1);
+  rowSlider(b,"轮跳 RR","TRAVEL RR","mm",()=>S.trMin,()=>S.trMax,0.5,()=>S.trRR,v=>{S.trRR=v;S.exc="off";},1);
+  rowSlider(b,"轮跳 RL","TRAVEL RL","mm",()=>S.trMin,()=>S.trMax,0.5,()=>S.trRL,v=>{S.trRL=v;S.exc="off";},1);
+  rowSlider(b,"整车俯仰","PITCH","°",-6,6,0.1,()=>S.pitch,v=>{S.pitch=v;S.exc="off";},2);
   rowSlider(b,"车身侧倾","BODY ROLL","°",-6,6,0.1,()=>S.roll,v=>S.roll=v,2);
   rowSlider(b,"齿条位移","RACK TRAVEL","mm",-70,70,0.5,()=>S.rack,
     v=>{S.rack=v;S.steerExc="off";SIM.dirtySweep=true;},1);
