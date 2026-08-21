@@ -366,7 +366,7 @@ function loadPreset(k){
   S.axles.rear.hp={}; for(const id in S.hp)
     S.axles.rear.hp[id]=[S.hp[id][0],S.hp[id][1]-S.wb,S.hp[id][2]];
   S.axles.rear.tire=Object.assign({},S.tire);
-  /* 前推后拉（第 4 预设）：后轴摇臂 Z 由 rearRk 覆写（前推杆 vs 后拉杆 Z 位置不同） */
+  /* 前推后拉模式：后轴摇臂/拉杆关键点由 rearRk 覆写（前推杆 vs 后拉杆 Z 位置不同） */
   if(P.rearRk) for(const k in P.rearRk) S.axles.rear.hp[k]=cpy(P.rearRk[k]);
 }
 loadPreset(S.preset);
