@@ -1,5 +1,16 @@
 # 开发日志
 
+## 2026-08-21 — Task 5: 水平减振器支架（addShared 双分支改造）
+
+- 修改文件：`dwb-mod/double-wishbone-suspension.html`（+22/-12 行）。
+- 位置：`addShared(sc)` 内 `if(S.show.chassis){...}` 中「减振器塔」forEach 回调体。
+- 变更：回调体替换为 `if(hpA.RK_A&&hpA.DMP_T)` 双分支——
+  - **新分支（有 RK_A）**：水平减振器支架——从摇臂端 `A=RK_A` 到支架端 `B=DMP_T` 绘水平筒体、两端支承圆柱、落地立柱。前高后低由各轴硬点坐标天然决定。
+  - **else 分支（旧预设）**：原垂直塔逐字保留（矩形顶板 PL、四角立柱 L3、横向撑杆、上支点座 cylinder）。
+- 清理：删除死变量 `base`（原 L1039 声明但从未引用）。
+- 验证（Node24 + DOM 桩 harness）：fresh（FSR-06，前/后轴均有 RK_A/DMP_T → 水平支架分支）n:300 零异常；sport-rear（SPORT 无 RK_* → 垂直塔分支）n:300 零异常。
+- 提交：`dwb(P1): per-axle horizontal damper cradle (front high / rear low), guarded for legacy presets`（5d68078）。
+
 ## 2026-08-21 — Task 2: buildMech 簇成员存在性过滤 + addPushrodMode 显式前推后拉
 
 - 修改文件：`dwb-mod/double-wishbone-suspension.html`（+25/-21 行）。
