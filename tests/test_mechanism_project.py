@@ -1,7 +1,6 @@
 import numpy as np
 
 from geometry import rotate_around_x
-
 from solver.mechanism.models import Node
 from solver.mechanism.project import (
     polar_q,
