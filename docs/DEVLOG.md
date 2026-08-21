@@ -1,5 +1,14 @@
 # 开发日志
 
+## 2026-08-21 — Task 2: buildMech 簇成员存在性过滤 + addPushrodMode 显式前推后拉
+
+- 修改文件：`dwb-mod/double-wishbone-suspension.html`（+25/-21 行）。
+- Step 1：`buildMech` 刚体簇（cl 数组）按节点存在性组装——新增 `const has=id=>i[id]!==undefined`，LCA/UCA/KNUCKLE 三个簇的 members 数组均追加 PR_L/PR_U 并 `.filter(has)`，确保旧预设无推拉杆点时行为与原来完全一致。
+- Step 2：`addPushrodMode` 整体替换为按 `axleKey` 显式推/拉逻辑——删除旧的 dLBJ/dUBJ 距离猜测，改为 `M.axleKey==="rear"?"PR_U":"PR_L"`；提取 `m_L_push` 子函数处理推杆刚线 + 减震器重锚 + 摇臂簇。
+- Step 3：PROD 预设补 PR_L/PR_U——hp 增加 `PR_L:[640,6,150]`（LBJ[680,5,145] 内侧），rearRk 增加 `PR_U:[640,-1565,450]`（UBJ[650,-1565,445] 附近）。
+- 验证（Node24 + DOM 桩 harness）：fresh/prod/sport-rear 三场景均 `[loop] completed without exception`、`[frames] n:300`、`res=0`（零发散）；fresh geo=[-8,138]（前轴 ±30mm+ 行程）、geoRR=[-138,138]（后轴 ±138mm 行程）；prod geo=[-138,138]（双轴）。
+- 提交：`dwb(P1): explicit pushrod(front)/pullrod(rear) branch by axleKey; hinge members existence filter; PROD gains PR_L/PR_U`（66b7d7f）。
+
 ## 2026-08-21 — 修复 dwb-mod 打开即卡死（首帧 TypeError 杀死 rAF 循环）+ PROD 前推后拉收敛性根治
 - 用户反馈：`dwb-mod/double-wishbone-suspension.html` 浏览器打开无运动模拟、页面卡住。
 - 根因①（卡死主因，所有非 PROD 预设必现）：`e37e372` 给 HPDEF 增加 RK_PIVOT/RK_A/RK_B 后，硬点表为全部 14 点注册 `UI.sync` 回调 `fmt(S.hp[d[0]][k])`；SPORT/RACE/SUV 的 `S.hp` 无 RK_* 键 → 首帧 `loop()` 内回调读 `undefined[0]` 抛 TypeError；`requestAnimationFrame(loop)` 位于 loop 末尾 → 循环出生即死。修复：表行回调对缺失点禁用输入框并留空（随预设切换动态生效）。
