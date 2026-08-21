@@ -1,5 +1,13 @@
 # 开发日志
 
+## 2026-08-21 — DWB-SIM PRO 整车版：前推杆+后拉杆双轴合成（dwb-mod/dwb-pro-chassis.html）
+- 需求：用户已在参考.html（PRO 闭式求解器）内分别调试好前悬架(推杆)/后悬架(拉杆)两套几何，要求前后连接合成整车模型（等同 dwb-mod 全底盘能力）。
+- 决策（用户拍板）：复制参考.html → dwb-mod/dwb-pro-chassis.html（原参考保留）；后轴无转向 rack 恒 0；RIG 台架仅前轴（四轮台架后续）；渲染保持 PRO 风格。
+- 实现：S.axles 双轴账本（front attach=lca / rear attach=uca，后轴 Y−wb=2750 平移）；buildMech(axleKey)/setChassis/metrics 按轴参数化；四机构 SIM.R/L/RR/RL 解耦驱动（轮跳主滑块+四轮独立 trFR/FL/RR/RL+侧倾+俯仰±Δ）；ALL/FRONT/REAR 轴视图；整车共享件（底盘框横贯、摇臂支架/DMP 支座按轴两组）；四轮定位表（FR/FL/RR/RL×6 参数）+ 整车读数分区；曲线随轴视图；localStorage 持久化（dwbProChassis）；节点拾取/拖拽按轴落盘（PICK 带 ax）；findLimits 去除 ±40 保底暴露真实行程。
+- 验证（Node24+DOM 桩 harness）：fresh/sport-rear/rigtest 三场景各 300 帧零异常；前后轴几何极限均 [-118,118]（okGeo true，超 ±60）；RIG 路面正弦激励轮跳振荡正常、残差 0.0004mm；帧均 <15ms。
+- 已知边界：harness seed 键名为旧文件键（dwbFullChassis），新车持久化键 dwbProChassis——工具需按文件区分；RIG 仅前轴。
+- 提交：dwb-mod/dwb-pro-chassis.html + DEVLOG。
+
 ## 2026-08-21 — Task 2 几何源：STRUT_OUT 派生 + 摇臂转轴车架节点（DWB-SIM PRO）
 - 需求：为新「推/拉杆悬架」拓扑（DWB-SIM PRO）在几何派生层加入 STRUT_OUT 硬点与摇臂转轴框架节点。
 - 变更（`src/config.py` / `src/hardpoints.py` / `tests/test_geometry.py`）：
