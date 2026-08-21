@@ -16,6 +16,7 @@ VALID / APPROXIMATE / OUT_OF_RANGE，单轮异常隔离为 SOLVER_FAILED。
 from __future__ import annotations
 
 import math
+import os
 
 import numpy as np
 from fastapi import APIRouter, HTTPException
@@ -33,6 +34,8 @@ from core.results import (
     WheelReport,
 )
 from core.store import DataStore
+from metrics.bounce import simulate as bounce_simulate
+from metrics.dynamics import damping_ratio, ride_frequency_hz, sprung_mass_per_corner
 from metrics.handling import understeer_curve, understeer_gradient
 from metrics.kinematics import (
     ackermann_pct,
@@ -52,12 +55,18 @@ from metrics.kinematics import (
 from metrics.loads import arb_droplink_force, solve_upright_forces
 from metrics.ride import ride_level
 from metrics.roll import compute_instant_center, compute_roll_stiffness_suspension
+from metrics.targets import TARGET_BANDS
 from metrics.wheel_loads import distribute_vehicle_loads
 from routes.solve import DEFAULT_FRAME_NODES, _rear_rocker_frame_nodes, _solve_axle
 
 router = APIRouter(prefix="/api/v2")
 
-SOLVER_NAME = "sequential-bump-steer-v1"
+# DWB 式机制求解模式：环境开关（达标后默认切 mechanism；sequential 保留为回退）
+_SOLVER_MODE = os.environ.get("DWB_SOLVER_MODE", "sequential")
+SOLVER_NAME = {
+    "mechanism": "dwb-mechanism-v1",
+    "sequential": "sequential-bump-steer-v1",
+}.get(_SOLVER_MODE, "sequential-bump-steer-v1")
 RESIDUAL_VALID_TOL = 0.02      # mm，设计文档 §13.2 正常状态
 RESIDUAL_OUT_OF_RANGE_TOL = 0.5  # mm，超过则几何不可信（K-4 全行程最差 ~0.75）
 
@@ -228,24 +237,34 @@ class SolveV2Request(BaseModel):
     ride_mm: dict[str, float] | None = None        # 调平目标轮跳偏移（来自 /handling ride_level）
 
 
-def _solve_corner(axle_hp, travel: float, rack: float, track: float) -> dict:
+def _solve_corner(axle_hp, travel: float, rack: float, track: float,
+                  solver: str | None = None) -> dict:
     """求解一个角（方案中独立存储的硬点，polish=True 分析路径）。
 
     返回 result/angles/residual/status/pose/cp/rocker；异常向上抛出，
-    由调用方按角隔离。
+    由调用方按角隔离。solver: 'mechanism'|'mw' 走 DWB 机制求解；否则按
+    模块 `_SOLVER_MODE`（默认 sequential，顺序解为回退）。
     """
     hp = axle_hp.flat()
     hp.setdefault("track_width", track)
-    ax = _solve_axle(hp, travel, rack, mirror=False, polish=True)
-    result = ax["right"]
-    angles = {k: ax["angles_right"].get(k) for k in _ANGLE_KEYS}
-    residual = float(ax.get("geometry_residual_mm", 0.0))
+    mode = solver if solver in ("mechanism", "mw") else _SOLVER_MODE
+    if mode in ("mechanism", "mw"):
+        from solver.mechanism.v2adapter import solve_corner_mechanism
+
+        result, angles, residual, cp, rocker = solve_corner_mechanism(hp, travel, rack)
+    else:
+        ax = _solve_axle(hp, travel, rack, mirror=False, polish=True)
+        result = ax["right"]
+        angles = {k: ax["angles_right"].get(k) for k in _ANGLE_KEYS}
+        residual = float(ax.get("geometry_residual_mm", 0.0))
+        cp = ax.get("contact_patch_right")
+        rocker = ax.get("rocker_right")
     status = _status_for_residual(residual)
-    pose = _wheel_pose("", travel, result, angles, ax.get("contact_patch_right"))
+    pose = _wheel_pose("", travel, result, angles, cp)
     return {
         "result": result, "angles": angles, "residual": residual,
-        "status": status, "pose": pose, "cp": ax.get("contact_patch_right"),
-        "rocker": ax.get("rocker_right"),
+        "status": status, "pose": pose, "cp": cp,
+        "rocker": rocker,
     }
 
 
@@ -642,7 +661,6 @@ def sweep_v2(req: SweepV2Request):
     axis_vals = sw["values"]
     curves = sw["curves"]
     warnings = list(sw["warnings"])
-    veh = dv.vehicle
     t = cv.travel
     r_name, r_hp, l_name, l_hp, track_key, frame_nodes = _axle_pair(dv, req.axle)
     track = float(dv.vehicle.get(track_key, 0.0))
@@ -693,6 +711,7 @@ class SolveInlineRequest(BaseModel):
                                "brake_split_front": 0.5, "drive_split_rear": 1.0}
     arb_enabled: bool = True
     label: str = "modeler"
+    solver: str | None = None    # "mw"/"mechanism" → DWB 机制求解；None 按 SOLVER_MODE
     sweep: SweepInline | None = None
     front_right: CornerHardpointsIn
     front_left: CornerHardpointsIn | None = None
@@ -738,8 +757,10 @@ def solve_hardpoints_v2(req: SolveInlineRequest):
         loads=_as_loads(req.loads),
         options=_as_options(req),
     )
-    body = _solve_vehicle(dv, cv, design_id="inline", case_id=req.case_id)
+    body = _solve_vehicle(dv, cv, design_id="inline", case_id=req.case_id,
+                          solver=req.solver)
     body["label"] = req.label
+    body["p1"] = _p1_metrics(dv, cv, body)
     if req.sweep is not None:
         if req.sweep.axle not in ("front", "rear") or \
            req.sweep.axis not in ("travel", "rack"):
@@ -770,6 +791,175 @@ def _as_options(req: SolveInlineRequest):
 
 
 # ---------- P4：A/B 对比 / 敏感性 / 导出 ----------
+
+# ---------- Rig：四轮时域台架（7-DOF 动力学） ----------
+
+def _band_status(band, v):
+    """target band → green/yellow/red。band=(green_lo,green_hi,warn_lo,warn_hi)。"""
+    if v is None:
+        return None
+    gl, gh, wl, wh = band
+
+    def inside(a, b):
+        return (a is None or v >= a) and (b is None or v <= b)
+    if inside(gl, gh):
+        return "green"
+    if inside(wl, wh):
+        return "yellow"
+    return "red"
+
+
+def _p1_metrics(dv, cv, body) -> dict:
+    """P1 呈现补全：侧倾刚度 / 载荷转移分解 / 瞬心坐标 / ride 频率·阻尼 / 目标带。
+
+    纯派生：复用 /solve/hardpoints 已算的 loads 与 per_wheel_geometry，+ 几何 MR。
+    """
+    veh = dv.vehicle
+    tr_f = float(veh.get("front_track_mm", 0.0))
+    tr_r = float(veh.get("rear_track_mm", 0.0))
+    mr_f = _axle_motion_ratio(dv.front_right, cv.travel.fr, cv.rack_displacement,
+                              tr_f, DEFAULT_FRAME_NODES) or 0.4
+    mr_r = _axle_motion_ratio(dv.rear_right, cv.travel.rr, cv.rack_displacement,
+                              tr_r, _rear_rocker_frame_nodes()) or 0.55
+    k_spring_f = float(veh.get("k_spring_f", 26.0))
+    k_spring_r = float(veh.get("k_spring_r", 47.0))
+    k_arb_f = float(veh.get("k_arb_f", 0.0))
+    k_arb_r = float(veh.get("k_arb_r", 0.0))
+    k_f = compute_roll_stiffness_suspension(k_spring_f, mr_f, tr_f) + k_arb_f
+    k_r = compute_roll_stiffness_suspension(k_spring_r, mr_r, tr_r) + k_arb_r
+    k_tot = max(k_f + k_r, 1e-9)
+    front_pct = 100.0 * k_f / k_tot
+
+    # 载荷转移分解（轴级，来自 body.loads 每角 transfers）
+    def tras(corner):
+        t = ((body.get("loads") or {}).get(corner, {}).get("transfers") or {})
+        return {k: round(float(t.get(k, 0.0)), 1) for k in
+                ("lateral_total", "geometric", "elastic", "unsprung", "longitudinal")}
+
+    # 瞬心坐标（侧视 SVIC + 主销 YZ IC），来自当前姿态球头
+    def inst(corner_name, hp):
+        g = (body.get("per_wheel_geometry") or {}).get(corner_name, {})
+        bj = g.get("ball_joints") or {}
+        up1, up2 = bj.get("upper"), bj.get("lower")
+        if not up1 or not up2:
+            return {"svic_x": None, "svic_z": None, "ic_y": None, "ic_z": None}
+        p = svic_point(hp["CH1"], hp["CH2"], up1, hp["CH3"], hp["CH4"], up2)
+        icp = compute_instant_center(hp, {"UP1": up1, "UP2": up2})
+        return {
+            "svic_x": round(p[0], 1) if p else None,
+            "svic_z": round(p[1], 1) if p else None,
+            "ic_y": round(icp[0], 1) if icp is not None else None,
+            "ic_z": round(icp[1], 1) if icp is not None else None,
+        }
+
+    # ride 频率 / 阻尼
+    m_total = float(veh.get("mass_kg", 280.0))
+    frac = float(veh.get("front_axle_frac", 0.5))
+    unsp = float(veh.get("unsprung_kg", 20.0))
+    ms_f = sprung_mass_per_corner(m_total, frac, unsp)
+    ms_r = sprung_mass_per_corner(m_total, max(1e-6, 1.0 - frac), unsp)
+    c_damp = float(veh.get("c_damper_n_s_m", 2200.0))
+    ride_f = ride_frequency_hz(k_spring_f, mr_f, ms_f)
+    ride_r = ride_frequency_hz(k_spring_r, mr_r, ms_r)
+    damp_f = damping_ratio(k_spring_f, mr_f, ms_f, c_damp)
+    damp_r = damping_ratio(k_spring_r, mr_r, ms_r, c_damp)
+    freq_ratio = (ride_r / ride_f) if ride_f > 1e-9 else None
+
+    # 目标带评估（可算的动态/几何项）
+    def band_out(key, label, value, unit=""):
+        b = TARGET_BANDS.get(key)
+        return {"key": key, "label": label, "value": (round(value, 3) if value is not None else None),
+                "unit": unit, "status": _band_status(b, value) if b else None}
+    targets = [
+        band_out("ride_freq_f", "前轴固有频率", ride_f, "Hz"),
+        band_out("ride_freq_r", "后轴固有频率", ride_r, "Hz"),
+        band_out("damping_ratio_f", "前阻尼比", damp_f, ""),
+        band_out("damping_ratio_r", "后阻尼比", damp_r, ""),
+        band_out("motion_ratio_f", "前运动比", mr_f, ""),
+        band_out("motion_ratio_r", "后运动比", mr_r, ""),
+        band_out("load_transfer_f", "前轴横向转移占比", front_pct, "%"),
+    ]
+
+    return {
+        "roll_stiffness": {"front": round(k_f, 1), "rear": round(k_r, 1),
+                           "total": round(k_tot, 1), "front_pct": round(front_pct, 1)},
+        "transfer": {"front": tras("front_right"), "rear": tras("rear_right")},
+        "instant_center": {"front": inst("front_right", dict(dv.front_right.points)),
+                           "rear": inst("rear_right", dict(dv.rear_right.points))},
+        "ride": {"ride_freq_f_hz": round(ride_f, 3), "ride_freq_r_hz": round(ride_r, 3),
+                 "damping_f": round(damp_f, 3), "damping_r": round(damp_r, 3),
+                 "freq_ratio": round(freq_ratio, 3) if freq_ratio else None,
+                 "mr_f": round(mr_f, 3), "mr_r": round(mr_r, 3)},
+        "targets": targets,
+        "note": "P1 派生：纯复用 /solve/hardpoints 已算结果 + 几何 MR。",
+    }
+
+class ExcitationIn(BaseModel):
+    kind: str = "step"                 # step|sine|pulse
+    amplitude_mm: float = 10.0
+    freq_hz: float = 1.0
+    duration_s: float = 3.0
+    corners: list[str] = []            # 施加轮位；空=全部
+
+
+class RigRequest(BaseModel):
+    front_right: CornerHardpointsIn
+    front_left: CornerHardpointsIn | None = None
+    rear_right: CornerHardpointsIn | None = None
+    rear_left: CornerHardpointsIn | None = None
+    vehicle: dict = {}                 # bounce 参数覆盖（键名见 metrics.bounce.default_params）
+    motion_ratio: dict[str, float] | None = None
+    excitation: ExcitationIn = ExcitationIn()
+    dt_s: float = 0.001
+    ns: int = 10
+
+
+@router.post("/rig")
+def rig_v2(req: RigRequest):
+    """四轮时域台架：全车 7-DOF（车身垂向·侧倾·俯仰 × 四角簧下），
+    弹簧(分离压缩/拉伸阻尼)+缓冲块+轮胎垂向+路面 step/sine/pulse。
+    运动比缺省由几何 rocker mini-sweep 求取，可显式传入覆盖。
+    """
+    from core.models import AxleHardpoints
+
+    def _mk(points, tire):
+        return AxleHardpoints(points=points, tire=tire)
+
+    fr = _mk(req.front_right.points, req.front_right.tire)
+    fl = _mk(req.front_left.points, req.front_left.tire) if req.front_left else fr.mirrored()
+    rr = _mk(req.rear_right.points, req.rear_right.tire) if req.rear_right else fr.mirrored()
+    rl = _mk(req.rear_left.points, req.rear_left.tire) if req.rear_left else rr.mirrored()
+    tr_f = float(req.front_right.tire.get("track_width", 1220.0))
+    tr_r = float((req.rear_right or req.front_right).tire.get("track_width", 1180.0))
+
+    # 运动比：缺省几何；回退默认
+    fallback = {"fl": 0.4, "fr": 0.4, "rl": 0.55, "rr": 0.55}
+    if req.motion_ratio:
+        mr = {k: float(v) for k, v in req.motion_ratio.items()}
+    else:
+        corners = [("fl", fl, tr_f, DEFAULT_FRAME_NODES),
+                   ("fr", fr, tr_f, DEFAULT_FRAME_NODES),
+                   ("rl", rl, tr_r, _rear_rocker_frame_nodes()),
+                   ("rr", rr, tr_r, _rear_rocker_frame_nodes())]
+        mr = {}
+        for c, hp, track, fn in corners:
+            v = _axle_motion_ratio(hp, 0.0, 0.0, track, fn)
+            mr[c] = v if v and v > 0 else fallback[c]
+
+    veh = dict(req.vehicle or {})
+    veh.setdefault("front_track_mm", tr_f)
+    veh.setdefault("rear_track_mm", tr_r)
+
+    exc = {
+        "kind": req.excitation.kind,
+        "amplitude_mm": req.excitation.amplitude_mm,
+        "freq_hz": req.excitation.freq_hz,
+        "duration_s": req.excitation.duration_s,
+    }
+    res = bounce_simulate(veh, mr, exc, dt_s=req.dt_s, ns=req.ns,
+                          corners=list(req.excitation.corners) or None)
+    res["meta"]["track_mm"] = {"front": tr_f, "rear": tr_r}
+    return res
 
 # ---------- P5：稳态转向 / 整车调平 ----------
 
@@ -1261,7 +1451,8 @@ def _settle_case(dv, cv, ride_mm=None):
     return cv2
 
 
-def _solve_vehicle(dv, cv, design_id: str = "", case_id: str = ""):
+def _solve_vehicle(dv, cv, design_id: str = "", case_id: str = "",
+                   solver: str | None = None):
     """用给定的 DesignVersion + CaseVersion 求解四轮 VehicleResult。
 
     design_id/case_id 仅用于返回的响应标识（内联求解可传入空或自定义标签）。
@@ -1282,7 +1473,8 @@ def _solve_vehicle(dv, cv, design_id: str = "", case_id: str = ""):
     ]
     for name, axle_hp, travel, track in corners:
         try:
-            sol = _solve_corner(axle_hp, travel, cv.rack_displacement, track)
+            sol = _solve_corner(axle_hp, travel, cv.rack_displacement, track,
+                                solver=solver)
             angles = sol["angles"]
             residual = sol["residual"]
             status = sol["status"]
