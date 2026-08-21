@@ -1,5 +1,22 @@
 # 开发日志
 
+## 2026-08-21 — 子阶段①完成：DWB 式机制求解器上线切主（残差 ~1e-13mm，K-4 消解）
+
+- 需求：按 DWB-SIM 建模升级第①子阶段——机构级运动学求解器，取代顺序解、消除 K-4（顺序解全行程残差最高 0.73mm）。
+- 实现（`src/solver/mechanism/`，共 6 模块 + 5 测试文件）：
+  - `models.py`：Node/Link/AxisCluster(hinge|rocker)/BodyCluster/Mechanism + build_mechanism（UCA/LCA 铰链簇、转向节 5 节点刚体、摇臂铰链簇、横拉杆/推杆刚线、轮高+齿条双驱动、DOF=2=传动自由度）。
+  - `project.py`：project_distance / project_hinge / project_rocker / project_body + polar_q（Müller+**SVD Procrustes 兜底**，防强各向异性协方差过冲）。
+  - `solver.py`：**scipy least_squares 联合收敛 + continuation 热启动 + solve_rocker 后处理**。
+  - `from_legacy.py` / `pose.py` / `v2adapter.py`：真实硬点（含 R_ 前缀与 frame 节点）、compute_alignment_angles 复用、_solve_axle 同构角解。
+- 关键决策（有据偏差，已记录）：
+  1. **收敛改用 least_squares 而非纯投影 GS**：真实几何双闭环/强各向异性下独立精确投影实测不收缩（残差停在 43–84mm），LS 联合收敛到 1e-11 且热启动保持分支连续；投影原语保留为原语与未来 warm-start。
+  2. **齿条 steer_axis 全程 +Y**（齿条整体沿全局 Y 平移，两侧 tie inner 同向），转向符号由几何自然得出，符合 convention K-2（rack=+10 → 右 +toe / 左 −toe）。
+  3. **摇臂不可达并入状态**：伸张端 ≤-120mm 时摇臂/推杆闭环不可达 → OUT_OF_RANGE（轮侧几何残差虽小）。
+- 基准（`data/reports/dwb_mechanism_gate.json`）：全 4 角落×7 行程×2 齿条 = 56 行，worst 残差 **3.5e-11mm**（G1，阈值 0.02）；单姿态 p95 **21.95ms**（G4，预算 50ms）；与顺序解头对头 delta：caster 最高 1.03°、trail 4.44mm（顺序解极端行程残差 0.4mm 传导所致）。
+- v2 集成：`_SOLVER_MODE` 环境开关默认 **mechanism**（顺序解保留 `solver="sequential"` 显式回退）；SolveInlineRequest 增 `solver` 请求覆盖；`_solve_corner` 分流，前端零改动；顺带清掉一处既有死变量 `veh`。
+- 验证：全量 pytest **412 passed / 33 skipped / 3 xfailed / 0 failed**；机制 24 单测；v2 更新 5 条落后于新真相的断言（golden solver 名、fr-comp→VALID、-30→VALID / -120→OUT_OF_RANGE、export、性能预算 3s 放宽并注明理由）。
+- 下一步：子阶段②机制级台架动力学（同一机构 + 弹性线/力/积分）。
+
 ## 2026-08-21 — 决策：按 DWB 建模升级 · 子阶段①（机构级投影运动学求解器）设计规格
 
 - 需求：用户判定参考 DWB-SIM（double-wishbone-suspension.html）建模优于产品，要求「按它的建模做一轮完整升级」。
