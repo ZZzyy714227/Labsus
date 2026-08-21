@@ -51,8 +51,10 @@ class AxleHardpoints(BaseModel):
     @classmethod
     def _check_keys(cls, v):
         bad = set(v) - ALL_POINT_KEYS
-        if bad:
-            raise ValueError(f"invalid point keys: bad={sorted(bad)}")
+        missing = POINT_KEYS - set(v)
+        if bad or missing:
+            raise ValueError(
+                f"invalid point keys: bad={sorted(bad)} missing={sorted(missing)}")
         return v
 
     def mirrored(self) -> AxleHardpoints:
