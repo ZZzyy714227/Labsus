@@ -260,8 +260,27 @@ class TestPhysicalConsistency:
 # ============================================================
 
 def test_strut_out_derived_on_arm_plane():
+    import numpy as np
     from hardpoints import DEFAULT_HARDPOINTS, DEFAULT_REAR_HARDPOINTS
     f = DEFAULT_HARDPOINTS
     assert "STRUT_OUT" in f          # 前轴推杆：LCA 三角面内
     r = DEFAULT_REAR_HARDPOINTS
     assert "R_STRUT_OUT" in r        # 后轴拉杆：UCA 三角面内
+
+    # 前轴：STRUT_OUT 必须共面于 LCA 三角面（CH3/CH4/UP2）
+    ch3, ch4, up2 = (np.array(f[k], float) for k in ("CH3", "CH4", "UP2"))
+    n = np.cross(ch4 - ch3, up2 - ch3)
+    n = n / (np.linalg.norm(n) or 1.0)
+    so = np.array(f["STRUT_OUT"], float)
+    assert abs(np.dot(so - ch3, n)) < 1e-6          # 共面
+    frac = np.linalg.norm(so - ch3) / (np.linalg.norm(up2 - ch3) or 1.0)
+    assert 0.2 < frac < 0.8                          # 比例 t 在合理范围
+
+    # 后轴：STRUT_OUT 必须共面于 UCA 三角面（CH1/CH2/UP1）
+    ch1, ch2, up1 = (np.array(r[k], float) for k in ("R_CH1", "R_CH2", "R_UP1"))
+    n2 = np.cross(ch2 - ch1, up1 - ch1)
+    n2 = n2 / (np.linalg.norm(n2) or 1.0)
+    so2 = np.array(r["R_STRUT_OUT"], float)
+    assert abs(np.dot(so2 - ch1, n2)) < 1e-6
+    frac2 = np.linalg.norm(so2 - ch1) / (np.linalg.norm(up1 - ch1) or 1.0)
+    assert 0.2 < frac2 < 0.8
