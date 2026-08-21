@@ -52,18 +52,16 @@ def build_side_from_legacy(
     """
     fr = front_right if front_right is not None else DEFAULT_HARDPOINTS
     rr = rear_right if rear_right is not None else DEFAULT_REAR_HARDPOINTS
+    # 齿条是整体沿全局 +Y 平移（两侧 tie inner 同方向）；转向符号由几何自然给出
+    sa = steer_axis if steer_axis is not None else np.array([0.0, 1.0, 0.0])
     if corner == "fr":
         pts = _points_dict(fr, "", _FRONT_R_FRAME)
-        sa = steer_axis if steer_axis is not None else np.array([0.0, 1.0, 0.0])
     elif corner == "fl":
         base = front_left if front_left is not None else mirror_left(fr)
         pts = _points_dict(base, "", _FRONT_R_FRAME)
-        sa = steer_axis if steer_axis is not None else np.array([0.0, -1.0, 0.0])
     elif corner == "rr":
         pts = _points_dict(rr, "R_", _REAR_R_FRAME)
-        sa = steer_axis if steer_axis is not None else np.array([0.0, 1.0, 0.0])
     else:  # rl
         base = rear_left if rear_left is not None else mirror_left(rr)
         pts = _points_dict(base, "R_", _REAR_R_FRAME)
-        sa = steer_axis if steer_axis is not None else np.array([0.0, -1.0, 0.0])
     return build_mechanism(pts, steer_axis=sa)
