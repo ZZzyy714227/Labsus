@@ -321,10 +321,12 @@ const PRESETS={
  },
  "PROD 前推后拉（FSAE）":{
    hp:{LCA_F:[180,145,110],LCA_R:[180,-145,118],LBJ:[680,5,145],SPR_L:[480,8,180],
+       PR_L:[640,6,150],
        UCA_F:[380,115,395],UCA_R:[380,-115,400],UBJ:[650,-15,445],
        WC:[760,0,300],TRO:[650,-145,195],RACK:[245,-170,185],DMP_T:[340,0,590],
        RK_PIVOT:[280,0,460],RK_A:[320,0,410],RK_B:[350,0,350]},
-   rearRk:{RK_PIVOT:[280,-1550,260],RK_A:[320,-1550,310],RK_B:[350,-1550,430]},
+   rearRk:{RK_PIVOT:[280,-1550,260],RK_A:[320,-1550,310],RK_B:[350,-1550,430],
+       PR_U:[640,-1565,450]},
    tire:{R:300,W:245,rim:215.9,disc:170,label:"245/40R17"},
    cam0:-0.80,toe0:0.08,mS:230,kS:95,kT:230,cB:7,cR:12,wb:1550,hcg:290
  }
@@ -440,23 +442,24 @@ const LINKDEF=[
 ];
 
 /* ---- 推杆/拉杆/摇臂（前推后拉模式）：当 RK_PIVOT 存在时条件启用 ---- */
-function addPushrodMode(m){
-  if(m.i["RK_PIVOT"]===undefined||m.i["RK_A"]===undefined||m.i["RK_B"]===undefined) return;
-  const i=m.i,n=m.n;
-  /* 判断推杆(LBJ→RK_B)或拉杆(UBJ→RK_B)：RK_B 离谁近就连谁 */
-  const dLBJ=dst(n[i.RK_B].p,n[i.LBJ].p), dUBJ=dst(n[i.RK_B].p,n[i.UBJ].p);
-  const rodFrom=dLBJ<dUBJ?"LBJ":"UBJ";
-  /* 添加推杆/拉杆刚线 */
-  m.L.push({a:i[rodFrom],b:i["RK_B"],id:rodFrom+"_rod",type:"R",
-    zh:dLBJ<dUBJ?"推杆":"拉杆",grp:"rod",
-    L0:dst(n[i[rodFrom]].p,n[i["RK_B"]].p),Ld:dst(n[i[rodFrom]].p,n[i["RK_B"]].p)});
-  /* 弹簧减振器弹性线从 SPR_L→DMP_T 改为 RK_A→DMP_T */
-  const di=m.L.findIndex(l=>l.grp==="damper");
-  if(di>=0){m.L[di].a=i["RK_A"];m.L[di].b=i["DMP_T"];
-    m.L[di].L0=dst(n[i["RK_A"]].p,n[i["DMP_T"]].p);m.L[di].Ld=m.L[di].L0;}
-  /* 摇臂簇：RK_A + RK_B 绕 RK_PIVOT 轴旋转（轴=车架 X） */
-  m.cl.push({kind:"hinge",name:"ROCKER",zh:"摇臂",
-    axA:i["RK_PIVOT"],axB:i["RK_PIVOT"],  // 同一点 → projHinge 默认 X 轴
+function addPushrodMode(M){
+  if(M.i["RK_PIVOT"]===undefined||M.i["RK_A"]===undefined||M.i["RK_B"]===undefined) return;
+  const i=M.i,n=M.n;
+  /* 前轴=推杆（LCA 外端 PR_L→RK_B）; 后轴=拉杆（UCA 外端 PR_U→RK_B） */
+  const rodFrom=M.axleKey==="rear"?"PR_U":"PR_L";
+  if(i[rodFrom]===undefined) return;               // 旧预设/旧存档无推拉杆点 → 退回纯叉臂
+  m_L_push(M,rodFrom,i,n);
+}
+function m_L_push(M,rodFrom,i,n){
+  const n0=n[i[rodFrom]],n1=n[i["RK_B"]];
+  M.L.push({a:i[rodFrom],b:i["RK_B"],id:rodFrom+"_rod",type:"R",
+    zh:M.axleKey==="rear"?"拉杆":"推杆",grp:"rod",
+    L0:dst(n0.p,n1.p),Ld:dst(n0.p,n1.p)});
+  const di=M.L.findIndex(l=>l.grp==="damper");
+  if(di>=0){M.L[di].a=i["RK_A"];M.L[di].b=i["DMP_T"];
+    M.L[di].L0=dst(n[i["RK_A"]].p,n[i["DMP_T"]].p);M.L[di].Ld=M.L[di].L0;}
+  M.cl.push({kind:"hinge",name:"ROCKER",zh:"摇臂",
+    axA:i["RK_PIVOT"],axB:i["RK_PIVOT"],
     ids:[i["RK_A"],i["RK_B"]],
     rel:[sub(n[i["RK_A"]].p0,n[i["RK_PIVOT"]].p0),sub(n[i["RK_B"]].p0,n[i["RK_PIVOT"]].p0)],
     wt:[Math.max(n[i["RK_A"]].m,1e-3),Math.max(n[i["RK_B"]].m,1e-3)]});
@@ -499,10 +502,11 @@ function buildMech(axleKey){
     return{kind:"body",name:name,zh:zh,ids:ids,wt:wt,ws:ws,rc:c,
            rel:ids.map(k=>sub(n[k].p0,c)),q:qId()};
   }
+  const has=id=>i[id]!==undefined;
   const cl=[
-    hinge("LCA","下摆臂","LCA_F","LCA_R",["LBJ","SPR_L"]),
-    hinge("UCA","上摆臂","UCA_F","UCA_R",["UBJ"]),
-    freeBody("KNUCKLE","转向节+轮毂总成",["LBJ","UBJ","WC","TRO"])
+    hinge("LCA","下摆臂","LCA_F","LCA_R",["LBJ","SPR_L","PR_L"].filter(has)),
+    hinge("UCA","上摆臂","UCA_F","UCA_R",["UBJ","PR_U"].filter(has)),
+    freeBody("KNUCKLE","转向节+轮毂总成",["LBJ","UBJ","WC","TRO"].filter(has))
   ];
   /* 轮面法向（自旋轴，指向外侧）在转向节局部坐标下的表达 */
   const camb=S.cam0*D2R, toe=S.toe0*D2R;
