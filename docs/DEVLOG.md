@@ -234,3 +234,10 @@
 - 修复过程：块注释 CH*/FL1 提前闭合吞掉 displayCorner；删除残留无效行 const TI=…；拖拽时清空硬点表 tbody 的 bug；重置后轴误用前种子(改 _seedR 捕获)；statusBox 累积/无 parentElement 防护。
 - 验证：node --check 语法 OK；mock DOM + vm 全流程(init→solve→renderAll→drawAll)不抛异常；wheelAxis 数学抽查正确；骨骼重建(后轴 UP3/UP4 与模板吻合)、侧视图投影 后轴在左 ✓；真后端 POST solve/hardpoints 返回四角 VALID、轮心 [0,610] 与 [−1550,590]、含载荷。modeler.html 200 且新内容在线上。
 - 注意：本机 8000 旧 python 进程(38632)已结束，已重启新服务(作业 pwsh-1)，浏览器刷新即见新模型；如重启服务请用 start_modeler.bat。
+
+## 2026-08-21 — Task 3: metrics.sl 改按实际弹性线端点
+
+- 修改文件：`dwb-mod/double-wishbone-suspension.html`（+2/-1 行）。
+- `metrics()` 返回值的 `sl` 字段由固定 `dst(spl,P("DMP_T"))` 改为条件取值：`M.spring` 存在时用 `dst(M.n[M.spring.a].p,M.n[M.spring.b].p)`（实际弹性线端点，推杆/拉杆模式下 addRodRocker 已重锚为 RK_A→DMP_T），否则回退旧路径。
+- 验证：fresh / sport-rear 两场景均 `[loop] completed without exception`、n:300、res=0。
+- 提交：`dwb(P1): metrics.sl uses actual elastic line endpoints (RK_A->DMP_T in pushrod mode)`（15cd6f7）。
