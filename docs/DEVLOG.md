@@ -1,5 +1,21 @@
 # 开发日志
 
+## 2026-08-21 — gemini 全车版功能补全（dwb-mod/gemini-code-1787322645956.html）
+- 需求：用户判定 Gemini 生成的 DWB-SIM PRO 全车版（四机构同屏、每轴独立弹性参数账本、点击硬点自动切换编辑轴、双副车架、RIG 四轮台架）优于既有整车版，但功能偏少，要求补齐。
+- 补全（保持 gemini 架构：S.front/S.rear 账本 + S.axis 编辑轴 + 渲染平移 Y±wb/2）：
+  1. 四轮独立行程 trFR/trFL/trRR/trRL（主滑块之外的独立轮跳，前后轴各自限位 trMinR/trMaxR）
+  2. 整车俯仰 pitch（前组 −Δ、后组 +Δ，mm/°=4）
+  3. 轴距滑块（渲染平移联动，无需平移硬点数据）
+  4. 轴视图过滤 ALL/FRONT/REAR（机构+副车架+摇臂支架+转向机全部跟随过滤）
+  5. 右栏四轮定位表 FR/FL/RR/RL×6 参数 + 整车读数分区（后轴 cam/toe/RC/行程极限、RC@0 前后、RC 连线角、轴距、俯仰）
+  6. 激励接线：轮跳 exc 选择器 + 转向激励 steerExc（loop 应用）+ 路面波形/幅值/频率/触发/清轨迹（rig 四轮共用）
+  7. localStorage 持久化（键 dwbProChassisGM：双轴 hp/tire/弹性参数/轴距/视图/编辑轴），rebuild/refreshDerived 自动保存
+  8. findLimits 去除 ±40 保底（前后轴真实极限 −118/+118）
+  9. 键盘快捷键：空格 播放暂停 · ←→轮跳 · Shift+←→ 转向 · F 适配 · A 循环轴视图 · 1-4 最大化 · 0 四视图
+- 验证：harness fresh/rigtest 各 300 帧零异常、okGeo true、RIG 残差 0.0004mm；功能探针（.workbuddy/tmp/gemini_probe.mjs）——trRR=20 独立生效、pitch=2 → 前 −8/后 +8、wb=3200 渲染范围 ±1930、FRONT/REAR 视图节点数 30、转向激励驱动 rack ±30、持久化 round-trip（前轴 kS=150 与后轴独立参数、后轴 LBJ、wb、视图全部恢复）。
+- 已知边界：harness 的 trSamples 采样字段为 SIM.mR（gemini 用 mFR）——工具侧显示空，实际轮跳由 probe 验证；两版整车文件并存（dwb-pro-chassis.html 旧架构 / gemini 版为当前推荐）。
+- 提交：dwb-mod/gemini-code-1787322645956.html + DEVLOG。
+
 ## 2026-08-21 — DWB-SIM PRO 整车版：前推杆+后拉杆双轴合成（dwb-mod/dwb-pro-chassis.html）
 - 需求：用户已在参考.html（PRO 闭式求解器）内分别调试好前悬架(推杆)/后悬架(拉杆)两套几何，要求前后连接合成整车模型（等同 dwb-mod 全底盘能力）。
 - 决策（用户拍板）：复制参考.html → dwb-mod/dwb-pro-chassis.html（原参考保留）；后轴无转向 rack 恒 0；RIG 台架仅前轴（四轮台架后续）；渲染保持 PRO 风格。
