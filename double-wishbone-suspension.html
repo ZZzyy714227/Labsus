@@ -1291,7 +1291,7 @@ function drawView(v,sc){
       ctx.strokeStyle=o.c;ctx.lineWidth=o.w;ctx.stroke();
     }else if(o.k==="n"){
       const A=P2(v,o.p);if(!A)continue;
-      PICK.push({x:A[0],y:A[1],id:o.id,v:v,p:o.p,sx:o.sx||1});
+      PICK.push({x:A[0],y:A[1],id:o.id,v:v,p:o.p,sx:o.sx||1,ax:o.ax});
       const sel=(UI.hover===o.id||UI.selHP===o.id);
       dash(ctx,[]);
       ctx.fillStyle=C.bg;ctx.strokeStyle=sel?C.nodeSel:(o.fix?C.nodeFix:C.node);ctx.lineWidth=sel?1.8:1.3;
@@ -1896,7 +1896,8 @@ function doReset(){
 }
 function rebuildLight(){
   const tr=S.travel;
-  SIM.R=buildMech();SIM.L=buildMech();
+  SIM.R=buildMech("front");SIM.L=buildMech("front");
+  SIM.RR=buildMech("rear");SIM.RL=buildMech("rear");   // 全底盘：拖拽后前后轴都重建
   refreshDerived(false);S.travel=clamp(tr,S.trMin,S.trMax);
   SIM.dirtySweep=true;
   persistState();
