@@ -345,9 +345,14 @@ loadPreset(S.preset);
 
 /* ---- 全底盘持久化（T1）：localStorage 自动 + JSON 文件导入/导出 ---- */
 function persistState(){
-  try{localStorage.setItem("dwbFullChassis",JSON.stringify({
-    axles:S.axles,wb:S.wb,axleView:S.axleView,preset:S.preset,
-    kS:S.kS,cB:S.cB,cR:S.cR,kT:S.kT,mS:S.mS}));}catch(e){/* file:// 受限时静默 */}
+  try{
+    /* 前轴活源=S.hp：序列化前同步进 axles.front.hp，保证拖拽/表格编辑可持久化 */
+    S.axles.front.hp={}; for(const id in S.hp) S.axles.front.hp[id]=cpy(S.hp[id]);
+    S.axles.front.tire=Object.assign({},S.tire);
+    localStorage.setItem("dwbFullChassis",JSON.stringify({
+      axles:S.axles,wb:S.wb,axleView:S.axleView,preset:S.preset,
+      kS:S.kS,cB:S.cB,cR:S.cR,kT:S.kT,mS:S.mS}));
+  }catch(e){/* file:// 受限时静默 */}
 }
 function loadPersist(){
   try{
@@ -408,7 +413,8 @@ const LINKDEF=[
 
 function buildMech(axleKey){
   axleKey=axleKey||"front";
-  const HP=(S.axles[axleKey]&&S.axles[axleKey].hp)||S.hp;   // 全底盘：按轴取硬点
+  /* 前轴编辑面=S.hp（拖拽/硬点表写它）；后轴=S.axles.rear.hp（真车坐标，含 Y−wb） */
+  const HP=axleKey==="rear"?((S.axles.rear&&S.axles.rear.hp)||S.hp):S.hp;
   const n=[],i={};
   HPDEF.forEach((d,k)=>{
     const p=cpy(HP[d[0]]);
@@ -543,9 +549,9 @@ function solveKin(M,drvZ,maxIt,tol){
   M.res=res;M.iter=it;M.ms=performance.now()-t0;M.ok=res<0.02;
   return res;
 }
-/* 设定车身侧节点（含齿条位移）；全底盘：按机构所属轴取硬点 */
+/* 设定车身侧节点（含齿条位移）；前轴用 S.hp 活源、后轴用 S.axles.rear.hp */
 function setChassis(M,rack){
-  const HP=(S.axles[M.axleKey]&&S.axles[M.axleKey].hp)||S.hp;
+  const HP=M.axleKey==="rear"?((S.axles.rear&&S.axles.rear.hp)||S.hp):S.hp;
   for(const d of HPDEF){ if(!d[4])continue; const N=M.n[M.i[d[0]]];
     N.p[0]=HP[d[0]][0];N.p[1]=HP[d[0]][1];N.p[2]=HP[d[0]][2];}
   const R=M.n[M.i.RACK]; R.p[0]-=rack;      // 齿条横向平移（本侧局部坐标，+输入=向右转）
