@@ -1,6 +1,6 @@
 # DWB 全底盘改造（整车运动学工具台）实施计划
 
-> **执行状态（2026-08-21）**：T1 ✅ `103f1c0`｜T2 ✅ `88b199c`｜T3 ✅（并入 T2）｜T4 ✅ `ae24b56`｜T5 ✅ `a09748c`｜T6 ✅ `80f654c`/`8d4b8ca`/`fa5ffe1`/`3a77e65`。代码侧全部完成并经 DOM 存根全链路冒烟实证；**浏览器 8 项验收待用户实测**（本机 Edge headless 无输出，无法自验渲染）。
+> **执行状态（2026-08-21）**：T1 ✅ `103f1c0`｜T2 ✅ `88b199c`｜T3 ✅（并入 T2）｜T4 ✅ `ae24b56`｜T5 ✅ `a09748c`｜T6 ✅ `80f654c`/`8d4b8ca`/`fa5ffe1`/`3a77e65`；修复轮 ✅ `ec2c24e`/`3e84bf8`/`5846c2f`/`234b2cf`。**验收自动核对（DOM 存根可实证项）：A1轴开关/A2后轴拖拽+保存/A3转向解耦/A4曲线常驻/A5残差≤0.02/A6 JSON往返/A8前后轴解耦 全部 PASS**（A6 经真实 importJSON+FileReader 路径）；仅 A7 流畅度需浏览器肉眼实测。本机 Edge headless 无输出、无 Chrome，渲染级验收待用户浏览器实测。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans（本计划推荐本会话内联执行——单文件 2100 行 HTML 强耦合，子代理难以脱离上下文安全修改）。
 
