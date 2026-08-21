@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans（本计划推荐本会话内联执行——单文件 2100 行 HTML 强耦合，子代理难以脱离上下文安全修改）。
 
-**Goal:** 在不改动 DWB-SIM 三件核心资产（轮跳驱动、齿条转向链路、连杆几何约束链）的前提下，把 `double-wishbone-suspension.html` 增长式扩展为"前+后轴四轮同屏、硬点可拖可存、整车运动学可分析"的全底盘工具台。
+**Goal:** 在不改动 DWB-SIM 既有资产（轮跳驱动、齿条转向链路、连杆几何约束链、立柱/弹簧建模——均为用户确认正确）的前提下，把 `double-wishbone-suspension.html` 增长式扩展为"前+后轴四轮同屏、硬点可拖可存、整车运动学可分析"的全底盘工具台；唯一建模缺口是后轴。
 
 **Architecture:** 单文件内增长：`SIM.R/L` → `SIM.C={fr,fl,rr,rl}` 同构四机构；`buildMech` 参数化；`S.axles` 双轴硬点 + `axleView` 轴开关；后轴按可编辑轴距布置于 Y≈−wb；前后轴解耦（无车架耦合）。持久化 localStorage + JSON 导入导出。
 
@@ -111,21 +111,23 @@ function cornerTravel(c){
 
 ---
 
-### Task 3: 建模细节修正（立柱 / 弹簧连接 / 转向视觉）
+### Task 3: 轴语义 —— 后轴无转向，前轴转向视觉保持（不动立柱/弹簧）
 
-**Files:** `metrics()` L546-583（ax 更新核对）/ `addInstance` L893-1043（弹簧/立柱渲染）/ `drawOverlay` L1331-1433（前束弧/主销标注）
+**Files:** `setChassis` L492-497 / `simulate` 四角驱动（Task2 已建）/ `drawOverlay` L1331-1433（前束弧/阿克曼）/ `addInstance` 弹簧接线核对（只核对不改）
 
-- [ ] **Step 1: 主销旋转核对与修复**
+> 用户裁定（2026-08-21）：参考的立柱（主销）与弹簧连接是正确的，本轮**不做**"主销旋转修复/弹簧连接统一"——四轴同构自动沿用参考建模；此处仅保证新后轴的"无转向"语义与既有前轴转向视觉不回归。
 
-核对链：`setChassis(rack)` → 齿条平移 FL1 → 横拉杆投影 → 转向节刚体投影 → `metrics()` 中 `ax=mApply(R,axL)`。若发现"转向时车轮轴向未更新/不绕主销"，修正点在 `projBody` 后强制按主销轴线重投影（补救式：对 `ax` 施加绕主销修正旋转），并加可视验证：俯视图车轮朝向/前束弧在 rack≠0 时随动正确。
+- [ ] **Step 1: 后轴无转向语义**
 
-- [ ] **Step 2: 弹簧/减振器连接统一**
+后轴驱动 `rack=0`（`rackOf("rr"/"rl")→0`），`FL1` 保持设计位（`setChassis` 不施加 rack 平移）；`S.steerExc`/转向激励仅作用于前轴。
 
-`addInstance` 中弹簧两端 `SPL(=SPR_L)` 与 `DMT(=DMP_T)` 已接真实求解节点（四轴同构即自动正确）；核对后轴实例的 `DMP_T` 取 `S.axles.rear.hp.DMP_T`；如有"弹簧长度 L 未随机构更新"残留，确保 `metrics().sl` 消费 `M.springL0` 与当前长度路径一致。
+- [ ] **Step 2: 前轴转向视觉保持**
 
-- [ ] **Step 3: 后轴无转向 + 整车 toe 视觉**
+俯视图转向弧/阿克曼/转向中心仅前轴（现状如此，四轮同框后确认不串到后轴）；后轴显示静态前束弧（toe0 读数）。
 
-后轴驱动 `rack=0`；俯视图仅前轴显示转向弧与阿克曼；后轴显示静态前束弧（toe0 读数）。`metrics()` 前束符号沿用 convention。
+- [ ] **Step 3: 弹簧接线核对（只核对不改建模）**
+
+`addInstance` 后轴实例的弹簧两端（SPR↔DMP_T）从 `S.axles.rear.hp` 取值，确认接对；如有取值错误只修取值路径。
 
 ---
 
