@@ -895,8 +895,15 @@ function springPts(a,b,r,turns,seg){
 function buildScene(){
   const sc=[];
   addShared(sc);
-  addInstance(sc,SIM.R,SIM.mR,SIM.swR,1);
-  if(S.show.mirror&&SIM.mL)addInstance(sc,SIM.L,SIM.mL,SIM.swL||SIM.swR,-1);
+  const view=S.axleView;                    // 全底盘（T4）：轴视图过滤
+  if(view!=="rear"){
+    addInstance(sc,SIM.R,SIM.mR,SIM.swR,1,0);
+    if(S.show.mirror&&SIM.mL)addInstance(sc,SIM.L,SIM.mL,SIM.swL||SIM.swR,-1,0);
+  }
+  if(view!=="front"){
+    addInstance(sc,SIM.RR,SIM.mRR,SIM.swRR,1,-S.wb);
+    if(S.show.mirror&&SIM.mRL)addInstance(sc,SIM.RL,SIM.mRL,SIM.swRL||SIM.swRR,-1,-S.wb);
+  }
   return sc;
 }
 /* ---- 车身/副车架/转向机（左右共用） ---- */
@@ -969,8 +976,9 @@ function addShared(sc){
   }
 }
 /* ---- 单侧悬架总成 ---- */
-function addInstance(sc,M,m,sw,sx){
-  const T=p=>[p[0]*sx,p[1],p[2]];
+function addInstance(sc,M,m,sw,sx,dy){
+  dy=dy||0;                                 // 全底盘（T4）：后轴纵向平移 −wb
+  const T=p=>[p[0]*sx,p[1]+dy,p[2]];
   const N=id=>T(M.n[M.i[id]].p);
   const LBJ=N("LBJ"),UBJ=N("UBJ"),WC=N("WC"),TRO=N("TRO"),SPL=N("SPR_L"),DMT=N("DMP_T");
   const LAF=N("LCA_F"),LAR=N("LCA_R"),UAF=N("UCA_F"),UAR=N("UCA_R"),RCK=N("RACK");
@@ -1193,11 +1201,25 @@ function S2W(v,sx,sy,base){
 function fitPoints(){
   const pts=[];
   if(!SIM.R)return[[0,0,0],[900,-400,760],[-900,400,0]];
-  const inst=[[SIM.R,1]];if(S.show.mirror&&SIM.mL)inst.push([SIM.L,-1]);
-  inst.forEach(q=>{const M=q[0],sx=q[1];
-    M.n.forEach(n=>pts.push([n.p[0]*sx,n.p[1],n.p[2]]));
-    const m=(sx>0?SIM.mR:SIM.mL);if(!m)return;
-    const w=[m.wc[0]*sx,m.wc[1],m.wc[2]],R=S.tire.R,W=S.tire.W/2;
+  const view=S.axleView;
+  const inst=[[SIM.R,1,0,SIM.mR]];if(S.show.mirror&&SIM.mL)inst.push([SIM.L,-1,0,SIM.mL]);
+  if(view!=="front"){
+    inst.push([SIM.RR,1,-S.wb,SIM.mRR]);
+    if(S.show.mirror&&SIM.mRL)inst.push([SIM.RL,-1,-S.wb,SIM.mRL]);
+  }
+  if(view==="rear")inst.length=0;             // 只看后轴
+  if(view==="rear"){
+    inst.push([SIM.RR,1,-S.wb,SIM.mRR]);
+    if(S.show.mirror&&SIM.mRL)inst.push([SIM.RL,-1,-S.wb,SIM.mRL]);
+  }else if(view==="front"){
+    inst.length=0;
+    inst.push([SIM.R,1,0,SIM.mR]);
+    if(S.show.mirror&&SIM.mL)inst.push([SIM.L,-1,0,SIM.mL]);
+  }
+  inst.forEach(q=>{const M=q[0],sx=q[1],dy=q[2],m=q[3];
+    M.n.forEach(n=>pts.push([n.p[0]*sx,n.p[1]+dy,n.p[2]]));
+    if(!m)return;
+    const w=[m.wc[0]*sx,m.wc[1]+dy,m.wc[2]],R=S.tire.R,W=S.tire.W/2;
     [[R,0,0],[-R,0,0],[0,R,0],[0,-R,0],[0,0,R],[0,0,-R]].forEach(o=>pts.push(add(w,o)));
     pts.push([w[0]+sx*W,w[1],w[2]-R]);pts.push([w[0]-sx*W,w[1],w[2]+R]);
   });
@@ -1408,7 +1430,7 @@ function angArc(ctx,O,r,a0,a1,txt,col){
   ctx.fillText(txt,O[0]+cos(am)*(r+5),O[1]+sin(am)*(r+5));
 }
 function drawOverlay(v){
-  const ctx=v.ctx,m=SIM.mR;if(!m)return;
+  const ctx=v.ctx,m=SIM.axleView==="rear"?(SIM.mRR||SIM.mR):SIM.mR;if(!m)return;
   /* ---- 正视图：瞬心 / 侧倾中心 / 主销偏移距 / 轮距 ---- */
   if(v.key==="front"){
     if(S.show.ic&&m.ic){
@@ -1720,6 +1742,9 @@ function buildLeft(){
 
   /* --- 视图 --- */
   b=sec(host,"视图","VIEW");
+  rowBtns(b,[["整车 ALL",()=>{S.axleView="all";SIM.dirtySweep=true;VW.forEach(fitView);},()=>S.axleView==="all"],
+             ["前轴 F",()=>{S.axleView="front";VW.forEach(fitView);},()=>S.axleView==="front"],
+             ["后轴 R",()=>{S.axleView="rear";VW.forEach(fitView);},()=>S.axleView==="rear"]]);
   rowBtns(b,[["全部适应 FIT",()=>VW.forEach(fitView)],["还原视角",()=>{VW.forEach(v=>{v.az=-38*D2R;v.elv=22*D2R;fitView(v);});}]]);
   rowSlider(b,"等轴测方位","AZIMUTH","°",-180,180,1,()=>VW[3]?VW[3].az*R2D:0,v=>{if(VW[3])VW[3].az=v*D2R;},0);
   rowSlider(b,"等轴测仰角","ELEVATION","°",-85,85,1,()=>VW[3]?VW[3].elv*R2D:0,v=>{if(VW[3])VW[3].elv=v*D2R;},0);
