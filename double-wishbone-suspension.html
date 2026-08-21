@@ -1661,8 +1661,8 @@ function buildLeft(){
   rowSlider(b,"轴距","WHEELBASE","mm",1800,3200,10,()=>S.wb,v=>{
     const nv=parseFloat(v);if(!isFinite(nv))return;
     const d=nv-S.wb;S.wb=nv;
-    if(S.axles&&S.axles.rear&&S.axles.rear.hp)   // 后轴硬点整体平移新差值（真车坐标体系）
-      for(const k in S.axles.rear.hp)S.axles.rear.hp[k][1]+=d;
+    if(S.axles&&S.axles.rear&&S.axles.rear.hp)   // 后轴在 Y 负侧：wb 增 → 后轴更远（y -= d）
+      for(const k in S.axles.rear.hp)S.axles.rear.hp[k][1]-=d;
     rebuildLight();},0);
   rowSlider(b,"车身侧倾","BODY ROLL","°",-6,6,0.1,()=>S.roll,v=>S.roll=v,2);
   rowSlider(b,"齿条位移","RACK TRAVEL","mm",-70,70,0.5,()=>S.rack,
