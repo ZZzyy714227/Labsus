@@ -406,10 +406,12 @@ const LINKDEF=[
  ["SPR_L","DMP_T","E","螺旋弹簧+减振器","damper"],
 ];
 
-function buildMech(){
+function buildMech(axleKey){
+  axleKey=axleKey||"front";
+  const HP=(S.axles[axleKey]&&S.axles[axleKey].hp)||S.hp;   // 全底盘：按轴取硬点
   const n=[],i={};
   HPDEF.forEach((d,k)=>{
-    const p=cpy(S.hp[d[0]]);
+    const p=cpy(HP[d[0]]);
     n.push({id:d[0],zh:d[1],en:d[2],grp:d[3],fix:!!d[4],m:d[5],
             p:p,p0:cpy(p),pp:cpy(p),v:[0,0,0],w:d[4]?0:(d[5]>0?1/d[5]:0),f:[0,0,0]});
     i[d[0]]=k;
@@ -449,6 +451,7 @@ function buildMech(){
   const axW=nrm([cos(toe)*cos(camb),sin(toe),-sin(camb)]);
   const KN=cl[2], R0=qM(KN.q);
   const M={n:n,i:i,L:L,cl:cl,tie:tie,
+    axleKey:axleKey,                // 所属轴（metrics 取轴硬点用）
     axL:axW,                          // 设计位形下自旋轴（局部=全局，因 q=I）
     nFree:n.filter(x=>!x.fix).length,
     nRig:L.filter(l=>l.type==="R").length,
@@ -540,10 +543,11 @@ function solveKin(M,drvZ,maxIt,tol){
   M.res=res;M.iter=it;M.ms=performance.now()-t0;M.ok=res<0.02;
   return res;
 }
-/* 设定车身侧节点（含齿条位移） */
+/* 设定车身侧节点（含齿条位移）；全底盘：按机构所属轴取硬点 */
 function setChassis(M,rack){
+  const HP=(S.axles[M.axleKey]&&S.axles[M.axleKey].hp)||S.hp;
   for(const d of HPDEF){ if(!d[4])continue; const N=M.n[M.i[d[0]]];
-    N.p[0]=S.hp[d[0]][0];N.p[1]=S.hp[d[0]][1];N.p[2]=S.hp[d[0]][2];}
+    N.p[0]=HP[d[0]][0];N.p[1]=HP[d[0]][1];N.p[2]=HP[d[0]][2];}
   const R=M.n[M.i.RACK]; R.p[0]-=rack;      // 齿条横向平移（本侧局部坐标，+输入=向右转）
   M.n[M.i.RACK].pp=cpy(R.p);
 }
@@ -595,7 +599,8 @@ function arbRate(mrArb){
   const kt=S.arb.G*J/L;                                    // 扭转刚度 N·mm/rad
   return{k:kt/(g.a*g.a)*mrArb*mrArb,J:J,kt:kt,a:g.a,L:L};
 }
-function metrics(M){
+function metrics(M,hpSrc){
+  const HP=hpSrc||S.hp;                                  // 全底盘：后轴传入 S.axles.rear.hp
   const P=id=>M.n[M.i[id]].p;
   const KN=M.cl[2], R=KN.R||qM(KN.q);
   const wc=cpy(P("WC")),lbj=cpy(P("LBJ")),ubj=cpy(P("UBJ")),tro=cpy(P("TRO")),spl=cpy(P("SPR_L"));
@@ -614,14 +619,14 @@ function metrics(M){
   const scrub=cp[0]-kg[0];                              // 主销偏移距(正=接地点在轴线外侧)
   const trail=kg[1]-cp[1];                              // 主销后倾拖距(正=轴线交点在接地点前方)
   /* 正视图瞬心 IC 与侧倾中心 */
-  const lp=axisAtY(S.hp.LCA_F,S.hp.LCA_R,wc[1]);
-  const up=axisAtY(S.hp.UCA_F,S.hp.UCA_R,wc[1]);
+  const lp=axisAtY(HP.LCA_F,HP.LCA_R,wc[1]);
+  const up=axisAtY(HP.UCA_F,HP.UCA_R,wc[1]);
   const ic=isect2([lp[0],lp[2]],[lbj[0]-lp[0],lbj[2]-lp[2]],[up[0],up[2]],[ubj[0]-up[0],ubj[2]-up[2]]);
   let rcH=null;
   if(ic){const r=isect2([cp[0],cp[2]],[ic[0]-cp[0],ic[1]-cp[2]],[0,0],[0,1]); if(r)rcH=r[1];}
   /* 侧视图瞬心 SVIC 与抗俯仰 */
-  const ld=[S.hp.LCA_R[1]-S.hp.LCA_F[1],S.hp.LCA_R[2]-S.hp.LCA_F[2]];
-  const ud=[S.hp.UCA_R[1]-S.hp.UCA_F[1],S.hp.UCA_R[2]-S.hp.UCA_F[2]];
+  const ld=[HP.LCA_R[1]-HP.LCA_F[1],HP.LCA_R[2]-HP.LCA_F[2]];
+  const ud=[HP.UCA_R[1]-HP.UCA_F[1],HP.UCA_R[2]-HP.UCA_F[2]];
   const svic=isect2([lbj[1],lbj[2]],ld,[ubj[1],ubj[2]],ud);
   let anti=null;
   if(svic){const dy=cp[1]-svic[0],dzz=svic[1]-cp[2];
@@ -750,10 +755,12 @@ function stepDyn(M,dt,rack,tSim){
 }
 
 /* ================================ 6. 仿真管理 ================================ */
-const SIM={R:null,L:null,mR:null,mL:null,swR:null,swL:null,limR:[-80,80],geo:null,
+const SIM={R:null,L:null,mR:null,mL:null,RR:null,RL:null,mRR:null,mRL:null,
+  swR:null,swL:null,swRR:null,limR:[-80,80],limRR:[-80,80],geo:null,geoRR:null,
   dirtyGeom:true,dirtySweep:true,lastSweep:0,rc2:null,trace:[],mrRef:0.6};
 function rebuild(){
-  SIM.R=buildMech();SIM.L=buildMech();
+  SIM.R=buildMech("front");SIM.L=buildMech("front");
+  SIM.RR=buildMech("rear");SIM.RL=buildMech("rear");
   SIM.dirtyGeom=true;SIM.dirtySweep=true;SIM.trace=[];
   refreshDerived(true);
   persistState();
@@ -780,13 +787,26 @@ function refreshDerived(full){
   const m0=metrics(M);
   const rz=m0.cp[2]+corN/S.kT;
   SIM.R.roadZ0=rz;SIM.L.roadZ0=rz;
+  /* 全底盘（T2）：后轴几何极限 + 扫掠 + 预载（无转向 rack=0） */
+  const MR=SIM.RR;
+  if(full||!SIM.geoRR)SIM.geoRR=findLimits(MR,0);
+  SIM.limRR=[Math.max(SIM.geoRR[0],-(S.bsD+12)),Math.min(SIM.geoRR[1],S.bsU+12)];
+  SIM.swRR=runSweep(MR,0,SIM.limRR,45);
+  [SIM.RR,SIM.RL].forEach(m=>{
+    m.springF0=sprN/SIM.mrRef*FS;
+    m.springL0=m.spring.Ld;
+  });
   SIM.corN=corN;SIM.sprN=sprN;SIM.mU=mU;
   loadState(SIM.R,stR);loadState(SIM.L,stL);
   SIM.dirtySweep=true;
 }
 function rollOffset(){return (SIM.half||762)*Math.tan(S.roll*D2R);}
-function travelR(){return clamp(S.travel+rollOffset(),S.trMin,S.trMax);}
-function travelL(){return clamp(S.travel-rollOffset(),S.trMin,S.trMax);}
+function pitchOff(){return S.pitch*4;}                       /* 俯仰映射：前组 −Δ、后组 +Δ，mm/°=4 */
+function rrRollOffset(){return (SIM.mRR&&Math.abs(SIM.mRR.cp[0])||762)*Math.tan(S.roll*D2R);}
+function travelR(){return clamp(S.travel+S.trFR+rollOffset()-pitchOff(),S.trMin,S.trMax);}
+function travelL(){return clamp(S.travel+S.trFL-rollOffset()-pitchOff(),S.trMin,S.trMax);}
+function travelRR(){return clamp(S.travel+S.trRR+rrRollOffset()+pitchOff(),S.trMin,S.trMax);}
+function travelRL(){return clamp(S.travel+S.trRL-rrRollOffset()+pitchOff(),S.trMin,S.trMax);}
 
 function simulate(dt){
   const M=SIM.R,N=SIM.L;
@@ -795,6 +815,12 @@ function simulate(dt){
     driveTo(M,z0+travelR(),S.rack);
     SIM.mR=metrics(M);
     if(S.show.mirror){driveTo(N,z0+travelL(),-S.rack);SIM.mL=metrics(N);}else SIM.mL=null;
+    /* 全底盘（T2）：后轴同构、无转向（rack=0），独立求解（前后轴解耦） */
+    const HP2=S.axles.rear&&S.axles.rear.hp||S.hp;
+    const zr0=SIM.RR.n[SIM.RR.i.WC].p0[2];
+    driveTo(SIM.RR,zr0+travelRR(),0);
+    SIM.mRR=metrics(SIM.RR,HP2);
+    if(S.show.mirror){driveTo(SIM.RL,zr0+travelRL(),0);SIM.mRL=metrics(SIM.RL,HP2);}else SIM.mRL=null;
     S.dyn.on=false;
   }else{
     const r=stepDyn(M,dt,S.rack,S.simT);
@@ -1862,6 +1888,8 @@ function steerArm(m){
 /* ================================ 13. 读数刷新 ================================ */
 function updateReadouts(){
   const m=SIM.mR;if(!m)return;
+  /* 全底盘（T2）：状态残差 = 四机构 max */
+  const resMax=Math.max(SIM.R.res,SIM.L.res,SIM.RR.res,SIM.RL.res);
   const sw=SIM.swR,M=SIM.R;
   const mr=sampleSweep(sw,m.tr,"mr")||SIM.mrRef;
   const cg=sampleSweep(sw,m.tr,"cg"),bs=sampleSweep(sw,m.tr,"bs");
@@ -1921,7 +1949,7 @@ function updateReadouts(){
   setRO("tlen",fmt(M.tie.L0,1));
   setRO("mNode",M.n.length+"  ("+M.nFree+" 自由)");
   setRO("mRig",M.nRig+" / "+M.nCons);setRO("mEla",""+M.nEla);setRO("mDof",""+M.dof);
-  setRO("mRes",M.res<1e-4?M.res.toExponential(1):fmt(M.res,5),M.res>0.02);
+  setRO("mRes",resMax<1e-4?resMax.toExponential(1):fmt(resMax,5),resMax>0.02);
   setRO("mIter",""+M.iter);setRO("mMs",fmt(M.ms,2));
   setRO("mU",fmt(SIM.mU,1));setRO("mCor",fmt(SIM.corN,0));setRO("mPre",fmt(M.springF0/FS,0));
   /* 状态栏 */
@@ -1929,8 +1957,8 @@ function updateReadouts(){
   document.getElementById("sbRig").textContent=M.nRig;
   document.getElementById("sbEla").textContent=M.nEla;
   document.getElementById("sbDof").textContent=M.dof;
-  document.getElementById("sbRes").textContent=M.res<1e-4?M.res.toExponential(1):fmt(M.res,4);
-  document.getElementById("sbResC").className="c "+(M.res<0.001?"ok":(M.res<0.05?"hl":"bad"));
+  document.getElementById("sbRes").textContent=resMax<1e-4?resMax.toExponential(1):fmt(resMax,4);
+  document.getElementById("sbResC").className="c "+(resMax<0.001?"ok":(resMax<0.05?"hl":"bad"));
   document.getElementById("sbIter").textContent=M.iter;
   document.getElementById("sbMs").textContent=fmt(M.ms,2)+" ms";
   document.getElementById("tbMode").textContent=S.mode==="kin"?"运动学":"台架动力学";
