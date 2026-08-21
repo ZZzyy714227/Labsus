@@ -582,8 +582,10 @@ function isect2(p1,d1,p2,d2){
 function axisAtY(a,b,y){const t=(y-a[1])/((b[1]-a[1])||1e-9);return lerp3(a,b,t);}
 
 /* ---- 横向稳定杆（U 形扭杆）几何：扭杆绕 X 轴，臂端由连杆长度解析定位 ---- */
-function arbGeom(lbj){
-  const F=S.hp.LCA_F,B=S.hp.LBJ,t=S.arb.t;
+function arbGeom(lbj,hpSrc){
+  /* 全底盘建模：稳定杆几何按轴取硬点（后轴传 S.axles.rear.hp，否则会把锚点拉到前轴） */
+  const HP=hpSrc||S.hp;
+  const F=HP.LCA_F,B=HP.LBJ,t=S.arb.t;
   const P0=lerp3(F,B,t);                                  // 设计位形：连杆下端(下摆臂上一点)
   const xa=P0[0],ay=F[1]+S.arb.dy,az=F[2]+S.arb.dz;
   const a=ay-P0[1];                                       // 扭杆臂长(力臂)
@@ -944,16 +946,16 @@ function addShared(sc){
       /* 上支点座 */
       cylinder(sc,[T[0],T[1],T[2]-10],[T[0],T[1],T[2]+10],34,C.chas,1,14);
     }));
-    /* 车身侧铰点支架 */
+    /* 车身侧铰点支架（全底盘：前/后轴各绘） */
     const brk=["LCA_F","LCA_R","UCA_F","UCA_R"];
-    sgn.forEach(s=>brk.forEach(id=>{
-      const p=[h[id][0]*s,h[id][1],h[id][2]];
+    sgn.forEach(s=>axHps.forEach(hpA=>brk.forEach(id=>{
+      const p=[hpA[id][0]*s,hpA[id][1],hpA[id][2]];
       L3(sc,p,[s*bx,p[1],p[2]],C.chas2,1);
       /* 衬套 */
       const other=id.slice(0,-1)+(id.endsWith("F")?"R":"F");
-      const ax=nrm(sub([h[other][0]*s,h[other][1],h[other][2]],p));
+      const ax=nrm(sub([hpA[other][0]*s,hpA[other][1],hpA[other][2]],p));
       cylinder(sc,sub(p,mul(ax,17)),add(p,mul(ax,17)),15,C.rig,1,12);
-    }));
+    })));
   }
   if(S.show.arb&&S.arb.d>0.5&&SIM.mR){
     const g=arbGeom(SIM.mR.lbj);
@@ -1069,9 +1071,10 @@ function addInstance(sc,M,m,sw,sx,dy){
     PL(sc,circPts(add(SPL,mul(u,L*0.09)),u,60,22),C.ela,1.2);
     PL(sc,circPts(add(DMT,mul(u,-L*0.05)),u,60,22),C.ela,1.2);
   }
-  /* --- 稳定杆臂与连杆 --- */
+  /* --- 稳定杆臂与连杆（全底盘：按机构轴取硬点） --- */
   if(S.show.arb&&S.arb.d>0.5){
-    const g=arbGeom(m.lbj);
+    const hpA=(M.axleKey==="rear")?((S.axles.rear&&S.axles.rear.hp)||S.hp):S.hp;
+    const g=arbGeom(m.lbj,hpA);
     const A0=T([g.xa,g.ay,g.az]),E=T(g.E),Pd=T(g.P);
     L3(sc,A0,E,C.arb,3.0);
     cylinder(sc,E,Pd,7,C.arb,1,8);
