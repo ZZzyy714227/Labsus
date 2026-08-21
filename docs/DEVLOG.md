@@ -1,5 +1,12 @@
 # 开发日志
 
+## 2026-08-21 — FSR-06 前推后拉正式构建 · 全量交付（dwb-mod）
+- 需求：用户批准 spec/plan 后按 subagent-driven 流程执行 7 任务（T1 HPDEF+FSR-06 默认预设 → T2 显式推/拉杆分支+簇过滤 → T3 metrics.sl 端点 → T4 泪滴/摇臂/Heim 渲染 → T5 水平减振器支架 → T6 harness 断言+行程调参 → T7 文档）。
+- 关键发现：HPDEF 扩 16 节点后旧预设索引错位崩溃（buildMech i[d[0]]=ni++ 修复）；FSR-06 前轴伸张死点根因 = RK_B 设计位形在摇臂圆最低点（圆不可达），非迭代不足；按 spec §4 授权调整 RK_PIVOT(600→640)/RK_B(505→[320,−107,567])，前轴几何极限 [−8,138]→[−88,138]（超 ±60 验收），推杆角 44.3°。
+- 验证：harness 四场景 fresh/fsr06/prod/sport-rear 各 300 帧零异常；FSR-06 前后轴 okGeo=true、残差 0、ok=true；旧预设兼容回退不崩。
+- 已知边界：PROD 前轴伸张 −6mm（同因几何死点，参考预设不达标，不强求）；后轴 rearRk 预设伸张 −8mm 为既有数据特性。
+- 提交链：77f0cf7→409c679→66b7d7f→98481a1→15cd6f7→246ce04→41eec13→5d68078→d8065eb→530508d→ddeacde（+本轮）。
+
 ## 2026-08-21 — Task 5: 水平减振器支架（addShared 双分支改造）
 
 - 修改文件：`dwb-mod/double-wishbone-suspension.html`（+22/-12 行）。

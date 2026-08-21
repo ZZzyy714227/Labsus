@@ -125,7 +125,7 @@ const DRIVER = `
     check(){
       const g=SIM.geo, gR=SIM.geoRR;
       const okGeo = g && g[0]<=-60 && g[1]>=60 && gR && gR[0]<=-60 && gR[1]>=60;
-      return {geo:g&&g.map(x=>+x.toFixed(0)), geoRR:gR&&gR.map(x=>+x.toFixed(0)),
+      return {geo:g&&g.map(x=>+x.toFixed(0)), geoRR:gR&&gR.map(x=>+x.toFixed(0)), // 整数形式对齐 ≤−60/≥60 谓词
               okGeo, resR:+SIM.R.res.toFixed(4), okR:SIM.R.ok};
     },
     diag(){
@@ -161,30 +161,6 @@ const DRIVER = `
   };
 })();`;
 
-/* ---------------- two-phase: prod seed extraction ---------------- */
-let seedStorage = null;
-if (scenario === "prod" || scenario === "sport-rear" || scenario === "fsr06") {
-  // Phase 1: run script in a scratch context, switch preset, persist, dump storage.
-  const scratchStore = makeStorage();
-  const ctx1 = makeVMContext(scratchStore);
-  vm.runInContext(code + DRIVER, ctx1, { filename: "dwb-inline.js" });
-  vm.runInContext(`
-    __H.seed = (() => {
-      const N=${JSON.stringify(scenario==="fsr06"?"FSR-06 前推后拉正式版":(scenario==="prod"?"PROD 前推后拉（FSAE）":null))};
-      if(N){loadPreset(PRESET_KEYS.find(k=>k===N)||PRESET_KEYS[0]);}
-      ${scenario==="sport-rear"||scenario==="fsr06"? "S.axleView=\"rear\";":""}
-      persistState();
-      return localStorage.getItem("dwbFullChassis");
-    })();
-  `, ctx1, {timeout:120000});
-  seedStorage = { dwbFullChassis: ctx1.__H.seed };
-  console.log(`[seed] scenario=${scenario} bytes=${ctx1.__H.seed ? ctx1.__H.seed.length : 0}`);
-}
-
-/* ---------------- phase 2: the actual repro ---------------- */
-const store = makeStorage(seedStorage);
-const ctx = makeVMContext(store);
-
 function makeVMContext(store) {
   let rafCb = null;
   const sandbox = {
@@ -213,7 +189,29 @@ function makeVMContext(store) {
   return ctx;
 }
 
-const DRIVER_TAIL = ""; // (driver defined above)
+/* ---------------- two-phase: prod seed extraction ---------------- */
+let seedStorage = null;
+if (scenario === "prod" || scenario === "sport-rear" || scenario === "fsr06") {
+  // Phase 1: run script in a scratch context, switch preset, persist, dump storage.
+  const scratchStore = makeStorage();
+  const ctx1 = makeVMContext(scratchStore);
+  vm.runInContext(code + DRIVER, ctx1, { filename: "dwb-inline.js" });
+  vm.runInContext(`
+    __H.seed = (() => {
+      const N=${JSON.stringify(scenario==="fsr06"?"FSR-06 前推后拉正式版":(scenario==="prod"?"PROD 前推后拉（FSAE）":null))};
+      if(N){loadPreset(PRESET_KEYS.find(k=>k===N)||PRESET_KEYS[0]);}
+      ${scenario==="sport-rear"||scenario==="fsr06"? "S.axleView=\"rear\";":""}
+      persistState();
+      return localStorage.getItem("dwbFullChassis");
+    })();
+  `, ctx1, {timeout:120000});
+  seedStorage = { dwbFullChassis: ctx1.__H.seed };
+  console.log(`[seed] scenario=${scenario} bytes=${ctx1.__H.seed ? ctx1.__H.seed.length : 0}`);
+}
+
+/* ---------------- phase 2: the actual repro ---------------- */
+const store = makeStorage(seedStorage);
+const ctx = makeVMContext(store);
 
 vm.runInContext(code + DRIVER, ctx, { filename: "dwb-inline.js" });
 
