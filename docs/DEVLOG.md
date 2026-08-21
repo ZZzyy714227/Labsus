@@ -241,3 +241,14 @@
 - `metrics()` 返回值的 `sl` 字段由固定 `dst(spl,P("DMP_T"))` 改为条件取值：`M.spring` 存在时用 `dst(M.n[M.spring.a].p,M.n[M.spring.b].p)`（实际弹性线端点，推杆/拉杆模式下 addRodRocker 已重锚为 RK_A→DMP_T），否则回退旧路径。
 - 验证：fresh / sport-rear 两场景均 `[loop] completed without exception`、n:300、res=0。
 - 提交：`dwb(P1): metrics.sl uses actual elastic line endpoints (RK_A->DMP_T in pushrod mode)`（15cd6f7）。
+
+## 2026-08-21 — Task 4: 渲染升级 — 泪滴叉臂 + 摇臂 + 推/拉杆 + Heim 关节 + 配色
+
+- 修改文件：`dwb-mod/double-wishbone-suspension.html`（+42/-11 行）。
+- Step 1：C 调色板新增 `carbon:"#23282e"`（碳纤黑，用于泪滴叉臂和推/拉杆）和 `rocker:"#b9c2c9"`（钛银，用于摇臂本体）。
+- Step 2：`cylinder()` 后新增 `teardropPts(a,b,w)` 函数——泪滴形杆体轮廓生成器。a=外端（圆钝半圆，R=w/2），b=内端（收尖），沿杆轴生成 N=8 段半圆 + T=14 段锥形收缩点列，供 PL() 绘制闭合面片。
+- Step 3：`addInstance()` 摆臂面片渲染替换——4 个三角面片（LAF-LBJ-LAR、UAF-UBJ-UAR）替换为 `tear(A,B,w)` lambda 调用 `teardropPts`（下叉臂 w=34、上叉臂 w=30），填充 `C.carbon` + `rgba(35,40,46,0.45)` 半透明；立柱面片（knuF）和弹簧座三角保持不变。
+- Step 4：ROCKER 渲染块整体替换——摇臂本体：`PL([piv,rkA,piv,rkB,piv])` 填充 `C.rocker` + `rgba(185,194,201,0.35)` 多边形 + 两臂端 cylinder；推/拉杆：cylinder 改用 `C.carbon`，两端增加 Heim 球头（三正交面 `circPts` ×3，半径 12）。
+- 验证（Node24 + DOM 桩 harness）：fresh（FSR-06 前推后拉）n:300、geo=[-8,138]、iter=112、res=0；sport-rear（旧预设无 ROCKER 分支）n:300、res=0——两场景均 `[loop] completed without exception`，兼容性确认。
+- 提交：`dwb(P1): teardrop A-arms (carbon), titanium rocker, push/pull-rod cylinders + Heim joints`（246ce04）。
+- 自审：teardropPts 在极端轮跳（t=±30mm）下 cos/sin 取值范围 [-1,1]，无 NaN/Inf 风险；abs(dot(ref,u))>0.9 防退化参考向量；旧预设无 ROCKER 簇时 Step 4 整块不执行，无副作用。
