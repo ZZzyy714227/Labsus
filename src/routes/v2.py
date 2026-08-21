@@ -487,6 +487,128 @@ def _sweep_curves(dv, cv, axle: str, axis: str, _min: float, _max: float,
     return {"values": [round(float(v), 3) for v in axis_vals],
             "curves": curves, "warnings": warnings}
 
+def _sweep_metrics(dv, cv, axle: str, axis: str, sw: dict) -> dict:
+    """从一条轴级扫掠({values,curves})派生静态点整车指标（sweep 与内联建模共用）。
+
+    axle: front|rear；axis: travel|rack。返回 metrics dict（值 + 状态 + 单位）。
+    """
+    curve_list = sw["curves"]
+    axis_vals = sw["values"]
+    veh = dv.vehicle
+    t = cv.travel
+    _r_name, r_hp, _l_name, l_hp, track_key, _fn = _axle_pair(dv, axle)
+    track = float(dv.vehicle.get(track_key, 0.0))
+
+    def solve_axle(axis_val):
+        if axis == "rack":
+            travel_r = t.fr if axle == "front" else t.rr
+            travel_l = t.fl if axle == "front" else t.rl
+            rack = axis_val
+        else:
+            travel_r = (t.fr if axle == "front" else t.rr) + axis_val
+            travel_l = (t.fl if axle == "front" else t.rl) + axis_val
+            rack = cv.rack_displacement
+        sol_r = _solve_corner(r_hp, travel_r, rack, track)
+        sol_l = _solve_corner(l_hp, travel_l, rack, track)
+        return sol_r, sol_l
+
+    metrics: dict[str, dict] = {}
+    try:
+        sol_r0, sol_l0 = solve_axle(0.0)
+        a_r0, a_l0 = sol_r0["angles"], sol_l0["angles"]
+    except Exception:
+        return metrics
+    metrics["included_angle_right"] = included_angle(
+        a_r0["kpi_deg"], a_r0["camber_deg"]).with_key("included_angle_right").model_dump()
+    metrics["included_angle_left"] = included_angle(
+        a_l0["kpi_deg"], a_l0["camber_deg"]).with_key("included_angle_left").model_dump()
+    metrics["bump_steer_right"] = bump_steer_deg_per_25(
+        curve_list["right_toe_deg"], axis_vals, 0.0).with_key("bump_steer_right").model_dump()
+    metrics["camber_gain_right"] = camber_gain_deg_per_25(
+        curve_list["right_camber_deg"], axis_vals, 0.0).with_key("camber_gain_right").model_dump()
+    if sol_r0["rocker"]:
+        metrics["motion_ratio"] = motion_ratio(
+            curve_list["motion_ratio"], axis_vals, 0.0).with_key("motion_ratio").model_dump()
+    else:
+        metrics["motion_ratio"] = motion_ratio(
+            [], axis_vals, 0.0).with_key("motion_ratio").model_dump()
+    if axis == "rack":
+        toe_c = curve_list["right_toe_deg"]
+        cam_c = curve_list["right_camber_deg"]
+        idx0 = min(range(len(axis_vals)),
+                   key=lambda i: abs(float(axis_vals[i]) - 0.0))
+        cam0 = cam_c[idx0] if idx0 < len(cam_c) else None
+        toe0 = toe_c[idx0] if idx0 < len(toe_c) else None
+        if cam0 is not None and toe0 is not None:
+            d_cam = 0.0
+            d_toe = 0.0
+            for j in range(max(0, idx0 - 1), min(len(toe_c), idx0 + 2)):
+                if j == idx0 or toe_c[j] is None or cam_c[j] is None:
+                    continue
+                d_cam += float(cam_c[j]) - float(cam0)
+                d_toe += float(toe_c[j]) - float(toe0)
+            metrics["steering_camber_gain_right"] = steering_camber_gain(
+                cam0, cam0 + d_cam, toe0, toe0 + d_toe
+            ).with_key("steering_camber_gain_right").model_dump()
+        else:
+            metrics["steering_camber_gain_right"] = {
+                "key": "steering_camber_gain_right", "value": None,
+                "unit": "deg/deg", "status": ResultStatus.SOLVER_FAILED.value,
+                "note": "rack 曲线在 0 处不可用"}
+        metrics["ackermann"] = ackermann_pct(
+            a_l0["toe_deg"], a_r0["toe_deg"],
+            track, float(veh.get("wheelbase_mm", 1550.0))).with_key("ackermann").model_dump()
+    hp_r0 = r_hp.flat()
+    hp_r0.setdefault("track_width", track)
+    svic_r = side_view_ic(hp_r0["CH1"], hp_r0["CH2"], sol_r0["result"]["UP1"],
+                          hp_r0["CH3"], hp_r0["CH4"], sol_r0["result"]["UP2"]
+                          ).with_key("side_view_ic_right")
+    metrics["side_view_ic_right"] = svic_r.model_dump()
+    sv = svic_point(hp_r0["CH1"], hp_r0["CH2"], sol_r0["result"]["UP1"],
+                    hp_r0["CH3"], hp_r0["CH4"], sol_r0["result"]["UP2"])
+    if sv is not None:
+        cp_r0 = sol_r0["cp"]["center"] if sol_r0["cp"] else None
+        if cp_r0:
+            wb = float(veh.get("wheelbase_mm", 1550.0))
+            hcg = float(veh.get("cg_height_mm", 300.0))
+            if axle == "front":
+                metrics["anti_dive"] = anti_dive(
+                    sv, (float(cp_r0[0]), float(cp_r0[2])), wb, hcg,
+                    float(veh.get("ax_brake", 1.2)),
+                    float(veh.get("brake_front_frac", 0.6))).with_key("anti_dive").model_dump()
+            else:
+                metrics["anti_squat"] = anti_squat(
+                    sv, (float(cp_r0[0]), float(cp_r0[2])), wb, hcg,
+                    float(veh.get("ax_accel", 1.0)),
+                    float(veh.get("drive_rear_frac", 1.0))).with_key("anti_squat").model_dump()
+    metrics["jacking"] = jacking(0.0).with_key("jacking").model_dump()
+    try:
+        other_axle = "rear" if axle == "front" else "front"
+        _o_name, o_r_hp, _ol, _ol2, o_track_key, _ofn = _axle_pair(dv, other_axle)
+        o_track = float(dv.vehicle.get(o_track_key, 0.0))
+        o_travel_r = t.rr if other_axle == "rear" else t.fr
+        o_travel_l = t.rl if other_axle == "rear" else t.fl
+        sol_or = _solve_corner(o_r_hp, o_travel_r, cv.rack_displacement, o_track)
+        sol_ol = _solve_corner(o_r_hp.mirrored(), o_travel_l, cv.rack_displacement, o_track)
+        wb = float(veh.get("wheelbase_mm", 1550.0))
+        fx = (float(sol_r0["result"]["UP5"][0]) + float(sol_l0["result"]["UP5"][0])) / 2.0
+        rx = (float(sol_or["result"]["UP5"][0]) + float(sol_ol["result"]["UP5"][0])) / 2.0
+        fx0 = (float(hp_r0["UP5"][0]) + float(r_hp.mirrored().flat()["UP5"][0])) / 2.0
+        rx0 = (float(o_r_hp.flat()["UP5"][0]) + float(o_r_hp.mirrored().flat()["UP5"][0])) / 2.0
+        metrics["wheelbase_change"] = wheelbase_change(
+            fx, rx, fx0, rx0).with_key("wheelbase_change").model_dump()
+    except Exception as exc:  # noqa: BLE001
+        metrics["wheelbase_change"] = {
+            "key": "wheelbase_change", "value": None, "unit": "mm",
+            "status": ResultStatus.SOLVER_FAILED.value,
+            "note": f"另一轴求解失败: {type(exc).__name__}"}
+    metrics["track_change"] = {
+        "key": "track_change", "value": round(curve_list["track_change_mm"][0] or 0.0, 4),
+        "unit": "mm", "status": ResultStatus.VALID.value, "note": "静态点轴轮距变化"}
+    return metrics
+
+
+
 
 @router.post("/sweep")
 def sweep_v2(req: SweepV2Request):
@@ -533,116 +655,12 @@ def sweep_v2(req: SweepV2Request):
         sol_l = _solve_corner(l_hp, travel_l, rack, track)
         return sol_r, sol_l
 
-    # 静态点派生指标（axis_val=0 或 rack=0）
-    try:
-        sol_r0, sol_l0 = solve_axle(0.0)
-        a_r0, a_l0 = sol_r0["angles"], sol_l0["angles"]
-    except Exception as exc:  # noqa: BLE001
-        sol_r0 = sol_l0 = None
-        warnings.append(f"静态点求解失败: {type(exc).__name__}")
-
-    metrics: dict[str, dict] = {}
-    if sol_r0 is not None and sol_l0 is not None:
-        metrics["included_angle_right"] = included_angle(
-            a_r0["kpi_deg"], a_r0["camber_deg"]).with_key("included_angle_right").model_dump()
-        metrics["included_angle_left"] = included_angle(
-            a_l0["kpi_deg"], a_l0["camber_deg"]).with_key("included_angle_left").model_dump()
-        metrics["bump_steer_right"] = bump_steer_deg_per_25(
-            curves["right_toe_deg"], axis_vals, 0.0).with_key("bump_steer_right").model_dump()
-        metrics["camber_gain_right"] = camber_gain_deg_per_25(
-            curves["right_camber_deg"], axis_vals, 0.0).with_key("camber_gain_right").model_dump()
-        if sol_r0["rocker"]:
-            metrics["motion_ratio"] = motion_ratio(
-                curves["motion_ratio"], axis_vals, 0.0).with_key("motion_ratio").model_dump()
-        else:
-            metrics["motion_ratio"] = motion_ratio(
-                [], axis_vals, 0.0).with_key("motion_ratio").model_dump()
-        if req.axis == "rack":
-            # Steering Camber Gain：从 rack 曲线在 rack=0 处的 camber-vs-toe 斜率
-            toe_c = curves["right_toe_deg"]
-            cam_c = curves["right_camber_deg"]
-            idx0 = min(range(len(axis_vals)),
-                      key=lambda i: abs(float(axis_vals[i]) - 0.0))
-            cam0 = cam_c[idx0] if idx0 < len(cam_c) else None
-            toe0 = toe_c[idx0] if idx0 < len(toe_c) else None
-            if cam0 is not None and toe0 is not None:
-                # 取 rack=0 邻域差分
-                d_cam = 0.0
-                d_toe = 0.0
-                for j in range(max(0, idx0 - 1), min(len(toe_c), idx0 + 2)):
-                    if j == idx0 or toe_c[j] is None or cam_c[j] is None:
-                        continue
-                    d_cam += float(cam_c[j]) - float(cam0)
-                    d_toe += float(toe_c[j]) - float(toe0)
-                metrics["steering_camber_gain_right"] = steering_camber_gain(
-                    cam0, cam0 + d_cam, toe0, toe0 + d_toe
-                ).with_key("steering_camber_gain_right").model_dump()
-            else:
-                metrics["steering_camber_gain_right"] = {
-                    "key": "steering_camber_gain_right", "value": None,
-                    "unit": "deg/deg", "status": ResultStatus.SOLVER_FAILED.value,
-                    "note": "rack 曲线在 0 处不可用"}
-            metrics["ackermann"] = ackermann_pct(
-                a_l0["toe_deg"], a_r0["toe_deg"],
-                track, float(veh.get("wheelbase_mm", 1550.0))).with_key("ackermann").model_dump()
-        # 侧视瞬心 + Anti-dive/squat（静态点，SVIC 重写）
-        hp_r0 = r_hp.flat()
-        hp_r0.setdefault("track_width", track)
-        hp_l0 = l_hp.flat()
-        hp_l0.setdefault("track_width", track)
-        svic_r = side_view_ic(hp_r0["CH1"], hp_r0["CH2"], sol_r0["result"]["UP1"],
-                              hp_r0["CH3"], hp_r0["CH4"], sol_r0["result"]["UP2"]
-                              ).with_key("side_view_ic_right")
-        metrics["side_view_ic_right"] = svic_r.model_dump()
-        sv = svic_point(hp_r0["CH1"], hp_r0["CH2"], sol_r0["result"]["UP1"],
-                        hp_r0["CH3"], hp_r0["CH4"], sol_r0["result"]["UP2"])
-        if sv is not None:
-            cp_r0 = sol_r0["cp"]["center"] if sol_r0["cp"] else None
-            if cp_r0:
-                wb = float(veh.get("wheelbase_mm", 1550.0))
-                hcg = float(veh.get("cg_height_mm", 300.0))
-                if req.axle == "front":
-                    metrics["anti_dive"] = anti_dive(
-                        sv, (float(cp_r0[0]), float(cp_r0[2])), wb, hcg,
-                        float(veh.get("ax_brake", 1.2)),
-                        float(veh.get("brake_front_frac", 0.6))).with_key("anti_dive").model_dump()
-                else:
-                    metrics["anti_squat"] = anti_squat(
-                        sv, (float(cp_r0[0]), float(cp_r0[2])), wb, hcg,
-                        float(veh.get("ax_accel", 1.0)),
-                        float(veh.get("drive_rear_frac", 1.0))).with_key("anti_squat").model_dump()
-        metrics["jacking"] = jacking(0.0).with_key("jacking").model_dump()
-        # Wheelbase Change：静态点求解另一轴
-        try:
-            other_axle = "rear" if req.axle == "front" else "front"
-            o_name, o_r_hp, o_l_name, o_l_hp, o_track_key, _fn = _axle_pair(dv, other_axle)
-            o_track = float(dv.vehicle.get(o_track_key, 0.0))
-            o_travel_r = t.rr if other_axle == "rear" else t.fr
-            o_travel_l = t.rl if other_axle == "rear" else t.fl
-            sol_or = _solve_corner(o_r_hp, o_travel_r, cv.rack_displacement, o_track)
-            sol_ol = _solve_corner(o_l_hp, o_travel_l, cv.rack_displacement, o_track)
-            wb = float(veh.get("wheelbase_mm", 1550.0))
-            fx = (float(sol_r0["result"]["UP5"][0]) + float(sol_l0["result"]["UP5"][0])) / 2.0
-            rx = (float(sol_or["result"]["UP5"][0]) + float(sol_ol["result"]["UP5"][0])) / 2.0
-            fx0 = (float(hp_r0["UP5"][0]) + float(hp_l0["UP5"][0])) / 2.0
-            rx0 = (float(o_r_hp.flat()["UP5"][0]) + float(o_l_hp.flat()["UP5"][0])) / 2.0
-            metrics["wheelbase_change"] = wheelbase_change(
-                fx, rx, fx0, rx0).with_key("wheelbase_change").model_dump()
-        except Exception as exc:  # noqa: BLE001
-            metrics["wheelbase_change"] = {
-                "key": "wheelbase_change", "value": None, "unit": "mm",
-                "status": ResultStatus.SOLVER_FAILED.value,
-                "note": f"另一轴求解失败: {type(exc).__name__}"}
-        metrics["track_change"] = {
-            "key": "track_change", "value": round(curves["track_change_mm"][0] or 0.0, 4),
-            "unit": "mm", "status": ResultStatus.VALID.value, "note": "静态点轴轮距变化"}
-
     return {
         "design_id": req.design_id, "case_id": req.case_id,
         "axle": req.axle, "axis": req.axis,
         "values": [round(float(v), 3) for v in axis_vals],
         "curves": curves,
-        "metrics": metrics,
+        "metrics": _sweep_metrics(dv, cv, req.axle, req.axis, sw),
         "warnings": warnings,
     }
 
@@ -723,6 +741,7 @@ def solve_hardpoints_v2(req: SolveInlineRequest):
             raise HTTPException(status_code=422, detail="sweep axle|axis bad")
         sw = _sweep_curves(dv, cv, req.sweep.axle, req.sweep.axis,
                            req.sweep.min, req.sweep.max, req.sweep.points)
+        sw["metrics"] = _sweep_metrics(dv, cv, req.sweep.axle, req.sweep.axis, sw)
         body["sweep"] = sw
     return body
 

@@ -32,8 +32,20 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
 #left{width:284px;flex:0 0 284px;background:var(--pnl);border-right:1px solid var(--bd2);overflow-y:auto;overflow-x:hidden}
 #right{width:332px;flex:0 0 332px;background:var(--pnl);border-left:1px solid var(--bd2);overflow-y:auto;overflow-x:hidden}
 .sec{border-bottom:1px solid var(--bd)}
-.sh{display:flex;align-items:center;height:20px;background:var(--pnl2);border-bottom:1px solid var(--bd);padding-left:7px;
-    font-size:9.5px;letter-spacing:.14em;color:var(--tx2);text-transform:uppercase;cursor:pointer}
+.sh{display:flex;align-items:center;height:20px;background:var(--pnl2);border-bottom:1px solid var(--bd);padding-left:10px;
+    font-size:9.5px;letter-spacing:.14em;color:var(--tx2);text-transform:uppercase;cursor:pointer;position:relative;border-left:2px solid var(--acc)}
+.sh:hover{background:var(--head)}
+.sec.col .sb{display:none}
+.sec.col .sh .tg::after{content:"+";margin-left:4px}
+.sec .sh .tg::after{content:"−";margin-left:4px}
+.mtbl{width:100%;border-collapse:collapse;font-size:9.5px;margin-top:2px}
+.mtbl td{padding:1.5px 4px;border-bottom:1px solid #1d2126;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mtbl td:first-child{text-align:left;color:var(--tx2);padding-left:2px}
+.mtbl td.v{color:var(--tx)}
+.mtbl td.u{color:var(--tx3);font-size:8.5px;padding-left:3px}
+.mtbl td.g{color:var(--grn)}.mtbl td.a{color:var(--amb)}.mtbl td.r{color:var(--red)}.mtbl td.na{color:var(--tx3)}
+.note{font-size:8.5px;color:var(--tx3);line-height:1.5;padding:3px 0 0}
+.note b{color:var(--tx2);font-weight:400}
 .sh b{font-weight:400;color:var(--tx);letter-spacing:.02em;font-size:10px;margin-right:7px;text-transform:none}
 .sh .tg{margin-left:auto;margin-right:7px;color:var(--tx3);font-size:9px}
 .sb{padding:4px 8px 6px}
@@ -210,11 +222,17 @@ canvas.plot.ks{height:62px}
       <div class="sec"><div class="sh"><b>状态 / 警告</b><span class="tg">—</span></div>
         <div class="sb"><div id="statusBox" style="font-size:9.5px;line-height:1.7;color:var(--tx)"></div></div>
       </div>
+      <div class="sec"><div class="sh"><b>整车指标 Vehicle Metrics</b><span class="tg">随扫掠更新</span></div>
+        <div class="sb" style="padding-top:0"><div id="metricsBox" style="font-size:9.5px"></div>
+          <div class="note" style="font-size:8.5px;color:var(--tx3);padding:3px 0 0">来源：所选轴扫掠的静态点派生指标（播放中显示最近一次，暂停自动刷新）</div>
+        </div>
+      </div>
       <div class="sec"><div class="sh"><b>曲线 Curves</b><span class="tg"><span id="curveTitle">前轴 travel</span></span></div>
         <div class="row" style="padding:2px 8px"><b>曲线轴</b>
           <button id="cvFront" class="on">前轴</button><button id="cvRear">后轴</button>
         </div>
         <div class="plotbox"><canvas id="chart" class="plot"></canvas></div>
+        <div class="plotbox" style="padding-top:0"><canvas id="axChart" class="plot" style="height:60px"></canvas></div>
       </div>
       <div class="sec"><div class="sh"><b>操稳 Handling · 调平</b><span class="tg">P5 ay 工况</span></div>
         <div class="sb" style="padding:3px 8px"><div id="handlingBox" style="font-size:10px">— 待求解 —</div>
@@ -1070,6 +1088,14 @@ function renderAll(d){
       const v=c[1].angles&&c[1].angles[a[0]];
       return"<td class='sx'>"+(v!=null?(+v).toFixed(3):"<span class='na'>—</span>")+"</td>";}).join("")+"</tr>";
   });
+  [["主销接地 X","x"],["主销接地 Y","y"]].forEach(kp=>{
+    h+="<tr><td class='mn'>"+kp[0]+"</td>"+corners.map(c=>{
+      const n=c[0]==="FL"?"front_left":c[0]==="FR"?"front_right":c[0]==="RL"?"rear_left":"rear_right";
+      const p=d.per_wheel_geometry&&d.per_wheel_geometry[n];
+      const g=p&&p.steering_axis&&p.steering_axis.ground_point;
+      const v=g?+g[kp[1]==="x"?0:1]:null;
+      return"<td class='sx'>"+(v!=null?(+v).toFixed(1):"<span class='na'>—</span>")+"</td>";}).join("")+"</tr>";
+  });
   tb.innerHTML=h;
   const ld=d.loads||{};
   const ft=$("forceTable"),FE=$("forceNote");
@@ -1113,7 +1139,8 @@ function renderAll(d){
   $("sbRig").textContent="36";
   $("sbEla").textContent="4";
   needsDraw=true;
-  if(!S.play||d.sweep)drawChart(d.sweep||null);
+  if(!S.play||d.sweep){drawChart(d.sweep||null);drawAxChart(d.sweep||null);}
+  renderMetrics(d);
 }
 function drawChart(sw){
   const cv=$("chart");
@@ -1143,6 +1170,70 @@ function drawChart(sw){
   ctx.strokeStyle=CC.grid;ctx.setLineDash([4,4]);
   const yz=sy(0);ctx.beginPath();ctx.moveTo(pad,yz);ctx.lineTo(W-pad,yz);ctx.stroke();ctx.setLineDash([]);
 }
+
+/* ================================ 整车指标 ================================ */
+function mval(v){ if(v==null)return "—"; if(typeof v==="number")return isFinite(v)?(+v).toFixed(3):"—"; if(Array.isArray(v))return v.map(x=>typeof x==="number"?Math.round(x):x).join(", "); return String(v); }
+function mcls(st){ return st==="VALID"?"g":(st==="SOLVER_FAILED"?"r":(st==="APPROXIMATE"?"a":"na")); }
+function mrow(zh,unit,obj,sub){
+  if(obj&&typeof obj==="object"&&obj.key!==undefined){
+    const v=obj.value,st=obj.status,u=obj.unit||unit;
+    let tip=(obj.note||"")+" ["+st+"]"; tip=tip.replace(/"/g,"&quot;");
+    return "<tr title='"+tip+"'><td>"+zh+(sub?" <i style='color:var(--tx3);font-style:normal'>"+sub+"</i>":"")+"</td><td class='v "+mcls(st)+"'>"+mval(v)+"</td><td class='u'>"+(v!=null?(u||""):"")+"</td></tr>";
+  }
+  return "<tr><td>"+zh+"</td><td class='na'>—</td><td class='u'></td></tr>";
+}
+function renderMetrics(d){
+  const el=$("metricsBox"); if(!el)return;
+  const m=d.sweep&&d.sweep.metrics?d.sweep.metrics:null;
+  if(!m||!Object.keys(m).length){ el.innerHTML="<div class='na'>— 待扫掠（暂停后自动更新）—</div>"; return; }
+  const sw=d.sweep, cur=sw.curves||{};
+  let ridx=0,bd=1e9; (sw.values||[]).forEach((v,i)=>{ if(v!=null&&Math.abs(+v)<bd){bd=Math.abs(+v);ridx=i;} });
+  const rcH=cur.roll_center_height_mm&&cur.roll_center_height_mm[ridx];
+  const AX=["f","r"][S.curveAxle==="rear"?1:0]; void AX;
+  let h="<table class='mtbl'>";
+  h+=mrow("运动速比 Motion Ratio","",m.motion_ratio);
+  h+=mrow("外倾增益 Camber Gain","°/25mm",m.camber_gain_right,"R");
+  h+=mrow("跳动转向 Bump Steer","°/25mm",m.bump_steer_right,"R");
+  if(S.curveAxis==="rack"){
+    h+=mrow("转向外倾增益","°/°",m.steering_camber_gain_right,"R");
+    const ia=m.included_angle_right,il=m.included_angle_left;
+    h+="<tr title='包含角 = 主销内倾 + 外倾'><td>包容角 Included</td><td class='v'>"+((ia&&ia.value!=null&&il&&il.value!=null)?((+ia.value).toFixed(1)+" / "+(+il.value).toFixed(1)):"—")+"</td><td class='u'>° R/L</td></tr>";
+    h+=mrow("阿克曼率 Ackermann","%",m.ackermann);
+  }
+  h+="<tr title='轮跳 0 处的整车侧倾中心高'><td>侧倾中心高 RC Height</td><td class='v "+(rcH!=null?"g":"na")+"'>"+(rcH!=null?(+rcH).toFixed(1):"—")+"</td><td class='u'>"+(rcH!=null?"mm":"")+"</td></tr>";
+  h+=S.curveAxle==="rear"?mrow("抗蹲 Anti-squat","%",m.anti_squat):mrow("抗俯仰 Anti-dive","%",m.anti_dive);
+  h+=mrow("顶升 Jacking","%",m.jacking);
+  h+=mrow("轴距变化 Wheelbase Δ","mm",m.wheelbase_change);
+  h+=mrow("轮距变化 Track Δ","mm",m.track_change);
+  h+="</table>";
+  el.innerHTML=h;
+}
+function drawAxChart(sw){
+  const cv=$("axChart"); if(!cv)return;
+  const ctx=cv.getContext("2d");
+  if(!sw||!sw.curves){ctx.clearRect(0,0,cv.width,cv.height);ctx.fillStyle=CC.txt3;ctx.font="8.5px monospace";ctx.fillText("轴级指标曲线：RC 高 / 轮距Δ 或 阿克曼（暂停后显示）",6,12);return;}
+  const X=sw.values||[];
+  const rc=sw.curves.roll_center_height_mm||[], trk=sw.curves.track_change_mm||[], ack=sw.curves.ackermann_pct||[];
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const pad=20,W=cv.width,H=cv.height;
+  const sx=v=>pad+(v-X[0])/((X[X.length-1]-X[0])||1)*(W-pad*2);
+  const norm=(data,col,label,side,na)=>{
+    let y0=1e9,y1=-1e9; for(const v of data)if(v!=null){y0=Math.min(y0,+v);y1=Math.max(y1,+v);}
+    if(y0===1e9)return;
+    if(y1===y0){y0-=1;y1+=1;}
+    const sy=v=>H-(v-y0)/(y1-y0)*(H-pad);
+    ctx.strokeStyle=col;ctx.lineWidth=1.3;ctx.beginPath();let st=false;
+    for(let i=0;i<data.length;i++){ if(data[i]==null){st=false;continue;} const x=sx(X[i]),y=sy(+data[i]); if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y); }
+    ctx.stroke();
+    ctx.fillStyle=col;ctx.font="8.5px monospace";
+    if(side==="r")ctx.textAlign="right"; else ctx.textAlign="left";
+    ctx.fillText(label+" ["+fmt(y0,1)+".."+fmt(y1,1)+"]",side==="r"?W-4:4,10);
+    ctx.textAlign="left";
+  };
+  if(S.curveAxis==="rack"){ norm(ack,CC.arb,"Ackermann %","l"); }
+  else { norm(rc,CC.ic,"RC mm","l"); norm(trk,CC.tie,"TrackΔ mm","r"); }
+}
+
 function renderHandling(d){
   const el=$("handlingBox");
   const ug=d.understeer||{},y=d.yaw&&d.yaw.status==="VALID"?d.yaw:null;
@@ -1382,6 +1473,7 @@ async function init(){
   S._seedF=deep(S.frontR);S._seedR=deep(S.rearR);
   initViews();
   buildToggles();
+  document.querySelectorAll(".sec > .sh").forEach(sh=>sh.addEventListener("click",()=>sh.parentElement.classList.toggle("col")));
   buildTable();
   $("hpFront").addEventListener("click",()=>setHpAxle("front"));
   $("hpRear").addEventListener("click",()=>setHpAxle("rear"));
