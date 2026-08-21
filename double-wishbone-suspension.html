@@ -2222,6 +2222,8 @@ function updateSweeps(){
   SIM.lastSweep=now;SIM.dirtySweep=false;
   SIM.swR=runSweep(SIM.R,S.rack,SIM.limR,45);
   SIM.swL=S.show.mirror?runSweep(SIM.L,-S.rack,SIM.limR,45):null;
+  /* 全底盘：后轴扫掠同步刷新（后轴几何变化后曲线不陈旧） */
+  if(SIM.RR&&SIM.limRR)SIM.swRR=runSweep(SIM.RR,0,SIM.limRR,45);
   SIM.mrRef=Math.max(0.05,sampleSweep(SIM.swR,0,"mr")||0.6);
 }
 let _last=0,_fps=0,_fc=0,_ft=0;
