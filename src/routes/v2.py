@@ -61,8 +61,8 @@ from routes.solve import DEFAULT_FRAME_NODES, _rear_rocker_frame_nodes, _solve_a
 
 router = APIRouter(prefix="/api/v2")
 
-# DWB 式机制求解模式：环境开关（达标后默认切 mechanism；sequential 保留为回退）
-_SOLVER_MODE = os.environ.get("DWB_SOLVER_MODE", "sequential")
+# DWB 式机制求解模式：环境开关（机制为生产默认；sequential 保留为回退）
+_SOLVER_MODE = os.environ.get("DWB_SOLVER_MODE", "mechanism")
 SOLVER_NAME = {
     "mechanism": "dwb-mechanism-v1",
     "sequential": "sequential-bump-steer-v1",
@@ -247,11 +247,15 @@ def _solve_corner(axle_hp, travel: float, rack: float, track: float,
     """
     hp = axle_hp.flat()
     hp.setdefault("track_width", track)
-    mode = solver if solver in ("mechanism", "mw") else _SOLVER_MODE
+    if solver in ("mechanism", "mw", "sequential"):
+        mode = solver
+    else:
+        mode = _SOLVER_MODE
     if mode in ("mechanism", "mw"):
         from solver.mechanism.v2adapter import solve_corner_mechanism
 
-        result, angles, residual, cp, rocker = solve_corner_mechanism(hp, travel, rack)
+        result, angles, residual, cp, rocker, rocker_ok = solve_corner_mechanism(
+            hp, travel, rack)
     else:
         ax = _solve_axle(hp, travel, rack, mirror=False, polish=True)
         result = ax["right"]
@@ -259,7 +263,11 @@ def _solve_corner(axle_hp, travel: float, rack: float, track: float,
         residual = float(ax.get("geometry_residual_mm", 0.0))
         cp = ax.get("contact_patch_right")
         rocker = ax.get("rocker_right")
+        rocker_ok = rocker is not None
     status = _status_for_residual(residual)
+    if rocker_ok is False and status is ResultStatus.VALID:
+        # 轮侧几何可达但摇臂/推杆闭环不可达（伸张端减振器布局极限）→ OUT_OF_RANGE
+        status = ResultStatus.OUT_OF_RANGE
     pose = _wheel_pose("", travel, result, angles, cp)
     return {
         "result": result, "angles": angles, "residual": residual,

@@ -103,4 +103,4 @@ def solve_corner_mechanism(
             "push_rod_len_design": l_pr,
             "rocker_angle_deg": math.degrees(rep.rocker_theta) if rep.rocker_theta is not None else None,
         }
-    return result, angles, float(rep.residual), cp, rocker
+    return result, angles, float(rep.residual), cp, rocker, bool(rep.rocker_ok)
