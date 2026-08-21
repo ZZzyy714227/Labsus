@@ -4,10 +4,11 @@
 
 - 修改文件：`dwb-mod/double-wishbone-suspension.html`（+25/-21 行）。
 - Step 1：`buildMech` 刚体簇（cl 数组）按节点存在性组装——新增 `const has=id=>i[id]!==undefined`，LCA/UCA/KNUCKLE 三个簇的 members 数组均追加 PR_L/PR_U 并 `.filter(has)`，确保旧预设无推拉杆点时行为与原来完全一致。
-- Step 2：`addPushrodMode` 整体替换为按 `axleKey` 显式推/拉逻辑——删除旧的 dLBJ/dUBJ 距离猜测，改为 `M.axleKey==="rear"?"PR_U":"PR_L"`；提取 `m_L_push` 子函数处理推杆刚线 + 减震器重锚 + 摇臂簇。
+- Step 2：`addPushrodMode` 整体替换为按 `axleKey` 显式推/拉逻辑——删除旧的 dLBJ/dUBJ 距离猜测，改为 `M.axleKey==="rear"?"PR_U":"PR_L"`；提取 `addRodRocker` 子函数处理推杆刚线 + 减震器重锚 + 摇臂簇。
 - Step 3：PROD 预设补 PR_L/PR_U——hp 增加 `PR_L:[640,6,150]`（LBJ[680,5,145] 内侧），rearRk 增加 `PR_U:[640,-1565,450]`（UBJ[650,-1565,445] 附近）。
 - 验证（Node24 + DOM 桩 harness）：fresh/prod/sport-rear 三场景均 `[loop] completed without exception`、`[frames] n:300`、`res=0`（零发散）；fresh geo=[-8,138]（前轴 ±30mm+ 行程）、geoRR=[-138,138]（后轴 ±138mm 行程）；prod geo=[-138,138]（双轴）。
 - 提交：`dwb(P1): explicit pushrod(front)/pullrod(rear) branch by axleKey; hinge members existence filter; PROD gains PR_L/PR_U`（66b7d7f）。
+- 代码审查后清理（`98481a1`）：`m_L_push` 重命名为 `addRodRocker`（消除文件中唯一的下划线命名函数，语义更准确）；helper 参数从 `(M,rodFrom,i,n)` 精简为 `(M,rodFrom)`，内部走 `M.i`/`M.n`。验证 fresh+prod 均 n:300 零异常。
 
 ## 2026-08-21 — 修复 dwb-mod 打开即卡死（首帧 TypeError 杀死 rAF 循环）+ PROD 前推后拉收敛性根治
 - 用户反馈：`dwb-mod/double-wishbone-suspension.html` 浏览器打开无运动模拟、页面卡住。
