@@ -319,6 +319,11 @@ const S={
   road:"none", rA:16, rF:2.0,
   wb:2600, hcg:500, brkF:0.65,
   trMin:-80, trMax:80,
+  /* 全底盘扩展（T1）：双轴硬点 / 轴视图 / 四轮独立行程 / 整车俯仰 */
+  axles:{front:{hp:{},tire:null},rear:{hp:{},tire:null}},
+  axleView:"all",               // "all" | "front" | "rear"
+  trFR:0,trFL:0,trRR:0,trRL:0,  // 四轮独立轮跳（mm）
+  pitch:0,                      // 整车俯仰角输入（°）
   show:{node:1,label:1,rigid:1,elastic:1,face:1,wheel:1,disc:1,chassis:1,steer:1,ground:1,
         dim:1,kp:1,kpsw:1,path:1,ic:1,force:0,mirror:1,axis:1,tirefill:0,arb:1},
   t:0, simT:0, dyn:{on:false,z:0,v:0,load:0,fs:0,fd:0,pen:0,acc:0}
@@ -329,8 +334,55 @@ function loadPreset(k){
   S.tire=Object.assign({},P.tire);
   S.cam0=P.cam0; S.toe0=P.toe0; S.mS=P.mS; S.kS=P.kS; S.kT=P.kT; S.cB=P.cB; S.cR=P.cR;
   S.wb=P.wb; S.hcg=P.hcg; S.tieTrim=0;
+  /* 全底盘（T1）：前轴=当前模板；后轴=同拓扑几何平移至 Y−wb（示例起点，用户自调） */
+  S.axles.front.hp={}; for(const id in S.hp) S.axles.front.hp[id]=cpy(S.hp[id]);
+  S.axles.front.tire=Object.assign({},S.tire);
+  S.axles.rear.hp={}; for(const id in S.hp)
+    S.axles.rear.hp[id]=[S.hp[id][0],S.hp[id][1]-S.wb,S.hp[id][2]];
+  S.axles.rear.tire=Object.assign({},S.tire);
 }
 loadPreset(S.preset);
+
+/* ---- 全底盘持久化（T1）：localStorage 自动 + JSON 文件导入/导出 ---- */
+function persistState(){
+  try{localStorage.setItem("dwbFullChassis",JSON.stringify({
+    axles:S.axles,wb:S.wb,axleView:S.axleView,preset:S.preset,
+    kS:S.kS,cB:S.cB,cR:S.cR,kT:S.kT,mS:S.mS}));}catch(e){/* file:// 受限时静默 */}
+}
+function loadPersist(){
+  try{
+    const s=localStorage.getItem("dwbFullChassis"); if(!s)return false;
+    const j=JSON.parse(s);
+    if(!j.axles||!j.axles.front||!j.axles.rear||!j.axles.front.hp||!j.axles.rear.hp)return false;
+    S.axles=j.axles; if(j.wb)S.wb=j.wb; S.axleView=j.axleView||"all"; S.preset=j.preset||S.preset;
+    for(const k of["kS","cB","cR","kT","mS"]) if(j[k]!==undefined) S[k]=j[k];
+    /* 现有渲染仍消费 S.hp：用存档前轴右侧模板同步 */
+    S.hp={}; for(const id in S.axles.front.hp) S.hp[id]=cpy(S.axles.front.hp[id]);
+    S.tire=Object.assign({},S.axles.front.tire);
+    return true;
+  }catch(e){return false;}
+}
+function exportJSON(){
+  const j={meta:{app:"DWB-FULL-CHASSIS",v:1},preset:S.preset,axles:S.axles,
+    wb:S.wb,axleView:S.axleView,kS:S.kS,cB:S.cB,cR:S.cR,kT:S.kT,mS:S.mS};
+  const b=new Blob([JSON.stringify(j,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(b); a.download="dwb-fullchassis.json"; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),0);
+}
+function importJSON(file){
+  const r=new FileReader();
+  r.onload=e=>{try{
+    const j=JSON.parse(e.target.result);
+    if(!j.axles||!j.axles.front||!j.axles.rear||!j.axles.front.hp||!j.axles.rear.hp)throw 0;
+    S.axles=j.axles; if(j.wb)S.wb=j.wb; S.axleView=j.axleView||"all"; S.preset="custom";
+    for(const k of["kS","cB","cR","kT","mS"]) if(j[k]!==undefined) S[k]=j[k];
+    S.hp={}; for(const id in S.axles.front.hp) S.hp[id]=cpy(S.axles.front.hp[id]);
+    S.tire=Object.assign({},S.axles.front.tire);
+    rebuild(); VW.forEach(v=>fitView(v)); persistState();
+  }catch(err){alert("导入失败：JSON 结构不是 DWB-FULL-CHASSIS 格式");}};
+  r.readAsText(file);
+}
 
 /* ================================ 2. 机构建模 ================================ */
 /* 连线定义：[a,b,类型,中文,分组]  类型 R=刚性线 E=可形变线 */
@@ -704,6 +756,7 @@ function rebuild(){
   SIM.R=buildMech();SIM.L=buildMech();
   SIM.dirtyGeom=true;SIM.dirtySweep=true;SIM.trace=[];
   refreshDerived(true);
+  persistState();
 }
 /* 重算行程极限、静态速比、弹簧预载、路面基准 */
 function refreshDerived(full){
@@ -1560,6 +1613,12 @@ function buildLeft(){
     v=>{S.rack=v;S.steerExc="off";SIM.dirtySweep=true;},1);
   rowSlider(b,"横拉杆微调","TIE ROD TRIM","mm",-16,16,0.1,()=>S.tieTrim,
     v=>{S.tieTrim=v;rebuildLight();},2);
+  rowBtns(b,[["导出整车 JSON",()=>exportJSON()],
+             ["导入整车 JSON",()=>document.getElementById("impJSON").click()]]);
+  const fi=document.createElement("input");fi.type="file";fi.id="impJSON";
+  fi.accept=".json,application/json";fi.style.display="none";
+  fi.onchange=e=>{if(e.target.files&&e.target.files[0])importJSON(e.target.files[0]);e.target.value="";};
+  b.appendChild(fi);
   rowBtns(b,[["前束调零 ZERO TOE",()=>zeroToe(),null,"二分求解横拉杆长度使静态前束为 0"],
              ["输入归零",()=>{S.travel=0;S.roll=0;S.rack=0;S.exc="off";S.steerExc="off";SIM.dirtySweep=true;}]]);
   rowBtns(b,[["最小跳动转向优化",()=>optRack(),null,"扫掠转向机高度，最小化全行程跳动转向 RMS"]]);
@@ -1749,6 +1808,7 @@ function rebuildLight(){
   SIM.R=buildMech();SIM.L=buildMech();
   refreshDerived(false);S.travel=clamp(tr,S.trMin,S.trMax);
   SIM.dirtySweep=true;
+  persistState();
 }
 function zeroToe(){
   const z0=()=>SIM.R.n[SIM.R.i.WC].p0[2];
@@ -2092,6 +2152,7 @@ function loop(ts){
 }
 /* ================================ 16. 启动 ================================ */
 buildLeft();buildRight();
+loadPersist();
 rebuild();
 initViews();
 simulate(0.016);simulate(0.016);
