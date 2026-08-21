@@ -1,11 +1,14 @@
 import numpy as np
 
+from geometry import rotate_around_x
+
 from solver.mechanism.models import Node
 from solver.mechanism.project import (
     polar_q,
     project_body,
     project_distance,
     project_hinge,
+    project_rocker,
     q_axis_angle,
     q_mat,
 )
@@ -100,3 +103,18 @@ def test_body_rigid_reconstruction():
             d0 = float(np.linalg.norm(pts0[i] - pts0[j]))
             d1 = float(np.linalg.norm(n[ids[i]].pos - n[ids[j]].pos))
             assert abs(d1 - d0) < 1e-9, f"{ids[i]}-{ids[j]}: {d1 - d0}"
+
+
+def test_rocker_rotates_like_rotate_around_x():
+    pivot = np.array([-220.0, 0.0, 340.0])
+    m0 = np.array([-160.0, 0.0, 360.0])
+    d0 = np.array([-220.0, 0.0, 430.0])
+    n = mk(["P", "C", "D"], [pivot, m0, d0])
+    axis = np.array([1.0, 0.0, 0.0])
+    th = np.deg2rad(25.0)
+    n["C"].pos = rotate_around_x(m0, pivot, th)
+    n["D"].pos = rotate_around_x(d0, pivot, th)
+    err = project_rocker(n, "P", axis, ["C", "D"], [m0 - pivot, d0 - pivot], [1.0, 1.0])
+    assert err < 1e-9  # 已是最优旋转位 → 零位移
+    assert np.allclose(n["C"].pos, rotate_around_x(m0, pivot, th), atol=1e-7)
+    assert np.allclose(n["D"].pos, rotate_around_x(d0, pivot, th), atol=1e-7)

@@ -68,6 +68,12 @@ def project_hinge(nodes: dict[str, Node], anchor: str, axis: Vec,
     return project_axis_rotation(nodes, anchor, axis, members, rel, wt)
 
 
+def project_rocker(nodes: dict[str, Node], anchor: str, axis: Vec,
+                   members: list[str], rel: list[Vec], wt: list[float]) -> float:
+    """摇臂：绕车架枢轴的固定轴做单参数最优旋转（规则同 project_axis_rotation）。"""
+    return project_axis_rotation(nodes, anchor, axis, members, rel, wt)
+
+
 def q_axis_angle(ax: Vec, an: float) -> Vec:
     """轴角 → 四元数 [x,y,z,w]（单位轴）。"""
     h = an * 0.5
