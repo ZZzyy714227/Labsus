@@ -89,3 +89,16 @@ class TestContainerDocs:
     def test_design_latest_tracks_versions(self):
         d = ChassisDesign(design_id="x", versions=[], latest=0)
         assert d.latest == 0
+
+
+def test_new_pro_keys_optional_but_valid():
+    from core.models import AxleHardpoints
+    base = {k: [0.0, 100.0, 200.0] for k in
+            ("CH1","CH2","CH3","CH4","CH5","UP1","UP2","UP3","UP4","UP5","FL1")}
+    hp = AxleHardpoints(points=base)          # 旧 11 键仍合法（新键可缺省）
+    hp2 = AxleHardpoints(points={**base,
+        "STRUT_OUT": [0.0, 500.0, 150.0],
+        "RCK_AX_A": [0.0, 120.0, 300.0],
+        "RCK_AX_B": [0.0, 80.0, 300.0]})
+    assert "STRUT_OUT" in hp2.points
+    assert hp2.points["RCK_AX_A"] == [0.0, 120.0, 300.0]
