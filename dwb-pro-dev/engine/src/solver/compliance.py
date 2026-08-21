@@ -265,3 +265,74 @@ def solve_compliance(
         anchors=final_anchors,
         bush_loads={n: bush_force(bushings[n], d[n]) for n in names},
     )
+
+
+# ── T8: K&C 全链路求解 ──────────────────────────────────────────────
+
+def solve_compliance_full(
+    mech,
+    *,
+    bushings: dict[str, Bushing6DOF],
+    case: "QSLoad",
+    travel: float,
+    rack: float,
+    mk_links=None,
+    cp_rel=None,
+) -> ComplianceSolverResult:
+    """K&C 全链路：接地点外载 →（二力杆静力）→ 锚点合力 → solve_compliance。
+
+    mk_links: (mech) -> list[LinkForce] 回调；默认构造 PUSH(UP4→CH5) +
+              LCA 前/后杆(CH3/CH4→UP2) + UCA 前/后杆(CH1/CH2→UP1)。
+    cp_rel: 接地点相对轮心（默认 [0,0,-320] 近似，标注 APPROXIMATE）。
+
+    依赖 T5 corner_to_anchor_loads 返回 {杆id: 锚点合力}；本函数把杆车身端映射到
+    mech 节点名（位置 allclose 匹配），按节点聚合后传入 solve_compliance 的 loads。
+    """
+    from src.solver.forces import LinkForce, corner_to_anchor_loads, _chassis_end
+
+    # 1) 运动学求解（确认机构可达当前姿态）
+    rep = solve_pose(mech, travel, rack)
+    if not rep.ok:
+        return ComplianceSolverResult(status="SOLVER_FAILED", kin_residual=rep.residual)
+
+    # 2) 构造二力杆列表
+    if mk_links is not None:
+        links = mk_links(mech)
+    else:
+        links = [
+            LinkForce(a=mech.node("UP4").pos.copy(), b=mech.node("CH5").pos.copy(), id="PUSH"),
+            LinkForce(a=mech.node("CH3").pos.copy(), b=mech.node("UP2").pos.copy(), id="LCA_F"),
+            LinkForce(a=mech.node("CH4").pos.copy(), b=mech.node("UP2").pos.copy(), id="LCA_R"),
+            LinkForce(a=mech.node("CH1").pos.copy(), b=mech.node("UP1").pos.copy(), id="UCA_F"),
+            LinkForce(a=mech.node("CH2").pos.copy(), b=mech.node("UP1").pos.copy(), id="UCA_R"),
+        ]
+
+    # 3) 接地点外载 → 各杆轴向力 → 车身锚点合力
+    hub_point = mech.node(mech.wheel).pos.copy()
+    _cp = cp_rel if cp_rel is not None else np.array([0.0, 0.0, -320.0])
+    corner = corner_to_anchor_loads(case, links, hub_point=hub_point, cp_rel=_cp)
+
+    # 4) 杆车身端 → 节点名（位置 allclose 匹配）
+    def _node_name(pos: np.ndarray) -> str:
+        for nm, nd in mech.nodes.items():
+            if np.allclose(nd.pos, pos, atol=1.0):
+                return nm
+        return ""
+
+    # 5) 按节点聚合力（anchor_loads 值已是车身端力，直接累加）
+    per_node: dict[str, np.ndarray] = {}
+    for l in links:
+        end = _chassis_end(l, hub_point)
+        nm = _node_name(end)
+        if nm:
+            per_node[nm] = per_node.get(nm, np.zeros(3)) + corner.anchor_loads.get(l.id, np.zeros(3))
+
+    # 6) 衬套载荷映射：{衬套名: 对应成员节点合力}
+    loads: dict[str, np.ndarray] = {}
+    for name, b in bushings.items():
+        node = next(iter(b.member_nodes))
+        loads[name] = per_node.get(node, np.zeros(3))
+
+    # 7) 调用 T4 求解器
+    return solve_compliance(mech, bushings=bushings, loads=loads,
+                            load=np.zeros(3), travel=travel, rack=rack)
