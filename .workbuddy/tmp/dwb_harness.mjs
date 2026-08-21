@@ -124,7 +124,7 @@ const DRIVER = `
     },
     check(){
       const g=SIM.geo, gR=SIM.geoRR;
-      const okGeo = g && g[1]-g[0]>=120 && gR && gR[1]-gR[0]>=120;   // ≥ ±60
+      const okGeo = g && g[0]<=-60 && g[1]>=60 && gR && gR[0]<=-60 && gR[1]>=60;
       return {geo:g&&g.map(x=>+x.toFixed(0)), geoRR:gR&&gR.map(x=>+x.toFixed(0)),
               okGeo, resR:+SIM.R.res.toFixed(4), okR:SIM.R.ok};
     },
