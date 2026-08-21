@@ -1,5 +1,15 @@
 # 开发日志
 
+## 2026-08-21 — 开发版本归档：DWB 单文件系列全版本独立成文件
+- 需求：开发暂告一段落，把积累的大版本（含 git 历史中已删除的版本）各自独立成文件，集中入库管理。
+- 盘点：仓库内 dwb 单文件线 3 个现行文件 + `parent.html` 早期快照；git 历史恢复 `web/sim-view.html`（自包含版，曾因模块化重构删除）与根路径 `double-wishbone-suspension.html` 旧副本（与 v2 同源，不重复归档）。
+- 执行：
+  - `dwb-mod/versions/`：v1-fullchassis-fsr06-early（parent.html 早期快照，2396 行，FSR-06 无泪滴渲染）/ v2-fullchassis-fsr06 / v3-pro-chassis / v4-pro-fullchassis（gemini 强化版，标注当前主力）；git mv 保留历史。
+  - `web/versions/v1-dwb-web-simview.html`：自研线历史版恢复归档。
+  - `dwb-mod/README.md` 重写为版本索引表；新增落版约定（复制主力 → 修改 → 稳定后入 versions/）。
+- 边界：桌面参考.html（PRO 单轴版）与桌面旧副本按用户指示**不纳入**（仅归档仓库内文件）；自研线 modeler.html 为活文件保持原位。
+- 提交：dwb-mod/versions/* + web/versions/* + README + DEVLOG。
+
 ## 2026-08-21 — gemini 全车版功能补全（dwb-mod/gemini-code-1787322645956.html）
 - 需求：用户判定 Gemini 生成的 DWB-SIM PRO 全车版（四机构同屏、每轴独立弹性参数账本、点击硬点自动切换编辑轴、双副车架、RIG 四轮台架）优于既有整车版，但功能偏少，要求补齐。
 - 补全（保持 gemini 架构：S.front/S.rear 账本 + S.axis 编辑轴 + 渲染平移 Y±wb/2）：
