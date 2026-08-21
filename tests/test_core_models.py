@@ -102,3 +102,12 @@ def test_new_pro_keys_optional_but_valid():
         "RCK_AX_B": [0.0, 80.0, 300.0]})
     assert "STRUT_OUT" in hp2.points
     assert hp2.points["RCK_AX_A"] == [0.0, 120.0, 300.0]
+    # 部分新键缺省仍合法（RCK_AX_A/B 可不提供）
+    hp3 = AxleHardpoints(points={**base, "STRUT_OUT": [0.0, 500.0, 150.0]})
+    assert "RCK_AX_A" not in hp3.points
+    # 拼错新键被拒
+    with pytest.raises(ValidationError):
+        AxleHardpoints(points={**base, "STRUT_OUTT": [0.0, 500.0, 150.0]})
+    # 缺核心键被拒
+    with pytest.raises(ValidationError):
+        AxleHardpoints(points={k: v for k, v in base.items() if k != "CH1"})
