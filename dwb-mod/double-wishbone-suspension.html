@@ -1032,6 +1032,7 @@ function addShared(sc){
     const sgn=[1].concat(mir?[-1]:[]);
     const axHps=[h];if(S.axles&&S.axles.rear&&S.axles.rear.hp)axHps.push(S.axles.rear.hp);
     sgn.forEach(s=>axHps.forEach(hpA=>{
+      /* 有摇臂机构(RK_A)+减振器支架(DMP_T)→水平支架；旧预设无 RK_*→原垂直塔；支承段数 8 为视觉简化 */
       if(hpA.RK_A&&hpA.DMP_T){
         /* 水平减振器支架（前高后低按轴数据） */
         const A=[hpA.RK_A[0]*s,hpA.RK_A[1],hpA.RK_A[2]];
