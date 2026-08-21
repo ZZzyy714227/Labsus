@@ -18,6 +18,10 @@ from core.convention import DEFAULT_CONVENTION, CoordinateConvention
 
 POINT_KEYS = frozenset({"CH1", "CH2", "CH3", "CH4", "CH5",
                         "UP1", "UP2", "UP3", "UP4", "UP5", "FL1"})
+# PRO 拓扑新键：STRUT_OUT（推/拉杆外端，随 LCA/UCA 铰链）、
+# RCK_AX_A/B（摇臂转轴两点）。为兼容存量数据允许缺省（validator 只查 bad 不查 missing）。
+PRO_POINT_KEYS = frozenset({"STRUT_OUT", "RCK_AX_A", "RCK_AX_B"})
+ALL_POINT_KEYS = POINT_KEYS | PRO_POINT_KEYS
 
 TIRE_KEYS = ("tire_radius", "tire_width", "tire_spring_rate", "corner_weight_n")
 
@@ -38,18 +42,17 @@ class ResultStatus(str, Enum):
 
 
 class AxleHardpoints(BaseModel):
-    """单轴单侧硬点实例。points 键必须完整属于 POINT_KEYS（无前缀，轴由字段名区分）。"""
+    """单轴单侧硬点实例。points 键必须属于 POINT_KEYS ∪ PRO_POINT_KEYS
+    （无前缀，轴由字段名区分；PRO 新键可缺省以兼容存量数据）。"""
     points: dict[str, list[float]]
     tire: dict[str, float] = Field(default_factory=dict)
 
     @field_validator("points")
     @classmethod
     def _check_keys(cls, v):
-        bad = set(v) - POINT_KEYS
-        missing = POINT_KEYS - set(v)
-        if bad or missing:
-            raise ValueError(
-                f"invalid point keys: bad={sorted(bad)} missing={sorted(missing)}")
+        bad = set(v) - ALL_POINT_KEYS
+        if bad:
+            raise ValueError(f"invalid point keys: bad={sorted(bad)}")
         return v
 
     def mirrored(self) -> AxleHardpoints:

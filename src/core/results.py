@@ -33,6 +33,20 @@ class WheelAngles(BaseModel):
     caster_trail_mm: float | None = None
 
 
+class ActuationChain(BaseModel):
+    """推/拉杆 + 摇臂 + 内置减振器传动链真值（随姿态更新）。"""
+    kind: str                       # "pushrod" | "pullrod"
+    strut_outer: list[float]        # STRUT_OUT 解算位（随 LCA/UCA 铰链旋转）
+    rocker_input: list[float]       # CH5 解算位（摇臂输入臂端，随动）
+    rocker_axis_a: list[float]      # RCK_AX_A（车架固定）
+    rocker_axis_b: list[float]      # RCK_AX_B（车架固定）
+    damper_rocker: list[float]      # RK_DAMPER 解算位（输出臂端，随动）
+    damper_chassis: list[float]     # DAMPER_CHASSIS（车架固定）
+    damper_len_mm: float
+    damper_travel_mm: float         # 负=压缩
+    strut_len_mm: float             # 推/拉杆长度（刚线恒定）
+
+
 class ContactPatch(BaseModel):
     center: list[float]
     loaded_radius: float
@@ -54,6 +68,7 @@ class WheelPose(BaseModel):
     tie_rod_inner: list[float] | None = None
     contact_patch: ContactPatch
     steering_axis: SteeringAxis
+    actuation: ActuationChain | None = None
     trajectory: list[dict] = Field(
         default_factory=list,
         description="单点解为空列表；扫掠端点（P2-2）按行程填充轮心/接地点/主销接地轨迹。",
