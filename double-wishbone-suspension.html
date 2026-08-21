@@ -1373,10 +1373,12 @@ function drawGround(v){
     ctx.beginPath();ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();
     dash(ctx,[]);return;
   }
-  /* 正/侧视：地面线 + 剖面线 */
+  /* 正/侧视：地面线 + 剖面线（全底盘：随轴视图取该轴接地点） */
   let gA,gB;
-  if(v.key==="front"&&S.show.mirror&&SIM.mL){
-    gA=[-SIM.mL.cp[0],0,SIM.mL.cp[2]];gB=[SIM.mR.cp[0],0,SIM.mR.cp[2]];
+  const grL=S.axleView==="rear"?(SIM.mRL||SIM.mL):SIM.mL;
+  const grR=S.axleView==="rear"?(SIM.mRR||SIM.mR):SIM.mR;
+  if(v.key==="front"&&S.show.mirror&&grL){
+    gA=[-grL.cp[0],0,grL.cp[2]];gB=[grR.cp[0],0,grR.cp[2]];
     const d=sub(gB,gA);gA=sub(gA,mul(d,0.55));gB=add(gB,mul(d,0.55));
   }else{
     const w=3000/v.s>1?3000:3000;
