@@ -957,15 +957,23 @@ function addShared(sc){
       cylinder(sc,sub(p,mul(ax,17)),add(p,mul(ax,17)),15,C.rig,1,12);
     })));
   }
-  if(S.show.arb&&S.arb.d>0.5&&SIM.mR){
-    const g=arbGeom(SIM.mR.lbj);
-    const bxa=Math.max(60,bx-26);
-    const x0a=mir?-g.xa:0;
-    L3(sc,[x0a,g.ay,g.az],[g.xa,g.ay,g.az],C.arb,3.2);
-    [1].concat(mir?[-1]:[]).forEach(sg=>{
-      const bp=[sg*bxa,g.ay,g.az];
-      cylinder(sc,[bp[0]-sg*16,g.ay,g.az],[bp[0]+sg*16,g.ay,g.az],17,C.chas,1,10);
-      L3(sc,bp,[sg*Math.min(bx,bxa),g.ay,z0+30],C.chas2,1);
+  /* 扭杆体 + 车架支座（全底盘：前/后轴各一条，参考原前轴画法） */
+  if(S.show.arb&&S.arb.d>0.5){
+    const barCfg=[
+      {g:arbGeom(SIM.mR?SIM.mR.lbj:S.hp.LBJ,S.hp),show:SIM.mR},
+      {g:arbGeom(SIM.mRR?(SIM.mRR.lbj||S.axles.rear.hp.LBJ):S.axles.rear.hp.LBJ,
+                 (S.axles.rear&&S.axles.rear.hp)||S.hp),show:SIM.mRR},
+    ];
+    barCfg.forEach(b=>{
+      if(!b.show)return;
+      const g=b.g,bxa=Math.max(60,bx-26);
+      const x0a=mir?-g.xa:0;
+      L3(sc,[x0a,g.ay,g.az],[g.xa,g.ay,g.az],C.arb,3.2);
+      [1].concat(mir?[-1]:[]).forEach(sg=>{
+        const bp=[sg*bxa,g.ay,g.az];
+        cylinder(sc,[bp[0]-sg*16,g.ay,g.az],[bp[0]+sg*16,g.ay,g.az],17,C.chas,1,10);
+        L3(sc,bp,[sg*Math.min(bx,bxa),g.ay,z0+30],C.chas2,1);
+      });
     });
   }
   if(S.show.steer){
