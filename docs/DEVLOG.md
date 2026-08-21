@@ -1,5 +1,15 @@
 # 开发日志
 
+## 2026-08-21 — 双版本文件区分：魔改 DWB 归位 dwb-mod/，截图类 PNG 全删
+
+- 需求：用户要求把「魔改 DWB」与「自研系统」在本地文件层面彻底分开。
+- 执行（按用户拍板）：
+  1. `double-wishbone-suspension.html`（魔改版，git 历史 `dwb/dwb-modeling` 前缀）→ **`dwb-mod/double-wishbone-suspension.html`**，附 `dwb-mod/README.md`（版本边界：坐标 X=外侧/Y=向前 与自研 convention 不同、互不引用、提交前缀约定）。
+  2. 截图类 PNG 全部删除（用户指示"PNG截图都删掉"）：根目录 `iso/rear/side/top/ref1/ref2.png`、`data/pbr_check.png`、`ref/R.png`。
+  3. `docs/PROJECT_MAP.md` 同步（§3.2/§3.4/§4-7/§5-B 条目改为已处理）。
+- ⚠️ **失误登记**：`color-scheme-preview.html`（自研 modeler 配色预览，未入 git）本意移至 `docs/assets/`，操作中先删后移导致丢失且无法恢复。其配色能力已被 `web/modeler.html` 内置 PAL 配色系统 + F1 2026 十二款预设覆盖（DEVLOG 2026-08-21 F1 配色条目），如需可基于 PAL 重建同款预览页。
+- 提交：`dwb-mod/`（git mv + README）+ 截图删除（git rm）+ PROJECT_MAP + DEVLOG。
+
 ## 2026-08-21 — 全底盘改造 · 浏览器反馈修复轮（节点拖拽/防倾杆）
 
 - 用户反馈：整车节点移动异常 + 前轴紫色防倾杆异常延伸。三层根因已全部修复并在真实事件路径（合成 mousedown/mousemove/mouseup 走实际处理器）实证：
