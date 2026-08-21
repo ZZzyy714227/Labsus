@@ -1754,6 +1754,23 @@ function buildLeft(){
 function buildRight(){
   const host=document.getElementById("rp");
   let b=sec(host,"车轮定位参数","WHEEL ALIGNMENT");
+  /* 全底盘（T5）：四轮定位小表 */
+  const tw=E("table","hp");
+  const twH=E("thead");twH.innerHTML="<tr><th>参数</th><th>FR</th><th>FL</th><th>RR</th><th>RL</th></tr>";
+  const twB=E("tbody");
+  tw.appendChild(twH);tw.appendChild(twB);b.appendChild(tw);
+  [["cam","外倾","°"],["toe","前束","°"],["cast","后倾","°"],["kpi","内倾","°"],
+   ["scrub","偏移","mm"],["trail","拖距","mm"]].forEach(r=>{
+    const tr=E("tr");
+    tr.appendChild(E("td","n","<b>"+r[1]+"</b>"));
+    for(let j=1;j<5;j++){
+      const c=E("td");
+      c.id="tw_"+r[0]+(j-1);
+      c.style.cssText="padding:1px 6px;text-align:right;color:#c3cad2;font-variant-numeric:tabular-nums";
+      tr.appendChild(c);
+    }
+    twB.appendChild(tr);
+  });
   ro(b,"车轮外倾角","CAMBER","°","cam","k");
   ro(b,"车轮前束角","TOE","°","toe","k");
   ro(b,"主销后倾角","CASTER","°","cast");
@@ -1777,6 +1794,15 @@ function buildRight(){
   ro(b,"等效摆臂长","SWING ARM","mm","swl");
   ro(b,"侧倾中心高","ROLL CTR H","mm","rc","k");
   ro(b,"抗俯仰率","ANTI-DIVE","%","anti");
+
+  b=sec(host,"整车 VEHICLE","FULL CHASSIS");
+  ro(b,"后轴外倾","REAR CAMBER","°","rcam","k");
+  ro(b,"后轴前束","REAR TOE","°","rtoe","k");
+  ro(b,"后轴侧倾中心","RC REAR","mm","rcRR","k");
+  ro(b,"后轴行程 压缩/伸张","REAR LIMIT","mm","limRR");
+  ro(b,"RC@0 前轴 / 后轴","RC F/R","mm","rcFR2");
+  ro(b,"整车 RC 连线角","RC AXIS ANG","°","rcAng");
+  ro(b,"轴距","WHEELBASE","mm","wbOut");
 
   b=sec(host,"弹性元件 / 刚度","ELASTIC & RATES");
   ro(b,"弹簧-减振器长度","DAMPER LEN","mm","sl");
@@ -1938,6 +1964,22 @@ function updateReadouts(){
   const rcv=SIM.rc2?SIM.rc2[1]:m.rcH;
   setRO("rc",rcv===null?"--":fmt(rcv,1));
   setRO("anti",m.anti===null?"--":fmt(m.anti,1));
+  /* 全底盘（T5）：四轮定位小表 + 整车读数 */
+  const ms4=[SIM.mR,SIM.mL,SIM.mRR,SIM.mRL];
+  [["cam","cam"],["toe","toe"],["cast","cast"],["kpi","kpi"],["scrub","scrub"],["trail","trail"]]
+    .forEach(k=>{for(let j=0;j<4;j++){
+      const e=document.getElementById("tw_"+k[0]+j);if(!e)continue;
+      const mm=ms4[j];
+      e.textContent=mm?fmt(mm[k[1]],k[1]==="toe"?3:2):"--";}});
+  setRO("rcam",SIM.mRR?fmt(SIM.mRR.cam,2):"--");
+  setRO("rtoe",SIM.mRR?fmt(SIM.mRR.toe,3):"--");
+  const rcRs=SIM.swRR?sampleSweep(SIM.swRR,0,"rcH"):null;
+  setRO("rcRR",rcRs===null?"--":fmt(rcRs,1));
+  setRO("limRR",SIM.limRR?(sfmt(SIM.limRR[1],0)+" / "+fmt(SIM.limRR[0],0)):"--");
+  const rcFs=sampleSweep(SIM.swR,0,"rcH");
+  setRO("rcFR2",(rcFs===null?"--":fmt(rcFs,1))+" / "+(rcRs===null?"--":fmt(rcRs,1)));
+  setRO("rcAng",(rcFs!==null&&rcRs!==null)?fmt(Math.atan2(rcRs-rcFs,S.wb)*R2D,2):"--");
+  setRO("wbOut",fmt(S.wb,0));
   setRO("sl",fmt(m.sl,1));setRO("dsl",sfmt(M.springL0-m.sl,1));
   setRO("mr",fmt(mr,3));setRO("wr",fmt(wr,1));setRO("frq",fmt(frq,2));
   setRO("zeta",fmt(zeta,2));setRO("hop",fmt(hop,1));
@@ -2048,8 +2090,10 @@ function plotXY(cv,title,unit,series,xr,yforce,curx){
   ctx.textAlign="left";
 }
 function drawPlots(){
-  const sw=SIM.swR;if(!sw)return;
-  const xr=[sw.min,sw.max],cur=SIM.mR?SIM.mR.tr:0;
+  /* 全底盘（T5）：曲线随轴视图取前/后轴扫掠 */
+  const sw=SIM.axleView==="rear"?SIM.swRR:SIM.swR;if(!sw)return;
+  const mm=SIM.axleView==="rear"?(SIM.mRR||SIM.mR):SIM.mR;
+  const xr=[sw.min,sw.max],cur=mm?mm.tr:0;
   if(S.mode==="kin"){
     const S1=k=>({pts:sw.rows.map(r=>[r.tr,r[k]]),c:null});
     const P=[["外倾角 CAMBER","°","cam",C.knu],["前束角 TOE (跳动转向)","°","toe",C.tie],
@@ -2166,6 +2210,8 @@ window.addEventListener("keydown",e=>{
   else if(k>="1"&&k<="4")toggleMax(VW[+k-1]);
   else if(k==="0"){document.getElementById("vp").classList.remove("max0");
     VW.forEach(q=>{q.mx=false;q.el.classList.remove("mx");});setTimeout(()=>VW.forEach(sizeView),0);}
+  else if(k==="a"||k==="A"){S.axleView=S.axleView==="all"?"front":(S.axleView==="front"?"rear":"all");
+    VW.forEach(v=>fitView(v));}
 });
 
 /* ================================ 15. 主循环 ================================ */
