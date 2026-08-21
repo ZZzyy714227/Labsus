@@ -1684,7 +1684,8 @@ function buildLeft(){
   fi.onchange=e=>{if(e.target.files&&e.target.files[0])importJSON(e.target.files[0]);e.target.value="";};
   b.appendChild(fi);
   rowBtns(b,[["前束调零 ZERO TOE",()=>zeroToe(),null,"二分求解横拉杆长度使静态前束为 0"],
-             ["输入归零",()=>{S.travel=0;S.roll=0;S.rack=0;S.exc="off";S.steerExc="off";SIM.dirtySweep=true;}]]);
+             ["输入归零",()=>{S.travel=0;S.roll=0;S.rack=0;S.trFR=S.trFL=S.trRR=S.trRL=0;S.pitch=0;
+      S.exc="off";S.steerExc="off";SIM.dirtySweep=true;}]]);
   rowBtns(b,[["最小跳动转向优化",()=>optRack(),null,"扫掠转向机高度，最小化全行程跳动转向 RMS"]]);
 
   /* --- 弹性元件 --- */
@@ -1955,10 +1956,12 @@ function steerArm(m){
 
 /* ================================ 13. 读数刷新 ================================ */
 function updateReadouts(){
-  const m=SIM.mR;if(!m)return;
+  /* 全底盘（T5）：主读数随轴视图取前/后轴 */
+  const m=(S.axleView==="rear")?(SIM.mRR||SIM.mR):SIM.mR;if(!m)return;
   /* 全底盘（T2）：状态残差 = 四机构 max */
   const resMax=Math.max(SIM.R.res,SIM.L.res,SIM.RR.res,SIM.RL.res);
-  const sw=SIM.swR,M=SIM.R;
+  const sw=(S.axleView==="rear")?(SIM.swRR||SIM.swR):SIM.swR;
+  const M=(S.axleView==="rear")?(SIM.RR||SIM.R):SIM.R;
   const mr=sampleSweep(sw,m.tr,"mr")||SIM.mrRef;
   const cg=sampleSweep(sw,m.tr,"cg"),bs=sampleSweep(sw,m.tr,"bs");
   const wr=S.kS*mr*mr;
@@ -1971,8 +1974,9 @@ function updateReadouts(){
   setRO("scrub",sfmt(m.scrub,1));setRO("trail",sfmt(m.trail,1));
   setRO("kgx",fmt(m.kg[0],1));setRO("kgy",fmt(m.kg[1],1));
   setRO("tr",sfmt(m.tr,1));
-  setRO("lim",sfmt(S.trMax,0)+" / "+fmt(S.trMin,0));
-  setRO("glim",SIM.geo?(sfmt(SIM.geo[1],0)+" / "+fmt(SIM.geo[0],0)):"--");
+  setRO("lim",(S.axleView==="rear"&&SIM.limRR)?(sfmt(SIM.limRR[1],0)+" / "+fmt(SIM.limRR[0],0)):(sfmt(S.trMax,0)+" / "+fmt(S.trMin,0)));
+  const geoAX=S.axleView==="rear"?SIM.geoRR:SIM.geo;
+  setRO("glim",geoAX?(sfmt(geoAX[1],0)+" / "+fmt(geoAX[0],0)):"--");
   setRO("cg",cg===null?"--":sfmt(cg,3));setRO("bs",bs===null?"--":sfmt(bs,3));
   setRO("half",fmt(m.cp[0],1));
   setRO("dtrk",sfmt(m.cp[0]-(sampleSweep(sw,0,"half")||m.cp[0]),2));
