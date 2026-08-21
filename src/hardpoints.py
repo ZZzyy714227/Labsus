@@ -64,6 +64,16 @@ def derive_hardpoints(axle_params, prefix=""):
     # ---- Push-rod rocker mount (CH5) ----
     CH5 = np.array([p["pushrod_ch5_x"], p["pushrod_ch5_y"], p["pushrod_ch5_z"]])
 
+    # ---- PRO 拓扑：推/拉杆外端 STRUT_OUT ----
+    # 前轴（推杆）：LCA 三角面内，LBJ(UP2) 与 LCA 铰轴中点之间取比例点；
+    # 后轴（拉杆）：UCA 三角面内，UBJ(UP1) 与 UCA 铰轴中点之间取比例点。
+    lca_mid = 0.5 * (CH3 + CH4)
+    uca_mid = 0.5 * (CH1 + CH2)
+    t_lca = p.get("strut_out_t_lca", 0.35)
+    t_uca = p.get("strut_out_t_uca", 0.35)
+    STRUT_OUT = lca_mid + (UP2 - lca_mid) * t_lca if prefix == "" else \
+                uca_mid + (UP1 - uca_mid) * t_uca
+
     # ---- Upright points UP3, UP4 in upright local frame ----
     # Build upright local frame matching the solver's convention:
     #   z = kingpin (UP1→UP2), x = cross(UP5→UP1, z), y = cross(z, x)
@@ -86,6 +96,7 @@ def derive_hardpoints(axle_params, prefix=""):
         str(prefix + "CH3"): CH3.tolist(),
         str(prefix + "CH4"): CH4.tolist(),
         str(prefix + "CH5"): CH5.tolist(),
+        str(prefix + "STRUT_OUT"): STRUT_OUT.tolist(),
         str(prefix + "UP1"): UP1.tolist(),
         str(prefix + "UP2"): UP2.tolist(),
         str(prefix + "UP3"): UP3.tolist(),
