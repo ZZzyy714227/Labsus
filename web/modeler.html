@@ -7,19 +7,20 @@
 <style>
 @charset "utf-8";
 :root{
-  --bg:#0e1013; --bg2:#0a0c0e; --pnl:#15181c; --pnl2:#1a1e23; --head:#21262d; --headhi:#2a3038;
-  --bd:#2c323a; --bd2:#39414b; --bd3:#4a545f;
+  --bg:#0B0D0E; --bg2:#0a0c0e; --pnl:#16191d; --pnl2:#1d2126; --head:#0B0D0E; --headhi:#1a1e23;
+  --bd:#444c57; --bd2:#5b6573; --bd3:#000000; --bs:#000000;
   --tx:#c3cad2; --tx2:#8b95a1; --tx3:#616b77;
-  --acc:#2fa9d6; --accd:#125a75; --amb:#d9a238; --red:#d2543f; --grn:#54a06a; --mag:#a473c4; --cy2:#43c9c0;
+  --psep:#AEB6C0; /* 面板划分银线 */
+  --acc:#0AFFCE; --accd:#0A6E60; --amb:#FFCE0A; --red:#FF0A3B; --grn:#3BFF0A; --mag:#540AFF; --purple:#540AFF; --cy2:#47FFDA;
   --grid:#1c2126; --grid2:#262d34;
 }
 *{margin:0;padding:0;box-sizing:border-box;border-radius:0!important;outline:none}
 html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(--tx);
   font:11px/1.35 ui-monospace,"Cascadia Mono","DejaVu Sans Mono",Consolas,"Noto Sans Mono CJK SC",monospace;-webkit-font-smoothing:antialiased;user-select:none;cursor:default}
 #app{display:flex;flex-direction:column;height:100%}
-#tb{display:flex;align-items:stretch;height:34px;background:var(--head);border-bottom:1px solid var(--bd2);flex:0 0 auto}
+#tb{display:flex;align-items:stretch;height:34px;background:var(--head);border-bottom:3px solid var(--bd3);box-shadow:0 3px 0 var(--bs);flex:0 0 auto}
 #tb .brand{display:flex;align-items:center;padding:0 10px;border-right:1px solid var(--bd2);background:var(--pnl2)}
-#tb .brand b{color:var(--acc);font-size:13px;letter-spacing:.14em}
+#tb .brand b{color:var(--purple);font-size:13px;letter-spacing:.14em}
 #tb .tt{display:flex;flex-direction:column;justify-content:center;padding:0 12px;border-right:1px solid var(--bd)}
 #tb .tt span:first-child{font-size:11.5px;color:var(--tx)}
 #tb .tt span:last-child{font-size:8.5px;color:var(--tx3);letter-spacing:.16em;text-transform:uppercase}
@@ -29,12 +30,12 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
 #tb .cell b{font-weight:400;font-size:11px;color:var(--tx)}
 #tb .cell b.g{color:var(--grn)}#tb .cell b.a{color:var(--amb)}#tb .cell b.r{color:var(--red)}#tb .cell b.c{color:var(--acc)}
 #main{flex:1 1 auto;display:flex;min-height:0}
-#left{width:284px;flex:0 0 284px;background:var(--pnl);border-right:1px solid var(--bd2);overflow-y:auto;overflow-x:hidden}
-#right{width:332px;flex:0 0 332px;background:var(--pnl);border-left:1px solid var(--bd2);overflow-y:auto;overflow-x:hidden}
-.sec{border-bottom:1px solid var(--bd)}
-.sh{display:flex;align-items:center;height:20px;background:var(--pnl2);border-bottom:1px solid var(--bd);padding-left:10px;
-    font-size:9.5px;letter-spacing:.14em;color:var(--tx2);text-transform:uppercase;cursor:pointer;position:relative;border-left:2px solid var(--acc)}
-.sh:hover{background:var(--head)}
+#left{width:284px;flex:0 0 284px;background:var(--pnl);border-right:3px solid var(--bd3);box-shadow:4px 0 0 var(--bs);overflow-y:auto;overflow-x:hidden}
+#right{width:332px;flex:0 0 332px;background:var(--pnl);border-left:3px solid var(--bd3);box-shadow:-4px 0 0 var(--bs);overflow-y:auto;overflow-x:hidden}
+.sec{border-bottom:2px solid var(--psep)}
+.sh{display:flex;align-items:center;height:20px;background:var(--head);border-bottom:2px solid var(--psep);padding-left:10px;
+    font-size:9.5px;letter-spacing:.14em;color:var(--tx);font-weight:700;text-transform:uppercase;cursor:pointer;position:relative;border-left:4px solid var(--bd3)}
+.sh:hover{background:var(--headhi)}
 .sec.col .sb{display:none}
 .sec.col .sh .tg::after{content:"+";margin-left:4px}
 .sec .sh .tg::after{content:"−";margin-left:4px}
@@ -58,23 +59,24 @@ input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:12px
 input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--bd2)}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:5px;height:13px;background:var(--tx2);margin-top:-5.5px}
 input[type=range]:hover::-webkit-slider-thumb{background:var(--acc)}
-input[type=number]{background:var(--bg2);border:1px solid var(--bd);color:var(--tx);font:9.5px/16px inherit;padding:0 3px;height:16px;text-align:right;appearance:none;-webkit-appearance:none}
+input[type=number]{background:var(--bg2);border:2px solid var(--bd3);color:var(--tx);font:9.5px/16px inherit;padding:0 3px;height:16px;text-align:right;appearance:none;-webkit-appearance:none}
 input[type=number]:focus{border-color:var(--acc)}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 .btnrow{display:flex;gap:4px;padding:3px 0}
-button{flex:1;background:var(--head);border:1px solid var(--bd2);color:var(--tx2);
-  font:9.5px/1 inherit;letter-spacing:.08em;text-transform:uppercase;padding:5px 3px;cursor:pointer;white-space:nowrap}
-button:hover{background:var(--headhi);color:var(--tx);border-color:var(--bd3)}
-button:active{background:var(--accd)}
-button.on{background:var(--accd);border-color:var(--acc);color:#dff2f9}
+button{flex:1;background:var(--head);border:2px solid var(--bd3);color:var(--tx2);font-weight:700;
+  font:9.5px/1 inherit;letter-spacing:.08em;text-transform:uppercase;padding:5px 3px;cursor:pointer;white-space:nowrap;
+  box-shadow:3px 3px 0 var(--bs)}
+button:hover{background:var(--headhi);color:var(--tx);border-color:var(--bd3);transform:translate(1px,1px);box-shadow:2px 2px 0 var(--bs)}
+button:active{background:var(--accd);transform:translate(3px,3px);box-shadow:none}
+button.on{background:var(--acc);border-color:var(--acc);color:#0B0D0E}
 button.wide{flex:1 1 100%}
-button:disabled{color:var(--tx3);background:var(--pnl2);cursor:not-allowed;border-color:var(--bd)}
-select{background:var(--bg2);border:1px solid var(--bd);color:var(--tx);font:9.5px/15px inherit;width:100%;height:17px;text-align:left;appearance:none;-webkit-appearance:none;padding:0 2px;cursor:pointer}
+button:disabled{color:var(--tx3);background:var(--pnl2);cursor:not-allowed;border-color:var(--bd);box-shadow:none}
+select{background:var(--bg2);border:2px solid var(--bd3);color:var(--tx);font:9.5px/15px inherit;width:100%;height:17px;text-align:left;appearance:none;-webkit-appearance:none;padding:0 2px;cursor:pointer}
 select:hover{border-color:var(--bd3)}
 .chkrow{display:grid;grid-template-columns:1fr 1fr;gap:1px 10px;padding:2px 0}
 .chk{display:flex;align-items:center;gap:5px;padding:1.5px 0;cursor:pointer;font-size:9.5px;color:var(--tx2)}
 .chk:hover{color:var(--tx)}
-.chk i{width:11px;height:11px;border:1px solid var(--bd3);flex:0 0 11px;position:relative;display:inline-block;background:var(--bg2)}
+.chk i{width:11px;height:11px;border:2px solid var(--bd3);flex:0 0 11px;position:relative;display:inline-block;background:var(--bg2)}
 .chk.on i{background:var(--acc);border-color:var(--acc)}
 .chk.on i::after{content:"";position:absolute;left:2px;top:2px;width:5px;height:5px;background:#0b1418}
 .chk.on{color:var(--tx)}
@@ -105,11 +107,11 @@ table.ro td.sx{border-left:1px solid #22282f}table.ro th.sx{border-left:1px soli
 .warn{color:var(--amb);font-size:9.5px;line-height:1.4}.err{color:var(--red);font-size:10px}.na{color:var(--tx3)}
 .force{color:var(--amb)}.mr{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 #center{flex:1;min-width:0;display:flex;flex-direction:column}
-#vp{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:1px;background:var(--bd2);padding:0}
+#vp{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:2px;background:var(--bd3);padding:0}
 #vp.max0{grid-template-columns:1fr;grid-template-rows:1fr}
 #vp.max0 .vw{display:none}#vp.max0 .vw.mx{display:flex}
 .vw{position:relative;background:var(--bg2);display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
-.vwh{display:flex;align-items:center;height:18px;background:var(--pnl);border-bottom:1px solid var(--bd);
+.vwh{display:flex;align-items:center;height:18px;background:var(--pnl);border-bottom:2px solid var(--bd3);
      padding:0 0 0 7px;font-size:9px;letter-spacing:.1em;color:var(--tx3);text-transform:uppercase;flex:0 0 18px}
 .vwh b{font-weight:400;color:var(--tx2);letter-spacing:.02em;font-size:10px;margin-right:7px;text-transform:none}
 .vwh .en{color:#4a545f}.vwh .ax{color:#39414b}
@@ -119,16 +121,16 @@ table.ro td.sx{border-left:1px solid #22282f}table.ro th.sx{border-left:1px soli
 .wrapc{flex:1 1 auto;min-height:0;position:relative}
 .vw canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .vw.act .vwh{background:var(--head)}.vw.act .vwh b{color:var(--acc)}
-#statsRow{height:38px;background:var(--pnl);border-top:1px solid var(--bd2);overflow:auto;padding:2px 6px}
-#sb{display:flex;height:22px;background:var(--head);border-top:1px solid var(--bd2);flex:0 0 auto;align-items:stretch}
+#statsRow{height:38px;background:var(--pnl);border-top:3px solid var(--bd3);overflow:auto;padding:2px 6px}
+#sb{display:flex;height:22px;background:var(--head);border-top:3px solid var(--bd3);box-shadow:0 -3px 0 var(--bs);flex:0 0 auto;align-items:stretch}
 #sb .c{display:flex;align-items:center;padding:0 8px;border-right:1px solid var(--bd);font-size:9.5px;color:var(--tx2);white-space:nowrap}
 #sb .c u{text-decoration:none;color:var(--tx3);margin-right:5px;font-size:8.5px;letter-spacing:.1em}
 #sb .c b{font-weight:400;color:var(--tx);font-variant-numeric:tabular-nums}
 #sb .sp{flex:1;border-right:1px solid var(--bd)}
 #sb .c.ok b{color:var(--grn)}#sb .c.bad b{color:var(--red)}#sb .c.hl b{color:var(--acc)}
 .plotbox{padding:2px 4px;position:relative}
-canvas.plot{display:block;width:100%;height:84px;background:var(--bg2);border:1px solid var(--bd)}
-canvas.plot.ks{height:62px}
+canvas.plot{display:block;width:100%;height:225px;background:var(--bg2);border:2px solid var(--bd3)}
+canvas.plot.ks{height:144px}
 .legend{padding:2px 8px;display:grid;grid-template-columns:1fr 1fr;gap:1px 8px;font-size:9px;color:var(--tx2)}
 .legend div{display:flex;align-items:center;gap:5px;height:13px}
 .legend s{text-decoration:none;width:14px;height:0;border-top-width:2px;border-top-style:solid;flex:0 0 14px}
@@ -136,6 +138,25 @@ canvas.plot.ks{height:62px}
 ::-webkit-scrollbar{width:9px;background:var(--bg2)}
 ::-webkit-scrollbar-thumb{background:var(--bd2);border:1px solid var(--bg2)}
 ::-webkit-scrollbar-thumb:hover{background:var(--bd3)}
+
+/* 统一配色编辑器（浮层） */
+.hidden{display:none}
+/* 隐藏态优先级须盖过 #themeOverlay 的 display:flex（ID 选择器优先于 .hidden） */
+#themeOverlay.hidden{display:none}
+#themeOverlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center}
+#themePanel{width:min(410px,92vw);max-height:86vh;overflow-y:auto;background:var(--pnl);border:2px solid var(--bd3);box-shadow:4px 4px 0 var(--bs);padding:8px;color:var(--tx)}
+#themePanel .col-head{display:flex;justify-content:space-between;align-items:center;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--tx);border-bottom:2px solid var(--bd3);padding-bottom:4px;margin-bottom:6px}
+.tg-grp{border:1px solid var(--bd2);margin-bottom:6px}
+.tg-title{font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--tx2);text-transform:uppercase;border-bottom:1px solid var(--bd);padding:2px 6px;background:var(--pnl2)}
+.tg-row{display:flex;align-items:center;gap:5px;font-size:10px;padding:2px 6px;border-bottom:1px solid #1d2126}
+.tg-row:last-child{border-bottom:none}
+.tg-name{flex:1;color:var(--tx)}
+.tg-swatch{width:12px;height:12px;border:1px solid var(--bd3);flex:0 0 12px}
+.tg-input{width:30px;height:18px;padding:0;border:1px solid var(--bd3);background:none;cursor:pointer;flex:0 0 30px}
+.tg-hex{width:56px;text-align:right;color:var(--tx3);font-size:9px}
+.tg-presetwrap{display:flex;flex-wrap:wrap;gap:3px;padding:4px 6px}
+.tg-preset{flex:none;font-size:8.5px;padding:2px 5px;box-shadow:1px 1px 0 var(--bs);background:var(--head);color:var(--tx2);border:1px solid var(--bd3)}
+.tg-preset:hover{color:var(--tx);background:var(--headhi);border-color:var(--acc)}
 
 </style>
 </head>
@@ -145,6 +166,7 @@ canvas.plot.ks{height:62px}
     <div class="brand"><b>FSAE·MODELER</b></div>
     <div class="tt"><span>整车双叉臂底盘 · 运动学仿真台</span><span>whole-chassis kinematic simulator</span></div>
     <div class="sp"></div>
+    <button id="btnTheme" style="flex:0 0 auto;align-self:center;margin:0 4px;background:var(--pnl2)">🎨 配色</button>
     <div class="cell"><i>mode 模式</i><b class="a c" id="tbMode">运动学</b></div>
     <div class="cell"><i>state 状态</i><b class="g" id="tbState">加载中</b></div>
     <div class="cell"><i>solver</i><b id="tbSolver">—</b></div>
@@ -182,6 +204,9 @@ canvas.plot.ks{height:62px}
           <div class="btnrow"><button id="fitAll">全部适应</button><button id="resetView">还原视角</button></div>
           <div class="ctl"><label>等轴测方位 AZIMUTH <u>°</u></label><input type="range" id="sAz" min="-180" max="180" step="1" value="-52"><input type="number" id="sAzv" value="-52" step="1"></div>
           <div class="ctl"><label>等轴测仰角 ELEVATION <u>°</u></label><input type="range" id="sEl" min="-85" max="85" step="1" value="24"><input type="number" id="sElv" value="24" step="1"></div>
+          <div class="row"><b>轴显示</b>
+            <button id="axleBoth" class="on">两轴</button><button id="axleFront">仅前轴</button><button id="axleRear">仅后轴</button>
+          </div>
           <div class="chkrow" id="showToggles"></div>
         </div>
       </div>
@@ -201,14 +226,14 @@ canvas.plot.ks{height:62px}
     <div id="center">
       <div id="vp"></div>
       <div id="statsRow"><div class="legend">
-          <div><s style="border-top-color:#e0603f"></s>主销</div>
-          <div><s style="border-top-color:#43c9c0"></s>横拉杆/立柱</div>
-          <div><s style="border-top-color:#d9a238"></s>弹簧/减振器</div>
-          <div><s style="border-top-color:#aab9c7"></s>摆臂</div>
-          <div><q style="background:#c3cad2"></q>运动小球</div>
-          <div><q style="background:#d2543f"></q>车架节点</div>
-          <div><s style="border-top-color:#c07ad0"></s>防倾杆</div>
-          <div><s style="border-top-color:#8191a0"></s>转向机</div>
+          <div><s id="lg-kp" style="border-top-color:#e0603f"></s>主销</div>
+          <div><s id="lg-knu" style="border-top-color:#47FFDA"></s>横拉杆/立柱</div>
+          <div><s id="lg-ela" style="border-top-color:#FFCE0A"></s>弹簧/减振器</div>
+          <div><s id="lg-rig" style="border-top-color:#aab9c7"></s>摆臂</div>
+          <div><q id="lg-node" style="background:#c3cad2"></q>运动小球</div>
+          <div><q id="lg-nodefix" style="background:#d2543f"></q>车架节点</div>
+          <div><s id="lg-arb" style="border-top-color:#540AFF"></s>防倾杆</div>
+          <div><s id="lg-rack" style="border-top-color:#8191a0"></s>转向机</div>
         </div></div>
     </div>
     <aside id="right">
@@ -227,16 +252,39 @@ canvas.plot.ks{height:62px}
           <div class="note" style="font-size:8.5px;color:var(--tx3);padding:3px 0 0">来源：所选轴扫掠的静态点派生指标（播放中显示最近一次，暂停自动刷新）</div>
         </div>
       </div>
+      <div class="sec"><div class="sh"><b>侧倾/动力学/目标带 Roll&Ride</b><span class="tg">P1 派生</span></div>
+        <div class="sb" style="padding-top:0"><div id="p1Box" style="font-size:9.5px">— 随求解更新 —</div>
+          <div class="note" style="font-size:8.5px;color:var(--tx3);padding:3px 0 0">来源：当前静态点派生的侧倾刚度/转移分解/瞬心/ride 频率·阻尼；目标带绿/黄/红。</div>
+        </div>
+      </div>
       <div class="sec"><div class="sh"><b>曲线 Curves</b><span class="tg"><span id="curveTitle">前轴 travel</span></span></div>
         <div class="row" style="padding:2px 8px"><b>曲线轴</b>
           <button id="cvFront" class="on">前轴</button><button id="cvRear">后轴</button>
         </div>
         <div class="plotbox"><canvas id="chart" class="plot"></canvas></div>
-        <div class="plotbox" style="padding-top:0"><canvas id="axChart" class="plot" style="height:60px"></canvas></div>
+        <div class="plotbox" style="padding-top:0"><canvas id="axChart" class="plot" style="height:165px"></canvas></div>
       </div>
       <div class="sec"><div class="sh"><b>操稳 Handling · 调平</b><span class="tg">P5 ay 工况</span></div>
         <div class="sb" style="padding:3px 8px"><div id="handlingBox" style="font-size:10px">— 待求解 —</div>
           <div class="plotbox" style="padding:2px 0 0"><canvas id="kChart" class="plot ks"></canvas></div></div>
+      </div>
+      <div class="sec"><div class="sh"><b>台架 Rig · 四轮时域</b><span class="tg">7-DOF 动力学</span></div>
+        <div class="sb">
+          <div class="row"><b>激励</b>
+            <button id="rgStep" class="on">阶跃</button><button id="rgSine">正弦</button><button id="rgPulse">脉冲</button>
+          </div>
+          <div class="row"><b>轮位</b>
+            <button id="rgAll" class="on">全轮</button><button id="rgFR">右前</button><button id="rgFL">左前</button><button id="rgRR">右后</button><button id="rgRL">左后</button>
+          </div>
+          <div class="ctl"><label>幅值 AMPL <u>mm</u></label><input type="range" id="rgA" min="1" max="45" step="1" value="15"><input type="number" id="rgAv" value="15" step="1"></div>
+          <div class="ctl"><label>频率 FREQ <u>Hz</u></label><input type="range" id="rgF" min="0.2" max="10" step="0.1" value="2"><input type="number" id="rgFv" value="2" step="0.1"></div>
+          <div class="ctl"><label>时长 DUR <u>s</u></label><input type="range" id="rgD" min="1" max="6" step="0.5" value="3"><input type="number" id="rgDv" value="3" step="0.5"></div>
+          <div class="btnrow"><button id="btnRig">运行台架</button></div>
+          <div id="rgStatus" class="note" style="font-size:8.5px;color:var(--tx3);padding:0 0 2px">— 未运行 —</div>
+          <div class="plotbox"><canvas id="rgChart" class="plot"></canvas></div>
+          <div class="plotbox" style="padding-top:2px"><canvas id="rgChart2" class="plot" style="height:150px"></canvas></div>
+          <div class="note" style="font-size:8.5px;color:var(--tx3)">上：四轮 Fz(弹簧) 实线 / 轮胎 虚线 与渗透(N·mm)；下：车身垂向(mm)、wheel accel(g)。按右上运行。</div>
+        </div>
       </div>
       <div class="sec"><div class="sh"><b>敏感性 Sensitivity</b><span class="tg">右前 ±1mm</span></div>
         <div class="sb"><div id="sensBox" style="font-size:9.5px">— 待请求 —
@@ -258,6 +306,22 @@ canvas.plot.ks{height:62px}
     <div class="c hl"><u>hint</u><b id="sbHint">等轴测:左键旋转·Shift/中键平移·滚轮缩放 ‖ 正交:拖硬点·滚轮缩放·双击适应 ‖ Space 运行/暂停 · ↑/↓ 轮跳 · Shift+↑/↓ 齿条 · F 适应 · 1-4 最大化</b></div>
   </div>
 </div>
+
+<!-- 统一配色编辑器（浮层） -->
+<div id="themeOverlay" class="hidden">
+  <div id="themePanel">
+    <div class="col-head">统一配色编辑器
+      <span style="display:flex;gap:3px">
+        <button id="btnThemeExport" style="flex:none;font-size:8.5px;padding:2px 5px;box-shadow:1px 1px 0 var(--bs)">⤓ 导出</button>
+        <button id="btnThemeReset" style="flex:none;font-size:8.5px;padding:2px 5px;box-shadow:1px 1px 0 var(--bs)">↺ 重置</button>
+        <button id="btnThemeClose" style="flex:none;font-size:8.5px;padding:2px 5px;box-shadow:1px 1px 0 var(--bs)">✕</button>
+      </span>
+    </div>
+    <div id="themeList"></div>
+    <div class="note" style="font-size:8.5px;color:var(--tx3);padding-top:4px">改色即时生效（界面 + 3D 画布），自动保存本机。导出得到 JSON，可分享导入。</div>
+  </div>
+</div>
+
 <script>
 
 "use strict";
@@ -313,12 +377,14 @@ const S={
   travel:0, roll:0, rack:0, ay:0, ax:0,
   solveEvery:78, lastSolveT:0,
   show:{node:1,label:0,rigid:1,face:1,spring:1,wheel:1,disc:1,chassis:1,steer:1,arb:1,dim:1,tirefill:0,mirror:1},
+  axle:"both",
   held:null
 };
 let busy=false, pending=false, dragging=false, sweepTimer=null, solveSeq=0, needsDraw=true;
 let lastH=null, snapA=null, resp=null, sweepCache=null;
 let prevPose=null, curPose=null, interpF=1;
 let SCENE=[];
+let _sk=null, sceneDirty=true, _sched=null;
 let VW=[], UI={drag:null,hover:null,sel:null}, PICK=[];
 function deep(o){return JSON.parse(JSON.stringify(o));}
 const mirrorPts=w=>{const out={};for(const k in w)out[k]=[w[k][0],-w[k][1],w[k][2]];return out;};
@@ -464,6 +530,7 @@ function loadPose(d,immediate){
   if(!curPose)prevPose=fresh; else prevPose=curPose;
   curPose=fresh;
   interpF=immediate?1:0;
+  sceneDirty=true;   /* 新求解改变了姿态 → 重建场景 */
 }
 function poseOf(name){
   if(!curPose)return null;
@@ -478,11 +545,11 @@ function angOf(name){
 
 /* ================================ 场景构建 ================================ */
 const CC={
-  rig:"#aab9c7",rigArm:"#aab9c7",knu:"#43c9c0",knuF:"rgba(67,201,192,0.10)",
-  kp:"#e0603f",tie:"#43c9c0",tieD:"#2c7d76",ela:"#d9a238",chas:"#414b56",chas2:"#333c46",chas3:"#2c333b",
-  arb:"#c07ad0",rack:"#8191a0",tire:"#5f6a76",tread:"#3d454d",rim:"#7c8894",disc:"#6a747f",cal:"#8a5a3a",
+  rig:"#aab9c7",rigArm:"#aab9c7",knu:"#47FFDA",knuF:"rgba(71,255,218,0.10)",
+  kp:"#e0603f",tie:"#47FFDA",tieD:"#0A6E60",ela:"#FFCE0A",chas:"#414b56",chas2:"#333c46",chas3:"#2c333b",
+  arb:"#540AFF",rack:"#8191a0",tire:"#5f6a76",tread:"#3d454d",rim:"#7c8894",disc:"#6a747f",cal:"#8a5a3a",
   node:"#c3cad2",nodeFix:"#d2543f",nodeSel:"#f0e6c8",txt2:"#8b95a1",txt3:"#616b77",
-  axis:"#125a75",grid:"#1c2126",grid2:"#262d34",gnd:"#2f6f5e",bg:"#0a0c0e",frc:"#e8b84b",pathC:"#43c9c0",ic:"#a473c4"
+  axis:"#0A6E60",grid:"#1c2126",grid2:"#262d34",gnd:"#0A5A4F",bg:"#0a0c0e",frc:"#FFCE0A",pathC:"#47FFDA",ic:"#3A07B3"
 };
 function circPts(c,ax,r,n,e1,e2){
   const u=e1||perpOf(ax),v=e2||cross(nrm(ax),u),o=[];
@@ -538,7 +605,7 @@ function buildSkeleton(){
   const axes={front:S.frontR||deep(SEED), rear:S.rearR||deep(SEED)};
   ["front_right","front_left","rear_right","rear_left"].forEach(n=>{
     const axis=n.split("_")[0],side=n.split("_")[1];
-    const tpl=side==="right"?axes[axis]:mirrorPts(axes[axis]);
+    const tpl=side==="right"?axes[axis]:mirrorPts(axes[axis]);   /* 保持镜像：左右都用同一模板渲染 */
     const pose=poseOf(n);
     const angles=angOf(n);
     sk[n]=displayCorner(tpl,pose,angles,side==="right"?1:-1);
@@ -573,7 +640,7 @@ function buildScene(sk){
       }
     });
   }
-  if(sh.steer&&sk.front_right&&sk.front_left&&sk.front_right.tpl.FL1&&sk.front_left.tpl.FL1){
+  if(sh.steer&&S.axle!=="rear"&&sk.front_right&&sk.front_left&&sk.front_right.tpl.FL1&&sk.front_left.tpl.FL1){
     const F=sk.front_right.tpl.FL1,Lf=sk.front_left.tpl.FL1;
     const a=[F[0],Math.abs(F[1])-14,F[2]],b=[Lf[0],-(Math.abs(Lf[1])-14),Lf[2]];
     cyl(sc,[a[0],a[1],a[2]],[b[0],b[1],b[2]],22,CC.rack,1.1,12);
@@ -584,6 +651,7 @@ function buildScene(sk){
   }
   if(sh.arb){
     ["front_right","rear_right"].forEach(n=>{
+      if(S.axle!=="both"&&n.indexOf(S.axle)!==0)return;   /* 防倾杆按轴显示 */
       const rd=sk[n],ld=sk[n.replace("right","left")];if(!rd||!ld)return;
       const ay=rd.tpl.CH3[1],az=(rd.tpl.CH3[2]+rd.tpl.CH4[2])/2;
       const bx=rd.tpl.CH3[0];
@@ -595,6 +663,7 @@ function buildScene(sk){
     });
   }
   ["front_right","front_left","rear_right","rear_left"].forEach(n=>{
+    if(S.axle!=="both"&&n.indexOf(S.axle)!==0)return;   /* 轴显示：仅前/仅后 */
     const d=sk[n];if(!d)return;
     const H=k=>d.pt[k];
     const axis=n.split("_")[0];
@@ -826,13 +895,21 @@ function drawMetrics(v,sk){
   drawOne("front_right");
   if(S.show.mirror)drawOne("front_left");
 }
-function drawAll(){
-  const sk=buildSkeleton();
-  SCENE=buildScene(sk);
-  PICK.length=0;
+function scheduleDraw(){
+  if(_sched)return;
+  _sched=requestAnimationFrame(()=>{_sched=null;drawAll();});
+}
+function drawAll(force){
+  /* 场景只在姿态/几何/显示变化时重建；相机操作(缩放/平移/旋转)只重投影，避免暂停时每帧重建整台 */
+  if(force||sceneDirty||!_sk){
+    _sk=buildSkeleton();
+    SCENE=buildScene(_sk);
+    PICK.length=0;
+    sceneDirty=false;
+  }
   for(const v of VW){
     if($("vp").classList.contains("max0")&&!v.mx)continue;
-    drawView(v,sk);
+    drawView(v,_sk);
   }
 }
 function drawView(v,sk){
@@ -900,7 +977,7 @@ function hookView(v){
     if(e.button===0&&hit&&v.type==="o"){
       const axis=hit.corner.split("_")[0];
       const tpl=S[axis==="front"?"frontR":"rearR"];
-      if(tpl&&tpl[hit.id]&&hit.sx>0){
+      if(tpl&&tpl[hit.id]){   /* 左右均以右侧模板编辑，另一侧保持镜像同步 */
         UI.sel=hit.id;UI.drag={mode:"hp",v:v,corner:hit.corner,k:hit.id,sx:hit.sx,x0:e.clientX,y0:e.clientY,base:cpy(tpl[hit.id])};
         S.held={corner:hit.corner,k:hit.id};
         e.preventDefault();return;
@@ -939,6 +1016,7 @@ function hookView(v){
       v.s=clamp(v.s*f,0.02,40);
       v.cx=ax-(mx-v.w/2)/v.s;v.cy=by+(my-v.h/2)/v.s;
     }else v.s=clamp(v.s*f,0.02,40);
+    scheduleDraw();   /* 缩放只重投影（场景已缓存），按 rAF 合并，避免滚轮风暴 */
   },{passive:false});
   cv.addEventListener("dblclick",()=>fitView(v));
   cv.addEventListener("contextmenu",e=>e.preventDefault());
@@ -949,7 +1027,7 @@ window.addEventListener("mousemove",e=>{
   if(d.mode==="hp"){
     const da=(e.clientX-d.x0)/v.s,db=-(e.clientY-d.y0)/v.s;
     const w=[v.bx[0]*da+v.by[0]*db,v.bx[1]*da+v.by[1]*db,v.bx[2]*da+v.by[2]*db];
-    const snap=e.shiftKey?0.1:1;
+    const snap=e.shiftKey?0.1:1;   /* Shift=0.1mm 微调 */
     const axis=d.corner.split("_")[0],tpl=S[axis==="front"?"frontR":"rearR"];
     if(tpl&&tpl[d.k]){
       for(let k=0;k<3;k++)tpl[d.k][k]=Math.round((d.base[k]+w[k])/snap)*snap;
@@ -957,7 +1035,8 @@ window.addEventListener("mousemove",e=>{
     S.held={corner:d.corner,k:d.k};
     refreshTableInputs();
     interpF=1;
-    drawAll();requestSolve();
+    sceneDirty=true;   /* 硬点被拖动 → 重建场景 */
+    drawAll(true);requestSolve();
   }else if(d.mode==="orb"){
     v.az=d.az-(e.clientX-d.x0)*0.006;
     v.elv=clamp(d.el+(e.clientY-d.y0)*0.005,-85*D2R,85*D2R);
@@ -1012,8 +1091,10 @@ function loop(ts){
   if(S.play&&!dragging&&(ts-S.lastSolveT)>S.solveEvery){
     S.lastSolveT=ts;requestSolve({immediate:false});
   }
+  if(S.play||interpF<1)sceneDirty=true;   /* 姿态在变化 → 需重建场景 */
   if(S.play||needsDraw){drawAll();needsDraw=false;}
-  if(sweepCache){drawChart(sweepCache);drawAxChart(sweepCache);}
+  /* 曲线游标仅播放时随动；暂停时游标静止，由最后一次求解的 renderAll 已绘制，无需每帧重绘 */
+  if(S.play&&sweepCache){drawChart(sweepCache);drawAxChart(sweepCache);}
   if(S.play&&!dragging&&(ts-lastSweepT)>500){lastSweepT=ts;requestSolve({sweep:true,silent:true,immediate:false});}
   fpsFc++;fpsFt+=dt;
   if(fpsFt>0.4){fpsV=Math.round(fpsFc/fpsFt);fpsFc=0;fpsFt=0;fpsV&&($("tbFps").textContent=fpsV);}
@@ -1073,6 +1154,7 @@ function fetchHandling(){
 const ANGLES=[["camber_deg","外倾°"],["toe_deg","前束°"],["caster_deg","后倾°"],["kpi_deg","主销内倾°"],
   ["scrub_radius_mm","Scrub mm"],["caster_trail_mm","拖距 mm"]];
 function renderAll(d){
+  sceneDirty=true;   /* 新求解 → 姿态/几何变化 → 重建场景 */
   setStatus(d.status==="VALID"?"g":(d.status==="SOLVER_FAILED"?"r":"a"),
     "<span>"+(d.status||"—")+"</span> · "+(d.solver||"—")+" · "+(d.label||""));
   $("tbSolver").textContent=d.solver||"—";
@@ -1115,9 +1197,21 @@ function renderAll(d){
       const L=ld[c[0]==="FL"?"front_left":c[0]==="FR"?"front_right":c[0]==="RL"?"rear_left":"rear_right"];
       if(!L)continue;
       const mf=L.wheel_end&&L.wheel_end.member_forces||{};
-      note+=c[0]+" 推杆 "+(mf.pushrod_n!=null?mf.pushrod_n.toFixed(0)+"N":"—")+" · 横拉杆 "+
-        (mf.tie_rod_n!=null?mf.tie_rod_n.toFixed(0)+"N":"—")+" · 球头残差 "+
-        (L.wheel_end&&L.wheel_end.force_residual_n!=null?L.wheel_end.force_residual_n.toFixed(3)+"N":"—")+"<br>";
+      const we_=L.wheel_end||{};
+      const v3=v=>v&&v.length===3?Math.hypot(v[0],v[1],v[2]):null;
+      const fj=L.wheel_end&&L.wheel_end.ball_joints||{};
+      const cr=L.wheel_end&&L.wheel_end.chassis_reactions||{};
+      let line=c[0]+" 推杆 "+(mf.pushrod_n!=null?mf.pushrod_n.toFixed(0)+"N":"—")+" · 横拉杆 "+
+        (mf.tie_rod_n!=null?mf.tie_rod_n.toFixed(0)+"N":"—");
+      if(we_.arb_droplink_n!=null)line+=" · ARB "+(we_.arb_droplink_n).toFixed(0)+"N";
+      const ub=v3(fj.ubj),lb=v3(fj.lbj);
+      if(ub!=null||lb!=null)line+="<br><span class='tx3'>  UBJ "+(ub!=null?ub.toFixed(0)+"N":"—")+
+        " · LBJ "+(lb!=null?lb.toFixed(0)+"N":"—")+"</span>";
+      const chs=Math.max(v3(cr.ch3)||0,v3(cr.ch4)||0,v3(cr.ch5)||0);
+      line+="<br><span class='tx3'>  车架支点 max "+chs.toFixed(0)+"N · 残差 力 "+
+        (we_.force_residual_n!=null?we_.force_residual_n.toFixed(2)+"N":"—")+
+        " · 矩 "+(we_.moment_residual_nmm!=null?we_.moment_residual_nmm.toFixed(0)+"N·mm":"—")+"</span>";
+      note+=line+"<br>";
     }
     FE.innerHTML=note;
   }else{ft.innerHTML="<tr><td class='na'>载荷不可用</td></tr>";FE.innerHTML="";}
@@ -1143,6 +1237,7 @@ function renderAll(d){
   if(d.sweep)sweepCache=d.sweep;
   if(sweepCache){drawChart(sweepCache);drawAxChart(sweepCache);}
   renderMetrics(d);
+  renderP1(d);
 }
 function currentRightTravel(){
   const roll=clamp(S.roll||0,-6,6);
@@ -1206,6 +1301,30 @@ function mrow(zh,unit,obj,sub){
     return "<tr title='"+tip+"'><td>"+zh+(sub?" <i style='color:var(--tx3);font-style:normal'>"+sub+"</i>":"")+"</td><td class='v "+mcls(st)+"'>"+mval(v)+"</td><td class='u'>"+(v!=null?(u||""):"")+"</td></tr>";
   }
   return "<tr><td>"+zh+"</td><td class='na'>—</td><td class='u'></td></tr>";
+}
+function renderP1(d){
+  const el=$("p1Box"); if(!el)return;
+  const p=d.p1; if(!p){ el.innerHTML="<div class='na'>— 无 P1 派生数据 —</div>"; return; }
+  const rs=p.roll_stiffness||{}, tr=p.transfer||{}, ic=p.instant_center||{}, rd=p.ride||{};
+  let h="<table class='mtbl'>";
+  h+="<tr><td>侧倾刚度(弹簧+ARB)</td><td class='v g'>"+(rs.total!=null?rs.total.toFixed(0):"—")+"</td><td class='u'>N·mm/rad</td></tr>";
+  h+="<tr><td>前 / 后</td><td class='v'>"+(rs.front!=null?rs.front.toFixed(0):"—")+" / "+(rs.rear!=null?rs.rear.toFixed(0):"—")+"</td><td class='u'>/ 前"+(rs.front_pct!=null?rs.front_pct.toFixed(1):"—")+"%</td></tr>";
+  h+="<tr><td>载荷转移·前</td><td class='v'>G "+(tr.front?tr.front.geometric:0)+" · E "+(tr.front?tr.front.elastic:0)+" · U "+(tr.front?tr.front.unsprung:0)+"</td><td class='u'>N / 总 "+(tr.front?tr.front.lateral_total:0)+"</td></tr>";
+  h+="<tr><td>载荷转移·后</td><td class='v'>G "+(tr.rear?tr.rear.geometric:0)+" · E "+(tr.rear?tr.rear.elastic:0)+" · U "+(tr.rear?tr.rear.unsprung:0)+"</td><td class='u'>N / 总 "+(tr.rear?tr.rear.lateral_total:0)+"</td></tr>";
+  function icr(a){const x=ic[a]||{};return (x.svic_x!=null?("SVIC x"+x.svic_x.toFixed(0)+" z"+x.svic_z.toFixed(0)):"—")+(x.ic_y!=null?(" · IC y"+x.ic_y.toFixed(0)+" z"+x.ic_z.toFixed(0)):"");}
+  h+="<tr><td>瞬心·前</td><td class='v'>"+icr("front")+"</td><td class='u'>mm</td></tr>";
+  h+="<tr><td>瞬心·后</td><td class='v'>"+icr("rear")+"</td><td class='u'>mm</td></tr>";
+  h+="<tr><td>Ride 频率</td><td class='v'>"+(rd.ride_freq_f_hz!=null?rd.ride_freq_f_hz.toFixed(2):"—")+" / "+(rd.ride_freq_r_hz!=null?rd.ride_freq_r_hz.toFixed(2):"—")+"</td><td class='u'>Hz 前/后 · 比 "+(rd.freq_ratio!=null?rd.freq_ratio.toFixed(2):"—")+"</td></tr>";
+  h+="<tr><td>阻尼比</td><td class='v'>"+(rd.damping_f!=null?rd.damping_f.toFixed(2):"—")+" / "+(rd.damping_r!=null?rd.damping_r.toFixed(2):"—")+"</td><td class='u'>前/后</td></tr>";
+  // 目标带状态行
+  const stc=s=>({green:"g",yellow:"a",red:"r"}[s]||"na");
+  const tg=p.targets||[];
+  if(tg.length){
+    h+="</table><div class='note' style='font-size:8.5px;padding-top:2px;border-top:1px solid var(--bd2)'>目标带：";
+    tg.forEach((t,i)=>{ if(i%2===0)h+="<br>"; h+="<span class='"+stc(t.status)+"'>"+t.label+" "+(t.value!=null?t.value.toFixed(2):"—")+t.unit+"</span>　"; });
+    h+="</div>";
+  }else{ h+="</table>"; }
+  el.innerHTML=h;
 }
 function renderMetrics(d){
   const el=$("metricsBox"); if(!el)return;
@@ -1298,7 +1417,81 @@ function drawKcurve(d){
   }
   ctx.stroke();
   ctx.strokeStyle=CC.grid;ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(pad,sy(0));ctx.lineTo(W-pad,sy(0));ctx.stroke();ctx.setLineDash([]);
-  ctx.fillStyle=CC.txt3;ctx.font="9px monospace";ctx.fillText("K(ay) °/g",4,9);
+  ctx.strokeStyle=CC.txt3;ctx.font="9px monospace";ctx.fillText("K(ay) °/g",4,9);
+}
+/* ================================ 台架 Rig ================================ */
+var RG={kind:"step",corner:"all",amp:15,freq:2,dur:3,last:null};
+var RG_COLORS={fl:"#FFB648",fr:"#5AA8FF",rl:"#6BE08F",rr:"#FF87BC"};
+function rgMirror(p){if(!p)return p;var o={};for(var k in p)o[k]=[p[k][0],-p[k][1],p[k][2]];return o;}
+function runRig(){
+  var fr=S.frontR||deep(SEED),rr=S.rearR||deep(SEED);
+  if(!fr.UP5){fr=deep(SEED);} if(!rr.UP5){rr=deep(SEED);}
+  var corners=(RG.corner==="all")?[]:[RG.corner];
+  fetch("/api/v2/rig",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      front_right:{points:fr, tire:Object.assign({},S.tire,{track_width:1220})},
+      front_left:{points:rgMirror(fr),tire:Object.assign({},S.tire,{track_width:1220})},
+      rear_right:{points:rr, tire:Object.assign({},S.tire,{track_width:1180})},
+      rear_left:{points:rgMirror(rr),tire:Object.assign({},S.tire,{track_width:1180})},
+      excitation:{kind:RG.kind,amplitude_mm:RG.amp,freq_hz:RG.freq,duration_s:RG.dur,corners:corners},
+      dt_s:0.002,ns:10 })})
+    .then(r=>r.ok?r.json():Promise.reject("HTTP "+r.status))
+    .then(d=>{RG.last=d;drawRig(d);
+      var s=$("rgStatus");if(s)s.textContent="完成 · "+d.t.length+" 点 / "+(d.t.length*0.002).toFixed(1)+"s";})
+    .catch(e=>{console.error("rig failed",e);
+      var s=$("rgStatus");if(s)s.textContent="失败: "+e+(/404|405/.test(String(e))?"（后端未重启？无 /api/v2/rig）":"");});
+}
+window.addEventListener("resize",function(){ if(RG.last)drawRig(RG.last); });
+function sizeCv(cv,h){var r=cv.parentElement.getBoundingClientRect();
+  cv.width=Math.max(60,Math.round(r.width-10));cv.height=h||150;}
+function drawRig(d){
+  var c1=$("rgChart"),c2=$("rgChart2");
+  if(!c1||!c2)return;
+  sizeCv(c1,180);sizeCv(c2,150);
+  var pad=20,t=d.t;
+  function plotSeries(cv,series,label){
+    var ctx=cv.getContext("2d");ctx.clearRect(0,0,cv.width,cv.height);
+    var W=cv.width,H=cv.height,ys=[0];
+    series.forEach(s=>{ys.push(Math.min(...s[1]),Math.max(...s[1]));});
+    var y0=Math.min(...ys),y1=Math.max(...ys);if(y1===y0)y1=y0+1;
+    var X=v=>pad+(v-t[0])/((t[t.length-1]-t[0])||1)*(W-2*pad);
+    var Y=v=>H-pad-(v-y0)/(y1-y0)*(H-2*pad);
+    ctx.strokeStyle=CC.grid;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pad,Y(0));ctx.lineTo(W-2,Y(0));ctx.stroke();
+    series.forEach(s=>{
+      ctx.strokeStyle=s[0];ctx.lineWidth=1.3;if(s[2])ctx.setLineDash([3,3]);
+      ctx.beginPath();for(var j=0;j<t.length;j++){var x=X(t[j]),y=Y(s[1][j]);j?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();ctx.setLineDash([]);
+    });
+    ctx.fillStyle=CC.txt3;ctx.font="8px monospace";
+    ctx.fillText(label+" ["+Math.round(y0)+".."+Math.round(y1)+"]",pad+2,9);
+  }
+  /* 图1：四轮 Fs(实)/Ft(虚) N */
+  plotSeries(c1,
+    Object.keys(d.wheels).map(k=>{
+      return [[k.toUpperCase(),d.wheels[k].fs,RG_COLORS[k],0],
+              [k.toUpperCase(),d.wheels[k].ft,RG_COLORS[k],1]];
+    }).flat(),"Fs 实 / Ft 虚 N");
+  /* 图2：车身 heave mm(蓝) + roll×200(粉) */
+  plotSeries(c2,
+    [["heave",d.body.zc,"#7EC9FF",0],["roll×200",d.body.phi_deg.map(v=>v*200),"#FF87BC",1]],
+    "车身 heave mm / roll×200");
+}
+function bindRig(){
+  var setK=(k,arr,def)=>arr.forEach(b=>b.classList.toggle("on",b.dataset.k===def||(def==null&&b.dataset.k===k)));
+  ["rgStep","rgSine","rgPulse"].forEach(id=>$(id).addEventListener("click",()=>{
+    RG.kind=id.replace("rg","").toLowerCase();
+    ["rgStep","rgSine","rgPulse"].forEach(x=>$(x).classList.toggle("on",x===id));
+  }));
+  [["rgAll","all"],["rgFR","fr"],["rgFL","fl"],["rgRR","rr"],["rgRL","rl"]].forEach(p=>{
+    $(p[0]).addEventListener("click",()=>{RG.corner=p[1];
+      ["rgAll","rgFR","rgFL","rgRR","rgRL"].forEach(x=>$(x).classList.toggle("on",x===p[0]));});
+  });
+  [["rgA","rgAv","amp",1,45],["rgF","rgFv","freq",0.2,10],["rgD","rgDv","dur",1,6]].forEach(p=>{
+    var sl=$(p[0]),nb=$(p[1]);
+    var push=()=>{var v=clamp(parseFloat(nb.value)||parseFloat(sl.value),p[3],p[4]);RG[p[2]]=v;sl.value=v;nb.value=v;};
+    sl.addEventListener("input",()=>{nb.value=sl.value;push();});
+    nb.addEventListener("input",push);
+  });
+  $("btnRig").addEventListener("click",runRig);
 }
 /* ================================ 硬点表 ================================ */
 function curTpl(){return S[S.hpAxle==="front"?"frontR":"rearR"]||(S[S.hpAxle==="front"?"frontR":"rearR"]=deep(SEED));}
@@ -1318,7 +1511,7 @@ function buildTable(){
   tbody.querySelectorAll("input").forEach(inp=>{
     const k=inp.dataset.k,a=+inp.dataset.a;
     const onEdit=()=>{const v=parseFloat(inp.value);
-      if(isFinite(v)){curTpl()[k][a]=v;interpF=1;refreshTableInputs([k]);drawAll();requestSolve({sweep:true});}
+      if(isFinite(v)){curTpl()[k][a]=v;interpF=1;refreshTableInputs([k]);sceneDirty=true;drawAll(true);requestSolve({sweep:true});}
     };
     inp.addEventListener("change",onEdit);
     inp.addEventListener("input",onEdit);
@@ -1342,7 +1535,7 @@ function buildToggles(){
   SHOW_DEF.forEach(it=>{
     const c=document.createElement("div");c.className="chk"+(S.show[it[0]]?" on":"");
     c.innerHTML="<i></i><span>"+it[1]+"</span>";
-    c.addEventListener("click",()=>{S.show[it[0]]=S.show[it[0]]?0:1;c.classList.toggle("on");drawAll();});
+    c.addEventListener("click",()=>{S.show[it[0]]=S.show[it[0]]?0:1;c.classList.toggle("on");sceneDirty=true;drawAll(true);});
     host.appendChild(c);
   });
 }
@@ -1382,6 +1575,14 @@ function updateExcBtns(){
 function setEx(type){S.exc=type;updateExcBtns();if(type!=="off"&&!S.play){S.play=true;updatePlayBtn();}requestSolve();}
 function setSteerEx(type){S.steerExc=type;updateExcBtns();if(type!=="off"&&!S.play){S.play=true;updatePlayBtn();}requestSolve();}
 function bind(){
+  applyTheme(loadPal(),false);   /* 首次载入已存配色 */
+  buildThemePanel();
+  bindRig();
+  [["axleBoth","both"],["axleFront","front"],["axleRear","rear"]].forEach(p=>{
+    $(p[0]).addEventListener("click",()=>{S.axle=p[1];
+      ["axleBoth","axleFront","axleRear"].forEach(x=>$(x).classList.toggle("on",x===p[0]));
+      sceneDirty=true;drawAll(true);});
+  });
   $("btnPlay").addEventListener("click",()=>{S.play=!S.play;updatePlayBtn();requestSolve({sweep:!S.play});});
   $("btnReset").addEventListener("click",()=>doReset());
   $("excOff").addEventListener("click",()=>setEx("off"));
@@ -1425,7 +1626,7 @@ function bind(){
   $("reset").addEventListener("click",()=>{
     const ax=S.hpAxle;
     S[ax==="front"?"frontR":"rearR"]=deep(ax==="front"?S._seedF:S._seedR);
-    buildTable();refreshTableInputs();drawAll();requestSolve({sweep:true});
+    buildTable();refreshTableInputs();sceneDirty=true;drawAll(true);requestSolve({sweep:true});
   });
   $("snapA").addEventListener("click",()=>{
     snapA={hp:deep(curTpl()),corner:S.hpAxle==="front"?"front_right":"rear_right",angles:resp?(resp[S.hpAxle==="front"?"front":"rear"].right.angles||null):null};
@@ -1489,6 +1690,158 @@ function doReset(){
 }
 function setHpAxle(ax){S.hpAxle=ax;$("hpFront").classList.toggle("on",ax==="front");$("hpRear").classList.toggle("on",ax==="rear");buildTable();}
 function setCurveAxle(ax){S.curveAxle=ax;$("cvFront").classList.toggle("on",ax==="front");$("cvRear").classList.toggle("on",ax==="rear");$("curveTitle").textContent=(ax==="front"?"前轴":"后轴")+" "+S.curveAxis;requestSolve({sweep:true});}
+/* ================================ 统一配色 ================================ */
+/* PAl：单一调色板数据源。每项可写 --css 变量（界面）+ cc 字段（画布），改一处全局生效。 */
+var TKEY="fsae_modeler_theme_v1";
+var PAL=[
+  /* 界面 UI */
+  {g:"界面",k:"bg", l:"页面深底",css:"--bg", d:"#0B0D0E"},
+  {g:"界面",k:"bg2",l:"画布/输入底",css:"--bg2",cc:["bg"], d:"#0a0c0e"},
+  {g:"界面",k:"pnl", l:"面板底",css:"--pnl", d:"#16191d"},
+  {g:"界面",k:"pnl2",l:"面板亮/表头",css:"--pnl2", d:"#1d2126"},
+  {g:"界面",k:"head", l:"头部底",css:"--head", d:"#0B0D0E"},
+  {g:"界面",k:"headhi",l:"头部亮/悬停",css:"--headhi", d:"#1a1e23"},
+  {g:"界面",k:"bd", l:"边框",css:"--bd", d:"#444c57"},
+  {g:"界面",k:"bd2",l:"边框亮",css:"--bd2", d:"#5b6573"},
+  {g:"界面",k:"bd3",l:"描边黑",css:"--bd3", d:"#000000"},
+  {g:"界面",k:"tx", l:"主文字",css:"--tx", d:"#c3cad2"},
+  {g:"界面",k:"tx2",l:"次文字",css:"--tx2", d:"#8b95a1"},
+  {g:"界面",k:"tx3",l:"弱文字",css:"--tx3", d:"#616b77"},
+  /* 强调 / 语义 */
+  {g:"强调",k:"acc", l:"青强调",css:"--acc", cc:["acc"], d:"#0AFFCE"},
+  {g:"强调",k:"amb", l:"琥珀警示/力",css:"--amb", cc:["frc"], d:"#FFCE0A"},
+  {g:"强调",k:"red", l:"失败红",css:"--red", d:"#FF0A3B"},
+  {g:"强调",k:"grn", l:"通过绿",css:"--grn", d:"#3BFF0A"},
+  {g:"强调",k:"purple",l:"紫强调/防倾杆",css:"--purple", cc:["arb"], d:"#540AFF"},
+  /* 画布 3D */
+  {g:"画布",k:"kp", l:"主销",cc:["kp"], d:"#e0603f"},
+  {g:"画布",k:"rig", l:"摆臂/弹簧杆",cc:["rig","rigArm"], d:"#aab9c7"},
+  {g:"画布",k:"knu", l:"立柱/横拉杆",cc:["knu","tie"], d:"#47FFDA"},
+  {g:"画布",k:"ela", l:"弹簧",cc:["ela"], d:"#FFCE0A"},
+  {g:"画布",k:"chas", l:"车架",cc:["chas","chas2","chas3"], d:"#414b56"},
+  {g:"画布",k:"tire", l:"轮胎",cc:["tire"], d:"#5f6a76"},
+  {g:"画布",k:"rim", l:"轮辋/制动盘",cc:["rim","disc"], d:"#7c8894"},
+  {g:"画布",k:"cal", l:"卡钳",cc:["cal"], d:"#8a5a3a"},
+  {g:"画布",k:"node", l:"运动小球",cc:["node"], d:"#c3cad2"},
+  {g:"画布",k:"nodeFix",l:"固定节点",cc:["nodeFix"], d:"#d2543f"},
+  {g:"画布",k:"rack", l:"转向机",cc:["rack"], d:"#8191a0"},
+  {g:"画布",k:"grid", l:"网格",cc:["grid","grid2"], d:"#1c2126"},
+  {g:"画布",k:"gnd", l:"地面",cc:["gnd"], d:"#0A5A4F"}
+];
+/* F1 2026 车队预设（11 支 + 综合）。每款为「多色映射」：主强调 acc/次强调 purple/
+   3D 部件色（主销kp/立柱横拉杆knu/弹簧ela/摆臂rig/车架chas/轮rim/卡钳cal/节点等），
+   并非单色。语义红/绿与暗色界面保留默认，保证工程可读性。 */
+var PRESETS={
+  mcLaren:{l:"迈凯伦",o:{acc:"#FF8000",purple:"#0D7EDA",kp:"#F4572D",knu:"#FFB14B",ela:"#FFC15C",rig:"#AEB6C0",chas:"#101012",tire:"#0C0C0C",rim:"#2E3338",cal:"#E64500",node:"#D9DDE2",nodeFix:"#FF6B3D",rack:"#60666D"}},
+  ferrari:{l:"法拉利",o:{acc:"#E80020",purple:"#1E40AF",kp:"#C00F20",knu:"#FF4233",ela:"#FFD84D",rig:"#C7CCD3",chas:"#16161A",tire:"#0C0C0C",rim:"#3A3D42",cal:"#C00F1E",node:"#F2F2F2",nodeFix:"#D4001C",rack:"#8A8F96"}},
+  redBull:{l:"红牛",o:{acc:"#3671C6",purple:"#E4002B",kp:"#E4002B",knu:"#4E8BE0",ela:"#FFD100",rig:"#B7C0CB",chas:"#0A0E14",tire:"#0C0C0C",rim:"#33383E",cal:"#C8102E",node:"#E3E6EA",nodeFix:"#D4002A",rack:"#6B7280"}},
+  mercedes:{l:"梅赛德斯",o:{acc:"#27F4D2",purple:"#00C9B0",kp:"#C8CCD4",knu:"#45E8CB",ela:"#E6E6E6",rig:"#D5DAE0",chas:"#0B0D0E",tire:"#0A0A0A",rim:"#6F7780",cal:"#16181B",node:"#E8EAEC",nodeFix:"#9FA6B0",rack:"#848C96"}},
+  astonMartin:{l:"阿斯顿马丁",o:{acc:"#00665E",purple:"#C6D400",kp:"#0A8C7E",knu:"#1FA996",ela:"#D8E84A",rig:"#B7C0CB",chas:"#0A1412",tire:"#0C0C0C",rim:"#2F3B38",cal:"#0A7A6E",node:"#E2E6E2",nodeFix:"#7DA68F",rack:"#6A716E"}},
+  alpine:{l:"阿尔派",o:{acc:"#0090FF",purple:"#FF87BC",kp:"#0A6FC0",knu:"#3BA4FF",ela:"#79C4FF",rig:"#B7C4D0",chas:"#07121E",tire:"#0C0C0C",rim:"#3A4350",cal:"#0A84FF",node:"#DCE6F0",nodeFix:"#FF87BC",rack:"#7A8A99"}},
+  williams:{l:"威廉姆斯",o:{acc:"#64C4FF",purple:"#041E42",kp:"#0A4DA0",knu:"#93D4FF",ela:"#C7E8FF",rig:"#C0C8D2",chas:"#081225",tire:"#0C0C0C",rim:"#36424E",cal:"#0A66C8",node:"#E6EEF5",nodeFix:"#195DB0",rack:"#7C8892"}},
+  racingBulls:{l:"小红牛",o:{acc:"#6692FF",purple:"#1634CB",kp:"#1E50D0",knu:"#8AA9FF",ela:"#D6E0FF",rig:"#C2C9D6",chas:"#0A1120",tire:"#0C0C0C",rim:"#3A4355",cal:"#2F5FE0",node:"#EAF0FB",nodeFix:"#365CD0",rack:"#8290A2"}},
+  haas:{l:"哈斯",o:{acc:"#E8112D",purple:"#F5F5F5",kp:"#B4001E",knu:"#FF3D47",ela:"#FFD6DA",rig:"#C4CBD2",chas:"#161616",tire:"#0C0C0C",rim:"#3A3E42",cal:"#E8112D",node:"#F0F0F2",nodeFix:"#C20016",rack:"#828990"}},
+  audi:{l:"奥迪",o:{acc:"#F50537",purple:"#C8CED4",kp:"#B0062A",knu:"#FF3A58",ela:"#FFDCDD",rig:"#D2D7DC",chas:"#16161A",tire:"#0C0C0C",rim:"#2E3338",cal:"#E0052E",node:"#E8EAEC",nodeFix:"#D0D5DA",rack:"#8E959D"}},
+  cadillac:{l:"凯迪拉克",o:{acc:"#E8ECEF",purple:"#B9C0C8",kp:"#D3D8DD",knu:"#F0F3F6",ela:"#C9CFD6",rig:"#DDE1E6",chas:"#121212",tire:"#0C0C0C",rim:"#2B2F33",cal:"#161616",node:"#FFFFFF",nodeFix:"#B7BEC6",rack:"#7E858C"}},
+  composite:{l:"综合·十一配色",o:{acc:"#3671C6",purple:"#FF8000",kp:"#E80020",knu:"#27F4D2",ela:"#CEDC00",rig:"#B7C0CB",chas:"#0B0D0E",tire:"#0C0C0C",rim:"#3A4350",cal:"#FF87BC",node:"#E8ECEF",nodeFix:"#FF8000",rack:"#7C8892"}}
+};
+/* 面板专属强调色：让左右栏各个面板（.sec）拥有各自的标识色，
+   顺序对应 DOM 中 #left 5 个 + #right 8 个 = 13 个面板。 */
+var PANEL_COLORS=[
+  "#27F4D2", /* 1  仿真控制 Sim     */
+  "#FFD166", /* 2  输入 Input       */
+  "#5AA8FF", /* 3  视图 View        */
+  "#FF9040", /* 4  硬点 Hardpoints  */
+  "#C792EA", /* 5  A/B 快照         */
+  "#FF5148", /* 6  定位角 Alignment */
+  "#FF7A45", /* 7  轮边受力 Forces  */
+  "#FFB648", /* 8  状态/警告        */
+  "#3BD6B0", /* 9  整车指标 Metrics */
+  "#7EC9FF", /* 10 曲线 Curves      */
+  "#FF87BC", /* 11 操稳 Handling    */
+  "#6BE08F", /* 12 敏感性 Sensitivity */
+  "#94A8C8"  /* 13 导出 Export      */
+];
+function paintPanels(){
+  var secs=document.querySelectorAll(".sec");
+  var i=0;
+  for(var s=0;s<secs.length;s++){var c=PANEL_COLORS[i%PANEL_COLORS.length];i++;
+    var sh=secs[s].querySelector(".sh");
+    if(sh){sh.style.borderLeftColor=c;var b=sh.querySelector("b");if(b)b.style.color=c;}
+  }
+}
+function loadPal(){ var o={};PAL.forEach(function(p){o[p.k]=p.d;});
+  try{var raw=localStorage.getItem(TKEY);if(raw)Object.assign(o,JSON.parse(raw));}catch(e){}
+  return o; }
+function applyTheme(pal,redraw){
+  for(var i=0;i<PAL.length;i++){var p=PAL[i],v=(pal&&pal[p.k])||p.d;
+    if(p.css)document.documentElement.style.setProperty(p.css,v);
+    if(p.cc)for(var j=0;j<p.cc.length;j++)CC[p.cc[j]]=v; }
+  updateLegend();
+  paintPanels();
+  if(redraw){ needsDraw=true; if(sweepCache){drawChart(sweepCache);drawAxChart(sweepCache);} }
+}
+function updateLegend(){
+  var map={ "lg-kp":["kp",1],"lg-knu":["knu",1],"lg-ela":["ela",1],"lg-rig":["rig",1],
+    "lg-node":["node",0],"lg-nodefix":["nodeFix",0],"lg-arb":["arb",1],"lg-rack":["rack",1] };
+  for(var id in map){ var el=document.getElementById(id); if(!el)continue; var c=CC[map[id][0]];
+    if(map[id][1])el.style.borderTopColor=c; else el.style.background=c; }
+}
+function buildThemePanel(){
+  var ov=$("themeOverlay"),list=$("themeList"),pal=loadPal();
+  var byG={};PAL.forEach(function(p){(byG[p.g]=byG[p.g]||[]).push(p);});
+  var presetRow='<div class="tg-grp"><div class="tg-title">F1 2026 预置主题</div><div class="tg-presetwrap">'+
+    Object.keys(PRESETS).map(function(n){return '<button class="tg-preset" data-pr="'+n+'" title="'+PRESETS[n].l+'">'+PRESETS[n].l+'</button>';}).join('')+
+    '</div></div>';
+  list.innerHTML=presetRow+Object.keys(byG).map(function(g){
+    return '<div class="tg-grp"><div class="tg-title">'+g+'</div>'+byG[g].map(function(p){
+      return '<label class="tg-row"><span class="tg-name">'+p.l+'</span>'+
+        '<span class="tg-swatch" data-sw="'+p.k+'" style="background:'+pal[p.k]+'"></span>'+
+        '<input type="color" class="tg-input" data-k="'+p.k+'" value="'+pal[p.k]+'">'+
+        '<span class="tg-hex" data-hx="'+p.k+'">'+pal[p.k]+'</span></label>';
+    }).join('')+'</div>';
+  }).join('');
+  $("btnTheme").addEventListener("click",function(){ov.classList.toggle("hidden");});
+  $("btnThemeClose").addEventListener("click",function(){ov.classList.add("hidden");});
+  ov.addEventListener("click",function(e){if(e.target===ov)ov.classList.add("hidden");});
+  list.addEventListener("input",function(e){
+    var i=e.target;if(!i.classList.contains("tg-input"))return;
+    var k=i.dataset.k;pal[k]=i.value.toUpperCase();
+    var sw=list.querySelector('[data-sw="'+k+'"]'),hx=list.querySelector('[data-hx="'+k+'"]');
+    if(sw)sw.style.background=pal[k]; if(hx)hx.textContent=pal[k];
+    localStorage.setItem(TKEY,JSON.stringify(pal));
+    applyTheme(pal,true);
+  });
+  list.addEventListener("click",function(e){
+    var b=e.target.closest(".tg-preset");if(!b)return;
+    var n=b.dataset.pr,o=PRESETS[n].o;
+    for(var k in o)pal[k]=o[k];
+    localStorage.setItem(TKEY,JSON.stringify(pal));
+    applyTheme(pal,true);
+    list.querySelectorAll(".tg-input").forEach(function(i){
+      var k=i.dataset.k;i.value=pal[k];
+      var sw=list.querySelector('[data-sw="'+k+'"]'),hx=list.querySelector('[data-hx="'+k+'"]');
+      if(sw)sw.style.background=pal[k]; if(hx)hx.textContent=pal[k];
+    });
+  });
+  $("btnThemeReset").addEventListener("click",function(){
+    localStorage.removeItem(TKEY);
+    PAL.forEach(function(p){pal[p.k]=p.d;});
+    applyTheme(pal,true);
+    list.querySelectorAll(".tg-input").forEach(function(i){
+      i.value=pal[i.dataset.k];
+      var sw=list.querySelector('[data-sw="'+i.dataset.k+'"]'),hx=list.querySelector('[data-hx="'+i.dataset.k+'"]');
+      if(sw)sw.style.background=pal[i.dataset.k]; if(hx)hx.textContent=pal[i.dataset.k];
+    });
+  });
+  $("btnThemeExport").addEventListener("click",function(){
+    var j=JSON.stringify(pal,null,2);
+    try{ if(navigator.clipboard) navigator.clipboard.writeText(j); }
+    catch(e){}
+    alert("配色 JSON 已复制到剪贴板");
+  });
+}
+
 /* ================================ 初始化 ================================ */
 async function init(){
   try{

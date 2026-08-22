@@ -1,4 +1,4 @@
-# dwb-pro-dev —— 前后端隔离开发工作区
+# LABSUS —— 前后端隔离开发工作区
 
 > **隔离声明（2026-08-21）**：本目录承载工业级底盘分析软件（对标 OptimumK/ADAMS）的**全部后续开发**。
 > 主仓库其余文件（`dwb-mod/versions/*`、`web/`、`src/` 等）自本目录建立起**冻结隔离**，不再被开发改动。
@@ -6,7 +6,7 @@
 ## 结构
 
 ```
-dwb-pro-dev/
+LABSUS/
 ├── web/
 │   └── dwb-pro-fullchassis.html      ← 前端起点（Gemini v4 版复制，后续前端开发只在这里）
 ├── engine/                           ← Python 引擎（S1 起，Subagent-Driven 执行）

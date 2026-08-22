@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>DWB-SIM PRO · 全车底盘多体运动学、4-Post动力学与准静态操稳分析平台</title>
+<title>LABSUS 悬架实验室 · 全车底盘多体运动学、4-Post动力学与准静态操稳分析平台</title>
 <style>
 /* ============================================================
-   DWB-SIM PRO · 工业级高精度悬架仿真系统界面样式
+   LABSUS 悬架实验室 · 工业级高精度悬架仿真系统界面样式
    规则：精密暗黑工控风格 / 无圆角 / 高信息密度 / 极致流畅
    ============================================================ */
 :root{
@@ -171,14 +171,13 @@ canvas.plot{display:block;width:100%;height:84px;background:var(--bg2);border:1p
 <body>
 <div id="app">
   <div id="tb">
-    <div class="brand"><b>DWB-SIM PRO</b></div>
+    <div class="brand"><b>LABSUS</b></div>
     <div class="tt"><span>全车底盘 高性能悬架 · 运动学 / 动力学 / 准静态操稳分析台</span><span>Full Chassis Inboard Suspension K&C, Rig Dynamics & Quasi-Static Handling</span></div>
     <div class="sp"></div>
     <div class="cell"><i>正在调校</i><b class="a" id="tbArch">前悬架 PUSHROD</b></div>
     <div class="cell"><i>Baseline 快照</i><b id="tbBase">未锁定 (无比对)</b></div>
     <div class="cell"><i>求解内核</i><b class="c" id="tbSolver">闭式几何 + 静力平衡</b></div>
     <div class="cell"><i>仿真状态</i><b class="g" id="tbState">运行</b></div>
-    <div class="cell"><i>引擎 /api/v3</i><b id="tbEng">内置 JS</b></div>
     <div class="cell"><i>fps</i><b id="tbFps">--</b></div>
   </div>
   <div id="main">
@@ -1687,8 +1686,6 @@ function setRO(id,txt,warn){const e=UI.ro[id];if(!e)return;e.textContent=txt;
 function buildLeft(){
   const host=document.getElementById("lp");
   host.innerHTML="";
-  buildEnginePanel(host);
-  buildChassisPanel(host);
 
   let b=sec(host,"悬架底盘模块编辑","CHASSIS EDITOR");
   rowBtns(b,[["编辑前悬架 (FRONT)",()=>{S.axis='front'; UI.sync.forEach(f=>f());},()=>S.axis==='front'],
@@ -1849,302 +1846,12 @@ function buildRight(){
     if(i<3) pb.appendChild(E("div",null,'<div style="height:3px"></div>'));
   }
   b.appendChild(pb);
-  buildEngineResults(host);
-  buildChassisResults(host);
 
   b=sec(host,"多体求解器状态","SOLVER RESIDUALS",true);
   ro(b,"活动节点数","NODES","","roNodes");
   ro(b,"拓扑刚性约束","RIGID LINKS","","roRigLinks");
   ro(b,"最大约束残差","MAX RESIDUAL","mm","roRes");
   ro(b,"单步迭代耗时","SOLVE TIME","ms","roSolveMs");
-}
-
-/* ================================ 11.5 引擎接入 /api/v3（S2-2 双模，移植并入 Gemini 基线） ================================ */
-const ENG={url:"http://127.0.0.1:8001",ok:false,busy:false,kcCase:"bump",
-  sweep:{min:-50,max:50,n:21},fz:3000,useBush:true,result:null};
-function engRow(lb,el){const d=E("div");d.style.cssText="display:flex;align-items:center;gap:6px;padding:2px 8px";
-  const s=E("span");s.style.cssText="width:74px;flex:0 0 auto;font-size:9.5px;color:#8a94a0";s.textContent=lb;
-  d.appendChild(s);d.appendChild(el);return d;}
-function engNum(def,step){const i=E("input");i.type="number";i.value=def;i.step=step;
-  i.style.cssText="width:60px;background:#0b0d10;border:1px solid #272d36;color:#c5cbd3;font:10px ui-monospace,monospace;padding:2px 4px";return i;}
-function setKcStatus(t,c){const e=document.getElementById("kcStatus");if(e){e.textContent=t;e.style.color=c||"#58626e";}}
-function engineSyncTb(){const e=document.getElementById("tbEng");if(!e)return;
-  e.textContent=ENG.ok?"引擎 v3":"内置 JS";e.className=ENG.ok?"g":"";
-  const btn=document.getElementById("engBtn");if(btn)btn.textContent=ENG.ok?"断开引擎":"连接引擎";}
-async function engineConnect(){
-  const url=ENG.url.replace(/\/+$/,"");
-  try{
-    const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),4000);
-    const r=await fetch(url+"/api/v3/health",{signal:ctl.signal});clearTimeout(to);
-    if(!r.ok)throw new Error("HTTP "+r.status);
-    const h=await r.json();
-    if(h.status!=="ok")throw new Error("engine status="+h.status);
-    ENG.ok=true;ENG.url=url;
-    setKcStatus("已连接引擎 "+url+"\nK&C 工况: "+h.kandc.join(" / "),C.pathC);engineSyncTb();
-  }catch(err){
-    ENG.ok=false;setKcStatus("连接失败："+err.message+"\n→ 当前由内置 JS 求解器即时运算",C.nodeFix);engineSyncTb();
-  }
-}
-function engineDisconnect(){ENG.ok=false;setKcStatus("已断开引擎 → 内置 JS 求解器",C.txt3);engineSyncTb();}
-function enginePayload(){
-  const st=S[S.axis];
-  return {
-    points:JSON.parse(JSON.stringify(st.hp)), arch:st.arch, tire_radius:st.tire.R,
-    design:{camber_deg:st.cam0,toe_deg:st.toe0},
-    sweep:{min:ENG.sweep.min,max:ENG.sweep.max,n:ENG.sweep.n},
-    case:{fx:0,fy:0,fz:ENG.fz,mx:0,my:0,mz:0},
-    track_width:2*st.hp.WC[0],
-    bushings:ENG.useBush?[{name:"bLCA_F",node:"LCA_F",kT:[500,500,500],kR:[8e4,8e4,8e4],preload:[0,0,0,0,0,0]}]:[]
-  };
-}
-async function engineRun(){
-  if(!ENG.ok){setKcStatus("未连接引擎 → 请先连接（或继续使用内置 JS）",C.ela);return;}
-  if(ENG.busy)return;ENG.busy=true;
-  const runBtn=document.getElementById("kcRun");if(runBtn)runBtn.textContent="求解中…";
-  setKcStatus("求解 "+ENG.kcCase+" …",C.txt2);
-  try{
-    const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),60000);
-    const r=await fetch(ENG.url+"/api/v3/kandc/"+ENG.kcCase,
-      {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(enginePayload()),signal:ctl.signal});
-    clearTimeout(to);
-    if(!r.ok){const t=await r.text();throw new Error("HTTP "+r.status+" "+t.slice(0,140));}
-    ENG.result=await r.json();
-    engineRender();
-  }catch(err){setKcStatus("求解失败："+err.message,C.nodeFix);}
-  finally{ENG.busy=false;if(runBtn)runBtn.textContent="运行 K&C 分析 RUN";}
-}
-function engineRender(){
-  const d=ENG.result;if(!d)return;
-  const g=document.getElementById("kcGains");if(g){g.innerHTML="";
-    const mk=(lb,val,col)=>{const r=E("div","ro"+(col?((col===C.pathC)?"":" warn"):""));
-      r.appendChild(E("span",null,lb));
-      const v=E("b",null,String(val));if(col)v.style.color=col;r.appendChild(v);g.appendChild(r);};
-    mk("状态 STATUS · "+d.case,d.status+" · "+d.ms.toFixed(0)+"ms",
-       d.status==="VALID"?C.pathC:C.nodeFix);
-    for(const k in d.gains)mk(k,d.gains[k]);
-  }
-  const cv=document.getElementById("kcPlot");if(!cv||!d.curves)return;
-  const xk=d.case==="steer"?"rack":(d.case==="compliance"?"force":"travel");
-  const xs=d.curves[xk];if(!xs||!xs.length)return;
-  const ser=[];
-  const pairs=d.case==="roll"?
-    [["cam_r",C.knu],["cam_l",C.path],["toe_r",C.ela],["toe_l",C.tie]]:
-    [["cam",C.knu],["toe",C.ela],["cast",C.kp]];
-  pairs.forEach(([k,c])=>{if(!d.curves[k])return;
-    ser.push({pts:xs.map((x,i)=>[x,d.curves[k][i]]),c:c,w:1.4});});
-  const title={bump:"外倾/前束 ← 轮跳 [mm]",roll:"左右外倾/前束 ← 轮跳 [mm]",
-    steer:"前束/外倾/后倾 ← 齿条 [mm]",compliance:"前束/外倾/后倾 ← 力 [N]"}[d.case]||d.case;
-  plotXYMulti(cv,title,"°",ser,[xs[0],xs[xs.length-1]],null);
-  setKcStatus(d.case+" 完成 · status="+d.status+" · "+d.ms.toFixed(1)+"ms"+(d.warnings&&d.warnings.length?"\n⚠ "+d.warnings.join("；"):""),C.pathC);
-}
-function buildEnginePanel(host){
-  let b=sec(host,"引擎连接与 K&C 分析","ENGINE /api/v3");
-  const urlInp=E("input");urlInp.type="text";urlInp.value=ENG.url;
-  urlInp.style.cssText="flex:1;min-width:0;background:#0b0d10;border:1px solid #272d36;color:#c5cbd3;font:10px ui-monospace,monospace;padding:3px 6px";
-  urlInp.onchange=()=>{ENG.url=urlInp.value.replace(/\/+$/,"");};
-  b.appendChild(engRow("引擎地址",urlInp));
-  const engBtn=E("button");engBtn.id="engBtn";engBtn.textContent="连接引擎";
-  engBtn.style.cssText="flex:1;background:#171b20;border:1px solid #343c47;color:#c5cbd3;font:10px ui-monospace,monospace;padding:3px 0;cursor:pointer";
-  engBtn.onclick=()=>{ENG.ok?engineDisconnect():engineConnect();};
-  b.appendChild(engRow("连接",engBtn));
-  const kcCaseBtns=E("div");kcCaseBtns.id="kcCaseBtns";
-  kcCaseBtns.style.cssText="display:flex;gap:3px;padding:3px 8px;flex-wrap:wrap";
-  [["bump","平行跳动"],["roll","侧倾"],["steer","转向"],["compliance","力偏移"]].forEach(([v,lb])=>{
-    const k=E("button");k.textContent=lb;k.dataset.c=v;
-    k.style.cssText="flex:1;min-width:64px;background:#171b20;border:1px solid #272d36;color:#8a94a0;font:9.5px ui-monospace,monospace;padding:4px 0;cursor:pointer";
-    k.onclick=()=>{ENG.kcCase=v;kcCaseBtns.querySelectorAll("button").forEach(x=>x.style.borderColor="#272d36");k.style.borderColor=C.strut;};
-    kcCaseBtns.appendChild(k);
-  });
-  b.appendChild(kcCaseBtns);
-  const kcMin=engNum(-50,5),kcMax=engNum(50,5),kcN=engNum(21,2),kcFz=engNum(3000,100);
-  kcMin.onchange=()=>{ENG.sweep.min=parseFloat(kcMin.value)||0;};kcMax.onchange=()=>{ENG.sweep.max=parseFloat(kcMax.value)||0;};
-  kcN.onchange=()=>{ENG.sweep.n=Math.max(3,parseInt(kcN.value)||3);};kcFz.onchange=()=>{ENG.fz=parseFloat(kcFz.value)||0;};
-  const r1=E("div");r1.style.cssText="display:flex;align-items:center;gap:4px;padding:2px 8px";
-  r1.appendChild(E("span",null,"范围"));r1.appendChild(kcMin);r1.appendChild(E("span",null,"~"));r1.appendChild(kcMax);
-  r1.appendChild(E("span",null,"点"));r1.appendChild(kcN);r1.appendChild(E("span",null,"Fz"));r1.appendChild(kcFz);
-  b.appendChild(r1);
-  const kcBush=E("input");kcBush.type="checkbox";kcBush.checked=ENG.useBush;
-  kcBush.onchange=()=>{ENG.useBush=kcBush.checked;};
-  b.appendChild(engRow("LCA 衬套 500N/mm",kcBush));
-  const kcRun=E("button");kcRun.id="kcRun";kcRun.textContent="运行 K&C 分析 RUN";
-  kcRun.style.cssText="width:calc(100% - 16px);margin:4px 8px 2px;background:#11546e;border:1px solid #2fa9d6;color:#c5cbd3;font:10px ui-monospace,monospace;padding:5px 0;cursor:pointer";
-  kcRun.onclick=engineRun;b.appendChild(kcRun);
-  const kcStatus=E("div");kcStatus.id="kcStatus";
-  kcStatus.style.cssText="padding:3px 8px 5px;font-size:9px;color:#58626e;line-height:1.4";
-  kcStatus.textContent="未连接 → 由内置 JS 求解器即时运算";
-  b.appendChild(kcStatus);
-}
-function buildEngineResults(host){
-  const b2=sec(host,"引擎 K&C 结果","ENGINE K&C RESULTS",true);
-  const kcGains=E("div");kcGains.id="kcGains";b2.appendChild(kcGains);
-  const kcPlot=E("canvas","plot");kcPlot.id="kcPlot";kcPlot.style.height="120px";kcPlot.style.width="100%";
-  b2.appendChild(kcPlot);
-}
-/* ── 整车底盘分析（S2-5：四角+整车参数 → /api/v3/chassis/*，双模） ── */
-const CH={busy:false,kcCase:"solve",sweep:{min:-50,max:50,n:21},result:null};
-function buildChassisPanel(host){
-  let b=sec(host,"整车底盘分析 (引擎)","FULL-CHASSIS ENGINE");
-  const ck=E("div");ck.style.cssText="display:flex;gap:3px;padding:3px 8px;flex-wrap:wrap";
-  [["solve","单点 SOLVE"],["bump","整车 BUMP"],["roll","整车 ROLL"],["steer","整车 STEER"]].forEach(([v,lb])=>{
-    const k=E("button");k.textContent=lb;k.dataset.c=v;
-    k.style.cssText="flex:1;min-width:58px;background:#171b20;border:1px solid #272d36;color:#8a94a0;font:9.5px ui-monospace,monospace;padding:4px 0;cursor:pointer";
-    k.onclick=()=>{CH.kcCase=v;ck.querySelectorAll("button").forEach(x=>x.style.borderColor="#272d36");k.style.borderColor=C.rc;};
-    ck.appendChild(k);
-  });
-  b.appendChild(ck);
-  const cs=E("div");cs.style.cssText="display:flex;align-items:center;gap:4px;padding:2px 8px";
-  const cMin=engNum(-50,5),cMax=engNum(50,5),cN=engNum(21,2);
-  cMin.onchange=()=>{CH.sweep.min=parseFloat(cMin.value)||0;};
-  cMax.onchange=()=>{CH.sweep.max=parseFloat(cMax.value)||0;};
-  cN.onchange=()=>{CH.sweep.n=Math.max(3,parseInt(cN.value)||3);};
-  cs.appendChild(E("span",null,"扫掠"));cs.appendChild(cMin);cs.appendChild(E("span",null,"~"));
-  cs.appendChild(cMax);cs.appendChild(E("span",null,"点"));cs.appendChild(cN);
-  b.appendChild(cs);
-  const cRun=E("button");cRun.id="chRun";cRun.textContent="运行整车分析 RUN";
-  cRun.style.cssText="width:calc(100% - 16px);margin:4px 8px 2px;background:#11546e;border:1px solid #54a06a;color:#c5cbd3;font:10px ui-monospace,monospace;padding:5px 0;cursor:pointer";
-  cRun.onclick=chassisRun;b.appendChild(cRun);
-  const cSt=E("div");cSt.id="chStatus";
-  cSt.style.cssText="padding:3px 8px 5px;font-size:9px;color:#58626e;line-height:1.4";
-  cSt.textContent="整车分析：四角硬点+整车参数 → /api/v3/chassis/*（需先连接引擎）";
-  b.appendChild(cSt);
-}
-function buildChassisResults(host){
-  const b2=sec(host,"整车引擎结果","FULL-CHASSIS ENGINE RESULTS",true);
-  const box=E("div");box.id="chResult";b2.appendChild(box);
-  const cv=E("canvas","plot");cv.id="chPlot";cv.style.height="120px";cv.style.width="100%";
-  b2.appendChild(cv);
-}
-function chassisPayload(){
-  const f=S.front,r=S.rear;
-  const halfF=Math.abs(f.hp.WC[0]),halfR=Math.abs(r.hp.WC[0]);
-  return {
-    vehicle:{
-      wheelbase_mm:S.wb,mass_kg:S.mTotal,sprung_mass_kg:S.mSprung,hcg_mm:S.hcg,hs_mm:S.hs,
-      front:{points:JSON.parse(JSON.stringify(f.hp)),arch:f.arch,camber_deg:f.cam0,toe_deg:f.toe0,
-        tire_radius:f.tire.R,spring_rate:f.kS,spring_mass_kg:f.mS,unsprung_kg:f.mU,
-        motion_ratio:SIM.mrRefF||0.75,arb:{d:f.arb.d,t:f.arb.t,dy:f.arb.dy,dz:f.arb.dz,G:f.arb.G}},
-      rear:{points:JSON.parse(JSON.stringify(r.hp)),arch:r.arch,camber_deg:r.cam0,toe_deg:r.toe0,
-        tire_radius:r.tire.R,spring_rate:r.kS,spring_mass_kg:r.mS,unsprung_kg:r.mU,
-        motion_ratio:SIM.mrRefR||0.78,arb:{d:r.arb.d,t:r.arb.t,dy:r.arb.dy,dz:r.arb.dz,G:r.arb.G}}
-    },
-    quasi:{gy:S.qs.gy,gx:S.qs.gx,aero_force_n:S.qs.aeroF,aero_bias:S.qs.aeroBias},
-    travel:{fl:travelL(halfF,S.roll),fr:travelR(halfF,S.roll),
-            rl:travelL(halfR,S.roll),rr:travelR(halfR,S.roll)},
-    rack:S.rack,
-    sweep:{min:CH.sweep.min,max:CH.sweep.max,n:CH.sweep.n}
-  };
-}
-function setChStatus(t,c){const e=document.getElementById("chStatus");if(e){e.textContent=t;e.style.color=c||"#58626e";}}
-async function chassisRun(){
-  if(!ENG.ok){setChStatus("未连接引擎 → 请先连接引擎（连接后整车分析走 /api/v3/chassis/*）",C.ela);return;}
-  if(CH.busy)return;CH.busy=true;
-  const runBtn=document.getElementById("chRun");if(runBtn)runBtn.textContent="求解中…";
-  setChStatus("整车 "+CH.kcCase+" 求解中…（四角机制 + 准静态载荷）",C.txt2);
-  const ep=CH.kcCase==="solve"?"solve":"kandc/"+CH.kcCase;
-  try{
-    const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),90000);
-    const r=await fetch(ENG.url+"/api/v3/chassis/"+ep,
-      {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(chassisPayload()),signal:ctl.signal});
-    clearTimeout(to);
-    if(!r.ok){const t=await r.text();throw new Error("HTTP "+r.status+" "+t.slice(0,140));}
-    CH.result=await r.json();
-    chassisRender();
-  }catch(err){setChStatus("整车求解失败："+err.message,C.nodeFix);}
-  finally{CH.busy=false;if(runBtn)runBtn.textContent="运行整车分析 RUN";}
-}
-function chassisRender(){
-  const d=CH.result;if(!d)return;
-  const box=document.getElementById("chResult");if(!box)return;
-  box.innerHTML="";
-  if(d.pose){
-    /* 单点：四轮定位表 + 姿态 + 载荷 */
-    const tb=E("table","hp");
-    tb.innerHTML="<thead><tr><th>角</th><th>CAM°</th><th>TOE°</th><th>CAST°</th><th>KPI°</th><th>SCRUB</th><th>TRAIL</th><th>RC</th></tr></thead>";
-    const tbb=E("tbody");
-    ["FL","FR","RL","RR"].forEach(k=>{
-      const m=d.pose[k]||{};
-      const tr=E("tr");tr.appendChild(E("td","n","<b>"+k+"</b>"));
-      ["cam","toe","cast","kpi","scrub","trail","rc_h"].forEach(kk=>{
-        const v=m[kk];const c=E("td");
-        c.style.cssText="padding:1px 4px;text-align:right;color:#c5cbd3;font-variant-numeric:tabular-nums";
-        c.textContent=(v===null||v===undefined)?"--":Number(v).toFixed(2);
-        tr.appendChild(c);
-      });
-      tbb.appendChild(tr);
-    });
-    tb.appendChild(tbb);box.appendChild(tb);
-    const L=d.loads||{},att=d.attitude||{},fz=L.fz||{};
-    const rows=[
-      ["整车姿态","heave "+fmt(att.heave_mm,1)+"mm · roll "+fmt(att.roll_deg,2)+"° · pitch "+fmt(att.pitch_deg,2)+"°",C.pathC],
-      ["稳态侧倾",""+fmt(L.roll_deg,2)+"° @ "+fmt(L.roll_grad_deg_per_g,2)+"°/g",C.knu],
-      ["侧倾刚度","Kφ前 "+fmt(L.kphi_f,0)+" · 后 "+fmt(L.kphi_r,0)+" N·m/°（ARB 占 "+fmt(L.arb_share_f,1)+"/"+fmt(L.arb_share_r,1)+"%）",C.ela],
-      ["前轴载荷转移","UNS "+fmt(L.dFz_u_f,0)+" + GEO "+fmt(L.dFz_geo_f,0)+" + ELA "+fmt(L.dFz_elas_f,0)+" = "+fmt(L.dFz_f_tot,0)+" N",C.tie],
-      ["四轮接地载荷","FL "+fmt(fz.FL,0)+" · FR "+fmt(fz.FR,0)+" · RL "+fmt(fz.RL,0)+" · RR "+fmt(fz.RR,0)+" N",C.kp],
-      ["TLLTD 前轴占比",""+fmt(L.tlltd_pct,1)+"%",(L.tlltd_pct>54)?C.nodeFix:((L.tlltd_pct<47)?C.ela:C.pathC)],
-    ];
-    rows.forEach(([lb,val,col])=>{
-      const r2=E("div","ro");r2.appendChild(E("span",null,lb));
-      const v2=E("b",null,val);if(col)v2.style.color=col;r2.appendChild(v2);box.appendChild(r2);
-    });
-    setChStatus("整车单点完成 · status="+d.status+" · "+d.ms.toFixed(1)+"ms"+(d.warnings&&d.warnings.length?"\n⚠ "+d.warnings.join("；"):""),C.pathC);
-  } else if(d.curves){
-    /* 扫掠：四轮 cam 曲线 + 增益 */
-    const cv=document.getElementById("chPlot");
-    const xk=d.case==="steer"?"rack":(d.case==="roll"?"roll_deg":"travel");
-    const xs=d.curves[xk];
-    if(cv&&xs&&xs.length){
-      const ser=[];
-      [["cam_FL",C.knu],["cam_FR",C.ela],["cam_RL",C.path],["cam_RR",C.kp]].forEach(([k,c])=>{
-        if(!d.curves[k])return;ser.push({pts:xs.map((x,i)=>[x,d.curves[k][i]]),c:c,w:1.4});});
-      plotXYMulti(cv,d.case+" 四轮外倾 CAMBER ← "+(d.case==="roll"?"roll [°]":(d.case==="steer"?"rack [mm]":"travel [mm]")),
-        "°",ser,[xs[0],xs[xs.length-1]],null);
-    }
-    const gx=E("div");
-    for(const k in (d.gains||{})){
-      const r3=E("div","ro");r3.appendChild(E("span",null,k));r3.appendChild(E("b",null,String(d.gains[k])));gx.appendChild(r3);
-    }
-    box.appendChild(gx);
-    setChStatus("整车 "+d.case+" 完成 · status="+d.status+" · "+d.ms.toFixed(1)+"ms"+(d.warnings&&d.warnings.length?"\n⚠ "+d.warnings.join("；"):""),C.pathC);
-  } else {
-    setChStatus("响应无 pose/curves 字段："+JSON.stringify(d).slice(0,120),C.nodeFix);
-  }
-}
-function plotXYMulti(cv,title,unit,series,xr,curx){
-  /* 多实线绘制（plotXYOverlay 的多线版本，供引擎结果面板使用） */
-  const dpr=Math.min(2,window.devicePixelRatio||1);
-  const w=cv.clientWidth||300,h=cv.clientHeight||84;
-  if(cv.width!==w*dpr||cv.height!==h*dpr){cv.width=w*dpr;cv.height=h*dpr;}
-  const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.clearRect(0,0,w,h);ctx.fillStyle="#07090b";ctx.fillRect(0,0,w,h);
-  const ml=34,mr=6,mt=13,mb=11,pw=w-ml-mr,ph=h-mt-mb;
-  let y0=1e9,y1=-1e9;
-  series.forEach(s=>s.pts.forEach(p=>{if(p[1]===null||!isFinite(p[1]))return;
-    if(p[1]<y0)y0=p[1];if(p[1]>y1)y1=p[1];}));
-  if(y0>y1){y0=0;y1=1;}
-  let pad=(y1-y0)*0.15;if(pad<1e-6)pad=Math.max(0.5,abs(y1)*0.1+0.01);
-  y0-=pad;y1+=pad;
-  const X=x=>ml+(x-xr[0])/((xr[1]-xr[0])||1)*pw;
-  const Y=y=>mt+ph-(y-y0)/((y1-y0)||1)*ph;
-  ctx.strokeStyle="#161b20";ctx.lineWidth=1;ctx.setLineDash([]);
-  for(let i=0;i<=4;i++){const y=mt+ph*i/4;ctx.beginPath();ctx.moveTo(ml,y);ctx.lineTo(ml+pw,y);ctx.stroke();}
-  for(let i=0;i<=5;i++){const x=ml+pw*i/5;ctx.beginPath();ctx.moveTo(x,mt);ctx.lineTo(x,mt+ph);ctx.stroke();}
-  series.forEach(s=>{
-    ctx.strokeStyle=s.c;ctx.lineWidth=s.w||1.4;ctx.setLineDash([]);ctx.beginPath();let st=false;
-    s.pts.forEach(p=>{if(p[1]===null||!isFinite(p[1])){st=false;return;}
-      const x=X(p[0]),y=Y(p[1]);if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y);});
-    ctx.stroke();
-  });
-  if(curx!==null&&curx!==undefined&&series[0]){
-    const x=X(curx);
-    ctx.strokeStyle="#4f5966";ctx.setLineDash([2,2]);
-    ctx.beginPath();ctx.moveTo(x,mt);ctx.lineTo(x,mt+ph);ctx.stroke();ctx.setLineDash([]);
-  }
-  ctx.strokeStyle="#272f38";ctx.lineWidth=1;ctx.strokeRect(ml+.5,mt+.5,pw,ph);
-  ctx.fillStyle="#8a94a0";ctx.font="8.5px ui-monospace,monospace";
-  ctx.fillText(title,ml+1,mt-3.5);
-  ctx.fillStyle="#5d6773";ctx.textAlign="right";
-  ctx.fillText(fmt(y1,1),ml-3,mt+7);ctx.fillText(fmt(y0,1),ml-3,mt+ph-1);
-  ctx.textAlign="left";
 }
 
 function fitAll(){ VW.forEach(fitView); }

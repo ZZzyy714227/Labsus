@@ -1,13 +1,33 @@
-/* Neo-Brutalist design system */
+/* Mercedes-AMG Petronas × Lewis Hamilton
+   Silver Arrow / Carbon Black / Petronas Teal / Hamilton Purple
+   (Neo-Brutalist structure retained: thick borders, hard offset shadows, no radius) */
 :root {
-  --black: #000000; --white: #ffffff;
-  --cyan: #00d9ff; --orange: #ff9500; --pink: #ff006e; --lime: #ccff00;
-  --green: #00e676; --yellow: #ffd600; --red: #ff1744;
-  --ink: #111; --paper: #f4f4f4;
+  /* Carbon black & pure white */
+  --black: #0B0D0E; --white: #FFFFFF;
+
+  /* Neon Cyan — primary brand color */
+  --teal: #0AFFCE; --teal-bright: #47FFDA;
+
+  /* Electric Purple — secondary accent */
+  --purple: #540AFF; --purple-bright: #7B3AFF;
+
+  /* Silver Arrows — neutral surfaces */
+  --silver-light: #E8EAED; --silver: #C5C9CE; --silver-dark: #8A9099;
+
+  /* Backgrounds */
+  --bg: #F4F5F7; --paper: var(--silver-light);
+
+  /* Text */
+  --ink: #0B0D0E; --muted: #5F6A76;
+
+  /* Semantic status — retained for engineering clarity (pass / warn / fail) */
+  --good: #00E676; --warn: #FFD600; --bad: #FF1744;
+
+  /* Brutalist structure */
   --border-w: 3px; --shadow: 5px 5px 0 var(--black);
 }
 * { box-sizing: border-box; border-radius: 0 !important; }
-html, body { height: 100%; margin: 0; font-family: 'Courier New', monospace; color: var(--ink); background: var(--white); }
+html, body { height: 100%; margin: 0; font-family: 'Courier New', monospace; color: var(--ink); background: var(--bg); }
 body { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; padding: 10px; gap: 10px; }
 
 #topbar { background: var(--black); color: var(--white); border: var(--border-w) solid var(--black);
@@ -15,14 +35,21 @@ body { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; padding:
   gap: 8px 12px; flex-wrap: wrap; box-shadow: var(--shadow); }
 .brand { font-weight: bold; letter-spacing: 1px; white-space: nowrap; }
 .topbar-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.badge { border: 2px solid var(--black); background: var(--green); color: var(--black); padding: 1px 8px; font-weight: bold; font-size: 12px; }
+.badge { border: 2px solid var(--black); background: var(--good); color: var(--black); padding: 1px 8px; font-weight: bold; font-size: 12px; }
 .btn { border: 2px solid var(--black); background: var(--white); padding: 3px 10px; font-weight: bold;
-  cursor: pointer; box-shadow: 2px 2px 0 var(--black); font-family: inherit; font-size: 12px; }
+  cursor: pointer; box-shadow: 2px 2px 0 var(--black); font-family: inherit; font-size: 12px; color: var(--ink); }
 .btn:hover { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--black); }
 .btn:active { transform: translate(2px, 2px); box-shadow: none; }
 .btn:disabled { opacity: .4; cursor: not-allowed; }
-.btn-cyan { background: var(--cyan); } .btn-orange { background: var(--orange); }
-.btn-pink { background: var(--pink); color: var(--white); } .btn-lime { background: var(--lime); }
+/* Themed button variants */
+.btn-teal { background: var(--teal); color: #0B0D0E; }
+.btn-teal:hover { background: var(--teal-bright); }
+.btn-purple { background: var(--purple); color: var(--white); }
+.btn-purple:hover { background: var(--purple-bright); }
+.btn-silver { background: var(--silver); color: var(--ink); }
+.btn-silver:hover { background: var(--silver-light); }
+.btn-dark { background: var(--black); color: var(--white); }
+.btn-dark:hover { background: #1C2024; }
 
 #workbench { display: flex; gap: 10px; min-height: 0; min-width: 0; }
 #leftCol { width: 230px; flex-shrink: 0; border: var(--border-w) solid var(--black); background: var(--paper);
@@ -46,11 +73,11 @@ body { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; padding:
 #pointsetPanel .btn { font-size: 10px; padding: 1px 6px; }
 .ps-total { font-size: 11px; margin-bottom: 6px; border-bottom: 2px solid var(--black); padding-bottom: 4px; }
 .ps-row { display: flex; justify-content: space-between; font-size: 11px;
-  border-bottom: 1px solid #ccc; padding: 2px 4px; }
+  border-bottom: 1px solid var(--silver); padding: 2px 4px; }
 #sliderBar { border: var(--border-w) solid var(--black); background: var(--white);
   padding: 6px 10px; display: flex; gap: 18px; align-items: center; font-size: 12px;
   flex-wrap: wrap; box-shadow: var(--shadow); }
-input[type=range] { accent-color: var(--pink); }
+input[type=range] { accent-color: var(--teal); }
 #rightCol { width: min(55%, 480px); flex-shrink: 0; border: var(--border-w) solid var(--black); background: var(--white);
   padding: 8px; box-shadow: var(--shadow); overflow-y: auto; min-width: 0; }
 #rightCol.collapsed { display: none; }
@@ -68,11 +95,11 @@ input[type=range] { accent-color: var(--pink); }
   overflow-y: auto; overflow-x: hidden; }
 
 .tabs { display: flex; gap: 0; margin-bottom: 8px; }
-.tab { flex: 1; border: 2px solid var(--black); background: var(--white); padding: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px; }
-.tab.active { background: var(--black); color: var(--white); }
+.tab { flex: 1; border: 2px solid var(--black); background: var(--white); padding: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px; color: var(--ink); }
+.tab.active { background: var(--black); color: var(--teal-bright); }
 .hidden { display: none; }
 .mono { font-family: monospace; font-weight: bold; }
-.muted { color: #666; font-size: 11px; }
+.muted { color: var(--muted); font-size: 11px; }
 .col-head { font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
   border-bottom: 2px solid var(--black); padding-bottom: 4px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
 
@@ -84,31 +111,57 @@ input[type=range] { accent-color: var(--pink); }
 
 /* 指标盘 */
 .dim-grp { border: 2px solid var(--black); margin-bottom: 8px; }
-.grp-cyan { border-left: 10px solid var(--cyan); }
-.grp-orange { border-left: 10px solid var(--orange); }
-.grp-pink { border-left: 10px solid var(--pink); }
-.grp-lime { border-left: 10px solid var(--lime); }
+.grp-teal { border-left: 10px solid var(--teal); }      /* 运动学 */
+.grp-purple { border-left: 10px solid var(--purple); }  /* 姿态侧倾 */
+.grp-silver { border-left: 10px solid var(--silver-dark); } /* 动力学 */
+.grp-dark { border-left: 10px solid var(--black); }     /* 结构受力 */
 .dim-head { font-size: 11px; font-weight: bold; border-bottom: 2px solid var(--black);
   padding: 4px 6px; background: var(--paper); display: flex; justify-content: space-between; }
-.m-row { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid #ccc;
+.m-row { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--silver);
   padding: 4px 6px; font-size: 11px; min-width: 0; }
 .m-row .light { width: 12px; height: 12px; border: 2px solid var(--black); flex-shrink: 0; }
 .m-row .name { width: 34%; font-weight: bold; min-width: 0; overflow-wrap: anywhere; }
 .m-row .val { flex: 1; text-align: right; font-family: monospace; font-weight: bold; }
-.m-row .old { width: 20%; text-align: right; color: #888; text-decoration: line-through; }
+.m-row .old { width: 20%; text-align: right; color: var(--silver-dark); text-decoration: line-through; }
 .m-row .new { width: 20%; text-align: right; font-family: monospace; font-weight: bold; }
 .m-row .delta { width: 14%; text-align: right; font-weight: bold; font-size: 10px; }
-.d-good { color: #00c853; } .d-bad { color: var(--red); }
+.d-good { color: var(--good); } .d-bad { color: var(--bad); }
 
 /* 历史时间线 */
 .snap-row { display: flex; align-items: center; gap: 8px; border: 2px solid var(--black);
   background: var(--white); padding: 4px 8px; margin-bottom: 5px; cursor: pointer; font-size: 11px;
   flex-wrap: wrap; min-width: 0; }
 .snap-row:hover { background: var(--paper); }
-.snap-row.cur { outline: 3px solid var(--cyan); }
-.snap-row.sel { outline: 3px solid var(--orange); }
+.snap-row.cur { outline: 3px solid var(--teal); }    /* 当前快照 = Petronas 青 */
+.snap-row.sel { outline: 3px solid var(--purple); }  /* 选中对比 = Hamilton 紫 */
 .snap-row .dot { width: 20px; height: 20px; border: 2px solid var(--black); flex-shrink: 0;
   display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; }
-.dot-good { background: var(--green); } .dot-mid { background: var(--yellow); } .dot-bad { background: var(--red); color: var(--white); }
+.dot-good { background: var(--good); } .dot-mid { background: var(--warn); } .dot-bad { background: var(--bad); color: var(--white); }
 .snap-info { flex: 1 1 200px; min-width: 0; }
-.snap-info .mini { font-size: 10px; margin-right: 8px; color: #333; display: inline-block; }
+.snap-info .mini { font-size: 10px; margin-right: 8px; color: var(--muted); display: inline-block; }
+
+/* 焦点态：Hamilton 紫描边，统一键盘可达性 */
+:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+
+/* 统一配色编辑器（浮层） */
+#themeOverlay {
+  position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center;
+}
+#themePanel {
+  width: min(420px, 92vw); max-height: 86vh; overflow-y: auto;
+  background: var(--white); border: var(--border-w) solid var(--black);
+  box-shadow: var(--shadow); padding: 10px;
+}
+#themePanel .theme-ops { display: inline-flex; gap: 4px; }
+.theme-grp { border: 2px solid var(--black); margin-bottom: 8px; padding: 6px; }
+.theme-grp-title { font-size: 10px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase;
+  border-bottom: 2px solid var(--black); padding-bottom: 3px; margin-bottom: 4px; }
+.theme-row { display: flex; align-items: center; gap: 6px; font-size: 11px;
+  padding: 2px 0; border-bottom: 1px solid var(--silver); }
+.theme-row:last-child { border-bottom: none; }
+.theme-name { flex: 1; font-weight: bold; }
+.theme-swatch { width: 14px; height: 14px; border: 2px solid var(--black); flex-shrink: 0; }
+.theme-input { width: 34px; height: 22px; padding: 0; border: 2px solid var(--black); cursor: pointer;
+  background: none; flex-shrink: 0; }
+.theme-hex { width: 58px; text-align: right; font-family: monospace; color: var(--muted); }

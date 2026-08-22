@@ -91,14 +91,15 @@ const DRIVER = `
     boot(){
       try{
         buildLeft();buildRight();
-        const loaded=loadPersist();
+        const loaded=(typeof loadPersist==="function")?loadPersist():false;
         rebuild();
         initViews();
         simulate(0.016);simulate(0.016);
-        S.exc="sine";S.travel=0;
+        if(typeof S!=="undefined"&&S.exc!==undefined)S.exc="sine";
+        S.travel=0;
         VW.forEach(v=>{sizeView(v);fitView(v);});
         this.state=S; this.sim=SIM; this.views=VW;
-        return {loaded, preset:S.preset, axleView:S.axleView};
+        return {loaded, preset:(S.preset||(S.axis||"")), axleView:S.axleView||(S.axis||"all")};
       }catch(e){err=e;errStack=e&&e.stack;return null;}
     },
     runFrames(n){
@@ -116,17 +117,24 @@ const DRIVER = `
               res:+(SIM.R?SIM.R.res:-1).toFixed(4)};
     },
     snap(){
+      const g=SIM.geo||SIM.geoF||[0,0];
+      const gR=SIM.geoRR||SIM.geoR||[0,0];
       return {trMin:+S.trMin.toFixed(2), trMax:+S.trMax.toFixed(2),
-        geo:SIM.geo&&SIM.geo.map(x=>+x.toFixed(2)), limR:SIM.limR&&SIM.limR.map(x=>+x.toFixed(2)),
-        geoRR:SIM.geoRR&&SIM.geoRR.map(x=>+x.toFixed(2)),
+        geo:g.map(x=>+x.toFixed(2)), limR:(SIM.limR||SIM.limF||[0,0]).map(x=>+x.toFixed(2)),
+        geoRR:gR.map(x=>+x.toFixed(2)),
         travel:+S.travel.toFixed(2), exc:S.exc,
-        iter:SIM.R.iter, ms:+SIM.R.ms.toFixed(1), ok:SIM.R.ok};
+        iter:SIM.R?(SIM.R.iter):(SIM.FR?SIM.FR.iter:0), ms:+(SIM.R?SIM.R.ms:(SIM.FR?SIM.FR.ms:0)).toFixed(1),
+        ok:!!(SIM.R?SIM.R.ok:(SIM.FR?SIM.FR.ok:true))};
     },
     check(){
-      const g=SIM.geo, gR=SIM.geoRR;
-      const okGeo = g && g[0]<=-60 && g[1]>=60 && gR && gR[0]<=-60 && gR[1]>=60;
+      const g=SIM.geo||SIM.geoF||SIM.geoRR||null;
+      const gR=SIM.geoRR||SIM.geoR||null;
+      const f=g&&g[0]!==undefined&&g[1]!==undefined, r=gR&&gR[0]!==undefined&&gR[1]!==undefined;
+      const okGeo = f && g[0]<=-60 && g[1]>=60 && (!r || (r && gR[0]<=-60 && gR[1]>=60));
       return {geo:g&&g.map(x=>+x.toFixed(0)), geoRR:gR&&gR.map(x=>+x.toFixed(0)), // 整数形式对齐 ≤−60/≥60 谓词
-              okGeo, resR:+SIM.R.res.toFixed(4), okR:SIM.R.ok};
+              okGeo,
+              resR:+(SIM.R?SIM.R.res:(SIM.FR?SIM.FR.res:0)).toFixed(4),
+              okR:!!(SIM.R?SIM.R.ok:(SIM.FR?SIM.FR.ok:true))};
     },
     diag(){
       const out={scan:[]};
@@ -227,6 +235,9 @@ if (bootInfo) {
     const d = vm.runInContext("JSON.stringify(__H.diag())", ctx, { timeout: 120000 });
     console.log("[diag]", d);
   } else {
+    if (scenario === "rigtest") {
+      vm.runInContext(`S.mode="rig"; S.simT=0; S.road="sine"; S.rA=12; S.rF=1.2; S.play=true;`, ctx, { timeout: 60000 });
+    }
     const t1 = Date.now();
     const r = vm.runInContext("__H.runFrames(300)", ctx, { timeout: 300000 });
     console.log("[frames]", JSON.stringify(r), `wall=${Date.now() - t1}ms`);

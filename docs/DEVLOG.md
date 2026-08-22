@@ -1,5 +1,16 @@
 # 开发日志
 
+## 2026-08-22 — 项目重命名：dwb-pro-dev → LABSUS（悬架实验室）
+- 用户拍板：项目定名 **LABSUS / 悬架实验室**（Laboratory + Suspension）。
+- 执行（全套改名，git mv 保留历史，文件级迁移绕过句柄占用）：
+  - 目录 `dwb-pro-dev/` → `LABSUS/`（git 识别为 R rename，历史完整）；
+  - 文档路径引用批量替换（docs/DEVLOG、S1 计划、设计文档、LABSUS/README、dwb-mod/README）；
+  - 前端品牌：`<title>` / 界面样式注释 / 顶栏 brand `DWB-SIM PRO` → `LABSUS 悬架实验室`（`LABSUS/web/dwb-pro-fullchassis.html` + 源档 `LABSUS/Gemini.html`）；
+  - 引擎标识：`/api/v3/health` 返回 `engine:"labsus-engine"`、FastAPI title `LABSUS Engine /api/v3`（`LABSUS/engine/server.py`）＋ 测试断言同步；
+  - 提交前缀保留 `feat(engine)/feat(web)`（模块语义，不随产品名）。
+- 遗留说明：技术术语保留（DWB 硬点命名、PRO_POINTS、S2 系列编号）——它们是数据/拓扑名，非产品名；历史 DEVLOG 条目中作为产品演进史的 "DWB-SIM PRO" 叙述保留。
+- 验证：47 tests 全绿；服务重启后 health 返回 `labsus-engine`；全仓无 `dwb-pro-dev`/`dwb-pro-engine` 残留。
+
 ## 2026-08-22 — S2-6 前端整车分析面板：分离版整车准静态分析正式通道
 - 交付：`dwb-pro-fullchassis.html` 新增整车面板，把四角硬点+整车参数打包发 `/api/v3/chassis/*` 并渲染——用户单文件版 QUASI 操稳功能的分离版正式化（双模：连引擎走引擎，断开回退内置 JS）。
 - 左面板「整车底盘分析 (引擎)」（默认展开）：
@@ -28,7 +39,7 @@
 - 遗留：前端整车面板（chassis 端点 UI 接入，下一轮）；STRUT_OUT 挂点拓扑对齐；SolveRocker 分支连续性。
 
 ## 2026-08-22 — S2-4 前端基线升级：用户 Gemini 增量全量移植 + 引擎双模保留
-- 交付：用户在 `dwb-pro-dev/Gemini.html`（单文件版，2154 行）自行完成四大维度工业级增量，按约定交付后由我方学习移植进前后端分离版 `dwb-pro-dev/web/dwb-pro-fullchassis.html`。
+- 交付：用户在 `LABSUS/Gemini.html`（单文件版，2154 行）自行完成四大维度工业级增量，按约定交付后由我方学习移植进前后端分离版 `LABSUS/web/dwb-pro-fullchassis.html`。
 - 移植策略：**Gemini.html 直接成为新前端基线**（官方 v4→Gemini diff 731+/276-，逐块手工合并风险高），再把 S2-2 引擎面板移植回新基线。引擎面板适配点：`sec()` 增加 cls 参数（兼容）、`plotXY` 升级为单线 `plotXYOverlay` → 新增独立多线 `plotXYMulti`（引擎结果面板用，不改用户函数）、buildLeft/buildRight 整体重建（`host.innerHTML=""`）→ 引擎区块抽成独立 `buildEnginePanel(host)` / `buildEngineResults(host)` 防 `let b` 重复声明与重建丢失。
 - 用户增量确认（四维度，全部保留）：
   1. `solveQuasiStatic` 准静态载荷转移内核——非簧载直接/RC 几何力矩/弹簧+ARB 弹性力矩三路径解耦、稳态侧倾角+侧倾梯度代数反解、四轮 Fz（气动+纵向+侧向综合）、TLLTD 双色平衡条 + 操稳倾向判断；
@@ -39,11 +50,11 @@
   - 页面加载零 JS 错误；引擎面板/右面板 ARB·载荷转移·TLLTD/左面板 QUASI 输入·ARB·Baseline 控件齐全；
   - QUASI 模式切换 ✓、Baseline 快照锁定（tbBase→"已锁定"）+ **buildLeft/buildRight 重建后引擎面板不丢失**（Delta 面板出现）✓、sbTLLTD=71.4% ✓；
   - 引擎双模：连接 8001 → bump 21 点 VALID 2278ms、增益表渲染 ✓。
-- 提交：`dwb-pro-dev/Gemini.html`（用户交付源档）+ `dwb-pro-dev/web/dwb-pro-fullchassis.html`（新基线）+ DEVLOG。
+- 提交：`LABSUS/Gemini.html`（用户交付源档）+ `LABSUS/web/dwb-pro-fullchassis.html`（新基线）+ DEVLOG。
 - 遗留：引擎侧 `/api/v3/chassis/*` 整车端点（四角装配+载荷转移镜像实现）待做——用户 JS 实现可作为契约参照。
 
 ## 2026-08-22 — S2-2 前端引擎面板落地：dwb-pro-fullchassis.html 双模接入 /api/v3
-- 前端主线 = `dwb-pro-dev/web/dwb-pro-fullchassis.html`（唯一前端核心，与用户决策对齐；"modeler 迁移"提法正式废弃）。
+- 前端主线 = `LABSUS/web/dwb-pro-fullchassis.html`（唯一前端核心，与用户决策对齐；"modeler 迁移"提法正式废弃）。
 - 新增（同一文件内）：
   - 顶栏引擎状态 cell（#tbEng：内置 JS ↔ 引擎 v3 切换灯）；
   - 左面板首区块「引擎连接与 K&C 分析」：地址输入（默认 http://127.0.0.1:8001）· 连接/断开（AbortController 4s 超时）· 四工况按钮（bump/roll/steer/compliance）· 扫掠范围/点数/Fz 输入 · LCA 衬套开关（bLCA_F 500N/mm）· 运行按钮；
@@ -55,8 +66,8 @@
 - 引擎侧回归：38 tests 全绿（含上轮 15 v3 API 测试）。
 - Open Items：S2-3 WebSocket 拖拽实时求解流 + 结果缓存；多衬套 UI。
 
-## 2026-08-22 — S2-1 引擎 /api/v3 服务层落地（隔离工作区 dwb-pro-dev/engine）
-- 定位：S2 = 前端 `dwb-pro-dev/web/dwb-pro-fullchassis.html`（唯一前端核心，不换文件）接入引擎 `dwb-pro-dev/engine/`。本轮交付服务层，前端引擎面板下一轮。
+## 2026-08-22 — S2-1 引擎 /api/v3 服务层落地（隔离工作区 LABSUS/engine）
+- 定位：S2 = 前端 `LABSUS/web/dwb-pro-fullchassis.html`（唯一前端核心，不换文件）接入引擎 `LABSUS/engine/`。本轮交付服务层，前端引擎面板下一轮。
 - 新增：
   - `src/api/v3models.py` — /api/v3 请求/响应模型；**前端 DWB 硬点命名直通**（LCA_F/LBJ/WC/TRO/RACK/STRUT_OUT/RCK_AX_A/STRUT_IN/RCK_DMP/DMP_BODY…），含 DesignSpec（cam0/toe0 基准）、BushingSpec、SweepSpec、CaseLoad。
   - `src/api/v3service.py` — 业务层：DWB→引擎点映射表（LCA_F→CH1…DMP_BODY→DAMPER_CHASSIS）、镜像（左轮 X 取负 + steer_axis 反号）、四工况驱动器（bump 平行轮跳 / roll 双侧合成 / steer rack 扫掠 / compliance 力扫掠）、增益表复用 S1 `metrics/kandc.py`。
@@ -69,9 +80,9 @@
 - 验收：38 tests 全绿（23 S1 + 15 新增）；真实 HTTP 冒烟：bump 带衬套 9 点 VALID 733ms（~80ms/点 <300ms 预算），cam −40→+40mm 单调 +0.12→−2.81°，增益表与衬套形变输出正常。
 - Open Items：摇臂转轴用 RCK_AX_A 单点近似（引擎 solve_rocker 固定绕 X 轴，精确轴方向待升级）；多衬套/非垂直载荷扩展测试；前端引擎面板（S2-2）与 WebSocket 求解流（S2-3，设计文档 §6.1）。
 
-## 2026-08-21 — 工业级设计 S1 引擎内核落地（隔离工作区 dwb-pro-dev/engine）
+## 2026-08-21 — 工业级设计 S1 引擎内核落地（隔离工作区 LABSUS/engine）
 - 里程碑：K&C 弹性运动学分水岭打通——衬套 6DOF 元件 + 两层迭代求解器（TRF 外层力平衡 ⇄ 内层机构投影）+ 二力杆静力链 + MF 轮胎子集 + K&C 增益层，Subagent-Driven 双审查全流程通过。
-- 隔离规则：开发仅写 `dwb-pro-dev/`（Gemini v4 为前端主线副本 + engine 引擎基线快照）；主仓库其余文件冻结；引擎任务提交前缀 `feat(engine)`。一次违规（T8 误改主仓库 DEVLOG，e5e6121）已 revert（b3ad00b）并确立 T10 controller 统一同步约定。
+- 隔离规则：开发仅写 `LABSUS/`（Gemini v4 为前端主线副本 + engine 引擎基线快照）；主仓库其余文件冻结；引擎任务提交前缀 `feat(engine)`。一次违规（T8 误改主仓库 DEVLOG，e5e6121）已 revert（b3ad00b）并确立 T10 controller 统一同步约定。
 - 交付（T1-T9，22 提交）：
   1. `src/components/bushing.py` — 6DOF 衬套（线性/查表/样条曲线 + 解析雅可比 + 装配字段 + 外推钳制 + 构造校验）
   2. `src/solver/forces.py` — 二力杆/球铰静力（lstsq 最小范数 + 残差暴露）；`corner_to_anchor_loads` 接地点→锚点合力链
@@ -83,7 +94,7 @@
 - 验收门：23 tests 全绿——无衬套回归一致（1e-6）、单锚点物理合理（900N→3mm）、全链路点均 <300ms、静态定位角手算对照（KPI/Caster Δ<0.001°）；CLI 冒烟 VALID/残差 1e-14/60ms。
 - 决策固化：符号约定（load 全局 N、δz 正=成员上移）；UCA 杆加入默认二力杆集（CH1 载荷物理必要）；G4 用实际 angles 公式而非计划草稿公式。
 - 已知边界/Open Items：FL1 转向衬套化（S1 外）；OptimumK PDF 示例数值录入（benchmarks 占位）；复步进几何传导验证；多衬套/非垂直载荷 T9 扩展测试；`angles.py` 副本剥离接触斑依赖（scrub/trail 回退 UP5）已记录。
-- 后续：S2（K&C 四工况驱动器 + /api/v3 + modeler 迁移）在 S1 基线上继续（仍走 dwb-pro-dev）。
+- 后续：S2（K&C 四工况驱动器 + /api/v3 + modeler 迁移）在 S1 基线上继续（仍走 LABSUS）。
 
 ## 2026-08-21 — 开发版本归档：DWB 单文件系列全版本独立成文件
 - 需求：开发暂告一段落，把积累的大版本（含 git 历史中已删除的版本）各自独立成文件，集中入库管理。

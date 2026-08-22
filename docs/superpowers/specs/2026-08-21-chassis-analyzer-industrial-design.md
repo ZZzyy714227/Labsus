@@ -389,9 +389,9 @@ ws://solve-stream 拖拽实时
 
 ---
 
-## 15. S2-1 落地记录（2026-08-22，隔离工作区 dwb-pro-dev/engine）
+## 15. S2-1 落地记录（2026-08-22，隔离工作区 LABSUS/engine）
 
-> S2 起点：前端明文锁定 `dwb-pro-dev/web/dwb-pro-fullchassis.html`（Gemini v4 副本）为**唯一前端核心**，拒绝"modeler 迁移"提法（与隔离决策冲突）。S2 = 该 HTML 接入引擎。
+> S2 起点：前端明文锁定 `LABSUS/web/dwb-pro-fullchassis.html`（Gemini v4 副本）为**唯一前端核心**，拒绝"modeler 迁移"提法（与隔离决策冲突）。S2 = 该 HTML 接入引擎。
 
 | 计划项（§9 S2） | 落地 | 偏差/说明 |
 |---|---|---|
@@ -409,9 +409,9 @@ ws://solve-stream 拖拽实时
 
 ---
 
-## 14. S1 落地记录（2026-08-21 完成，隔离工作区 dwb-pro-dev/engine）
+## 14. S1 落地记录（2026-08-21 完成，隔离工作区 LABSUS/engine）
 
-> S1 引擎内核已按计划 `docs/superpowers/plans/2026-08-21-chassis-analyzer-s1.md` 完成（T1–T10，Subagent-Driven + 双审查）。与主仓库其余文件隔离（`dwb-pro-dev/` 为唯一开发区）。
+> S1 引擎内核已按计划 `docs/superpowers/plans/2026-08-21-chassis-analyzer-s1.md` 完成（T1–T10，Subagent-Driven + 双审查）。与主仓库其余文件隔离（`LABSUS/` 为唯一开发区）。
 
 | 计划项 | 落地 | 偏差/说明 |
 |---|---|---|

@@ -6,7 +6,7 @@
 
 **Architecture:** 纯 Python 增量（不改现有求解器行为）。新模块：`src/components/bushing.py`（元件）、`src/solver/forces.py`（静力）、`src/solver/compliance.py`（两层迭代）、`src/analysis/kandc_cases.py`（工况）、`src/metrics/kandc.py`（增益指标）、`src/tire_mf.py`（轮胎）。K&C 内层直接调用现有 `solve_pose`（衬套位移改写锚点 pos 后求解，无侵入）；外层为 δ 的力平衡（TRF + 数值雅可比 + Anderson 固定点兜底）。
 
-**Worktree（隔离开发工作区）:** 本计划全部任务工作在 **`dwb-pro-dev/engine/`**（仓库内隔离目录，前后端开发只写 `dwb-pro-dev/`；主仓库其余文件冻结）。计划中的相对路径（`src/...`、`tests/...`）均以 `dwb-pro-dev/engine/` 为工作区根；机制求解器基线已快照至 `engine/src/solver/mechanism/`（models/project/solver/pose/from_legacy/v2adapter/bench）。
+**Worktree（隔离开发工作区）:** 本计划全部任务工作在 **`LABSUS/engine/`**（仓库内隔离目录，前后端开发只写 `LABSUS/`；主仓库其余文件冻结）。计划中的相对路径（`src/...`、`tests/...`）均以 `LABSUS/engine/` 为工作区根；机制求解器基线已快照至 `engine/src/solver/mechanism/`（models/project/solver/pose/from_legacy/v2adapter/bench）。
 
 **Tech Stack:** Python 3.11+、numpy、scipy（least_squares/interp1d）、pytest。基础依赖：`src/solver/mechanism/{models,project,solver}.py`（快照复用，不改签名）、`src/core/models.py`（复用 CaseVersion 载荷输入）。
 
