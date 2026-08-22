@@ -124,10 +124,13 @@ def test_chassis_sweep_roll_symmetry():
     assert r.status_code == 200
     b = r.json()
     assert len(b["curves"]["roll_deg"]) == 13
-    # 左轮 -t / 右轮 +t → 镜像对称：cam_FL[i] ≈ cam_FR[i]（±0.3°）
+    # 左轮 -t / 右轮 +t → 对称不变量（2026-08-22 P0 修复后收紧）：
+    # cam_FL[i]（left at -t）== cam_FR[n-1-i]（right at -t）。旧断言比较同
+    # 索引（不同行程，物理上不等）；曾通过是因左角轮轴未镜像缺陷的意外抵消。
     cf = b["curves"]["cam_FL"]
     cr = b["curves"]["cam_FR"]
-    assert max(abs(a - c) for a, c in zip(cf, cr)) < 0.3
+    n = len(cf)
+    assert max(abs(cf[i] - cr[n - 1 - i]) for i in range(n)) < 1e-6
     assert "roll_camber_gain_front" in b["gains"]
 
 
