@@ -33,7 +33,8 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from pydantic import ValidationError  # noqa: E402
 
 from src.api import v3service  # noqa: E402
-from src.api.v3models import KandcRequest, PoseRequest  # noqa: E402
+from src.api import chassis as chassis_service  # noqa: E402
+from src.api.v3models import ChassisRequest, KandcRequest, PoseRequest  # noqa: E402
 
 ENGINE_VERSION = "0.3.0"          # 引擎（S1 内核 + S2 服务层）
 API_VERSION = "v3"
@@ -93,6 +94,32 @@ def kandc(case: str, req: KandcRequest) -> dict:
         return runner(req).model_dump()
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=422, detail=f"K&C solver error: {exc}") from exc
+
+
+@app.post("/api/v3/chassis/solve")
+def chassis_solve(req: ChassisRequest) -> dict:
+    """整车单点：四角定位角 + 整车姿态 + 准静态载荷转移（TLLTD/侧倾梯度）。"""
+    try:
+        return chassis_service.solve_chassis(req).model_dump()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=422,
+                            detail=f"chassis solve error: {exc}") from exc
+
+
+@app.post("/api/v3/chassis/kandc/{case}")
+def chassis_kandc(case: str, req: ChassisRequest) -> dict:
+    if case not in ("bump", "roll", "steer"):
+        raise HTTPException(status_code=404, detail=f"unknown chassis case {case!r}")
+    runner = {
+        "bump": chassis_service.sweep_bump,
+        "roll": chassis_service.sweep_roll,
+        "steer": chassis_service.sweep_steer,
+    }[case]
+    try:
+        return runner(req).model_dump()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=422,
+                            detail=f"chassis K&C error: {exc}") from exc
 
 
 if __name__ == "__main__":

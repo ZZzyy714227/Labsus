@@ -1,5 +1,19 @@
 # 开发日志
 
+## 2026-08-22 — S2-5 引擎整车分析端点：四角装配 + 准静态载荷转移（/api/v3/chassis/*）
+- 需求：前后端分离版获得整车级分析通道（单文件版 solveQuasiStatic 的引擎镜像）。
+- 新增：
+  - `src/api/chassis.py` — 整车业务层：四角装配（FR=front.points / FL=镜像+steer 反号 / RR / RL）、`corner_pose`（四角独立 solve_pose + 定位角）、`arb_geom/arb_rate`（稳定杆几何与扭转刚度，镜像前端）、`quasi_loads`（镜像 solveQuasiStatic 公式：非簧载直接 / RC 几何力矩 / 弹簧+ARB 弹性力矩三路径解耦 → 稳态侧倾角 + 侧倾梯度代数反解 → 四轮 Fz 含气动下压力/纵向/侧向 → TLLTD）、`solve_chassis`（+ 姿态 heave/roll/pitch 推导）、`sweep_bump/roll/steer`（整车三工况扫掠 → 四轮曲线 + 前后轴增益）；
+  - `v3models.py` 追加：ArbSpec/AxleSpec/VehicleSpec/QuasiInputs/CornerTravel/ChassisRequest/ChassisLoads/ChassisPoseResponse/ChassisSweepResponse；
+  - `server.py` 路由：`POST /api/v3/chassis/solve`（单点）、`POST /api/v3/chassis/kandc/{bump|roll|steer}`；
+  - `tests/test_v3_chassis.py` — 9 项：四角装配/载荷守恒/横向转移/姿态/三工况/ARB 影响/非法输入。
+- 关键决策与发现：
+  1. **MR 回退策略**：引擎 STRUT_OUT 固定于 knuckle 刚体（前端挂 LCA/UCA 铰链，已知拓扑 OpenItem）→ 引擎数值推导 MR 失真（实测 damper±2mm 差分 3.98 vs 前端 0.75；且 solve_rocker 二分在 0 附近存在分支跳变）→ `motion_ratio` 显式参数优先，缺省用前端同源常量 0.75/0.78（与前端 `SIM.mrRefF||0.75` 语义一致）；
+  2. 后轴引擎沿用同构机构（STRUT_OUT→CH5 推杆闭式近似拉杆拓扑），OpenItem 登记 STRUT_OUT 挂点对齐；
+  3. 姿态约定：pitch 正 = 车头下沉（与 core/models derived_pose 一致）。
+- 验收：**47 tests 全绿**（38 旧 + 9 新增）；真实 HTTP：chassis/solve 四角 12.2ms（1g → roll 1.096°、TLLTD 46.9%、ARB share 15.9/13.1%、aload 转移 FL 2165/FR 5196/RL 1571/RR 4998N 守恒）；chassis/kandc/bump 9 点 318ms（四轮 cam 单调、cg_front −0.883/cg_rear −0.867、bs 0.35/0.29）。
+- 遗留：前端整车面板（chassis 端点 UI 接入，下一轮）；STRUT_OUT 挂点拓扑对齐；SolveRocker 分支连续性。
+
 ## 2026-08-22 — S2-4 前端基线升级：用户 Gemini 增量全量移植 + 引擎双模保留
 - 交付：用户在 `dwb-pro-dev/Gemini.html`（单文件版，2154 行）自行完成四大维度工业级增量，按约定交付后由我方学习移植进前后端分离版 `dwb-pro-dev/web/dwb-pro-fullchassis.html`。
 - 移植策略：**Gemini.html 直接成为新前端基线**（官方 v4→Gemini diff 731+/276-，逐块手工合并风险高），再把 S2-2 引擎面板移植回新基线。引擎面板适配点：`sec()` 增加 cls 参数（兼容）、`plotXY` 升级为单线 `plotXYOverlay` → 新增独立多线 `plotXYMulti`（引擎结果面板用，不改用户函数）、buildLeft/buildRight 整体重建（`host.innerHTML=""`）→ 引擎区块抽成独立 `buildEnginePanel(host)` / `buildEngineResults(host)` 防 `let b` 重复声明与重建丢失。
