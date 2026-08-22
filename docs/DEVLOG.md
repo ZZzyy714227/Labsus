@@ -1,5 +1,16 @@
 # 开发日志
 
+## 2026-08-22 — 发布：LABSUS 独立开源仓库（github.com/ZZzyy714227/Labsus）
+- 需求：把项目整理后发到用户 GitHub，只发 LABSUS 最新版本（不发主仓库其余历史/目录）。
+- 发布形态：**干净快照**——从 `LABSUS/` 提取当前状态建独立 git 仓库，单初始提交，不含 New_suspension 历史；Public、分支 main。
+- 整理项：
+  - `serve_nocache.py` 去除硬编码绝对路径 → `os.path.dirname(os.path.abspath(__file__))` 相对定位（本地源文件已同步修复）；
+  - 删除空目录 `engine/benchmarks`（真基准在 `engine/tests/benchmarks/optimumk_examples.py`，README 已指正）；
+  - 新增公开版 `README.md`（功能 / 快速开始 / API 表 / 目录结构 / 技术栈）+ 根 `.gitignore` + `engine/requirements.txt`；
+  - 排除全部 `__pycache__/.pytest_cache`；扫描确认无敏感信息（无 token/key/密码）。
+- 发布前验证：engine 测试 **49 passed / 7.8s**。
+- 网络备注：本机直连 `github.com:443` 被阻断（连接重置/超时），重试后推送成功；若后续 push 失败可多重试或配置代理。
+
 ## 2026-08-22 — P0：前后端 quasi 静态内核统一（引擎侧倾耦合迭代落地）
 - 需求（深研报告 P0 建议）：TLLTD 侧倾耦合迭代此前仅在前端 JS，引擎 `quasi_loads` 仍线性 → 双真源漂移；统一为同一内核。
 - 引擎（`LABSUS/engine/src/api/`）：
