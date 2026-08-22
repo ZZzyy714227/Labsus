@@ -1,5 +1,18 @@
 # 开发日志
 
+## 2026-08-22 — S2-6 前端整车分析面板：分离版整车准静态分析正式通道
+- 交付：`dwb-pro-fullchassis.html` 新增整车面板，把四角硬点+整车参数打包发 `/api/v3/chassis/*` 并渲染——用户单文件版 QUASI 操稳功能的分离版正式化（双模：连引擎走引擎，断开回退内置 JS）。
+- 左面板「整车底盘分析 (引擎)」（默认展开）：
+  - 工况按钮：单点 SOLVE / 整车 BUMP / ROLL / STEER + 扫掠范围/点数输入 + 运行按钮；
+  - payload 实时打包 `S`：vehicle（wb/mTotal/mSprung/hcg/hs + front/rear 各 AxleSpec：hp 15 键、arch、cam0/toe0、tire.R、kS、mS、mU、**motion_ratio = SIM.mrRefF/R**（比常量更准）、arb 全参数）＋ quasi（S.qs.gy/gx/aeroF/aeroBias）＋ travel（travelL/travelR 聚合当前滑块+roll）＋ rack＋sweep。
+- 右面板「整车引擎结果」：
+  - 单点：四轮定位表（FL/FR/RL/RR × cam/toe/cast/kpi/scrub/trail/RC）+ 姿态（heave/roll/pitch）+ 载荷（稳态侧倾/侧倾梯度、Kφ 前/后、ARB 占比、三路径前轴转移分解、四轮 Fz、TLLTD 前轴占比带颜色判定）；
+  - 扫掠：四轮外倾曲线（plotXYMulti 四色）+ 增益表；
+  - 状态行含 warnings。
+- 细节：buildChassisPanel 默认展开（折叠区块 display:none 时按钮不可点）；结果区块折叠。
+- 验收（playwright 真实引擎）：面板元素齐；连接 → 单点 SOLVE VALID 43.6ms（四轮表/稳态侧倾/四轮 Fz/TLLTD 渲染）；整车 BUMP 21 点 VALID 47.3ms 曲线+增益；零 JS 错误。
+- 至此 S2 全部闭环：单角 K&C（S2-1/2）→ 前端基线升级保留（S2-4）→ 整车准静态（S2-5/6）。
+
 ## 2026-08-22 — S2-5 引擎整车分析端点：四角装配 + 准静态载荷转移（/api/v3/chassis/*）
 - 需求：前后端分离版获得整车级分析通道（单文件版 solveQuasiStatic 的引擎镜像）。
 - 新增：
