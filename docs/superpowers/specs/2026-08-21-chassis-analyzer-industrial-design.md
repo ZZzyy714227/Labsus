@@ -388,3 +388,25 @@ ws://solve-stream 拖拽实时
 5. 性能不达标时以 13.2 的 Numba 路径把复步进热路径 JIT。
 
 ---
+
+## 14. S1 落地记录（2026-08-21 完成，隔离工作区 dwb-pro-dev/engine）
+
+> S1 引擎内核已按计划 `docs/superpowers/plans/2026-08-21-chassis-analyzer-s1.md` 完成（T1–T10，Subagent-Driven + 双审查）。与主仓库其余文件隔离（`dwb-pro-dev/` 为唯一开发区）。
+
+| 计划项 | 落地 | 偏差/说明 |
+|---|---|---|
+| 衬套 6DOF 元件 | `src/components/bushing.py` | 线性/查表/样条 + 解析雅可比 + 外推钳制（clamp）+ 构造校验 + 装配字段 |
+| 二力杆/球铰静力 | `src/solver/forces.py` | lstsq 最小范数 + 残差暴露；`corner_to_anchor_loads` 接地点→锚点合力 |
+| 小角变换 | `src/solver/compliance_transform.py` | 平移+旋转到成员簇；守卫 KeyError；last-write-wins 文档化 |
+| K&C 两层求解器 | `src/solver/compliance.py` | TRF 外层 + Anderson 兜底 + 最终姿态写回 + per-bushing loads |
+| 全链路 | `solve_compliance_full` | 默认 5 杆集（PUSH/LCA×2/UCA×2——UCA 为 CH1 载荷物理必要）；位置匹配节点名 |
+| MF 轮胎子集 | `src/tire_mf.py` | .tir 风格参数；Fy 峰值 8000N@18.5°（Ey=−0.5）；摩擦圆回退保留 |
+| K&C 增益层 | `src/metrics/kandc.py` | °/25mm、°/kN、MR、RC 迁移（float/tuple，进 Variables Registry） |
+| 验收门 | `tests/test_s1_gate.py` + CLI `scripts/kandc_run.py` | 23 tests 全绿：无衬套回归 1e-6、物理 900N→3mm、点均 <300ms、KPI/Caster 手算 Δ<0.001° |
+
+**决策固化与 Open Items（截至 S1）**：
+- 符号约定：load 全局坐标系 N；δz 正 = 衬套成员相对锚点上移；`anchor_loads` 直接作 `loads[n]` 无需翻转（T5 docstring 已声明）。
+- Open Items：FL1 转向衬套化（S1 外）；OptimumK PDF 示例数值录入（`tests/benchmarks/optimumk_examples.py` 占位）；复步进几何传导验证（§13.4）；多衬套/非垂直载荷扩展测试；`angles.py` 副本剥离接触斑依赖（scrub/trail 回退 UP5）。
+- 性能实测：CLI 单点 ~60ms（远低于 300ms 预算）；Bushing/K&C 构件全部 NumPy 向量化。
+
+---

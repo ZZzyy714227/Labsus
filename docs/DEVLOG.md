@@ -1,5 +1,21 @@
 # 开发日志
 
+## 2026-08-21 — 工业级设计 S1 引擎内核落地（隔离工作区 dwb-pro-dev/engine）
+- 里程碑：K&C 弹性运动学分水岭打通——衬套 6DOF 元件 + 两层迭代求解器（TRF 外层力平衡 ⇄ 内层机构投影）+ 二力杆静力链 + MF 轮胎子集 + K&C 增益层，Subagent-Driven 双审查全流程通过。
+- 隔离规则：开发仅写 `dwb-pro-dev/`（Gemini v4 为前端主线副本 + engine 引擎基线快照）；主仓库其余文件冻结；引擎任务提交前缀 `feat(engine)`。一次违规（T8 误改主仓库 DEVLOG，e5e6121）已 revert（b3ad00b）并确立 T10 controller 统一同步约定。
+- 交付（T1-T9，22 提交）：
+  1. `src/components/bushing.py` — 6DOF 衬套（线性/查表/样条曲线 + 解析雅可比 + 装配字段 + 外推钳制 + 构造校验）
+  2. `src/solver/forces.py` — 二力杆/球铰静力（lstsq 最小范数 + 残差暴露）；`corner_to_anchor_loads` 接地点→锚点合力链
+  3. `src/solver/compliance_transform.py` — 小角刚体变换（衬套位移→锚点）
+  4. `src/solver/compliance.py` — K&C 两层求解器（TRF+Anderson 兜底+姿态写回+per-bushing loads）+ `solve_compliance_full` 全链路
+  5. `src/metrics/kandc.py` — 增益指标（°25mm / °kN / MR / RC 迁移）
+  6. `src/tire_mf.py` — Pacejka 子集（.tir 风格 + 摩擦圆回退保留）
+  7. `scripts/kandc_run.py` CLI + `tests/test_s1_gate.py` 四门禁
+- 验收门：23 tests 全绿——无衬套回归一致（1e-6）、单锚点物理合理（900N→3mm）、全链路点均 <300ms、静态定位角手算对照（KPI/Caster Δ<0.001°）；CLI 冒烟 VALID/残差 1e-14/60ms。
+- 决策固化：符号约定（load 全局 N、δz 正=成员上移）；UCA 杆加入默认二力杆集（CH1 载荷物理必要）；G4 用实际 angles 公式而非计划草稿公式。
+- 已知边界/Open Items：FL1 转向衬套化（S1 外）；OptimumK PDF 示例数值录入（benchmarks 占位）；复步进几何传导验证；多衬套/非垂直载荷 T9 扩展测试；`angles.py` 副本剥离接触斑依赖（scrub/trail 回退 UP5）已记录。
+- 后续：S2（K&C 四工况驱动器 + /api/v3 + modeler 迁移）在 S1 基线上继续（仍走 dwb-pro-dev）。
+
 ## 2026-08-21 — 开发版本归档：DWB 单文件系列全版本独立成文件
 - 需求：开发暂告一段落，把积累的大版本（含 git 历史中已删除的版本）各自独立成文件，集中入库管理。
 - 盘点：仓库内 dwb 单文件线 3 个现行文件 + `parent.html` 早期快照；git 历史恢复 `web/sim-view.html`（自包含版，曾因模块化重构删除）与根路径 `double-wishbone-suspension.html` 旧副本（与 v2 同源，不重复归档）。
