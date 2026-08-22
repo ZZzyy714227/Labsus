@@ -1,15 +1,17 @@
-"""/api/v3 整车分析业务层（S2-5）。
+"""/api/v3 整车分析业务层（S2-5；quasi 内核 P0 统一 2026-08-22）。
 
 四角装配（FR/FL/RR/RL）：
 - FR = vehicle.front.points（右轮，X=外侧）；FL = 镜像（x→−x）+ steer_axis 反号；
 - RR = vehicle.rear.points；RL = 镜像。
-每角用引擎机制求解器（solve_pose）出定位角；准静态载荷转移严格镜像
-单文件版 solveQuasiStatic 公式（三路径解耦 + 稳态侧倾角 + TLLTD）。
+每角用引擎机制求解器（solve_pose）出定位角；准静态载荷转移与前端
+solveQuasiStatic 同一内核（侧倾耦合迭代 3 轮：rc_h 引擎扫掠迁移 +
+kw 前端曲线迁移 → 三路径解耦 + TLLTD 随 gy 单调变化）。
 
 坐标系与前端一致：X=外侧 / Y=向前 / Z=向上；轮跳正 = 压缩。
 """
 from __future__ import annotations
 
+import bisect
 import math
 import time
 
@@ -110,9 +112,72 @@ def arb_rate(ax: AxleSpec) -> dict:
     return {"k": k, "J": J, "kt": kt, "a": g["a"], "L": L}
 
 
+_RC_SWEEP_CACHE: dict[tuple, dict] = {}
+
+
+def axle_rc_sweep(ax: AxleSpec, lim: float = 90.0, n: int = 21) -> dict:
+    """单轴 rc_h-行程扫掠（右轮机构，rack=0）——侧倾耦合迭代用。
+
+    rc_h 只依赖双叉臂几何（CH1-4 / LBJ / UBJ / WC），不受 STRUT_OUT 拓扑
+    影响，引擎可权威计算（对比：damper 链 MR 在引擎拓扑下失真，kw 迁移
+    改由前端 kw_curve 下发）。按轴参数缓存，重复 solve 免重算。
+    """
+    key = (tuple(sorted((k, tuple(map(float, v))) for k, v in ax.points.items())),
+           float(ax.tire_radius), float(ax.camber_deg), float(ax.toe_deg),
+           float(lim), int(n))
+    hit = _RC_SWEEP_CACHE.get(key)
+    if hit is not None:
+        return hit
+    mech = _new_mech(ax.points)
+    design = DesignSpec(camber_deg=ax.camber_deg, toe_deg=ax.toe_deg)
+    xs = [float(v) for v in np.linspace(-lim, lim, n)]
+    rc: list[float | None] = []
+    for t in xs:
+        solve_pose(mech, t, 0.0)
+        m = pose_metrics(mech, ax.tire_radius, design)
+        rc.append(None if m["rc_h"] is None else float(m["rc_h"]))
+    out = {"travel": xs, "rc_h": rc}
+    if len(_RC_SWEEP_CACHE) > 16:
+        _RC_SWEEP_CACHE.pop(next(iter(_RC_SWEEP_CACHE)))
+    _RC_SWEEP_CACHE[key] = out
+    return out
+
+
+def _interp_fb(xs: list[float], ys: list, x: float, fb: float) -> float:
+    """线性插值 + 端点钳位（镜像前端 sampleSweep）；任一邻点 None → 回退 fb。"""
+    if x <= xs[0]:
+        return ys[0] if ys[0] is not None else fb
+    if x >= xs[-1]:
+        return ys[-1] if ys[-1] is not None else fb
+    i = bisect.bisect_right(xs, x)
+    y0, y1 = ys[i - 1], ys[i]
+    if y0 is None or y1 is None:
+        return fb
+    t = (x - xs[i - 1]) / ((xs[i] - xs[i - 1]) or 1e-9)
+    return float(y0 + (y1 - y0) * t)
+
+
+def _kw_at(ax: AxleSpec, tr: float, kw0_nm: float) -> float:
+    """轮端刚度 @行程（N/m）：kw_curve 插值（N/mm→N/m）优先，否则常数 kw0。"""
+    cur = ax.kw_curve
+    if cur is None:
+        return kw0_nm
+    v = _interp_fb(cur.travel, cur.kw, tr, math.nan)
+    if v is None or not math.isfinite(v) or v <= 0:
+        return kw0_nm
+    return v * 1000.0
+
+
 def quasi_loads(vehicle: VehicleSpec, q: QuasiInputs,
-                mr: dict[str, float], rcH: dict[str, float]) -> ChassisLoads:
-    """准静态载荷转移（严格镜像单文件版 solveQuasiStatic）。"""
+                mr: dict[str, float], rcH: dict[str, float],
+                rc_sw: dict[str, dict]) -> ChassisLoads:
+    """准静态载荷转移 —— 侧倾耦合迭代（镜像前端 solveQuasiStatic 修复版）。
+
+    3 轮迭代：每轮由当前侧倾角解外侧（压缩侧）轮行程差 dt=roll·半轮距 →
+    rc_h 取引擎扫掠在 dt 处值（GEO 项随行程迁移）、kw 取 ±dt 处均值
+    （ELA 项迁移，kw_curve 优先否则常数）→ 更新前后侧倾刚度 → 重解侧倾角。
+    迁移后三路径不再与 ay 线性齐次 → TLLTD 随 gy 真实单调变化。
+    """
     wb = vehicle.wheelbase_mm
     L = wb / 1000.0
     mS = vehicle.sprung_mass_kg
@@ -131,36 +196,57 @@ def quasi_loads(vehicle: VehicleSpec, q: QuasiInputs,
     hur = vehicle.rear.tire_radius / 1000.0
     hs = vehicle.hs_mm / 1000.0
 
-    zrc_f = (rcH.get("FR") or 45.0) / 1000.0
-    zrc_r = (rcH.get("RR") or 65.0) / 1000.0
-    hra = zrc_f + (a / L) * (zrc_r - zrc_f)
-    hArm = max(0.05, hs - hra)
+    ay = q.gy * G
+    ax = q.gx * G
+
+    # 初值/回退：当前位 rc_h（前端 zrcF0=SIM.mFR.rcH 同源语义）
+    zrc_f0 = rcH.get("FR") or 45.0
+    zrc_r0 = rcH.get("RR") or 65.0
+    zrc_f, zrc_r = zrc_f0 / 1000.0, zrc_r0 / 1000.0
 
     mrF = mr.get("front") or 0.75
     mrR = mr.get("rear") or 0.78
-    kwF = vehicle.front.spring_rate * 1000.0 * mrF * mrF
-    kwR = vehicle.rear.spring_rate * 1000.0 * mrR * mrR
+    kw_f0 = vehicle.front.spring_rate * 1000.0 * mrF * mrF   # N/m
+    kw_r0 = vehicle.rear.spring_rate * 1000.0 * mrR * mrR
 
     arF = arb_rate(vehicle.front)
     arR = arb_rate(vehicle.rear)
     kphi_arb_f = arF["k"] * 1000.0 * tf * tf / 2.0
     kphi_arb_r = arR["k"] * 1000.0 * tr * tr / 2.0
 
-    kphi_f = 0.5 * kwF * tf * tf + kphi_arb_f
-    kphi_r = 0.5 * kwR * tr * tr + kphi_arb_r
+    kphi_f = 0.5 * kw_f0 * tf * tf + kphi_arb_f
+    kphi_r = 0.5 * kw_r0 * tr * tr + kphi_arb_r
     kphi_tot = kphi_f + kphi_r
+    roll_rad = 0.0
+
+    swf, swr = rc_sw["front"], rc_sw["rear"]
+    half_f = abs(vehicle.front.points["WC"][0])   # mm
+    half_r = abs(vehicle.rear.points["WC"][0])
+    for _ in range(3):
+        hra = zrc_f + (a / L) * (zrc_r - zrc_f)
+        h_arm = max(0.05, hs - hra)
+        denom = kphi_tot - mS * G * h_arm
+        roll_rad = (mS * ay * h_arm) / denom if denom > 100 else 0.0
+        dt_f = roll_rad * half_f    # 侧倾角×半轮距 = 轮行程差 mm
+        dt_r = roll_rad * half_r
+        zrc_f = _interp_fb(swf["travel"], swf["rc_h"], dt_f, zrc_f0) / 1000.0
+        zrc_r = _interp_fb(swr["travel"], swr["rc_h"], dt_r, zrc_r0) / 1000.0
+        kwf = (_kw_at(vehicle.front, dt_f, kw_f0) + _kw_at(vehicle.front, -dt_f, kw_f0)) / 2.0
+        kwr = (_kw_at(vehicle.rear, dt_r, kw_r0) + _kw_at(vehicle.rear, -dt_r, kw_r0)) / 2.0
+        kphi_f = 0.5 * kwf * tf * tf + kphi_arb_f
+        kphi_r = 0.5 * kwr * tr * tr + kphi_arb_r
+        kphi_tot = kphi_f + kphi_r
+
+    hra = zrc_f + (a / L) * (zrc_r - zrc_f)
+    h_arm = max(0.05, hs - hra)
+    denom = kphi_tot - mS * G * h_arm
+    roll_rad = (mS * ay * h_arm) / denom if denom > 100 else 0.0
+    roll_deg = roll_rad * R2D
+    roll_grad = ((mS * G * h_arm) / denom) * R2D if denom > 100 else 0.0
 
     F_aero = q.aero_force_n
     Fzf0 = mS * G * (b / L) + mU_f * G + F_aero * q.aero_bias
     Fzr0 = mS * G * (a / L) + mU_r * G + F_aero * (1 - q.aero_bias)
-
-    ay = q.gy * G
-    ax = q.gx * G
-
-    denom = kphi_tot - mS * G * hArm
-    roll_rad = (mS * ay * hArm) / denom if denom > 100 else 0.0
-    roll_deg = roll_rad * R2D
-    roll_grad = ((mS * G * hArm) / denom) * R2D if denom > 100 else 0.0
 
     dFz_u_f = mU_f * ay * (huf / tf)
     dFz_u_r = mU_r * ay * (hur / tr)
@@ -224,7 +310,9 @@ def solve_chassis(req: ChassisRequest) -> ChassisPoseResponse:
         if m["rc_h"] is not None:
             rcH[key] = float(m["rc_h"])
 
-    loads = quasi_loads(req.vehicle, req.quasi, mr, rcH)
+    rc_sw = {"front": axle_rc_sweep(req.vehicle.front),
+             "rear": axle_rc_sweep(req.vehicle.rear)}
+    loads = quasi_loads(req.vehicle, req.quasi, mr, rcH, rc_sw)
     attitude = _attitude(trav, req.vehicle)
     return ChassisPoseResponse(
         status="SOLVER_FAILED" if "SOLVER_FAILED" in statuses else "VALID",

@@ -1,5 +1,19 @@
 # 开发日志
 
+## 2026-08-22 — P0：前后端 quasi 静态内核统一（引擎侧倾耦合迭代落地）
+- 需求（深研报告 P0 建议）：TLLTD 侧倾耦合迭代此前仅在前端 JS，引擎 `quasi_loads` 仍线性 → 双真源漂移；统一为同一内核。
+- 引擎（`LABSUS/engine/src/api/`）：
+  - `chassis.py` `quasi_loads` 重写为**侧倾耦合迭代**（严格镜像前端 solveQuasiStatic 修复版）：3 轮迭代，每轮 roll → dt=roll·半轮距 → rc_h/kw 迁移 → kphi 更新 → 重解 roll；迁移后三路径不再与 ay 齐次 → TLLTD 随 gy 单调变化；
+  - 新增 `axle_rc_sweep`：单轴 rc_h-行程扫掠（±90mm·21 点，右轮机构 rack=0，按轴参数缓存 16 条）。**rc_h 只依赖双叉臂几何，不受 STRUT_OUT 拓扑影响 → 引擎权威计算**（实测 65.1→51.1mm 平滑迁移）；
+  - **kw 迁移走前端下发**：实测引擎 damper 链 MR 在压缩侧对行程几乎不敏感（mr≈0 甚至变号），kw 迁移不可从引擎机构推导（STRUT_OUT 拓扑 OpenItem 的直接后果）→ `v3models.py` 新增 `KwCurve`（travel/kw N/mm，长度≥2 且 >0 校验），`AxleSpec.kw_curve` 可选；缺省回退常数 kS·motion_ratio²。拓扑对齐后可撤下发；
+  - `_interp_fb`：sampleSweep 镜像（线性插值 + 端点钳位 + None 回退）。
+- 前端（`dwb-pro-fullchassis.html`）：`chassisPayload()` 每轴附带 `kw_curve`（SIM.swF/swR 扫掠行的 tr/kw，即前端 quasi 内核实际使用的那条曲线，保证两端输入完全同源）。
+- 测试：`test_v3_chassis.py` +2 —— TLLTD 随 gy 单调变化 + kphi 随行程迁移（合成二次 kw 曲线；线性曲线经 ±dt 均值恰抵消，测不出迁移，曲线形态须非线性）；KwCurve 非法输入 422。**49 全绿**。
+- 验证（playwright 真实浏览器 ↔ 真实引擎 :8001）：
+  - **前后端一致性**：gy=0.5/1.0g TLLTD 双端**完全一致**（68.26%/67.36%，roll 1.486°/3.093° 逐位相同）；gy=2.0g 差 0.063pp/0.006°（dt=95.7mm 超出两端扫掠范围各自钳位所致——前端 [-85,+80] vs 引擎 ±90，纯端点差异非公式差异，仅 >5.6° 极端侧倾出现）；
+  - 全链路：connect → 1g SOLVE VALID（冷 ~220ms 建扫掠 / 缓存后 29ms）→ 状态栏 67.4% 与双端内核一致；BUMP 21 点 VALID；零 JS 错误。
+- 遗留：引擎 damper 链 MR 修复（STRUT_OUT 挂点对齐）后可撤 kw_curve 下发，引擎 rc 扫掠范围改为随前端行程限制动态对齐可消 2g 残差。
+
 ## 2026-08-22 — 前端 UI 重做：Apple 液态玻璃拟态 + 浅色/深色双主题
 - 交付（`LABSUS/web/dwb-pro-fullchassis.html`，+295/-185）：界面从深色精密工业风整体重做为 Liquid Glass 风格——大圆角卡片 / 磨砂玻璃（backdrop-filter blur+saturate）/ 柔和弥散阴影 / 三色弥散渐变背景；保留普鲁士蓝·奶杏·酒红主色 + 低饱和复古辅助色组（灰靛蓝/陶土棕/鼠尾灰绿/雾蓝灰/暗铜金/蜜橘赭/灰薰紫/雾茶）。
 - 双主题机制：
