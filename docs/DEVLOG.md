@@ -1,6 +1,21 @@
 # 开发日志
 
+## 2026-08-22 — 修复序列：r2 深研四发现落地（P0–P5 全部执行，71 绿）
+- 需求：r2 深度研究报告（docs/research/…_r2，同日晚间）的发现与修复清单——用户指令"开始逐一修复"。
+- 研究新增确证（r2 报告，见 docs/research/2026-08-22-labsus-deep-research/）：①P0 quasi 内核统一已于早间报告后落地（C7 关闭）；②**新缺陷**：左角复用右框架公式，轮轴未镜像，FL/FR scrub 偏差恰 2·tireR·sin(|cam|)=13.61mm（解析 13.6126 vs 实测 13.613 精确吻合）；③bench/v2adapter/from_legacy 三快照依赖父仓 config/hardpoints/routes，隔离区内 import 即失败（C12 不可复现）；④四套指标管线并存（angles.py / pose_metrics / kinematics.py / 前端 JS）。
+- **P0 镜像修复**（0d88d96）：`pose_metrics` 侧别泛化——`_wheel_axis(design, side)`、toe 提取 `atan2(ay, side·ax_x)`、kpi/scrub 按 convention.py"两侧相同"翻号；镜像输入下六项定位角 FL==FR 逐位相等（gap=0）；roll 对称性测试修正为**反转行程索引**不变量（旧同索引断言比较不同行程，物理上不成立，曾通过恰因该缺陷污染抵消）；+6 镜像守卫（含右侧黄金值）。55 绿。
+- **P1 快照隔离**（006843c）：`_legacy_parent_snapshot/` + README（不可运行原因/重启用路径/历史基准 56 例纪录）。55 绿。
+- **P2 STRUT_OUT 拓扑 + 摇臂三维轴 + MR 权威化**（11eb2d5）：
+  - `build_mechanism(strut_attach=knuckle|lca|uca)`，arch 映射（pushrod->lca / pullrod->uca，与前端 PRESETS strutOutAttach 对齐）；残差刚体对改由 `m.bodies[0].ids` 派生 + UP4↔臂球头刚线（ATT_B-ST_O 等价，消除绕轴伪自由度）；
+  - **根因**：旧 `solve_rocker` 绕固定全局 X 轴（`rotate_around_x` 不改 X 坐标），CH5 到 UP4 的 X 跨距 358mm 使压缩侧推杆不可达，bracket 恒败，RK_DAMPER 不更新，MR 垃圾化 3.98；改罗斯福 Rodrigues 绕 `RCK_AX_A->B` 真实轴后压缩侧全行程可解；
+  - MR 链：显式参数 > `mr_at_zero`（|ΔL/Δt|，下游仅用 mr² 故取绝对值；后轴 pullrod 压缩行程减振器伸长为合法符号）> 常量 0.75/0.78 兜底；`KwCurve` 降级为可选细化（引擎已可自推常数 kw）。与并行会话的 `steer_axis(-1,0,0)`（齿条整体沿 -X，前端逐位一致，灵敏度 20.8:1）及 kg 地面交点 t0 修复合并提交（scrub/trail 值 229->54.58 / -54.7->24.64，更贴物理；测试同步对齐）。66 绿。
+- **P3 管线治理**（6a2d414）：实测 angles.py 为 V1 X-前向坐标系实现，喂 v3 DWB 系坐标产出废值（toe ±88°/kpi ±175°），不强制对拍而建立**治理守卫**：v3 只能走 pose_metrics，legacy 废值形态断言防静默切换。
+- **P5 卫生**（6a2d414）：CORS 环境变量化（LABSUS_CORS_ORIGINS，默认 * 保 file:// 直连）；轮胎 `mz(..., trail_mm=60)` 参数化；衬套使用状态 docstring（cT/cR 占位、coupled 已实现未喂入）。69 绿。
+- **P4 基准脚手架**（1961584）：pypdf 核对 ref/OptimumKinematics Help File.pdf（92 页）为手册无数据集，诚实脚手架：固化引擎 PRO 基线参考行 + 可 drop-in 的 OPTIMUMK_ROWS 对拍测试（原 optimumk_examples.py 未带 test_ 前缀从不被收集，更名 test_optimumk_examples.py 后真实执行）。71 绿。
+- 遗留登记：OpenItem-B（摇臂双根分支 vs 前端投影全局解，MR 前 0.47 vs FE 0.75、后 0.17 vs 0.78）；rocker bracket 在 knuckle 模式下 +10mm 仍不可达（PRO 几何压缩侧推杆超长 2mm，前端 3D 轴可解——分支选择待统一）；kg 符号 bug 已随 t0 修复闭合（上一 S3-1 条目的"待修 5 项"相应减少）。
+
 ## 2026-08-22 — S3-1 新功能：整车瞬态赛道仿真 /api/v3/chassis/simulate_track（开发暂停解除）
+
 - 需求：用户指令"做一些新功能"并提供 Gemini 设计稿（14-DOF + K&C 查表 + MF 轮胎 + 赛道端点）。设计稿动力学为占位假货（ax=throttle*2−brake*5），按项目标准实现**真物理版**（同日 1-11 讲教学课程交付后开工）。
 - 交付（`engine/src/solver/transient.py` + `v3models.py` 新模型 + `server.py` 路由）：
   - **平面 3-DOF 车体**（状态 X/Y/ψ/vx/vy/r，车体系牛顿-欧拉含 r×v 耦合），RK2 中点积分；
