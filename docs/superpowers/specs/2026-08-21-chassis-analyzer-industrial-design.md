@@ -399,12 +399,13 @@ ws://solve-stream 拖拽实时
 | /api/v3 版本化 | `server.py` FastAPI（health/version/solve/pose/kandc/{case}） | 端口 8001；CORS 全开支持 file:// 前端直连；请求硬点直接用前端 DWB 命名（映射表内置于服务层） |
 | WebSocket 求解流 | — | S2-3（拖拽实时流，设计 §6.1 预算 <100ms）；当前 REST 单点 ~80ms 已达标 |
 | 缓存 | — | 待 S2-3（结果按 geometric-hash 缓存） |
-| 前端迁移 v3 | — | S2-2：前端引擎连接面板（双模：连引擎走 /api/v3，断开回退内置 JS）；只改 `dwb-pro-fullchassis.html` |
+| 前端迁移 v3 | **S2-2 已完成** | `dwb-pro-fullchassis.html` 内嵌引擎面板（顶栏状态 cell + 左面板连接/四工况/扫掠参数 + 右面板增益表/曲线）；双模：连引擎走 /api/v3，断开回退内置 JS。验收：playwright 真实浏览器 bump 21 点 VALID 2183ms、增益/曲线渲染正常 |
 
 **关键决策固化**：
 - 轮轴 camber/toe 基准 = DesignSpec（cam0/toe0，默认 -1.2/+0.05 与前端 PRESETS 一致）；knuckle 姿态用 **Kabsch/SVD 估计**恢复（引擎无四元数输出），镜像对称实测 0.15°；
 - 转向增益低（±8mm rack → 0.3° toe）为基线硬点几何事实（横拉杆近轴向）；
-- Open Items：摇臂轴精确方向（现用 RCK_AX_A 单点 + 引擎固定绕 X）；S2-2/3 前端面板与求解流；OptimumK 示例数值录入持续挂账。
+- Open Items：摇臂轴精确方向（现用 RCK_AX_A 单点 + 引擎固定绕 X）；S2-3 前端求解流与缓存；OptimumK 示例数值录入持续挂账。
+- **S2-2 补充（2026-08-22）**：前端线程完成引擎面板——`dwb-pro-fullchassis.html` 顶栏状态 cell + 左面板「引擎连接与 K&C 分析」（地址/连接/四工况/扫掠参数/Fz/衬套开关/运行）+ 右面板「引擎 K&C 结果」（增益表 + plotXY 曲线，roll 左右双曲线）。双模语义成立，playwright 端到端验证通过（bump 21 点含衬套，VALID，2183ms）。
 
 ---
 

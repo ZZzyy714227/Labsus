@@ -1,5 +1,18 @@
 # 开发日志
 
+## 2026-08-22 — S2-2 前端引擎面板落地：dwb-pro-fullchassis.html 双模接入 /api/v3
+- 前端主线 = `dwb-pro-dev/web/dwb-pro-fullchassis.html`（唯一前端核心，与用户决策对齐；"modeler 迁移"提法正式废弃）。
+- 新增（同一文件内）：
+  - 顶栏引擎状态 cell（#tbEng：内置 JS ↔ 引擎 v3 切换灯）；
+  - 左面板首区块「引擎连接与 K&C 分析」：地址输入（默认 http://127.0.0.1:8001）· 连接/断开（AbortController 4s 超时）· 四工况按钮（bump/roll/steer/compliance）· 扫掠范围/点数/Fz 输入 · LCA 衬套开关（bLCA_F 500N/mm）· 运行按钮；
+  - 右面板「引擎 K&C 结果」折叠区块：增益表（状态/ms + 引擎 gains 全键）+ 曲线 canvas（plotXY 复用：bump/roll→轮跳轴，steer→rack 轴，compliance→力轴；roll 显示左右轮双曲线）；
+  - `ENG` 模块（url/ok/busy/kcCase/sweep/fz/useBush/result）+ 5 函数（连接/断开/payload/run/render）。
+- 双模语义：已连接 → K&C 分析走 `/api/v3/kandc/{case}`（正式通道）；未连接/失败 → 如实提示并回退内置 JS（页面原有功能零改动）。
+- payload 契约：前端 HP 命名直发（points=S[axis].hp）+ arch/tire.R/design(cam0,toe0) + track_width=2·WC.x；引擎侧映射表消化。
+- 验收（playwright 真实浏览器 + 真实 8001 引擎）：加载无 JS 错误；连接 → tbEng 变「引擎 v3」；bump 21 点含衬套 VALID 2183ms，增益 camber −1.065°/25 · bumpSteer +0.037 · MR 1.98 · RC 迁移 9.81mm；曲线像素 252 采样点非空；steer 切换重跑 OK。
+- 引擎侧回归：38 tests 全绿（含上轮 15 v3 API 测试）。
+- Open Items：S2-3 WebSocket 拖拽实时求解流 + 结果缓存；多衬套 UI。
+
 ## 2026-08-22 — S2-1 引擎 /api/v3 服务层落地（隔离工作区 dwb-pro-dev/engine）
 - 定位：S2 = 前端 `dwb-pro-dev/web/dwb-pro-fullchassis.html`（唯一前端核心，不换文件）接入引擎 `dwb-pro-dev/engine/`。本轮交付服务层，前端引擎面板下一轮。
 - 新增：
