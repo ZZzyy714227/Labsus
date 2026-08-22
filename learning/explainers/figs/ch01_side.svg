@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 672 670" font-family="Cascadia Mono,Consolas,monospace">
+<line x1="12.0" y1="624" x2="12.0" y2="46.0" stroke="#1e2632" stroke-width="1"/>
+<line x1="97.0" y1="624" x2="97.0" y2="46.0" stroke="#1e2632" stroke-width="1"/>
+<line x1="182.0" y1="624" x2="182.0" y2="46.0" stroke="#1e2632" stroke-width="1"/>
+<line x1="267.0" y1="624" x2="267.0" y2="46.0" stroke="#28313e" stroke-width="1"/>
+<line x1="352.0" y1="624" x2="352.0" y2="46.0" stroke="#1e2632" stroke-width="1"/>
+<line x1="437.0" y1="624" x2="437.0" y2="46.0" stroke="#1e2632" stroke-width="1"/>
+<line x1="522.0" y1="624" x2="522.0" y2="46.0" stroke="#1e2632" stroke-width="1"/>
+<line x1="46" y1="709.0" x2="522.0" y2="709.0" stroke="#1e2632" stroke-width="1"/>
+<line x1="46" y1="624.0" x2="522.0" y2="624.0" stroke="#28313e" stroke-width="1"/>
+<line x1="46" y1="539.0" x2="522.0" y2="539.0" stroke="#1e2632" stroke-width="1"/>
+<line x1="46" y1="454.0" x2="522.0" y2="454.0" stroke="#1e2632" stroke-width="1"/>
+<line x1="46" y1="369.0" x2="522.0" y2="369.0" stroke="#1e2632" stroke-width="1"/>
+<line x1="46" y1="284.0" x2="522.0" y2="284.0" stroke="#1e2632" stroke-width="1"/>
+<line x1="46" y1="199.0" x2="522.0" y2="199.0" stroke="#28313e" stroke-width="1"/>
+<line x1="46" y1="114.0" x2="522.0" y2="114.0" stroke="#1e2632" stroke-width="1"/>
+<defs><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7a8595"/></marker></defs>
+<line x1="46" y1="624" x2="86" y2="624" stroke="#7a8595" stroke-width="1.6" marker-end="url(#ar)"/><text x="92" y="628" font-size="11" fill="#7a8595">Y 向前 → (mm)</text>
+<line x1="46" y1="624" x2="46" y2="584" stroke="#7a8595" stroke-width="1.6" marker-end="url(#ar)"/><text x="52" y="578" font-size="11" fill="#7a8595">Z 上 (mm)</text>
+<text x="38" y="640" font-size="10" fill="#7a8595">0</text>
+<line x1="267.0" y1="624.0" x2="267.0" y2="624.0" stroke="#4a5568" stroke-width="2.5" opacity="1.0"/>
+<line x1="263.0" y1="352.0" x2="271.0" y2="352.0" stroke="#8c96a2" stroke-width="4"/>
+<line x1="267.0" y1="352.0" x2="267.0" y2="628.2" stroke="#8c96a2" stroke-width="2" opacity=".6"/>
+<line x1="420.0" y1="500.8" x2="131.0" y2="492.2" stroke="#b98a4f" stroke-width="2.5" opacity="1.0"/>
+<line x1="420.0" y1="500.8" x2="275.5" y2="483.8" stroke="#b98a4f" stroke-width="2.5" opacity="1.0"/>
+<line x1="131.0" y1="492.2" x2="275.5" y2="483.8" stroke="#b98a4f" stroke-width="2.5" opacity="1.0"/>
+<line x1="386.0" y1="301.0" x2="156.5" y2="292.5" stroke="#c98c65" stroke-width="2.5" opacity="1.0"/>
+<line x1="386.0" y1="301.0" x2="254.2" y2="237.2" stroke="#c98c65" stroke-width="2.5" opacity="1.0"/>
+<line x1="156.5" y1="292.5" x2="254.2" y2="237.2" stroke="#c98c65" stroke-width="2.5" opacity="1.0"/>
+<line x1="275.5" y1="483.8" x2="254.2" y2="237.2" stroke="#a66b58" stroke-width="2.5" opacity="1.0"/>
+<line x1="254.2" y1="237.2" x2="267.0" y2="352.0" stroke="#a66b58" stroke-width="2.5" opacity="1.0"/>
+<line x1="275.5" y1="483.8" x2="267.0" y2="352.0" stroke="#a66b58" stroke-width="2.5" opacity="1.0"/>
+<line x1="275.5" y1="483.8" x2="143.8" y2="449.8" stroke="#a66b58" stroke-width="2.5" opacity="1.0"/>
+<line x1="254.2" y1="237.2" x2="143.8" y2="449.8" stroke="#a66b58" stroke-width="2.5" opacity="1.0"/>
+<line x1="126.8" y1="455.6" x2="143.8" y2="449.8" stroke="#7a8c7e" stroke-width="2.5" opacity="1.0"/>
+<line x1="277.2" y1="449.3" x2="316.2" y2="245.2" stroke="#8f988a" stroke-width="2.5" opacity="1.0"/>
+<line x1="284.0" y1="312.6" x2="316.2" y2="245.2" stroke="#b9c2c9" stroke-width="2.5" opacity="1.0"/>
+<line x1="284.0" y1="312.6" x2="318.0" y2="296.8" stroke="#b9c2c9" stroke-width="2.5" opacity="1.0"/>
+<line x1="284.0" y1="312.6" x2="343.5" y2="313.8" stroke="#b9c2c9" stroke-width="2.5" opacity="1.0"/>
+<line x1="318.0" y1="296.8" x2="318.1" y2="470.1" stroke="#d9b98a" stroke-width="2.5" opacity="1.0"/>
+<line x1="420.0" y1="500.8" x2="-73.0" y2="486.2" stroke="#b98a4f" stroke-width="1.1" stroke-dasharray="5 4" opacity="1.0"/>
+<text x="-83.0" y="486.25" font-size="10" fill="#b98a4f" text-anchor="end">下臂轴倾角 1.68°(前低后高)</text>
+<rect x="416.0" y="496.8" width="8" height="8" fill="#943948"/>
+<text x="364.0" y="518.8" font-size="10.5" fill="#c9c2b2">LCA_F</text>
+<rect x="127.0" y="488.2" width="8" height="8" fill="#943948"/>
+<text x="139.0" y="506.2" font-size="10.5" fill="#c9c2b2">LCA_R</text>
+<circle cx="275.5" cy="483.8" r="4.5" fill="none" stroke="#e8dcc4" stroke-width="1.8"/>
+<text x="255.5" y="469.8" font-size="10.5" fill="#c9c2b2">LBJ</text>
+<rect x="382.0" y="297.0" width="8" height="8" fill="#943948"/>
+<text x="338.0" y="291.0" font-size="10.5" fill="#c9c2b2">UCA_F</text>
+<rect x="152.5" y="288.5" width="8" height="8" fill="#943948"/>
+<text x="164.5" y="278.5" font-size="10.5" fill="#c9c2b2">UCA_R</text>
+<circle cx="254.2" cy="237.2" r="4.5" fill="none" stroke="#e8dcc4" stroke-width="1.8"/>
+<text x="224.2" y="245.2" font-size="10.5" fill="#c9c2b2">UBJ</text>
+<circle cx="267.0" cy="352.0" r="6" fill="#8fb0d4"/>
+<text x="277.0" y="356.0" font-size="10.5" fill="#c9c2b2">WC</text>
+<circle cx="143.8" cy="449.8" r="4.5" fill="none" stroke="#e8dcc4" stroke-width="1.8"/>
+<text x="153.8" y="463.8" font-size="10.5" fill="#c9c2b2">TRO</text>
+<rect x="122.8" y="451.6" width="8" height="8" fill="#943948"/>
+<text x="136.8" y="471.6" font-size="10.5" fill="#c9c2b2">RACK</text>
+<circle cx="277.2" cy="449.3" r="4.5" fill="none" stroke="#e8dcc4" stroke-width="1.8"/>
+<text x="289.2" y="449.3" font-size="10.5" fill="#c9c2b2">STRUT_OUT</text>
+<rect x="280.0" y="308.6" width="8" height="8" fill="#943948"/>
+<text x="254.0" y="298.6" font-size="10.5" fill="#c9c2b2">RCK_AX_A</text>
+<rect x="339.5" y="309.8" width="8" height="8" fill="#943948"/>
+<text x="353.5" y="301.8" font-size="10.5" fill="#c9c2b2">RCK_AX_B</text>
+<circle cx="316.2" cy="245.2" r="4.5" fill="none" stroke="#e8dcc4" stroke-width="1.8"/>
+<text x="324.2" y="235.2" font-size="10.5" fill="#c9c2b2">STRUT_IN</text>
+<circle cx="318.0" cy="296.8" r="4.5" fill="none" stroke="#e8dcc4" stroke-width="1.8"/>
+<text x="298.0" y="312.8" font-size="10.5" fill="#c9c2b2">RCK_DMP</text>
+<rect x="314.1" y="466.1" width="8" height="8" fill="#943948"/>
+<text x="326.1" y="462.1" font-size="10.5" fill="#c9c2b2">DMP_BODY</text>
+<text x="60" y="24" font-size="10.5" fill="#9aa3ad" text-anchor="start">垂向弹性路径: WC→转向节→STRUT_OUT→推杆→STRUT_IN→摇臂(绕RCK_AX)→RCK_DMP→减振器→DMP_BODY</text>
+<text x="60" y="38" font-size="10.5" fill="#9aa3ad" text-anchor="start">侧视传动链各环节均按真实坐标投影 · 网格100mm</text>
+</svg>

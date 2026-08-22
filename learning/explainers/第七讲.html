@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第 2 章 · 刚体位姿与旋转 — LABSUS 悬架实验室</title>
+<!-- 引入 MathJax 渲染高质量数学公式 -->
+<script>
+window.MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']],
+    processEscapes: true
+  },
+  options: {
+    skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+  }
+};
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<style>
+:root {
+  --bg: #0f1319;
+  --panel: #161c26;
+  --ink: #e6edf3;
+  --ink-dim: #9aa7b8;
+  --pri: #58a6ff;
+  --pri-dim: rgba(88, 166, 255, 0.15);
+  --ok: #3fb950;
+  --ok-dim: rgba(63, 185, 80, 0.15);
+  --warn: #d29922;
+  --warn-dim: rgba(210, 153, 34, 0.15);
+  --err: #f85149;
+  --err-dim: rgba(248, 81, 73, 0.15);
+  --purple: #bc8cff;
+  --purple-dim: rgba(188, 140, 255, 0.15);
+  --line: #30363d;
+  --code-bg: #0b0e14;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: 15.5px;
+  line-height: 1.8;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 40px 24px 100px;
+}
+
+/* 标题体系 */
+h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+h1 small {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pri);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+h2 {
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--pri);
+  margin: 52px 0 18px;
+  padding-left: 12px;
+  border-left: 4px solid var(--pri);
+  display: flex;
+  align-items: center;
+}
+h3 {
+  font-size: 17px;
+  font-weight: 600;
+  color: #c9d1d9;
+  margin: 28px 0 10px;
+}
+
+p { margin: 12px 0; color: #c9d1d9; }
+strong, b { color: #fff; }
+em { color: var(--warn); font-style: normal; font-weight: 600; }
+
+/* 容器卡片 */
+.box {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px 22px;
+  margin: 20px 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.box.intuition { border-left: 4px solid var(--purple); background: linear-gradient(90deg, var(--purple-dim) 0%, var(--panel) 25%); }
+.box.proof { border-left: 4px solid var(--ok); background: linear-gradient(90deg, var(--ok-dim) 0%, var(--panel) 25%); }
+.box.warn { border-left: 4px solid var(--warn); background: linear-gradient(90deg, var(--warn-dim) 0%, var(--panel) 25%); }
+.box.algo { border-left: 4px solid var(--pri); background: linear-gradient(90deg, var(--pri-dim) 0%, var(--panel) 25%); }
+.box-title { font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.box.intuition .box-title { color: var(--purple); }
+.box.proof .box-title { color: var(--ok); }
+.box.warn .box-title { color: var(--warn); }
+.box.algo .box-title { color: var(--pri); }
+
+/* 步骤指示器 */
+.step-card {
+  background: #121720;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 16px 0;
+}
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 8px;
+}
+.step-tag {
+  background: var(--pri-dim);
+  color: var(--pri);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-family: monospace;
+  font-weight: bold;
+}
+
+/* 列表与表格 */
+ul, ol { margin: 12px 0 12px 24px; color: #c9d1d9; }
+li { margin: 6px 0; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+  background: var(--panel);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+th, td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+th { background: #1f2733; color: #fff; font-weight: 600; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,0.02); }
+
+/* 代码块 */
+code {
+  font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--code-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--pri);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  overflow-x: auto;
+}
+pre code {
+  background: transparent;
+  padding: 0;
+  border: none;
+  color: #e6edf3;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.comment { color: #8b949e; }
+.keyword { color: #ff7b72; }
+.func { color: #d2a8ff; }
+.num { color: #79c0ff; }
+
+/* 问答区域 */
+.qa-box {
+  background: #161c24;
+  border: 1px solid #232d3d;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 14px 0;
+}
+.qa-box b { color: var(--ok); }
+
+.formula-highlight {
+  background: #131922;
+  border-left: 3px solid var(--pri);
+  padding: 10px 16px;
+  margin: 12px 0;
+  border-radius: 0 6px 6px 0;
+}
+</style>
+</head>
+
+
+<body>
+
+<h1>第 7 章 · 静力学、二力杆力链与衬套柔顺
+<small>LABSUS 悬架实验室 · 自底向上 7/11 · 力进入系统主线</small></h1>
+
+<h2>7.0 这一章解决的物理问题</h2>
+<p>前六章是<b>运动学</b>（几何决定位形）。现在力正式入场：轮胎接地点承受 $F_x/F_y/F_z$，这些力怎么传到车身？传力路径上的柔性（衬套）又让位形反过来变化——<b>K&amp;C 的 C（Compliance）</b>。本章：① 静力地基（自由体图 + 平衡方程）；② <b>二力杆定理</b>及其在力链中的使用；③ 衬套 6DOF 模型与小角变换；④ <b>两层求解器</b>为什么必须两层（非线性的家）。</p>
+
+<div class="box intuition">
+  <div class="box-title">💡 核心图景：力链是一条"传力多边形"</div>
+  <p>接地点的力沿第一讲的传力路径流动：接触斑 → 转向节（通过球铰）→ 每根连杆 → 车身锚点。<b>转向节是力链的分水岭</b>：它是刚体，遵守六个平衡方程；它连接的每根二力杆只贡献一个未知数（轴向力）。静力学问题 = 数清未知数与方程。</p>
+</div>
+
+<h2>7.1 静力地基：自由体图与平衡方程</h2>
+<div class="box proof">
+  <div class="box-title">📐 刚体平衡（牛顿-欧拉，静态）</div>
+  $$\sum \vec{F} = 0 \;(3\ \text{方程}), \qquad \sum \vec{M}_O = \sum \vec{r}_i \times \vec{F}_i = 0\;(3\ \text{方程})$$
+  <p>力矩参考点 $O$ 任意取（$\sum F = 0$ 时力矩与参考点无关——证明：换点 $O'$，$\sum \vec{r}_i' \times F_i = \sum (\vec{r}_i + \vec{d}) \times F_i = \sum M_O + \vec{d} \times \sum F = \sum M_O$）。<b>自由体图（FBD）方法论</b>：在脑中"切开"要分析的物体，把所有暴露的内力画成外力，然后数方程。</p>
+</div>
+<div class="box proof">
+  <div class="box-title">📐 二力杆定理（力链的合法性证明）</div>
+  <p><b>命题</b>：一根只在两端 $A, B$ 受力（两端均为球铰，不传力矩）的轻杆，其两端力必沿 $AB$ 连线。</p>
+  <p><b>证明</b>：力平衡 ⟹ $\vec{F}_B = -\vec{F}_A$。对 $A$ 取矩：$\vec{M}_A = \vec{r}_{AB} \times \vec{F}_B = \vec{0}$（$A$ 点自身力无矩）。叉积为零 ⟹ 两矢量平行 ⟹ $\vec{F}_B \parallel \vec{r}_{AB}$。∎</p>
+  <p><b>后果</b>：每根二力杆只带 <b>1 个未知数</b>（轴向力标量 $m$），力向量 $= m \cdot \hat{u}$（$\hat u$ = 杆向单位向量，由几何已知）。这就是力链能算的原因。</p>
+</div>
+
+<h2>7.2 力链：从接触斑到车身锚点</h2>
+<div class="box algo">
+  <div class="box-title">🎯 结构：转向节处的线性方程组</div>
+  <p>转向节（刚体）在轮心承受外载 $f_{cp}$（接触斑力平移到轮心，S1 简化忽略力矩折算），连接 $n$ 根二力杆。力平衡：</p>
+  $$\underbrace{\begin{bmatrix} \hat u_1 & \hat u_2 & \cdots & \hat u_n \end{bmatrix}}_{A\,(3 \times n)} \begin{bmatrix} m_1 \\ \vdots \\ m_n \end{bmatrix} = -f_{cp}$$
+  <table>
+    <thead><tr><th>情形</th><th>数学</th><th>工程处置</th></tr></thead>
+    <tbody>
+      <tr><td>$n = 3$</td><td>恰定（$3\times3$）</td><td>直接解（条件好时残差 ~$10^{-12}$）</td></tr>
+      <tr><td>$n &gt; 3$</td><td>超静定（无穷多解）</td><td><b>最小范数最小二乘</b> + 状态标注 APPROXIMATE</td></tr>
+      <tr><td>$n &lt; 3$ 或方向退化</td><td>欠定/不可闭合</td><td>残差 $> 0$ ⟹ 力无法全部传递（真实悬架不应发生）</td></tr>
+    </tbody>
+  </table>
+</div>
+<div class="box algo">
+  <div class="box-title">🎯 实验 1（真实运行）：fy = −3000N 的三杆力链与牛三闭合</div>
+  <table>
+    <thead><tr><th>杆</th><th>轴向力 m (N)</th><th>锚点合力 (N)</th></tr></thead>
+    <tbody>
+      <tr><td>LCA（枢轴中点→LBJ）</td><td>−74 122</td><td>(+74 087, 0, +2 268)</td></tr>
+      <tr><td>UCA（枢轴中点→UBJ）</td><td>+5 184</td><td>(−5 051, +321, −1 122)</td></tr>
+      <tr><td>TIE（RACK→TRO）</td><td>+69 126</td><td>(−69 037, −3 321, −1 146)</td></tr>
+      <tr><td><b>锚点合力之和</b></td><td colspan="2"><b>(+0.00, −3000.00, −0.00) N ✓</b>（残差 3.7e−12）</td></tr>
+    </tbody>
+  </table>
+  <p><b>两个观察</b>：① 牛顿第三定律闭合逐位成立——传力守恒是力链代码的第一自检；② <b>内力远大于外载</b>（3kN 输入激发 74kN 内力）：LCA 与 TIE 方向近乎对顶，扛 $y$ 向载荷靠"巨力对消"——$A$ 的方向几何决定传力效率（与第 4 章"约束方向几何决定收敛"同构：<b>几何条件性无处不在</b>）。注：本实验是 <code>corner_to_anchor_loads</code> 的教学化三杆实例；产品路径按其装配拓扑组杆，语义相同。</p>
+</div>
+
+<h2>7.3 衬套 6DOF：柔性的数学化身</h2>
+<div class="box intuition">
+  <div class="box-title">💡 为什么是 6 个自由度</div>
+  <p>真实控制臂与车身之间不是理想铰链，是<b>橡胶衬套</b>：三个平移方向各有刚度（N/mm），三个转动方向各有刚度（N·mm/rad）。连接点因此可以"让"——让的量就是 δ = [dx, dy, dz, rx, ry, rz]。本构：</p>
+  $$f_i = k_i(\delta_i)\ \text{（逐 DOF 独立，可 linear / table / spline）} + f_{preload} + (K_{coupled}\,\delta)$
+  <p><code>Curve</code> 三种形态：linear（常数刚度）、table/spline（<b>Pchip</b> 单调样条插值——端点钳位防外推爆炸，第 9 章扫掠插值同款思想）。<code>bush_force_jac</code> 给解析雅可比（样条也有导数）——外层求解器因此无需差分。</p>
+</div>
+
+<h2>7.4 小角变换：第 2 章的回归</h2>
+<div class="box proof">
+  <div class="box-title">📐 从 $R \approx I + \theta[n]_\times$ 到锚点变换公式</div>
+  <p>第 2 章 2.3 的微小旋转线性化在此上岗：衬套转动是"小角"（工程上 &lt; 2°），</p>
+  $$R_{small}(r) = \begin{bmatrix} 1 & -r_z & r_y \\ r_z & 1 & -r_x \\ -r_y & r_x & 1 \end{bmatrix} = I + [r]_\times$$
+  <p>部件侧成员点变换（绕衬套锚点转 + 平移）：</p>
+  $$p' = \text{anchor} + R_{small}\,(p_0 - \text{anchor}) + t$$
+  <p><b>精度实验（真实运行，对 Rodrigues）</b>：</p>
+  <table>
+    <thead><tr><th>θ</th><th>0.5°</th><th>1°</th><th>2°</th><th>5°</th></tr></thead>
+    <tbody><tr><td>max|ΔR|</td><td>3.5e−5</td><td>1.4e−4</td><td>5.5e−4</td><td>3.5e−3</td></tr></tbody>
+  </table>
+  <p>误差按 $\theta^2/2$ 标度（每翻倍 ×4）——正是被丢掉的二阶项。<b>与源码注释互证</b>："θ&lt;5° 精度 1e−3 级"实测成立；K&amp;C 衬套工作区 &lt;2° ⟹ 5e−4 以下，安全。要大角？升级指数映射（Rodrigues），接口不变——扩展点已留好。</p>
+</div>
+
+<h2>7.5 两层求解器：非线性的家</h2>
+<div class="box intuition">
+  <div class="box-title">💡 为什么必须两层（耦合结构）</div>
+  <p>看似简单的问题："给锚点施力 $f_{ext}$，衬套让多少？"陷阱在于<b>循环依赖</b>：</p>
+  <ul>
+    <li>δ 决定锚点位置 → 决定<b>机构位形</b>（内层：小角变换 + solve_pose 重解）；</li>
+    <li>机构位形决定杆件<b>方向</b> → 决定外载在各衬套上的分配 → 决定需要的衬套力。</li>
+  </ul>
+  <p>所以衬套力不是 $k\delta$ 那么简单——<b>$\delta$ 还通过机构几何反过来改变力本身</b>。拆成两层：</p>
+  $$\text{外层（力平衡）}: \quad r(\delta) = f_{ext} - f_{bush}(\delta; \; \text{pose}(\delta)) = 0$$
+  $$\text{内层（机构）}: \quad \text{pose}(\delta) = \text{solve\_pose}(\text{anchors}(\delta),\ \text{travel},\ \text{rack})$$
+  <p>外层用 TRF（第 4 章信赖域，变量缩放控制步长），失败兜底 <b>Anderson 加速</b>（无雅可比不动点迭代：用历史差商 $\Delta F, \Delta x$ 做最小二乘外推，"免费的超线性收敛"）；内层就是第 3-4 章的机构求解器。状态机四档：VALID / APPROXIMATE（超静定最小范数）/ COMPLIANCE_DIVERGED / SOLVER_FAILED。</p>
+</div>
+<div class="box algo">
+  <div class="box-title">🎯 实验 3（真实 HTTP）：LCA 双衬套 fy ±2000N 柔顺扫掠</div>
+  <table>
+    <thead><tr><th>量</th><th>值</th></tr></thead>
+    <tbody>
+      <tr><td>状态</td><td>VALID（9 点共 1417ms ≈ 157ms/点——<b>双层成本</b>：每次外层评估都要重解一次机构）</td></tr>
+      <tr><td>compliance toe</td><td><b>−0.106 °/kN</b></td></tr>
+      <tr><td>toe 曲线</td><td>fy=−2000N → <b>+0.088°</b>；fy=+2000N → <b>−0.335°</b></td></tr>
+    </tbody>
+  </table>
+  <p><b>不对称性就是两层非线性的签名</b>：若系统线性，±2kN 的 toee 摆幅应严格对称（±0.21°）；实际正负侧摆幅 0.42°/0.18°——大变形侧的机构几何已经变了。注意区分：<b>衬套本征 $f = k\delta$ 恒线性；非线性全部来自"δ 改变几何 → 力方向/力臂变化"这一层</b>（备课时用假想 δ 直评衬套力得到严格线性——证明本征项无罪）。</p>
+</div>
+
+<h2>7.6 源码逐行对账</h2>
+<pre><code><span class="comment"># forces.py —— 二力杆力链（7.2）</span>
+A = np.column_stack([l.unit() <span class="keyword">for</span> l <span class="keyword">in</span> links])          <span class="comment"># 方向矩阵 3×n</span>
+m, resid = solve_linear(A, -f_cp)                              <span class="comment"># 恰定/超静定最小范数 + 残差</span>
+out[key] = out.get(key, zeros) - l.mag * l.unit()              <span class="comment"># 锚点反力（牛三闭合）</span>
+
+<span class="comment"># bushing.py —— 6DOF 本构（7.3）</span>
+f[i]   = b._fT[i][<span class="num">0</span>](d[i]);  f[<span class="num">3</span>+i] = b._fR[i][<span class="num">0</span>](d[<span class="num">3</span>+i])       <span class="comment"># 平移/旋转逐 DOF 曲线</span>
+J[i,i] = b._fT[i][<span class="num">1</span>](d[i])                                    <span class="comment"># 解析雅可比（样条导数）</span>
+
+<span class="comment"># compliance_transform.py —— 小角变换（7.4）</span>
+R = small_rot_matrix(d[<span class="num">3</span>:<span class="num">6</span>)                                   <span class="comment"># I + [r]×（第2章 2.3）</span>
+out[node] = transform_point(p0 - b.anchor, t, R) + b.anchor    <span class="comment"># p' = anchor + R(p0−anchor) + t</span>
+
+<span class="comment"># compliance.py —— 两层（7.5）</span>
+<span class="keyword">def</span> <span class="func">_residual</span>(x):
+    anchors = apply_bushing_to_anchors(bushings, _unpack(x))   <span class="comment"># δ → 锚点</span>
+    rep = solve_pose(mech, travel, rack, ...)                   <span class="comment"># 内层：机构重解（TRF）</span>
+    <span class="keyword">return</span> f_ext - bush_force(bushings[n], d[n])          <span class="comment"># 外层：力平衡残差</span>
+res = least_squares(_residual, x0, method=<span class="string">"trf"</span>, x_scale=...)   <span class="comment"># 外层 TRF</span>
+<span class="keyword">if</span> 失败: _anderson(_residual, x0)                             <span class="comment"># Anderson 兜底（历史差商外推）</span></code></pre>
+
+<h2>7.7 核心检查点与自测</h2>
+<div class="qa-box">
+  <p><b>Q1. 证明二力杆定理。为什么球铰是前提？</b></p>
+  <p><b>解析</b>：力平衡 ⟹ 两端力相反；对 A 取矩 ⟹ B 端力平行于 AB。球铰前提 = 不传力矩——若端部有力矩（如焊接），力线约束消失，杆可以受弯。二力杆让每杆只带 1 个未知数，力链才可解。</p>
+</div>
+<div class="qa-box">
+  <p><b>Q2. n 根二力杆汇交，方程与未知数怎么数？超静定为什么用最小范数解？</b></p>
+  <p><b>解析</b>：3 个力平衡方程对 n 个轴向力。n=3 恰定；n&gt;3 超静定——真实载荷分配取决于各杆微小的柔度差（本模型没建），最小范数是最不偏不倚的选取（所有满足平衡的解中能量/长度最小者），并诚实标注 APPROXIMATE。</p>
+</div>
+<div class="qa-box">
+  <p><b>Q3. 小角矩阵的误差为什么按 θ² 标度？5° 时误差多少，衬套工作区为什么安全？</b></p>
+  <p><b>解析</b>：$R = I + \theta[n]_\times + \tfrac{\theta^2}{2}[n]_\times^2 + \cdots$，线性化丢掉的首项是二阶 ⟹ 误差 ∝ θ²。实测 5° → 3.5e−3、2° → 5.5e−4；K&amp;C 衬套转角通常 &lt;2°，误差比几何公差小两个量级。</p>
+</div>
+<div class="qa-box">
+  <p><b>Q4. 为什么必须两层迭代？把衬套力写成 f=kδ 单层解会怎样？</b></p>
+  <p><b>解析</b>：δ 经小角变换改锚点 → 机构位形变 → 杆件方向变 → 外载在各衬套的分配变——循环依赖。若忽略（单层 f=kδ），得到的是"几何冻结"的近似：小载荷下尚可，大载荷系统性偏差（实验 3 的不对称摆幅正是被冻结近似丢掉的部分）。</p>
+</div>
+<div class="qa-box">
+  <p><b>Q5.（动手）把实验 1 的输入改成 fz = −3000N（纯垂向），三杆 m 怎么变？锚点和还闭合吗？</b></p>
+  <p><b>解析</b>：A 不变、右端项变，仍是恰定线性系统 ⟹ 新 m 直接解出；锚点合力之和必 = (0, 0, +3000)（牛三闭合与载荷方向无关，是恒等式级性质）。预期 LCA 扛绝大部分垂向、TIE/UCA 分少量——可跑 corner_to_anchor_loads 验证。</p>
+</div>
+
+</body>
+</html>

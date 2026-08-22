@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第 2 章 · 刚体位姿与旋转 — LABSUS 悬架实验室</title>
+<!-- 引入 MathJax 渲染高质量数学公式 -->
+<script>
+window.MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']],
+    processEscapes: true
+  },
+  options: {
+    skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+  }
+};
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<style>
+:root {
+  --bg: #0f1319;
+  --panel: #161c26;
+  --ink: #e6edf3;
+  --ink-dim: #9aa7b8;
+  --pri: #58a6ff;
+  --pri-dim: rgba(88, 166, 255, 0.15);
+  --ok: #3fb950;
+  --ok-dim: rgba(63, 185, 80, 0.15);
+  --warn: #d29922;
+  --warn-dim: rgba(210, 153, 34, 0.15);
+  --err: #f85149;
+  --err-dim: rgba(248, 81, 73, 0.15);
+  --purple: #bc8cff;
+  --purple-dim: rgba(188, 140, 255, 0.15);
+  --line: #30363d;
+  --code-bg: #0b0e14;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: 15.5px;
+  line-height: 1.8;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 40px 24px 100px;
+}
+
+/* 标题体系 */
+h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+h1 small {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pri);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+h2 {
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--pri);
+  margin: 52px 0 18px;
+  padding-left: 12px;
+  border-left: 4px solid var(--pri);
+  display: flex;
+  align-items: center;
+}
+h3 {
+  font-size: 17px;
+  font-weight: 600;
+  color: #c9d1d9;
+  margin: 28px 0 10px;
+}
+
+p { margin: 12px 0; color: #c9d1d9; }
+strong, b { color: #fff; }
+em { color: var(--warn); font-style: normal; font-weight: 600; }
+
+/* 容器卡片 */
+.box {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px 22px;
+  margin: 20px 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.box.intuition { border-left: 4px solid var(--purple); background: linear-gradient(90deg, var(--purple-dim) 0%, var(--panel) 25%); }
+.box.proof { border-left: 4px solid var(--ok); background: linear-gradient(90deg, var(--ok-dim) 0%, var(--panel) 25%); }
+.box.warn { border-left: 4px solid var(--warn); background: linear-gradient(90deg, var(--warn-dim) 0%, var(--panel) 25%); }
+.box.algo { border-left: 4px solid var(--pri); background: linear-gradient(90deg, var(--pri-dim) 0%, var(--panel) 25%); }
+.box-title { font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.box.intuition .box-title { color: var(--purple); }
+.box.proof .box-title { color: var(--ok); }
+.box.warn .box-title { color: var(--warn); }
+.box.algo .box-title { color: var(--pri); }
+
+/* 步骤指示器 */
+.step-card {
+  background: #121720;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 16px 0;
+}
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 8px;
+}
+.step-tag {
+  background: var(--pri-dim);
+  color: var(--pri);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-family: monospace;
+  font-weight: bold;
+}
+
+/* 列表与表格 */
+ul, ol { margin: 12px 0 12px 24px; color: #c9d1d9; }
+li { margin: 6px 0; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+  background: var(--panel);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+th, td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+th { background: #1f2733; color: #fff; font-weight: 600; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,0.02); }
+
+/* 代码块 */
+code {
+  font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--code-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--pri);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  overflow-x: auto;
+}
+pre code {
+  background: transparent;
+  padding: 0;
+  border: none;
+  color: #e6edf3;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.comment { color: #8b949e; }
+.keyword { color: #ff7b72; }
+.func { color: #d2a8ff; }
+.num { color: #79c0ff; }
+
+/* 问答区域 */
+.qa-box {
+  background: #161c24;
+  border: 1px solid #232d3d;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 14px 0;
+}
+.qa-box b { color: var(--ok); }
+
+.formula-highlight {
+  background: #131922;
+  border-left: 3px solid var(--pri);
+  padding: 10px 16px;
+  margin: 12px 0;
+  border-radius: 0 6px 6px 0;
+}
+</style>
+</head>
+
+
+<body>
+
+<h1>第 3 章 · 约束即数学——从物理铰链到方程组
+<small>LABSUS 悬架实验室 · 自底向上 3/11 · 机构建模主线</small></h1>
+
+<h2>3.0 这一章解决的物理问题</h2>
+<p>第 1 章给了 15 个硬点坐标（设计位），第 2 章解决了"刚体转到哪"。现在的问题是：<b>给定轮跳 travel 与齿条 rack 两个输入，机构每个构件处于什么位置？</b>——机构学称之为<strong>位置分析（Position Analysis）</strong>。本章把整个物理机构翻译成一组代数方程，并为第 4 章（数值求解）搭好舞台。</p>
+
+<div class="box intuition">
+  <div class="box-title">💡 核心思想：机构 = 坐标 + 约束 + 驱动</div>
+  <ol>
+    <li><b>坐标</b>（未知量）：哪些点的位置待求——引擎取 6 个可动节点 × 3 = <b>18 维状态向量</b>；</li>
+    <li><b>约束</b>（方程）：物理铰链/刚体提出的等式——本章主角；</li>
+    <li><b>驱动</b>（输入）：轮跳与齿条——把机构从"有自由度"钉到"唯一位形"。</li>
+  </ol>
+  <p>悬架的几何设计感来自一个事实：<b>约束方程的常数全部由硬点坐标决定</b>（第 1 章"移动硬点 = 设计悬架"在此兑现为数学）。</p>
+</div>
+
+<div class="box algo">
+  <div class="box-title">⚖️ 架构透视：同一机构，两种参数化</div>
+  <table>
+    <thead><tr><th>维度</th><th>引擎（least_squares 路径）</th><th>前端（顺序投影路径）</th></tr></thead>
+    <tbody>
+      <tr><td><b>未知量</b></td><td>18 维坐标向量 $x$（UP1..UP5 + FL1）</td><td>节点位置 + 刚体簇四元数 $q$（BodyCluster 热启动）</td></tr>
+      <tr><td><b>约束处理</b></td><td>全部叠进一个<b>残差向量函数</b> $F(x)$，整体求解</td><td>逐个约束<b>循环投影</b>（PBD 风格，第 4 章审判其收敛性）</td></tr>
+      <tr><td><b>车身点</b></td><td>CH1..CH5 / DAMPER_CHASSIS 为常量，不进状态</td><td>fix 标记节点，同样不动</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>3.1 约束 A：铰链圆——控制臂的数学化身</h2>
+<p>物理事实：下控制臂是一个绕 <code>CH1–CH2</code> 轴（LCA_F→LCA_R 连线）转动的刚体，下球铰 LBJ 焊在臂上。所以 <b>LBJ 只能在一个圆上运动</b>：圆位于垂直于臂轴的平面内、圆心是 LBJ 设计位在轴上的投影、半径是设计位到轴的距离。上臂同理（UCA 轴 CH3–CH4，挂 UBJ）。</p>
+
+<div class="box proof">
+  <div class="box-title">📐 推导：点到直线的距离（从投影出发，零跳步）</div>
+  <div class="step-card">
+    <div class="step-header"><span class="step-tag">Step 1</span> 直线的参数表示</div>
+    <p>直线过点 $a$、沿单位方向 $u$（$u = (b-a)/\|b-a\|$）。线上任意点：$\ell(t) = a + t\,u$，$t \in \mathbb{R}$。</p>
+  </div>
+  <div class="step-card">
+    <div class="step-header"><span class="step-tag">Step 2</span> 找最近点（垂足）</div>
+    <p>最小化 $g(t) = \|p - (a + t u)\|^2$。令导数为零：</p>
+    $$\frac{dg}{dt} = -2\,u \cdot (p - a - t u) = -2\left( u \cdot (p-a) - t \right) = 0 \implies t^* = (p-a) \cdot u$$
+    <p>垂足 $p_\parallel = a + \big((p - a)\cdot u\big) u$；向量分解 $p - a = \big((p-a)\cdot u\big)\,u + d$（轴向标量 × 方向 + 垂直向量）。</p>
+  </div>
+  <div class="step-card">
+    <div class="step-header"><span class="step-tag">Step 3</span> 距离的两种等价形式</div>
+    $$\mathrm{dist}(p, \ell) = \left\| (p - a) - \big((p-a)\cdot u\big)u \right\| \quad \text{（投影形式，引擎 geometry.py 用这种）}$$
+    $$\mathrm{dist}(p, \ell) = \| (p - a) \times u \| \quad \text{（叉积形式：垂线分量模）}$$
+    <p>由第 2 章叉积定义直接等价——同一几何，两种代数。</p>
+  </div>
+</div>
+
+<p>由此写出<b>铰链圆的两个约束方程</b>（每个控制臂球铰）：</p>
+<div class="formula-highlight">
+  $$\underbrace{\mathrm{dist}\big(p_{LBJ},\ \ell_{CH1CH2}\big) - r_0}_{\text{径向：留在圆上}} = 0, \qquad \underbrace{\big(p_{LBJ} - a\big)\cdot u - ax_0}_{\text{轴向：圆平面不许滑}} = 0$$
+</div>
+
+<div class="box warn">
+  <div class="box-title">⚠️ 为什么是 2 个方程而不是 3 个？（DWB 建模的灵魂）</div>
+  <p>若把球铰写成"两点重合"（3 个方程），就必须给臂本身建刚体模型——但<b>机构只关心 LBJ 的位置，不关心臂绕自身轴转了多少</b>（该自转自由度对轮子毫无影响）。用"圆"代替"点重合"，等于<b>主动删除不关心的自由度</b>：每个 A 臂不作为刚体出现，只留下它的轴线 + 半径 + 轴向位置三个常数。机构规模骤减，这是 DWB-SIM 血统建模的核心简化。</p>
+</div>
+
+<h2>3.2 约束 B：转向节刚性——刚体定义的直接翻译</h2>
+<p>第 2 章定义：刚体 = 任意两点距离不变的点集。翻译成方程零成本：转向节 5 点（UP1..UP5）两两距离等于设计值：</p>
+<div class="formula-highlight">
+  $$\|p_i - p_j\| = d_{ij}^0, \quad \forall\, 1 \le i < j \le 5 \implies \binom{5}{2} = 10 \text{ 个方程}$$
+</div>
+<div class="box proof">
+  <div class="box-title">📐 推导：10 个方程只有 9 个独立</div>
+  <p>$n$ 个自由点坐标数 $= 3n$；刚体自由度 $= 6$（3 平动 + 3 转动）。钉成刚体需独立约束 $3n - 6$，取 $n = 5$：</p>
+  $$15 - 6 = \mathbf{9} \ne 10$$
+  <p>10 个方程含<b>恰好 1 个相容冗余</b>（设计位下全部为零，对求解无害——第 4 章会看到最小二乘天然容忍相容冗余）。这解释了关键数字：残差方程总数 19 > 坐标 18，看似超定矛盾，实际独立约束恰好 18。</p>
+</div>
+
+<h2>3.3 约束 C 与驱动：二力杆 + 双输入</h2>
+<div class="step-card">
+  <div class="step-header"><span class="step-tag">约束 C</span> 横拉杆（二力杆 / Binary Link）</div>
+  <p>横拉杆是两端球铰的轻杆，只传轴向力（"二力杆"之名第 7 章静力学证明），几何上即<b>定长约束</b>：</p>
+  $$\|p_{TRO} - p_{FL1}\| - L_0 = 0 \quad \text{（1 个方程）}$$
+</div>
+<div class="step-card">
+  <div class="step-header"><span class="step-tag">驱动 1</span> 轮跳（travel，+ = 压缩）</div>
+  $$p_{WC,z} - (z_0 + \mathrm{travel}) = 0 \quad \text{（1 个方程，只锁 z）}$$
+</div>
+<div class="step-card">
+  <div class="step-header"><span class="step-tag">驱动 2</span> 齿条（rack，沿 steer_axis 平移 FL1）</div>
+  $$p_{FL1} - \big(\text{anchor} + \mathrm{rack} \cdot \hat{s}\big) = 0 \quad \text{（3 个线性方程，直接可解）}$$
+</div>
+
+<h2>3.4 自由度审计：坐标 − 独立约束 = DOF</h2>
+<table>
+  <thead><tr><th>情形</th><th>坐标</th><th>独立约束</th><th>DOF</th><th>物理含义</th></tr></thead>
+  <tbody>
+    <tr><td>双驱动都给定</td><td>18</td><td>18（2+2+9+1+1+3）</td><td><b>0</b></td><td>位形唯一 → 位置分析可解</td></tr>
+    <tr><td>只给轮跳（齿条自由）</td><td>18</td><td>16</td><td><b>2</b></td><td>轮跳 + 转向 = 传动自由度</td></tr>
+  </tbody>
+</table>
+<div class="box warn">
+  <div class="box-title">⚠️ Grübler/Kutzbach 公式在此失效（源码自己承认）</div>
+  <p>教科书自由度公式（$6(n{-}1) - \sum$ 运动副约束）对<b>空间超静定连杆</b>会算出负数/误导值。引擎 <code>models.py</code> 模块头原话："双叉臂空间机构是超静定（overconstrained）空间连杆，不能靠 3N−Σ约束 的秩加和得到正确自由度"——所以 <code>dof()</code> 直接返回传动自由度 2，可实现性交给求解器收敛测试验证。工程处理法：<b>坐标-方程计数 + 数值秩验证</b>，而不是背公式。</p>
+</div>
+<div class="box algo">
+  <div class="box-title">🎯 数值实验（真实运行，LABSUS 引擎）</div>
+  <table>
+    <thead><tr><th>量</th><th>值</th><th>解读</th></tr></thead>
+    <tbody>
+      <tr><td>状态维数</td><td><b>18</b>（6 节点×3）</td><td>$x \in \mathbb{R}^{18}$</td></tr>
+      <tr><td>残差方程数</td><td><b>19</b>（2+2+10+1+1+3）</td><td>超定 1 个（相容冗余）</td></tr>
+      <tr><td>数值雅可比秩</td><td><b>18</b>（19×18 矩阵）</td><td>独立约束确为 18 ✓</td></tr>
+      <tr><td>雅可比条件数</td><td><b>7.0</b></td><td>良态！第 4 章 TRF 收敛快的结构原因</td></tr>
+      <tr><td>解处 max&#124;残差&#124;</td><td><b>0.00e+00</b></td><td>19 方程在解处全零（冗余相容）</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>3.5 审判日：前端与引擎的转向输入轴裂缝（第 1 章悬案）</h2>
+<div class="step-card">
+  <div class="step-header"><span class="step-tag">实验</span> 引擎 rack = +2mm 发生了什么？</div>
+  <p>真实运行：toe 从 0.0500° → 0.0849°（$\Delta = +0.0349°$/2mm），<b>而横拉杆长度变化 = 0.0000mm</b>。</p>
+  <p><b>为什么长度不变却转了向？</b>定长是约束 C（$\|TRO - FL1\| = L_0$ 恒成立）！移动 FL1 改变的是横拉杆<b>方位</b>，机构必须转动转向节让 TRO 跟到新位置——"拉伸需求"由关节转动吸收。</p>
+</div>
+<div class="step-card">
+  <div class="step-header"><span class="step-tag">手算</span> 拉伸需求 = 输入位移在横拉杆方向上的投影</div>
+  <p>由第 1 章坐标 RACK=(269,−165,198)、TRO=(685,−145,205)：</p>
+  $$\hat{u} = \frac{TRO - RACK}{\|TRO - RACK\|} = (0.9987,\ 0.0480,\ 0.0166)$$
+  <p>输入位移 $\delta = 2$mm 沿 $\hat{d}$ 的一阶拉伸需求 $= \delta\,(\hat{u} \cdot \hat{d})$：</p>
+  <table>
+    <thead><tr><th>输入方向</th><th>投影</th><th>拉伸需求</th></tr></thead>
+    <tbody>
+      <tr><td>前端：$-\hat{x}$（横向，真齿条）</td><td>$|u \cdot \hat{x}| = 0.9987$</td><td><b>1.997 mm</b></td></tr>
+      <tr><td>引擎：$+\hat{y}$（纵向）</td><td>$u \cdot \hat{y} = 0.0480$</td><td><b>0.096 mm</b></td></tr>
+    </tbody>
+  </table>
+  <p><b>灵敏度比 20.8 : 1</b>。同样是"rack=2mm"，前端产生约 2mm 转向需求，引擎只有约 0.1mm——两者是<b>不同的物理输入</b>（横向齿条 vs 纵向拉杆），数值不可互换。</p>
+</div>
+<div class="step-card">
+  <div class="step-header"><span class="step-tag">判决</span> 裂缝定性 + 修复方向</div>
+  <ul>
+    <li><b>定性</b>：引擎 <code>steer_axis = (0,±1,0)</code>（models.py 注释"齿条平移方向（右轮 +Y）"）与真实齿条的横向（−X）物理不符；前端 <code>RACK.x −= rack</code> 物理正确。双真源风险的活案例：约束方程完全相同，<b>输入语义不同</b>。</li>
+    <li><b>修法</b>：引擎 steer_axis 改 $(\pm 1, 0, 0)$（与前端同号约定），登记 OpenItem；修复后引擎 steering 增益（deg/mm）放大 ~20 倍，需同步默认扫掠范围。</li>
+    <li><b>教训</b>：约束建模只保证"机构对"，<b>驱动方向也是模型的一部分</b>——审计机构模型，坐标、约束、驱动三样都要过堂。</li>
+  </ul>
+</div>
+
+<h2>3.6 残差向量组装：19 个数叠成一个函数（源码逐行对账）</h2>
+<pre><code><span class="keyword">def</span> <span class="func">_build_residual</span>(m, travel, rack):          <span class="comment"># 返回 F(x)：ℝ¹⁸ → ℝ¹⁹</span>
+    pair = 两两组合(_KNUCKLE_IDS)                      <span class="comment"># 约束B 的 10 对</span>
+    <span class="keyword">for</span> c <span class="keyword">in</span> m.axis_clusters:                    <span class="comment"># 约束A：铰链圆（LCA/UCA 各一簇）</span>
+        <span class="keyword">for</span> mem <span class="keyword">in</span> c.members:
+            out.append(dist_point_to_line(p, a, b) - r0)    <span class="comment"># 径向方程 ×2</span>
+            out.append(dot(p - a, u) - ax0)                  <span class="comment"># 轴向方程 ×2</span>
+    <span class="keyword">for</span> i, j <span class="keyword">in</span> pair:                              <span class="comment"># 约束B：10 个定长</span>
+        out.append(norm(pos_i - pos_j) - d0[(i, j)])
+    out.append(norm(pos_TRO - pos_FL1) - tie.L0)            <span class="comment"># 约束C：二力杆 ×1</span>
+    out.append(pos_wheel.z - (z_p0 + travel))               <span class="comment"># 驱动1：轮跳 ×1</span>
+    out.extend(pos_FL1 - (anchor + rack * steer_axis))      <span class="comment"># 驱动2：齿条 ×3</span></code></pre>
+<p>位置分析从此变成纯代数问题：<b>找 $x \in \mathbb{R}^{18}$ 使 $F(x) = 0$</b>。摇臂/减振器链（STRUT_IN/RCK_DMP/DMP_BODY）不在 $F$ 内——它是轮侧解完后的<b>运动从动链</b>，由 <code>solve_rocker</code> 二分搜索 θ 单独解（第 6 章专题）。怎么解 $F(x)=0$？19 个非线性方程、超定、要求分支连续……第 4 章的全部内容。</p>
+
+<h2>3.7 核心检查点与自测</h2>
+<div class="qa-box">
+  <p><b>Q1. 铰链圆为什么是 2 个方程而不是 3 个？删除了什么自由度？</b></p>
+  <p><b>解析</b>：臂绕自身轴线的自转对机构输出（轮位）无影响；用"圆约束（径向+轴向）"代替"球铰重合（3 方程）"= 删除不关心的自转 DOF，同时免给 A 臂建刚体——每臂省一个刚体。</p>
+</div>
+<div class="qa-box">
+  <p><b>Q2. 转向节 10 个两两定长方程为什么只有 9 个独立？</b></p>
+  <p><b>解析</b>：5 点 15 坐标 − 刚体 6 DOF = 9 个独立约束；10 方程含 1 个相容冗余。实测残差 19 条、雅可比秩 18，与此吻合。</p>
+</div>
+<div class="qa-box">
+  <p><b>Q3. 为什么引擎 rack=2mm 后横拉杆长度变化为 0，车轮却转了？</b></p>
+  <p><b>解析</b>：定长是约束恒成立；移动内端改变杆的方位，"拉伸需求"（2mm × 0.048 = 0.096mm）由转向节转动吸收 → toe +0.0349°。前端横向输入投影 2×0.9987≈2mm，需求大 20.8 倍。</p>
+</div>
+<div class="qa-box">
+  <p><b>Q4.（动手）把 RACK 的 y 从 −165 改到 −120，两种输入的灵敏度比怎么变？</b></p>
+  <p><b>解析</b>：杆向量的 y 分量 = (−145−(−120))/长度 → 分母不变、分子从 20 变 25？注意符号：u_y = (TRO_y − RACK_y)/L = (−145+120)/L = −25/L，绝对值反而增大到 ~0.06，纵向灵敏度略升、比值略降；横向投影仍 ~0.999 不变。规律：齿条 y 越远离 TRO 的 y，纵向输入越"没劲"。</p>
+</div>
+<div class="qa-box">
+  <p><b>Q5. models.py 的 dof() 直接返回 2，这偷懒吗？</b></p>
+  <p><b>解析</b>：不是偷懒，是诚实——空间超静定机构的 Grübler/Kutzbach 计数失真（冗余约束与被动 DOF 抵消不清），源码注释明说。工程替代 = 坐标-方程计数 + 数值秩验证 + 收敛实测；dof() 返回的"传动自由度 2"正是产品语义需要的两个（轮跳+转向）。</p>
+</div>
+
+</body>
+</html>

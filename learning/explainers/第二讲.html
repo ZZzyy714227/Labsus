@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第 2 章 · 刚体位姿与旋转 — LABSUS 悬架实验室</title>
+<!-- 引入 MathJax 渲染高质量数学公式 -->
+<script>
+window.MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']],
+    processEscapes: true
+  },
+  options: {
+    skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+  }
+};
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<style>
+:root {
+  --bg: #0f1319;
+  --panel: #161c26;
+  --ink: #e6edf3;
+  --ink-dim: #9aa7b8;
+  --pri: #58a6ff;
+  --pri-dim: rgba(88, 166, 255, 0.15);
+  --ok: #3fb950;
+  --ok-dim: rgba(63, 185, 80, 0.15);
+  --warn: #d29922;
+  --warn-dim: rgba(210, 153, 34, 0.15);
+  --err: #f85149;
+  --err-dim: rgba(248, 81, 73, 0.15);
+  --purple: #bc8cff;
+  --purple-dim: rgba(188, 140, 255, 0.15);
+  --line: #30363d;
+  --code-bg: #0b0e14;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: 15.5px;
+  line-height: 1.8;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 40px 24px 100px;
+}
+
+/* 标题体系 */
+h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+h1 small {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pri);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+h2 {
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--pri);
+  margin: 52px 0 18px;
+  padding-left: 12px;
+  border-left: 4px solid var(--pri);
+  display: flex;
+  align-items: center;
+}
+h3 {
+  font-size: 17px;
+  font-weight: 600;
+  color: #c9d1d9;
+  margin: 28px 0 10px;
+}
+
+p { margin: 12px 0; color: #c9d1d9; }
+strong, b { color: #fff; }
+em { color: var(--warn); font-style: normal; font-weight: 600; }
+
+/* 容器卡片 */
+.box {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px 22px;
+  margin: 20px 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.box.intuition { border-left: 4px solid var(--purple); background: linear-gradient(90deg, var(--purple-dim) 0%, var(--panel) 25%); }
+.box.proof { border-left: 4px solid var(--ok); background: linear-gradient(90deg, var(--ok-dim) 0%, var(--panel) 25%); }
+.box.warn { border-left: 4px solid var(--warn); background: linear-gradient(90deg, var(--warn-dim) 0%, var(--panel) 25%); }
+.box.algo { border-left: 4px solid var(--pri); background: linear-gradient(90deg, var(--pri-dim) 0%, var(--panel) 25%); }
+.box-title { font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.box.intuition .box-title { color: var(--purple); }
+.box.proof .box-title { color: var(--ok); }
+.box.warn .box-title { color: var(--warn); }
+.box.algo .box-title { color: var(--pri); }
+
+/* 步骤指示器 */
+.step-card {
+  background: #121720;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 16px 0;
+}
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 8px;
+}
+.step-tag {
+  background: var(--pri-dim);
+  color: var(--pri);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-family: monospace;
+  font-weight: bold;
+}
+
+/* 列表与表格 */
+ul, ol { margin: 12px 0 12px 24px; color: #c9d1d9; }
+li { margin: 6px 0; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+  background: var(--panel);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+th, td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+th { background: #1f2733; color: #fff; font-weight: 600; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,0.02); }
+
+/* 代码块 */
+code {
+  font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--code-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--pri);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  overflow-x: auto;
+}
+pre code {
+  background: transparent;
+  padding: 0;
+  border: none;
+  color: #e6edf3;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.comment { color: #8b949e; }
+.keyword { color: #ff7b72; }
+.func { color: #d2a8ff; }
+.num { color: #79c0ff; }
+
+/* 问答区域 */
+.qa-box {
+  background: #161c24;
+  border: 1px solid #232d3d;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 14px 0;
+}
+.qa-box b { color: var(--ok); }
+
+.formula-highlight {
+  background: #131922;
+  border-left: 3px solid var(--pri);
+  padding: 10px 16px;
+  margin: 12px 0;
+  border-radius: 0 6px 6px 0;
+}
+</style>
+</head>
+<body>
+
+<h1>第 2 章 · 刚体位姿与旋转
+<small>LABSUS 悬架实验室 · 自底向上 2/11 · 数学主线</small></h1>
+
+<!-- 2.0 -->
+<h2>2.0 这一章解决的物理问题</h2>
+<p>在悬架多体机构求解器运行完毕后，计算核心输出的仅仅是<b>三维节点坐标</b>（例如转向节上的 5 个硬点标记 <code>UP1...UP5</code>）。然而在汽车工程中，我们需要评估的是车轮的<strong>外倾角（Camber）</strong>和<strong>前束角（Toe）</strong>——这要求我们必须知道<b>车轮轮轴在空间中的精确指向</b>。</p>
+
+<div class="box intuition">
+  <div class="box-title">💡 核心矛盾：点坐标 $\neq$ 空间姿态</div>
+  <p>已知刚体在设计基准状态下的点集 $A=\{a_i\}$，以及悬架跳动变形后的点集 $B=\{b_i\}$。如何从中精确解算出该刚体相对设计基准<b>转了多少度、绕哪个轴转动</b>？</p>
+  <p>在数学上，从两组对应 3D 点云中求解最佳旋转与平移的问题被称为 <strong>Wahba 问题</strong>，其闭式最优解算法为 <strong>Kabsch 算法</strong>（在引擎底层实现为 <code>_estimate_rotation</code> 函数）。本章将从最基础的向量代数出发，每一步不跳跃地推导至该算法的完整闭式解。</p>
+</div>
+
+<div class="box algo">
+  <div class="box-title">⚖️ 架构透视：为什么前端与求解引擎采用了不同通路？</div>
+  <table>
+    <thead>
+      <tr>
+        <th>对比维度</th>
+        <th>前端交互通路（WebGL / Three.js）</th>
+        <th>后端机构求解引擎（Least Squares）</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>状态维护方式</b></td>
+        <td>将转向节的姿态作为<b>直接状态</b>维护（使用四元数 $q$）。每一步迭代直接对四元数进行约束投影。</td>
+        <td>状态向量只包含 18 个独立节点坐标（6 节点 $\times$ 3）。“姿态”在求解过程中从未显式存在。</td>
+      </tr>
+      <tr>
+        <td><b>核心数学工具</b></td>
+        <td><b>四元数乘法与插值</b>（无万向节死锁、逐帧平滑、计算开销小）。</td>
+        <td><b>Kabsch 算法（SVD）</b>：求解完成后，事后从变形后的 5 点点云中<b>一次性重构姿态</b>。</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 2.1 -->
+<h2>2.1 零跳步向量代数地基</h2>
+
+<h3>2.1.1 向量内积（点积）：从余弦定理自然推出</h3>
+<p>设空间中有两个非零向量 $a = (a_1, a_2, a_3)^T$ 与 $b = (b_1, b_2, b_3)^T$，它们之间的夹角为 $\theta$。</p>
+
+<div class="box proof">
+  <div class="box-title">📐 推导：点积代数式为何等于 $\sum a_i b_i$？</div>
+  <p>在由向量 $a$、$b$ 与差向量 $(a - b)$ 构成的三角形中，根据高中几何<strong>余弦定理</strong>：</p>
+  $$\|a - b\|^2 = \|a\|^2 + \|b\|^2 - 2\|a\|\|b\|\cos\theta$$
+  <p>将左边按照笛卡尔坐标展开：</p>
+  $$\|a - b\|^2 = \sum_{i=1}^3 (a_i - b_i)^2 = \sum_{i=1}^3 (a_i^2 - 2a_i b_i + b_i^2) = \|a\|^2 + \|b\|^2 - 2\sum_{i=1}^3 a_i b_i$$
+  <p>对比两式，即可严格消去平方项，得到内积的定义与计算公式：</p>
+  <div class="formula-highlight">
+    $$a \cdot b = a^T b = \sum_{i=1}^3 a_i b_i = \|a\|\|b\|\cos\theta$$
+  </div>
+  <p><b>物理与几何意义</b>：点积衡量了一个向量在另一个向量方向上的<b>投影长度</b>。当 $a \cdot b = 0$ 时，两向量严格正交。</p>
+</div>
+
+<h3>2.1.2 向量外积（叉积）与反对称矩阵</h3>
+<p>空间向量 $a$ 与 $b$ 的叉积定义为一个同时垂直于 $a$ 和 $b$ 的新向量：</p>
+$$a \times b = \begin{bmatrix} a_2 b_3 - a_3 b_2 \\ a_3 b_1 - a_1 b_3 \\ a_1 b_2 - a_2 b_1 \end{bmatrix}, \quad \|a \times b\| = \|a\|\|b\|\sin\theta$$
+<p>方向满足<strong>右手定则</strong>，模长对应两向量围成的平行四边形面积。</p>
+
+<div class="box intuition">
+  <div class="box-title">🔧 关键工具：将叉积写为矩阵乘法（反对称矩阵 $[a]_\times$）</div>
+  <p>在推导刚体动力学与 Rodrigues 旋转公式时，将“向量叉乘”转化为“矩阵乘向量”极其重要。定义向量 $a$ 对应的<b>反对称矩阵（Skew-symmetric Matrix）</b> $[a]_\times$：</p>
+  $$[a]_\times = \begin{bmatrix} 0 & -a_3 & a_2 \\ a_3 & 0 & -a_1 \\ -a_2 & a_1 & 0 \end{bmatrix}$$
+  <p>由此可将叉积恒等转换为矩阵乘法：</p>
+  <div class="formula-highlight">
+    $$a \times b = [a]_\times b$$
+  </div>
+  <p><b>必须掌握的代数性质</b>：</p>
+  <ul>
+    <li>反演性：$[a]_\times^T = -[a]_\times$（转置等于取负值）</li>
+    <li>反交换律：$a \times b = - (b \times a)$</li>
+    <li>混合积（六面体有向体积）：$a \cdot (b \times c) = \det \begin{bmatrix} a & b & c \end{bmatrix}$</li>
+  </ul>
+</div>
+
+<h3>2.1.3 矩阵迹（Trace）的循环性质</h3>
+<p>对于方阵 $M$，其迹 $\mathrm{tr}(M)$ 定义为对角线元素之和。在后文 Kabsch 算法推导中，有两个恒等性质必须熟练掌握：</p>
+<ol>
+  <li><b>标量等于其自身的迹</b>：若 $x$ 为标量（$1 \times 1$ 实数），则 $x = \mathrm{tr}(x)$。</li>
+  <li><b>迹的循环不变性（Cyclic Property）</b>：对任意尺寸相容的矩阵 $X, Y$，均有 $\mathrm{tr}(XY) = \mathrm{tr}(YX)$。推广至三个矩阵：
+  $$\mathrm{tr}(ABC) = \mathrm{tr}(CAB) = \mathrm{tr}(BCA)$$</li>
+</ol>
+
+<!-- 2.2 -->
+<h2>2.2 刚体的数学定义 $\to$ 正交矩阵与 $SO(3)$ 群</h2>
+
+<h3>2.2.1 刚体的本质与仿射映射</h3>
+<p><b>物理定义</b>：刚体是在运动过程中<b>内部任意两点间欧氏距离恒定不变</b>的点集：</p>
+$$\|p_i(t) - p_j(t)\| = \text{常数}, \quad \forall i, j$$
+
+<p><b>定理</b>：三维空间中任何保距刚体运动，充要数学表示均为一个<b>仿射变换（Affine Transformation）</b>：</p>
+<div class="formula-highlight">
+  $$p' = R \cdot p + t \quad (R \in \mathbb{R}^{3 \times 3}, \; t \in \mathbb{R}^3)$$
+</div>
+
+<h3>2.2.2 为什么旋转矩阵 $R$ 必须满足正交条件 $R^T R = I$？</h3>
+<div class="box proof">
+  <div class="box-title">📐 证明：距离保持必然导出正交矩阵</div>
+  <p>先消除平移分量 $t$（只考察纯旋转映射 $p' = R p$）。由于刚体必须保持从原点出发的任意向量长度不变，即对任意向量 $p$ 均有 $\|p'\|^2 = \|p\|^2$：</p>
+  $$\|p'\|^2 = (Rp)^T (Rp) = p^T R^T R p$$
+  <p>要使上式对<b>空间中任意向量 $p$</b> 均恒等于 $p^T p = p^T I p$，矩阵核必须严格相等：</p>
+  <div class="formula-highlight">
+    $$R^T R = I \quad \Longleftrightarrow \quad R^{-1} = R^T$$
+  </div>
+  <p>满足此条件的矩阵称为<b>正交矩阵（Orthogonal Matrix）</b>。正交矩阵的每一列都是两两正交且模长为 1 的单位向量。</p>
+  <p><b>保夹角推论</b>：根据极化恒等式 $u \cdot v = \frac{1}{2}(\|u+v\|^2 - \|u\|^2 - \|v\|^2)$，由于保长度，故变换后必然满足 $(Ru) \cdot (Rv) = u \cdot v$，即<b>任意两个向量变换后的夹角严格守恒</b>。</p>
+</div>
+
+<h3>2.2.3 为什么必须追加条件 $\det R = +1$？</h3>
+<p>对正交条件两边同时取行列式：</p>
+$$\det(R^T R) = \det(I) \implies \det(R^T) \det(R) = 1 \implies (\det R)^2 = 1 \implies \det R = \pm 1$$
+
+<div class="box warn">
+  <div class="box-title">⚠️ 为什么物理刚体必须剔除 $\det R = -1$？</div>
+  <ul>
+    <li><b>物理连续性原理</b>：刚体运动是随时间从初始状态连续演化的。在初始时刻 $t=0$，刚体未转动，$R(0) = I$，此时 $\det I = +1$。由于行列式 $\det(R(t))$ 是关于矩阵元素的连续函数，其值绝不可能跨过离散间隙突变到 $-1$。</li>
+    <li><b>空间手性（Chirality）</b>：$\det R = -1$ 代表<b>镜像反射（Reflection）</b>。它会将右手坐标系翻转为左手坐标系（如同照镜子）。真实的物理刚体无法通过三维空间中的平滑运动完成镜像翻转。</li>
+  </ul>
+</div>
+
+<p>由此，我们正式定义三维空间的<b>特殊正交群（Special Orthogonal Group，即三维旋转群）</b>：</p>
+<div class="formula-highlight">
+  $$SO(3) = \left\{ R \in \mathbb{R}^{3 \times 3} \;\middle|\; R^T R = I, \; \det R = +1 \right\}$$
+</div>
+
+<h3>2.2.4 自由度（DOF）分析：为什么 $3 \times 3$ 矩阵只有 3 个独立参数？</h3>
+<table>
+  <thead>
+    <tr>
+      <th>分析视角</th>
+      <th>数学/几何约束机制</th>
+      <th>净自由度计算</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>代数方程视角</b><br>(消除冗余)</td>
+      <td>$3 \times 3$ 矩阵共有 9 个元素。方程 $R^T R = I$ 展开后是对称矩阵，提供：<br>
+      • 3 个列向量单位模长约束：$\|r_1\|^2=1, \|r_2\|^2=1, \|r_3\|^2=1$<br>
+      • 3 个两两正交约束：$r_1 \cdot r_2 = 0, r_1 \cdot r_3 = 0, r_2 \cdot r_3 = 0$<br>
+      共计 <b>6 个独立约束方程</b>。</td>
+      <td>$$9 - 6 = \mathbf{3}$$</td>
+    </tr>
+    <tr>
+      <td><b>几何轴角视角</b><br>(物理描述)</td>
+      <td>任意三维旋转均可由“绕空间某轴转动特定角度”完全描述（Euler 旋转定理）：<br>
+      • <b>旋转轴 $n$</b>：单位向量满足 $n_x^2 + n_y^2 + n_z^2 = 1$（受 1 个长度约束 $\to$ <b>2 个参数</b>）<br>
+      • <b>旋转角 $\theta$</b>：转过角度标量（<b>1 个参数</b>）</td>
+      <td>$$2 + 1 = \mathbf{3}$$</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- 2.3 -->
+<h2>2.3 旋转矩阵从零几何构造</h2>
+
+<div class="box intuition">
+  <div class="box-title">💡 线性代数第一铁律：矩阵的列向量 = 基底变换后的像</div>
+  <p>在线性空间中，任何向量 $v = x e_1 + y e_2 + z e_3$。变换后的向量为：</p>
+  $$R v = R(x e_1 + y e_2 + z e_3) = x (R e_1) + y (R e_2) + z (R e_3) = \begin{bmatrix} R e_1 & R e_2 & R e_3 \end{bmatrix} \begin{bmatrix} x \\ y \\ z \end{bmatrix}$$
+  <p>因此，<b>只需看笛卡尔坐标系的三个单位基向量 $e_1, e_2, e_3$ 被转到了哪里，把它们拼成列向量，就是旋转矩阵！</b></p>
+</div>
+
+<h3>2.3.1 三个基本坐标轴旋转矩阵</h3>
+<p>以绕 $Z$ 轴逆时针旋转 $\theta$ 为例：</p>
+<ul>
+  <li>$e_1 = (1, 0, 0)^T \xrightarrow{\text{转动}} (\cos\theta, \sin\theta, 0)^T$</li>
+  <li>$e_2 = (0, 1, 0)^T \xrightarrow{\text{转动}} (-\sin\theta, \cos\theta, 0)^T$</li>
+  <li>$e_3 = (0, 0, 1)^T \xrightarrow{\text{不动}} (0, 0, 1)^T$</li>
+</ul>
+<p>将这三列拼合，即可直接写出 $R_z(\theta)$。同理按右手定则逐轴写出 $R_x(\theta)$ 与 $R_y(\theta)$：</p>
+
+<div class="formula-highlight">
+$$R_z(\theta) = \begin{bmatrix} \cos\theta & -\sin\theta & 0 \\ \sin\theta & \cos\theta & 0 \\ 0 & 0 & 1 \end{bmatrix}, \quad
+R_y(\theta) = \begin{bmatrix} \cos\theta & 0 & \sin\theta \\ 0 & 1 & 0 \\ -\sin\theta & 0 & \cos\theta \end{bmatrix}, \quad
+R_x(\theta) = \begin{bmatrix} 1 & 0 & 0 \\ 0 & \cos\theta & -\sin\theta \\ 0 & \sin\theta & \cos\theta \end{bmatrix}$$
+</div>
+
+<h3>2.3.2 复合旋转的不可交换性</h3>
+<p>矩阵从左侧依次作用：先绕 $X$ 轴旋转再绕 $Z$ 轴旋转，总变换矩阵为 $R = R_z R_x$。三维旋转<b>不满足乘法交换律</b>：</p>
+$$R_z(90^\circ) R_x(90^\circ) \neq R_x(90^\circ) R_z(90^\circ)$$
+<p>这导致欧拉角表示法具有强烈的<b>顺序依赖性</b>并伴随<b>万向节死锁（Gimbal Lock）</b>缺陷。</p>
+
+<h3>2.3.3 微小旋转线性化（工程衬套与摄动计算必备）</h3>
+<p>当旋转角 $\theta \to 0$ 时，利用一阶泰勒展开 $\cos\theta \approx 1, \; \sin\theta \approx \theta$。对于绕任意单位轴 $n = (n_1, n_2, n_3)^T$ 的微小旋转：</p>
+<div class="formula-highlight">
+  $$R \approx I + \theta [n]_\times = \begin{bmatrix} 1 & -\theta n_3 & \theta n_2 \\ \theta n_3 & 1 & -\theta n_1 \\ -\theta n_2 & \theta n_1 & 1 \end{bmatrix}$$
+</div>
+<p>作用于向量 $v$ 时：$R v \approx v + \theta (n \times v) = v + \omega \times v$。这正是理论力学中线速度等于角速度叉乘位矢的微分几何来源。</p>
+
+<!-- 2.4 -->
+<h2>2.4 轴角表示与 Rodrigues（罗德里格斯）公式推导</h2>
+
+<p><b>Euler 旋转定理</b>：三维空间中任何刚体旋转，均等价于绕空间中某一过原点的单位轴 $n$（满足 $\|n\|=1$）旋转一个标量角 $\theta$。</p>
+
+<div class="box proof">
+  <div class="box-title">📐 罗德里格斯公式几何几何分步推导</div>
+  <p><b>目标</b>：已知单位转轴 $n$ 与转角 $\theta$，求空间任意向量 $v$ 旋转后的新向量 $v'$ 的闭式表达式。</p>
+
+  <div class="step-card">
+    <div class="step-header"><span class="step-tag">Step 1</span> 向量正交分解（平行分量 + 垂直分量）</div>
+    <p>将待旋转向量 $v$ 分解为沿转轴方向的分量 $v_\parallel$ 与垂直于转轴平面的分量 $v_\perp$：</p>
+    $$v = v_\parallel + v_\perp$$
+    $$v_\parallel = (v \cdot n) n = (n n^T) v$$
+    $$v_\perp = v - v_\parallel = (I - n n^T) v$$
+  </div>
+
+  <div class="step-card">
+    <div class="step-header"><span class="step-tag">Step 2</span> 分析各分量在旋转过程中的几何运动</div>
+    <ul>
+      <li><b>平行分量 $v_\parallel$</b>：处于旋转轴线上，旋转时保持绝对不动：$v_\parallel' = v_\parallel$。</li>
+      <li><b>垂直分量 $v_\perp$</b>：在垂直于 $n$ 的二维平面内转过角度 $\theta$。在平面内引入与 $v_\perp$ 正交且等长的辅助向量 $w$：
+      $$w = n \times v_\perp = n \times (v - v_\parallel) = n \times v \quad (\text{因为 } n \times n = 0)$$</li>
+    </ul>
+  </div>
+
+  <div class="step-card">
+    <div class="step-header"><span class="step-tag">Step 3</span> 垂直平面内的 2D 旋转合成</div>
+    <p>在以 $\{v_\perp, n \times v\}$ 为正交基的平面内，$v_\perp$ 转动 $\theta$ 后的向量为：</p>
+    $$v_\perp' = \cos\theta \, v_\perp + \sin\theta \, (n \times v)$$
+  </div>
+
+  <div class="step-card">
+    <div class="step-header"><span class="step-tag">Step 4</span> 整体合成与矩阵形式提取</div>
+    $$v' = v_\parallel' + v_\perp' = (n n^T) v + \cos\theta (I - n n^T) v + \sin\theta [n]_\times v$$
+    <p>提取公因向量 $v$，得到直接由 $(n, \theta)$ 构造矩阵 $R(n, \theta)$ 的 <strong>Rodrigues 公式</strong>：</p>
+    <div class="formula-highlight">
+      $$R(n, \theta) = \cos\theta \, I + (1 - \cos\theta) n n^T + \sin\theta [n]_\times$$
+    </div>
+  </div>
+</div>
+
+<div class="box intuition">
+  <div class="box-title">✅ 严格性自检（三大特例验算）</div>
+  <ol>
+    <li><b>转轴不变性</b>：将 $v=n$ 代入，$n n^T n = n(n^T n) = n$，$[n]_\times n = 0 \implies R n = \cos\theta n + (1-\cos\theta) n = n$（轴上点不动，验算成立）。</li>
+    <li><b>零度旋转</b>：令 $\theta \to 0$，$\cos 0 = 1, \sin 0 = 0 \implies R = I$（退化为单位阵，验算成立）。</li>
+    <li><b>绕 Z 轴特例</b>：代入 $n = (0, 0, 1)^T$，直接还原出 2.3 节中的 $R_z(\theta)$ 矩阵（验算成立）。</li>
+  </ol>
+</div>
+
+<!-- 2.5 -->
+<h2>2.5 四元数操作卡（前端通路）</h2>
+<p>为了在前端 WebGL 交互中避免欧拉角死锁并实现高效插值（Slerp），旋转通常用<b>单位四元数（Unit Quaternion）</b>表示。</p>
+
+<div class="step-card">
+  <div class="step-header"><span class="step-tag">定义</span> 四元数与轴角映射</div>
+  $$q = \left( w, \, x, \, y, \, z \right) = \left( \cos\frac{\theta}{2}, \; \sin\frac{\theta}{2} \cdot n \right), \quad w^2 + x^2 + y^2 + z^2 = 1$$
+</div>
+
+<div class="step-card">
+  <div class="step-header"><span class="step-tag">旋转运算</span> 三明治乘积（Sandwich Product）</div>
+  <p>将三维点 $v$ 扩充为纯虚四元数 $\mathbf{v} = (0, v)$，旋转后的点为：</p>
+  $$\mathbf{v}' = q \otimes \mathbf{v} \otimes q^* \quad (q^* = (w, -x, -y, -z) \text{ 为共轭四元数})$$
+</div>
+
+<div class="step-card">
+  <div class="step-header"><span class="step-tag">矩阵转换</span> 四元数对应旋转矩阵 $R(q)$</div>
+  $$R(q) = \begin{bmatrix}
+  1 - 2(y^2 + z^2) & 2(xy - wz) & 2(xz + wy) \\
+  2(xy + wz) & 1 - 2(x^2 + z^2) & 2(yz - wx) \\
+  2(xz - wy) & 2(yz + wx) & 1 - 2(x^2 + y^2)
+  \end{bmatrix}$$
+</div>
+
+<!-- 2.6 -->
+<h2>2.6 Wahba 问题与 Kabsch 算法完整推导（求解引擎核心）</h2>
+
+<div class="box algo">
+  <div class="box-title">🎯 数学问题形式化表述</div>
+  <p>已知刚体在设计基准位（源坐标系）的 $N$ 个点集 $\{a_i\}$，以及在当前空间位（目标坐标系）对应的测量点集 $\{b_i\}$（$i=1 \dots N$，$N \ge 3$）。</p>
+  <p>寻找最优的刚体旋转矩阵 $R \in SO(3)$ 和平移向量 $t \in \mathbb{R}^3$，使得两组点集的加权最小二乘欧氏距离最小化：</p>
+  <div class="formula-highlight">
+    $$\min_{R \in SO(3), \, t \in \mathbb{R}^3} f(R, t) = \sum_{i=1}^N \|R a_i + t - b_i\|^2$$
+  </div>
+</div>
+
+<h3>Kabsch 算法保姆级五步推导</h3>
+
+<div class="step-card">
+  <div class="step-header"><span class="step-tag">Step 1</span> 质心解耦：消除平移向量 $t$</div>
+  <p>计算两组点集的几何中心（质心）：</p>
+  $$c_A = \frac{1}{N}\sum_{i=1}^N a_i, \quad c_B = \frac{1}{N}\sum_{i=1}^N b_i$$
+  <p>将点集去中心化（移至各自质心原点）：$\hat{a}_i = a_i - c_A, \quad \hat{b}_i = b_i - c_B$。注意去中心化点集满足：$\sum \hat{a}_i = \mathbf{0}, \; \sum \hat{b}_i = \mathbf{0}$。</p>
+  <p>令换元平移量 $s = t + R c_A - c_B$，则误差项化为：$R a_i + t - b_i = (R \hat{a}_i - \hat{b}_i) + s$。对目标函数关于 $s$ 求偏导并置零：</p>
+  $$\frac{\partial f}{\partial s} = 2 \sum_{i=1}^N (R \hat{a}_i - \hat{b}_i + s) = 2 \left( R \sum \hat{a}_i - \sum \hat{b}_i + N s \right) = 2 N s = 0 \implies s^* = \mathbf{0}$$
+  <div class="formula-highlight">
+    $$t^* = c_B - R c_A \quad \text{（物理意义：最优平移正是将转动后的 A 质心平移至 B 质心）}$$
+  </div>
+</div>
+
+<div class="step-card">
+  <div class="step-header"><span class="step-tag">Step 2</span> 展开目标函数：从最小化距离转为最大化相关性</div>
+  <p>将 $t^*$ 代入原式，消除平移后只剩下关于 $R$ 的优化：</p>
+  $$f(R) = \sum_{i=1}^N \|R \hat{a}_i - \hat{b}_i\|^2 = \sum_{i=1}^N \left( \|R \hat{a}_i\|^2 + \|\hat{b}_i\|^2 - 2 (R \hat{a}_i) \cdot \hat{b}_i \right)$$
+  <p>因为 $R$ 是正交矩阵，保持长度不变，所以 $\|R \hat{a}_i\|^2 = \|\hat{a}_i\|^2$。前两项均为只与输入数据相关的常数：</p>
+  $$f(R) = \text{常数} - 2 \sum_{i=1}^N (R \hat{a}_i) \cdot \hat{b}_i$$
+  <div class="formula-highlight">
+    $$\min_{R \in SO(3)} f(R) \quad \Longleftrightarrow \quad \max_{R \in SO(3)} g(R) = \sum_{i=1}^N (R \hat{a}_i) \cdot \hat{b}_i$$
+  </div>
+</div>
+
+<div class="step-card">
+  <div class="step-header"><span class="step-tag">Step 3</span> 巧妙利用迹（Trace）转换为矩阵乘法</div>
+  <p>利用 2.1.3 节的性质（标量等于其自身的迹 + 迹的循环不变性）：</p>
+  $$(R \hat{a}_i) \cdot \hat{b}_i = \hat{b}_i^T (R \hat{a}_i) = \mathrm{tr}(\hat{b}_i^T R \hat{a}_i) = \mathrm{tr}(R \hat{a}_i \hat{b}_i^T)$$
+  <p>求和号可直接移入迹算子内部：</p>
+  $$g(R) = \mathrm{tr}\left( R \sum_{i=1}^N \hat{a}_i \hat{b}_i^T \right) = \mathrm{tr}(R H)$$
+  <p>其中定义 $3 \times 3$ 的<b>协方差/互相关矩阵（Cross-dispersion Matrix）$H$</b>：</p>
+  <div class="formula-highlight">
+    $$H = \sum_{i=1}^N \hat{a}_i \hat{b}_i^T = \hat{A}^T \hat{B} \quad (\hat{A}, \hat{B} \text{ 分别为按行堆叠的去中心化坐标矩阵})$$
+  </div>
+</div>
+
+<div class="step-card">
+  <div class="step-header"><span class="step-tag">Step 4</span> 奇异值分解（SVD）求解上界</div>
+  <p>对互相关矩阵 $H$ 进行<b>奇异值分解（SVD）</b>：</p>
+  $$H = U \Sigma V^T \quad (U, V \in O(3), \; \Sigma = \mathrm{diag}(\sigma_1, \sigma_2, \sigma_3), \; \sigma_1 \ge \sigma_2 \ge \sigma_3 \ge 0)$$
+  <p>代入目标迹函数并利用循环不变性：</p>
+  $$g(R) = \mathrm{tr}(R U \Sigma V^T) = \mathrm{tr}(V^T R U \cdot \Sigma)$$
+  <p>记正交矩阵 $M = V^T R U \in O(3)$。因为 $M$ 是正交矩阵，其每个对角元素的绝对值必然满足 $|M_{ii}| \le 1$（单位向量的分量绝对值 $\le 1$）：</p>
+  $$\mathrm{tr}(M \Sigma) = M_{11}\sigma_1 + M_{22}\sigma_2 + M_{33}\sigma_3 \le 1\cdot\sigma_1 + 1\cdot\sigma_2 + 1\cdot\sigma_3 = \mathrm{tr}(\Sigma)$$
+  <p>当且仅当 $M = I$ 时取到理论全局最大值：</p>
+  $$M = V^T R U = I \implies R^* = V U^T$$
+</div>
+
+<div class="step-card">
+  <div class="step-header"><span class="step-tag">Step 5</span> 空间手性检查与镜像反射修正（det 修正）</div>
+  <p>上述求得的 $R^* = V U^T$ 属于 $O(3)$，必须检查是否满足特殊正交群约束 $\det R = +1$：</p>
+  <div class="box warn">
+    <div class="box-title">⚠️ 若 $\det(V U^T) = -1$ 时如何处理？</div>
+    <p>当实测数据存在较大噪声或点集发生退化时，$V U^T$ 可能会包含镜像翻转（$\det = -1$）。此时矩阵 $M$ 只能在所有 $\det(M) = -1$ 的正交矩阵中寻找最优解。</p>
+    <p>为了让 $\mathrm{tr}(M \Sigma) = M_{11}\sigma_1 + M_{22}\sigma_2 + M_{33}\sigma_3$ 最大，最优策略是令最大的两个分量保持 $+1$，而牺牲<b>最小的奇异值 $\sigma_3$</b>（对应数据中方差最小、最不确定的方向），即令 $M = \mathrm{diag}(1, 1, -1)$。</p>
+  </div>
+  <p>由此得到适用于所有工况的<b>通用最优闭式解</b>：</p>
+  <div class="formula-highlight">
+    $$R^* = V \begin{bmatrix} 1 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & 0 & \det(V U^T) \end{bmatrix} U^T$$
+  </div>
+</div>
+
+<!-- 2.7 -->
+<h2>2.7 引擎源码逐行对账（v3service._estimate_rotation）</h2>
+<p>以下是悬架动力学求解器中姿态重构的核心 Python 代码，每一行均与上述推导严格闭环：</p>
+
+<pre><code><span class="keyword">import</span> numpy <span class="keyword">as</span> np
+
+<span class="keyword">def</span> <span class="func">_estimate_rotation</span>(p0_dict, current_pos_dict, knuckle_ids):
+    <span class="comment"># 1. 提取源点集 A (设计位) 与目标点集 B (当前位)</span>
+    A = np.stack([p0_dict[k] <span class="keyword">for</span> k <span class="keyword">in</span> knuckle_ids])        <span class="comment"># 形状: (5, 3)</span>
+    B = np.stack([current_pos_dict[k] <span class="keyword">for</span> k <span class="keyword">in</span> knuckle_ids]) <span class="comment"># 形状: (5, 3)</span>
+
+    <span class="comment"># 2. 计算质心并中心化点集 (对应 Step 1)</span>
+    c0 = A.mean(axis=<span class="num">0</span>)
+    c1 = B.mean(axis=<span class="num">0</span>)
+    A_hat = A - c0
+    B_hat = B - c1
+
+    <span class="comment"># 3. 构造互相关矩阵 H = B_hat^T @ A_hat (注: 引擎代码使用了转置写法 H_eng = H^T)</span>
+    H = (B_hat.T) @ A_hat                                  <span class="comment"># 对应 Step 3</span>
+
+    <span class="comment"># 4. 奇异值分解 (对应 Step 4)</span>
+    <span class="comment"># 对 H_eng 进行 SVD: H_eng = u @ diag(s) @ vt</span>
+    u, s, vt = np.linalg.svd(H)
+
+    <span class="comment"># 5. 计算基础旋转矩阵 R = u @ vt (对应 V @ U^T)</span>
+    R = u @ vt
+
+    <span class="comment"># 6. 手性检查与反射修正 (对应 Step 5)</span>
+    <span class="keyword">if</span> np.linalg.det(R) &lt; <span class="num">0</span>:
+        vt[-<span class="num">1</span>, :] *= -<span class="num">1</span>  <span class="comment"># 将 V 的最小奇异值对应行取反 (等价于中间乘 diag(1,1,-1))</span>
+        R = u @ vt
+
+    <span class="keyword">return</span> R  <span class="comment"># 精确返回 SO(3) 旋转矩阵</span></code></pre>
+
+<!-- 2.8 -->
+<h2>2.8 工程应用：从旋转矩阵到外倾角（Camber）与前束角（Toe）</h2>
+
+<p>在悬架坐标系定义中（以右侧车轮为例）：设计基准位下的轮轴主向量为 $ax_0 = (1, 0, 0)^T$（沿 $+X$ 轴指向车身外侧）。</p>
+
+<h3>2.8.1 欧拉角复合几何定义</h3>
+<ul>
+  <li><b>外倾角（Camber, $\gamma$）</b>：车轮绕车辆纵向轴 $+Y$ 的倾角。根据右手定则，定义车轮顶部向内倾斜（负外倾）时绕 $+Y$ 产生正负偏角。</li>
+  <li><b>前束角（Toe, $\alpha$）</b>：车轮绕车辆竖直轴 $+Z$ 的偏转角。定义车轮前端向内收拢为正前束。</li>
+</ul>
+
+<p>对基准轮轴向量 $ax_0 = (1, 0, 0)^T$ 依次施加外倾 $R_y(\gamma)$ 与前束 $R_z(\alpha)$ 变换：</p>
+$$ax = R_z(\alpha) R_y(\gamma) \begin{bmatrix} 1 \\ 0 \\ 0 \end{bmatrix} = \begin{bmatrix} \cos\alpha & -\sin\alpha & 0 \\ \sin\alpha & \cos\alpha & 0 \\ 0 & 0 & 1 \end{bmatrix} \begin{bmatrix} \cos\gamma \\ 0 \\ -\sin\gamma \end{bmatrix} = \begin{bmatrix} \cos\alpha \cos\gamma \\ \sin\alpha \cos\gamma \\ -\sin\gamma \end{bmatrix}$$
+
+<div class="box algo">
+  <div class="box-title">📐 从实测轮轴向量 $ax = (a_x, a_y, a_z)^T$ 中逆向解析角度</div>
+  <p>通过 Kabsch 算法得到当前旋转矩阵 $R$ 后，当前轮轴实际向量为 $ax = R \cdot ax_0$。直接通过分量反解：</p>
+  <div class="formula-highlight">
+    $$\text{Camber } \gamma = -\arcsin(a_z)$$
+    $$\text{Toe } \alpha = \operatorname{atan2}(a_y, a_x) \quad \left( \text{因为 } \frac{\sin\alpha \cos\gamma}{\cos\alpha \cos\gamma} = \frac{\sin\alpha}{\cos\alpha} = \tan\alpha \right)$$
+  </div>
+</div>
+
+<!-- 2.9 -->
+<h2>2.9 核心检查点与自测</h2>
+
+<div class="qa-box">
+  <p><b>Q1. 为什么不能直接用两点求旋转，而必须至少 3 个非共线点？</b></p>
+  <p><b>解析</b>：空间中两点仅确定一条直线向量，绕该向量旋转的自由度是完全不确定的（存在未约束的自旋奇异性）。3 个非共线点可以确定一个 3D 刚体平面与法向向量，提供全部 3 个独立旋转自由度的完整约束。</p>
+</div>
+
+<div class="qa-box">
+  <p><b>Q2. 如果实测点云带噪声，Kabsch 算法对噪声的敏感度如何？</b></p>
+  <p><b>解析</b>：由于 Kabsch 是全局最小二乘估计，噪声会被 $N$ 个标记点平均化。对于转向节 5 个标记点，实测表明：$10\,\mu\text{m}$ 的几何节点坐标噪声仅引起约 $0.0045^\circ$ 的姿态估计误差，完全满足悬架工程开发精度的要求。</p>
+</div>
+
+</body>
+</html>

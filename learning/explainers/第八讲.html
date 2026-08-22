@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第 2 章 · 刚体位姿与旋转 — LABSUS 悬架实验室</title>
+<!-- 引入 MathJax 渲染高质量数学公式 -->
+<script>
+window.MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']],
+    processEscapes: true
+  },
+  options: {
+    skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+  }
+};
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<style>
+:root {
+  --bg: #0f1319;
+  --panel: #161c26;
+  --ink: #e6edf3;
+  --ink-dim: #9aa7b8;
+  --pri: #58a6ff;
+  --pri-dim: rgba(88, 166, 255, 0.15);
+  --ok: #3fb950;
+  --ok-dim: rgba(63, 185, 80, 0.15);
+  --warn: #d29922;
+  --warn-dim: rgba(210, 153, 34, 0.15);
+  --err: #f85149;
+  --err-dim: rgba(248, 81, 73, 0.15);
+  --purple: #bc8cff;
+  --purple-dim: rgba(188, 140, 255, 0.15);
+  --line: #30363d;
+  --code-bg: #0b0e14;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: 15.5px;
+  line-height: 1.8;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 40px 24px 100px;
+}
+
+/* 标题体系 */
+h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+h1 small {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pri);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+h2 {
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--pri);
+  margin: 52px 0 18px;
+  padding-left: 12px;
+  border-left: 4px solid var(--pri);
+  display: flex;
+  align-items: center;
+}
+h3 {
+  font-size: 17px;
+  font-weight: 600;
+  color: #c9d1d9;
+  margin: 28px 0 10px;
+}
+
+p { margin: 12px 0; color: #c9d1d9; }
+strong, b { color: #fff; }
+em { color: var(--warn); font-style: normal; font-weight: 600; }
+
+/* 容器卡片 */
+.box {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px 22px;
+  margin: 20px 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.box.intuition { border-left: 4px solid var(--purple); background: linear-gradient(90deg, var(--purple-dim) 0%, var(--panel) 25%); }
+.box.proof { border-left: 4px solid var(--ok); background: linear-gradient(90deg, var(--ok-dim) 0%, var(--panel) 25%); }
+.box.warn { border-left: 4px solid var(--warn); background: linear-gradient(90deg, var(--warn-dim) 0%, var(--panel) 25%); }
+.box.algo { border-left: 4px solid var(--pri); background: linear-gradient(90deg, var(--pri-dim) 0%, var(--panel) 25%); }
+.box-title { font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.box.intuition .box-title { color: var(--purple); }
+.box.proof .box-title { color: var(--ok); }
+.box.warn .box-title { color: var(--warn); }
+.box.algo .box-title { color: var(--pri); }
+
+/* 步骤指示器 */
+.step-card {
+  background: #121720;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 16px 0;
+}
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 8px;
+}
+.step-tag {
+  background: var(--pri-dim);
+  color: var(--pri);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-family: monospace;
+  font-weight: bold;
+}
+
+/* 列表与表格 */
+ul, ol { margin: 12px 0 12px 24px; color: #c9d1d9; }
+li { margin: 6px 0; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+  background: var(--panel);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+th, td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+th { background: #1f2733; color: #fff; font-weight: 600; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,0.02); }
+
+/* 代码块 */
+code {
+  font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--code-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--pri);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  overflow-x: auto;
+}
+pre code {
+  background: transparent;
+  padding: 0;
+  border: none;
+  color: #e6edf3;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.comment { color: #8b949e; }
+.keyword { color: #ff7b72; }
+.func { color: #d2a8ff; }
+.num { color: #79c0ff; }
+
+/* 问答区域 */
+.qa-box {
+  background: #161c24;
+  border: 1px solid #232d3d;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 14px 0;
+}
+.qa-box b { color: var(--ok); }
+
+.formula-highlight {
+  background: #131922;
+  border-left: 3px solid var(--pri);
+  padding: 10px 16px;
+  margin: 12px 0;
+  border-radius: 0 6px 6px 0;
+}
+</style>
+</head>
+
+
+<body>
+
+<h1>第 8 章 · 轮胎魔术公式
+<small>LABSUS 悬架实验室 · 自底向上 8/11 · 接触力学主线</small></h1>
+
+<h2>8.0 这一章解决的物理问题</h2>
+<p>除重力和空气，赛车<b>唯一的力源是四块巴掌大的胎面</b>。悬架几何的全部意义，就是把这四个接触斑用到位（载荷分布、外倾、前束）。本章：① 滑移现象的物理（为什么"滚动的弹性体"能产生侧向力）；② Pacejka 魔术公式（MF）的 B/C/D/E 结构逐项解剖（每个字母控制曲线的什么）；③ 载荷敏感性与本子集的已知简化；④ 复合滑移与摩擦圆。</p>
+
+<div class="box intuition">
+  <div class="box-title">💡 直觉：刷子模型（tire as a brush）</div>
+  <p>把胎面想象成一排小刷毛粘在轮辋上。车轮<b>指向</b>与<b>运动方向</b>差一个角度 α（侧偏角）时：每根刷毛触地瞬间被"粘住"，轮辋继续前进，刷毛被<b>剪切变形</b>——弹性恢复力 = 侧向力。小 α：力 ∝ 变形 ∝ α（<b>线性区</b>，侧偏刚度）；α 增大：越来越多的刷毛达到摩擦极限开始滑移，力增长变缓；某个 α 达<b>峰值</b> ≈ μ·Fz；再增大：滑动区占主导，力反而<b>回落</b>。纵向上同理：驱/制动让轮速 ≠ 车速（滑移率 κ），产生 Fx。MF 就是为这条"升起-峰值-回落"曲线设计的经验公式。</p>
+</div>
+
+<h2>8.1 滑移量的定义</h2>
+<div class="formula-highlight">
+  $$\alpha = (\text{车轮指向} - \text{速度方向}) \text{ 的夹角（°）}, \qquad \kappa = -\frac{v_{wheel} - \omega R}{|v|} \;(\text{滑移率，制动为正})$$
+</div>
+<p>侧偏角是"几何角"，滑移率是"速度差的无量纲化"。两者都是<b>滑移速度与滚动速度之比</b>的不同投影——深层统一（Pacejka 理论的 ISO 滑移定义），本子集各用各的。</p>
+
+<h2>8.2 魔术公式逐项解剖</h2>
+<div class="box proof">
+  <div class="box-title">📐 公式与三个解析性质（零跳步）</div>
+  <div class="formula-highlight">
+    $$Y(X) = D\,\sin\Big(C \arctan\big(\underbrace{B X - E\,(B X - \arctan B X)}_{\Theta}\big)\Big) + S_v, \quad X = \alpha + S_h$$
+  </div>
+  <div class="step-card">
+    <div class="step-header"><span class="step-tag">性质 1</span> 零点斜率 = D·C·B（E 在原点不起作用）</div>
+    <p>链式求导：$\frac{dY}{dX} = D\cos(C\Phi) \cdot C \Phi'$，$\Phi = \arctan\Theta$。在 $X=0$：$\Theta = 0$，$\Phi = 0$，$\cos 0 = 1$；$\Theta' = B - E(B - B) = B$；$\Phi' = \Theta'/(1+\Theta^2) = B$。故</p>
+    $$\frac{dY}{dX}\Big|_0 = D\,C\,B \quad (\text{N/rad}) \;——\textbf{侧偏刚度 cornering stiffness}$$
+  </div>
+  <div class="step-card">
+    <div class="step-header"><span class="step-tag">性质 2</span> 峰值上界 = D</div>
+    <p>外层是 $D \sin(\cdot) \le D$；当内层幅角经过 $\pi/2$ 时取到 D（有限 X 处）。<b>D 就是峰值摩擦力 $\mu F_z$ 的化身</b>。</p>
+  </div>
+  <div class="step-card">
+    <div class="step-header"><span class="step-tag">性质 3</span> 渐近线 = D·sin(Cπ/2)</div>
+    <p>$X \to \infty$：$\Theta \to \infty$，$\Phi \to \pi/2$，$Y \to D\sin(C\pi/2)$。$C = 1.2 \Rightarrow \sin(108°) = 0.951$：完全滑动时力回落到峰值的 95%——<b>C 决定峰后回落多少</b>。</p>
+  </div>
+</div>
+<div class="box algo">
+  <div class="box-title">🎯 实验验证（真实运行，Fz=3500N，一次只动一个参数）</div>
+  <table>
+    <thead><tr><th>参数变化</th><th>零点斜率 (N/°)</th><th>峰值 (N)</th><th>峰位 α (°)</th><th>语义结论</th></tr></thead>
+    <tbody>
+      <tr><td>基线 B9/C1.2/E−0.5</td><td><b>1504</b>（理论 D·C·B=1508 ✓）</td><td>8000.0</td><td>18.5</td><td>—</td></tr>
+      <tr><td>B: 9 → 4.5</td><td>754（<b>减半</b>）</td><td>7976</td><td>≥30</td><td>B = 刚度（多快到达峰值）</td></tr>
+      <tr><td>C: 1.2 → 1.6</td><td>2003（<b>按比例增</b>）</td><td>8000</td><td><b>8.3</b></td><td>C = 形状（峰更早更陡、峰后回落更多）</td></tr>
+      <tr><td>E: −0.5 → +0.5</td><td>1501（<b>不动</b>）</td><td>7982</td><td>≥30</td><td>E = 峰位/曲率微调（不影响原点与峰值）</td></tr>
+      <tr><td>Fy0: 8000 → 6000（即 D）</td><td>1128（按比例）</td><td><b>6000</b></td><td>18.5</td><td>D = 峰值尺度</td></tr>
+    </tbody>
+  </table>
+  <p>记忆卡：<b>D 管"多高"、B 管"多快"、C 管"峰后掉多少"、E 管"峰在哪微调"、Sh/Sv 管"整体平移"</b>（锥度效应/外倾推力）。调车语言："前轴轮胎峰值来得比后轴早"（B·C 更大）= 转向不足/过度的轮胎侧配方。</p>
+</div>
+
+<h2>8.3 载荷与摩擦：D 的线性化及其代价</h2>
+<div class="box proof">
+  <div class="box-title">📐 本子集的载荷模型</div>
+  $$D(F_z) = F_{y0} \cdot \frac{F_z}{F_{z,nom}} \;\Longrightarrow\; \mu_{eff}(F_z) = \frac{D}{F_z} = \frac{F_{y0}}{F_{z,nom}} = \text{常数（实测 2.2485 恒定）}$$
+</div>
+<div class="box warn">
+  <div class="box-title">⚠️ 已知简化：载荷敏感性（load sensitivity）缺失</div>
+  <p><b>真实轮胎</b>：$\mu$ 随 $F_z$ <b>递减</b>（胎体非线性，重压下接触压强分布恶化）——经验式 $D \sim (a F_z + a_2 F_z^2)$ 带负二次项。<b>本子集</b>：D 线性 ⟹ μ 恒定（实验 2 实测 2.2485 全载荷不变）。</p>
+  <p><b>后果链（第 9/11 章的伏笔，现在埋下）</b>：载荷转移把轴上一轮加到 $F_z + \Delta$、另一轮减到 $F_z - \Delta$，真实轮胎下两轮侧向力之和 $\sum F_y = f(F_z+\Delta) + f(F_z-\Delta) &lt; 2f(F_z)$（凹函数性质，Jensen 不等式）；线性 μ 下两者相等——<b>本模型会低估载荷转移的抓地力损失</b>，也因此无法表达"TLLTD 偏轻载端更好"的经典结论。要模拟该效应：给 D 加负二次项（一处改动，OpenItem 级）。</p>
+</div>
+
+<h2>8.4 复合滑移：摩擦圆与一个不一致观察</h2>
+<div class="box intuition">
+  <div class="box-title">💡 摩擦椭圆（本项目的回退检查）</div>
+  <p>同一点上，可用摩擦在 Fx/Fy 之间分配：$\sqrt{(F_x/\mu_x F_z)^2 + (F_y/\mu_y F_z)^2} \le 1$。直觉：摩擦力是"预算"，驱动/制动花掉的预算不能再买侧向力——弯中给油推头、刹车入弯甩尾，都是圆被吃满的表象。完整 MF 联合模型（MF-Tyre 的复合滑移耦合）远比圆复杂；本项目用<b>圆作为无 MF 参数时的回退</b>。</p>
+</div>
+<div class="box warn">
+  <div class="box-title">⚠️ 观察：回退 μ 与 MF 默认值不一致（读码发现）</div>
+  <p>实验：MF 默认参数下 $F_x(\kappa{=}0.05) = 4614$N 已<b>超过</b>回退检查的 $\mu F_z = 0.9 \times 3500 = 3150$N——回退圆的 μ=0.9 硬编码，而 MF 默认参数实际描述的是 $\mu \approx 2.25$ 的胎（FSAE 赛事+下压力语境的合理值，但两者各说各话）。<b>生产级一致性要求</b>：回退 μ 应从 MF 参数推导（$F_{y0}/F_{z,nom}$）或由用户统一给定——登记为观察项。</p>
+</div>
+
+<h2>8.5 回正力矩 Mz：占位实现与其物理</h2>
+<p>本项目 $M_z = 0.06\,F_y$（常数拖距 60mm，源码自标 APPROXIMATE）。<b>真实物理</b>： pneumatic trail $t(\alpha)$ 随侧偏增大<b>递减</b>（滑移区从后向前侵蚀接触斑，合力中心前移）——所以 Mz 的峰值比 Fy 的峰值来得早，越过之后回正力矩衰减甚至反号（手感变轻、丢方向的来源）。常数拖距丢掉了整段故事，但力矩量级正确。</p>
+
+<h2>8.6 源码对账（tire_mf.py）</h2>
+<pre><code><span class="keyword">def</span> <span class="func">fy</span>(alpha_deg, fz):
+    a = radians(alpha) + Sh                                  <span class="comment"># 水平偏移（锥度/外倾）</span>
+    x = B * a
+    <span class="keyword">return</span> D(fz) * sin(C * arctan(x - E*(x - arctan(x)))) + Sv   <span class="comment"># 8.2 公式逐字</span>
+
+<span class="keyword">def</span> <span class="func">_d</span>(fz):  <span class="keyword">return</span> Fy0 * (fz / FzNom)  <span class="keyword">if</span> fz &gt; <span class="num">0</span> <span class="keyword">else</span> <span class="num">0.0</span>            <span class="comment"># D 线性载荷（8.3 简化所在）</span>
+<span class="keyword">def</span> <span class="func">fx</span>(kappa, fz): ... B*<span class="num">1.2</span> ...                              <span class="comment"># 纵向：同一骨架，刚度系数 ×1.2</span>
+<span class="keyword">def</span> <span class="func">mz</span>(alpha_deg, fz): <span class="keyword">return</span> fy(...) * <span class="num">0.06</span>               <span class="comment"># 常数拖距 60mm 占位（8.5）</span>
+<span class="comment"># 回退：无 MF 参数时用摩擦圆 μ(Fz)·Fz 检查（μ=0.9 硬编码 ⚠ 8.4 观察）</span></code></pre>
+
+<h2>8.7 核心检查点与自测</h2>
+<div class="qa-box">
+  <p><b>Q1. 用刷子模型解释：为什么 Fy-α 曲线有线性区、峰值、回落三段？</b></p>
+  <p><b>解析</b>：小 α 刷毛粘附剪切，力 ∝ 变形（线性区，斜率=侧偏刚度）；α 大，滑移区从后缘扩张，达摩擦极限的刷毛不再增力（饱和弯曲）；全滑后摩擦力 ≈ μFz·滑动方向合力，α 再增大只是把滑动方向转向纯侧向的极限——结合回落段由 C&gt;1 的 MF 形状刻画。</p>
+</div>
+<div class="qa-box">
+  <p><b>Q2. 推导零点斜率 = D·C·B。E 为什么在原点不出现？</b></p>
+  <p><b>解析</b>：链式法则 + 原点处 Θ=0、Φ'=Θ'=B（E 项导数 (B−arctan BX)' 在 0 处 = B−B = 0，被 E 乘后消失）。E 只 reshape 峰附近。</p>
+</div>
+<div class="qa-box">
+  <p><b>Q3. 载荷转移让轴上两轮 ±ΔFz。真实轮胎与本模型各产生多少总侧向力差？工程含义？</b></p>
+  <p><b>解析</b>：本模型 D 线性 ⟹ f(Fz+Δ)+f(Fz−Δ) = 2f(Fz)，转移无损失；真实 μ(Fz) 递减 ⟹ 凹函数 ⟹ 和下降（Jensen）。含义：真实车不应把一轴压死——TLLTD 偏轻载端/控制总转移量都是为此服务；本模型系统性乐观，比较设计相对优劣仍有效，绝对圈速预测失真。</p>
+</div>
+<div class="qa-box">
+  <p><b>Q4. RWD 赛车弯中猛给油为什么趋向甩尾（过度）？带刹入弯为什么趋向推头？用摩擦圆各解释一遍。</b></p>
+  <p><b>解析</b>：摩擦圆语言 = "Fx 占用谁的圆，谁先丢 Fy"。给油：驱动 Fx 全部记在<b>后</b>轮账上 → 后轮圆预算被 Fx 吃掉 → 可用 Fy 下降 → 车尾先丢侧向力 = 过度（power oversteer）。带刹：制动力主要压在前轮（+载荷前移让前轮 Fz 大、制动力配额大）→ 前轮圆被 Fx 占用 → 前轮 Fy 先掉 = 推头（brake understeer）。同一物理，两种症状，取决于 Fx 记在哪个轴的账上。</p>
+</div>
+<div class="qa-box">
+  <p><b>Q5.（动手）把 By 改 12（更硬的胎侧），零点斜率与峰位怎么变？跑一下验证你的预测。</b></p>
+  <p><b>解析</b>：斜率 = D·C·B → ×12/9 = 1508×1.333 ≈ 2011 N/°；峰位提前（更快到达饱和，类比 C 实验的 8.3° 方向）。峰值仍 ≈ D（8000）。"更硬的胎"= 更快建立力 = 响应更快但滑移窗口更窄。</p>
+</div>
+
+</body>
+</html>

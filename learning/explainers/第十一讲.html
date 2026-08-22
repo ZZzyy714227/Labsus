@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第 2 章 · 刚体位姿与旋转 — LABSUS 悬架实验室</title>
+<!-- 引入 MathJax 渲染高质量数学公式 -->
+<script>
+window.MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']],
+    processEscapes: true
+  },
+  options: {
+    skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+  }
+};
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<style>
+:root {
+  --bg: #0f1319;
+  --panel: #161c26;
+  --ink: #e6edf3;
+  --ink-dim: #9aa7b8;
+  --pri: #58a6ff;
+  --pri-dim: rgba(88, 166, 255, 0.15);
+  --ok: #3fb950;
+  --ok-dim: rgba(63, 185, 80, 0.15);
+  --warn: #d29922;
+  --warn-dim: rgba(210, 153, 34, 0.15);
+  --err: #f85149;
+  --err-dim: rgba(248, 81, 73, 0.15);
+  --purple: #bc8cff;
+  --purple-dim: rgba(188, 140, 255, 0.15);
+  --line: #30363d;
+  --code-bg: #0b0e14;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: 15.5px;
+  line-height: 1.8;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 40px 24px 100px;
+}
+
+/* 标题体系 */
+h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+h1 small {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pri);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+h2 {
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--pri);
+  margin: 52px 0 18px;
+  padding-left: 12px;
+  border-left: 4px solid var(--pri);
+  display: flex;
+  align-items: center;
+}
+h3 {
+  font-size: 17px;
+  font-weight: 600;
+  color: #c9d1d9;
+  margin: 28px 0 10px;
+}
+
+p { margin: 12px 0; color: #c9d1d9; }
+strong, b { color: #fff; }
+em { color: var(--warn); font-style: normal; font-weight: 600; }
+
+/* 容器卡片 */
+.box {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px 22px;
+  margin: 20px 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.box.intuition { border-left: 4px solid var(--purple); background: linear-gradient(90deg, var(--purple-dim) 0%, var(--panel) 25%); }
+.box.proof { border-left: 4px solid var(--ok); background: linear-gradient(90deg, var(--ok-dim) 0%, var(--panel) 25%); }
+.box.warn { border-left: 4px solid var(--warn); background: linear-gradient(90deg, var(--warn-dim) 0%, var(--panel) 25%); }
+.box.algo { border-left: 4px solid var(--pri); background: linear-gradient(90deg, var(--pri-dim) 0%, var(--panel) 25%); }
+.box-title { font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.box.intuition .box-title { color: var(--purple); }
+.box.proof .box-title { color: var(--ok); }
+.box.warn .box-title { color: var(--warn); }
+.box.algo .box-title { color: var(--pri); }
+
+/* 步骤指示器 */
+.step-card {
+  background: #121720;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 16px 0;
+}
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 8px;
+}
+.step-tag {
+  background: var(--pri-dim);
+  color: var(--pri);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-family: monospace;
+  font-weight: bold;
+}
+
+/* 列表与表格 */
+ul, ol { margin: 12px 0 12px 24px; color: #c9d1d9; }
+li { margin: 6px 0; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+  background: var(--panel);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+th, td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+th { background: #1f2733; color: #fff; font-weight: 600; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,0.02); }
+
+/* 代码块 */
+code {
+  font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--code-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--pri);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  overflow-x: auto;
+}
+pre code {
+  background: transparent;
+  padding: 0;
+  border: none;
+  color: #e6edf3;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.comment { color: #8b949e; }
+.keyword { color: #ff7b72; }
+.func { color: #d2a8ff; }
+.num { color: #79c0ff; }
+
+/* 问答区域 */
+.qa-box {
+  background: #161c24;
+  border: 1px solid #232d3d;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 14px 0;
+}
+.qa-box b { color: var(--ok); }
+
+.formula-highlight {
+  background: #131922;
+  border-left: 3px solid var(--pri);
+  padding: 10px 16px;
+  margin: 12px 0;
+  border-radius: 0 6px 6px 0;
+}
+</style>
+</head>
+
+
+<body>
+
+<h1>第 11 章 · 验证方法论与全链总结——结业
+<small>LABSUS 悬架实验室 · 自底向上 11/11 · 收官</small></h1>
+
+<h2>11.0 这一章解决的问题</h2>
+<p>十讲下来你掌握了建模链。最后一问：<strong>你怎么知道它是对的？</strong>vibe coding 的原罪就是跳过这一问。本章把本课程中<b>实际用过、实际抓到过 bug</b> 的验证手段整理成体系，然后给你全链知识地图与 45 分钟结业讲稿骨架。</p>
+
+<h2>11.1 六层验证体系（每层都是本课程的真实案例）</h2>
+<div class="box algo">
+  <div class="box-title">🎯 验证金字塔（从便宜到贵）</div>
+  <table>
+    <thead><tr><th>层</th><th>手段</th><th>本课程案例</th><th>成本</th></tr></thead>
+    <tbody>
+      <tr><td><b>L1 量纲</b></td><td>单位链手推</td><td>kw N/mm→N/m 差 1000 倍吞掉迁移（TLLTD bug 半个根因）；$k_\phi$ 单位链验证</td><td>秒级</td></tr>
+      <tr><td><b>L2 守恒</b></td><td>合力/合矩闭合</td><td>力链锚点和 = (0,−3000,0)，残差 3.7e−12 ✓；hs/hcg 独立输入致 6% 不闭合（发现输入自洽问题）</td><td>秒级</td></tr>
+      <tr><td><b>L3 对称性</b></td><td>镜像/零输入检查</td><td>gy=0 ⟹ TLLTD 占位 50%、左右轮载对称（cam_FL≈cam_FR ±0.3°）</td><td>秒级</td></tr>
+      <tr><td><b>L4 物理直觉</b></td><td>量级/方向/单调红旗</td><td>scrub=229mm（量级错）+ 负拖距配正后倾（方向错）⟹ 现场捉到 kg 符号 bug；TLLTD 不随 gy 变（单调红旗）⟹ 齐次性证明</td><td>分钟级</td></tr>
+      <tr><td><b>L5 交叉验证</b></td><td>双实现互审 / 手算对账</td><td>kg bug：前端对引擎错；转向轴：前端对引擎错；第 9 章手算链 vs 引擎 0.16pp；P0 前后端 1g 逐位一致、2g 差 0.06pp</td><td>小时级</td></tr>
+      <tr><td><b>L6 外部基准</b></td><td>对标行业软件</td><td><b>OptimumK benchmarks 至今是空位</b>（深研报告 P0-2，唯一缺失的层）——补上它，验证金字塔封顶</td><td>天级</td></tr>
+    </tbody>
+  </table>
+  <p><b>核心心法</b>：L1-L4 免费且高频（每次改动跑一遍）；L5 是本项目架构红利（双内核互为审计器——但前提是你要知道它们<b>哪里故意不同</b>：转向输入轴、kw 来源）；L6 给绝对可信度。<b>断言的不是"数值等于某数"，而是"物理性质成立"</b>——这正是引擎测试套件的写法（载荷守恒、对称、ARB 减小侧倾、TLLTD 随 gy 单调）。</p>
+</div>
+<div class="box warn">
+  <div class="box-title">⚠️ 本课程期间活捉的问题清单（你已有能力评审它们的修复）</div>
+  <ol>
+    <li><b>kg 符号 bug</b>（第 5 章）：引擎 scrub/trail 错，修复 = t0 分母取 −dz，同步测试断言（54.6/+24.6）。一行。</li>
+    <li><b>转向输入轴裂缝</b>（第 3 章）：引擎 steer_axis 应为 (±1,0,0)，修复后转向增益放大 ~20×，需同步扫掠范围。</li>
+    <li><b>摇臂三病例</b>（第 6 章）：平面圆工作空间边界（+5mm 无解）+ bracket 分支跳变 + 失败冻结 ⟹ 球铰化模型 + 闭式分支规则；修好后 KwCurve 下发可撤。</li>
+    <li><b>回退 μ 不一致</b>（第 8 章）：摩擦圆 μ=0.9 硬编码 vs MF 默认 μ≈2.25，应从 MF 参数推导。</li>
+    <li><b>D 载荷敏感性缺失</b>（第 8 章）：加负二次项一处改动（乐观偏差的来源）。</li>
+  </ol>
+  <p>这五项都是"开发暂停"期间的教学发现——解除暂停后每一项你都能写出验收标准。</p>
+</div>
+
+<h2>11.2 全链知识地图（一页因果链）</h2>
+<div class="box intuition">
+  <div class="box-title">💡 从 45 个数字到 TLLTD 的完整通路</div>
+  <pre style="background:#0b0e14;border:1px solid #30363d;border-radius:8px;padding:14px;overflow-x:auto;font-size:12.5px;line-height:1.9;color:#c9d1d9">
+几何主链（静力学）:
+  15硬点(第1讲) → 坐标/约束/驱动(第3讲) → 残差 F(x):ℝ¹⁸→ℝ¹⁹(第3讲)
+    → TRF信赖域求解(第4讲) → 节点位姿 → Kabsch/SVD恢复旋转(第2讲)
+    → 轮轴向量 → cam/toe(第2/5讲) → RC构造: 臂线插值→交点→中面(第5讲)
+    → 扫掠+中心差分 → 增益/RC迁移/kw曲线(第5讲)
+
+刚度链:
+  摇臂从动链→MR(第6讲) → kw=kS·mr²(能量) → kφ=½kwt²+ARB·GJ/L·…(第6讲)
+
+力链(柔顺):
+  接触载荷(第8讲 MF: D峰值/CB刚度) → 二力杆定理(第7讲) → A·m=−f
+    → 衬套6DOF+小角I+[r]×(第7讲) → 两层迭代(TRF+Anderson)
+
+整车汇合(第9讲):
+  三路径 = 非簧载直接 + RC几何 + 弹性(kφ·φ) → φ=ay·hArm/(kφ−mS·g·hArm)
+    → TLLTD → [齐次陷阱] → 侧倾耦合迭代(P0) → 四轮Fz → 轮胎能力
+
+时域(第10讲):
+  1/4车2DOF理论 ↔ corner rig实现(车身接地) → PBD三段循环 → 稳定性ωh&lt;2
+  </pre>
+  <p><b>每个箭头你都推导过、且至少一个数字被手算或双实现验证过。</b></p>
+</div>
+
+<h2>11.3 结业讲稿骨架（45 分钟五幕）</h2>
+<div class="box algo">
+  <div class="box-title">🎯 讲稿分配（对着外人也能讲）</div>
+  <table>
+    <thead><tr><th>幕</th><th>时长</th><th>内容锚点</th><th>杀手数字</th></tr></thead>
+    <tbody>
+      <tr><td>① 立论</td><td>5'</td><td>悬架=受控路径=移动硬点；上短下长→外倾增益</td><td>323/490mm；−0.883°/25mm</td></tr>
+      <tr><td>② 运动学链</td><td>15'</td><td>约束即数学(19方程18坐标)→残差→TRF→位姿→Kabsch→定位角/RC</td><td>TRF 5次评估到1e−13；IC(−847,118)；RC 55.26 引擎逐位</td></tr>
+      <tr><td>③ 刚度链</td><td>10'</td><td>MR²能量推导→kw→ARB四连导(J→GJ/L→a²→mr²)</td><td>kw=61875；ARB share 15.9% 双算互证</td></tr>
+      <tr><td>④ 整车</td><td>10'</td><td>三路径→φ(重力失稳项)→TLLTD→齐次陷阱证明→迭代修复</td><td>149.6/225.7/1136N；φ=1.09°手算对上；68.3→64.4%单调</td></tr>
+      <tr><td>⑤ 怎么知道对</td><td>5'</td><td>验证六层 + 现场讲一个活捉 bug 的故事</td><td>kg bug：229→54.6 的三步审计</td></tr>
+    </tbody>
+  </table>
+  <p><b>弹药库纪律</b>：只讲你手算过的数字（上面每个都在对应讲义里留了推导），被追问就退一级到推导——退到底就是第 1 章的 45 个坐标。<b>听众分层</b>：车队机械讲①③④；懂数值的人加讲②⑤；答辩评委主打①④+⑤的验证故事。</p>
+</div>
+
+<h2>11.4 终章检查点（综合题）</h2>
+<div class="qa-box">
+  <p><b>Q1. 只用一张纸，从 15 个硬点坐标出发写出到 TLLTD 的全部公式（允许记不住系数，不允许记不住结构）。</b></p>
+  <p><b>解析</b>：结构链 = 约束方程(铰链圆2×2+两两10+杆1+驱动4) → 残差最小化 → 位姿 → 轮轴→角/RC → kw=kS·mr²、kφ=½kwt²+ARB → 三路径(A非簧载+B几何zrc+C弹性kφφ) → φ=mS·ay·hArm/(kφ−mS·g·hArm) → TLLTD=前/(前+后)。系数忘了查第 9 讲，结构忘了说明链断了——回去补那一环。</p>
+</div>
+<div class="qa-box">
+  <p><b>Q2. 有人给你看一个悬架仿真：TLLTD 不随侧向加速度变化。给他三分钟的解释框架。</b></p>
+  <p><b>解析</b>：①先问模型是线性还是非线性（线性下这是数学必然——齐次性证明）；②再看数值（50% 占位还是常数 71%）；③诊断路径（rc/kw 是否随行程迁移、迭代是否启用）；④给修复（侧倾耦合迭代 + kw 曲线来源可信吗——第 6 章摇臂病例）。四步全是本课程内容。</p>
+</div>
+<div class="qa-box">
+  <p><b>Q3. 验证六层里哪层最便宜、哪层最贵？本项目缺哪层、怎么补？</b></p>
+  <p><b>解析</b>：L1 量纲最便宜（秒级、纯手推）；L6 外部基准最贵（天级）。本项目缺 L6：解析 ref/OptimumKinematics PDF 里的示例工况录入 benchmarks（深研报告 P0-2），对齐定位角/增益数字。</p>
+</div>
+<div class="qa-box">
+  <p><b>Q4. 前端与引擎为什么要保持双内核？代价是什么？收益怎么兑现？</b></p>
+  <p><b>解析</b>：双模设计（断网回退+前端单文件可独立运行）是产品需求；代价 = 双真源漂移风险（转向轴、kg、quasi 曾经三处漂移）；兑现 = 互为审计器（L5）+ 明确的"故意不同清单"维护。架构选择=收益与维护成本的合同。</p>
+</div>
+<div class="qa-box">
+  <p><b>Q5.（结业动手）把第 9 讲 Q5 真的跑了（后轴 kS 130→160 的 TLLTD 预测+引擎验证），并把结果写进你的讲稿第④幕。</b></p>
+  <p><b>解析</b>：预测 TLLTD 下降（后轴弹性份额升）；引擎验证差应 &lt;0.5pp（kw 常数版全链 0.16pp 的精度参照）。完成这一题 = 你独立走完了一次"预测→验证→入稿"的完整工程循环。</p>
+</div>
+
+</body>
+</html>
