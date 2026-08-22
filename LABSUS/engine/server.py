@@ -34,7 +34,13 @@ from pydantic import ValidationError  # noqa: E402
 
 from src.api import v3service  # noqa: E402
 from src.api import chassis as chassis_service  # noqa: E402
-from src.api.v3models import ChassisRequest, KandcRequest, PoseRequest  # noqa: E402
+from src.api.v3models import (  # noqa: E402
+    ChassisRequest,
+    KandcRequest,
+    PoseRequest,
+    TrackSimRequest,
+)
+from src.solver.transient import run_track_sim  # noqa: E402
 
 ENGINE_VERSION = "0.3.0"          # 引擎（S1 内核 + S2 服务层）
 API_VERSION = "v3"
@@ -120,6 +126,16 @@ def chassis_kandc(case: str, req: ChassisRequest) -> dict:
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=422,
                             detail=f"chassis K&C error: {exc}") from exc
+
+
+@app.post("/api/v3/chassis/simulate_track")
+def simulate_track(req: TrackSimRequest) -> dict:
+    """整车瞬态赛道仿真（S3-1）：平面 3-DOF + 四轮 MF + 准静态载荷 + 纯追踪驾驶员。"""
+    try:
+        return run_track_sim(req)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=422,
+                            detail=f"transient sim error: {exc}") from exc
 
 
 if __name__ == "__main__":

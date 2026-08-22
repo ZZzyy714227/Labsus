@@ -252,3 +252,65 @@ class ChassisSweepResponse(BaseModel):
     curves: dict[str, list] = Field(default_factory=dict)
     gains: dict[str, float] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
+
+
+# ── 整车瞬态赛道仿真（S3-1：平面 3-DOF + 四轮 MF + 准静态载荷转移） ──
+
+class TrackPoint(BaseModel):
+    """赛道中心线点（世界坐标 m，target_speed m/s）。"""
+    x: float
+    y: float
+    target_speed: float = 15.0
+
+
+class TireParams(BaseModel):
+    """四轮共用的 MF 参数（缺省 = tire_mf 默认）。μ 由 Fy0/FzNom 推导用于摩擦圆。"""
+    Fy0: float = 8000.0
+    By: float = 9.0
+    Cy: float = 1.2
+    Ey: float = -0.5
+    Sh: float = 0.0
+    Sv: float = 0.0
+    FzNom: float = 3500.0
+
+
+class TrackSimRequest(BaseModel):
+    """赛道瞬态仿真请求。
+
+    kc_luts：前端下发的 K&C 查表（与 KwCurve 同源思路）：
+      {"front": {"travel": [mm...], "toe": [deg...], "cam": [deg...]}, "rear": {...}}
+      缺省 toe/cam = 0（LUT 影响关闭）；travel 索引由准静态侧倾角×半轮距给出。
+    """
+    vehicle: VehicleSpec
+    track: list[TrackPoint] = Field(min_length=2)
+    dt: float = Field(0.01, gt=1e-4, le=0.05)
+    sim_time: float = Field(30.0, gt=0.0, le=300.0)
+    kc_luts: dict[str, dict[str, list[float]]] = Field(default_factory=dict)
+    tire: TireParams = Field(default_factory=TireParams)
+    iz_kg_m2: float | None = None          # 缺省 ≈ m(L²+t̄²)/12
+    lookahead_gain: float = 0.9            # 纯追踪预视距离 = 3 + gain·vx（m）
+    start_speed: float = 5.0               # 初始车速 m/s
+
+    @model_validator(mode="after")
+    def _check_luts(self):
+        for ax, lut in self.kc_luts.items():
+            if ax not in ("front", "rear"):
+                raise ValueError(f"kc_luts axis must be front|rear, got {ax!r}")
+            for key in ("travel",):
+                if key in lut and len(lut[key]) < 2:
+                    raise ValueError("kc_luts travel needs >= 2 points")
+            for key in ("toe", "cam"):
+                if key in lut and "travel" in lut and len(lut[key]) != len(lut["travel"]):
+                    raise ValueError(f"kc_luts {ax}.{key} length must match travel")
+        return self
+
+
+class TrackSimResponse(BaseModel):
+    status: str
+    ms: float = 0.0
+    steps: int = 0
+    finished: bool = False
+    t: list[float] = Field(default_factory=list)
+    trace: list[dict] = Field(default_factory=list)
+    summary: dict[str, float] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
