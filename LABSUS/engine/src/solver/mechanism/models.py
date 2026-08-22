@@ -74,6 +74,7 @@ class Mechanism:
     wheel: str           # 轮心节点 id（轮跳驱动锚）
     steer_anchor: Vec    # FL1 齿条线锚点（=FL1.p0）
     steer_axis: Vec      # 单位向量，齿条平移方向（右轮 +Y）
+    strut_attach: str = "knuckle"  # STRUT_OUT 附着拓扑：knuckle|lca|uca（P2）
 
     def node(self, name: str) -> Node:
         return self.nodes[name]
@@ -101,13 +102,23 @@ def build_mechanism(
     pushrod_to: str = "CH5",
     rocker_axis: Vec | None = None,
     steer_axis: Vec | None = None,
+    strut_attach: str = "knuckle",
 ) -> Mechanism:
     """由侧硬点字典构造机构。
 
-    - UCA/LCA 铰链：绕 CH1–CH2 / CH3–CH4 轴，成员 [UP1] / [UP2]。
-    - 转向节刚体簇：5 节点 [UP1..UP5]。
+    - 下臂铰链 ARM_LOWER（历史误名 UCA）：轴 CH1–CH2，主成员 [UP1=LBJ]。
+    - 上臂铰链 ARM_UPPER（历史误名 LCA）：轴 CH3–CH4，主成员 [UP2=UBJ]。
+      注：引擎点 CH1/CH2 对应前端 DWB LCA_F/LCA_R、CH3/CH4 对应 UCA_F/UCA_R；
+      早期代码以 UP1 绕 CH1-CH2（下臂轴）仍称 "UCA" 属命名错位，2026-08-22 修正。
+    - 转向节刚体簇：默认 5 节点 [UP1..UP5]；strut_attach≠knuckle 时 UP4 移出，
+      改挂臂铰链（与前端 strutOutAttach 语义一致：lca=下臂 / uca=上臂）。
     - 摇臂：绕 RK_PIVOT 的固定 X 轴，成员 [CH5, RK_DAMPER]。
     - 刚线：横拉杆 UP3–FL1、推杆 UP4–CH5。
+
+    strut_attach（P2，2026-08-22）：
+        "knuckle" → UP4 固定于转向节刚体（历史行为，保留兼容）；
+        "lca"     → UP4 挂下臂铰链（前端 FRONT strutOutAttach:"lca" 推杆）；
+        "uca"     → UP4 挂上臂铰链（前端 REAR  strutOutAttach:"uca" 拉杆）。
     """
     nodes = {}
     for key in sorted(points):
@@ -125,16 +136,24 @@ def build_mechanism(
         return AxisCluster(kind=kind, name=name, anchor=anchor, members=members,
                            rel=rel, wt=wt, axA=axA, axB=axB, axis=axis)
 
+    if strut_attach not in ("knuckle", "lca", "uca"):
+        raise ValueError(f"strut_attach must be knuckle|lca|uca, got {strut_attach!r}")
+
     pivot = "RK_PIVOT"
+    lower_members = ["UP1"] + (["UP4"] if strut_attach == "lca" else [])
+    upper_members = ["UP2"] + (["UP4"] if strut_attach == "uca" else [])
     axis_clusters = [
-        _axis("hinge", "UCA", "CH1", ["UP1"], axA="CH1", axB="CH2"),
-        _axis("hinge", "LCA", "CH3", ["UP2"], axA="CH3", axB="CH4"),
+        _axis("hinge", "ARM_LOWER", "CH1", lower_members, axA="CH1", axB="CH2"),
+        _axis("hinge", "ARM_UPPER", "CH3", upper_members, axA="CH3", axB="CH4"),
         _axis("rocker", "ROCKER", pivot, ["CH5", "RK_DAMPER"],
               axis=_unit(rocker_axis if rocker_axis is not None else np.array([1.0, 0.0, 0.0]))),
     ]
 
-    ids = ["UP1", "UP2", "UP3", "UP4", "UP5"]
-    wt = np.array([1.0, 1.0, 0.5, 0.5, 1.0])
+    body_ids = [i for i in ("UP1", "UP2", "UP3", "UP4", "UP5")
+                if not (i == "UP4" and strut_attach != "knuckle")]
+    wm = {"UP1": 1.0, "UP2": 1.0, "UP3": 0.5, "UP4": 0.5, "UP5": 1.0}
+    ids = body_ids
+    wt = np.array([wm[i] for i in ids])
     ws = float(wt.sum())
     c0 = sum(w * nodes[i].p0 for w, i in zip(wt, ids)) / ws
     rel = [nodes[i].p0 - c0 for i in ids]
@@ -150,4 +169,5 @@ def build_mechanism(
     steer_anchor = nodes[tie_inner].p0.copy()
     sa = steer_axis if steer_axis is not None else np.array([0.0, 1.0, 0.0])
     return Mechanism(nodes=nodes, links=links, axis_clusters=axis_clusters, bodies=bodies,
-                     free_ids=free_ids, wheel=wheel, steer_anchor=steer_anchor, steer_axis=_unit(sa))
+                     free_ids=free_ids, wheel=wheel, steer_anchor=steer_anchor,
+                     steer_axis=_unit(sa), strut_attach=strut_attach)

@@ -17,7 +17,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.optimize import least_squares
 
-from geometry import distance_point_to_line, rotate_around_x
+from geometry import distance_point_to_line, rotate_around_axis
 
 from .models import Mechanism
 
@@ -51,9 +51,19 @@ def _apply(m: Mechanism, x: np.ndarray) -> None:
 
 
 def _build_residual(m: Mechanism, travel: float, rack: float):
-    """残差函数：铰链圆(半径/轴向) + 转向节刚性(distance) + 横拉杆 + 双驱动。"""
-    pair = [(i, j) for idx, i in enumerate(_KNUCKLE_IDS) for j in _KNUCKLE_IDS[idx + 1:]]
+    """残差函数：铰链圆(半径/轴向) + 转向节刚体距离 + 横拉杆 + 双驱动。
+
+    P2（2026-08-22）：刚体距离对由 m.bodies[0].ids 派生 —— strut_attach!=knuckle
+    时 UP4 已移出转向节，不再受 knuckle 刚距约束；同时补一条 UP4↔臂球头刚线
+    （对应前端 ATT_B-ST_O），消除"绕臂轴相对转角"的伪自由度。
+    """
+    body_ids = sorted(m.bodies[0].ids)
+    pair = [(i, j) for idx, i in enumerate(body_ids) for j in body_ids[idx + 1:]]
     d0 = {p: float(np.linalg.norm(m.node(p[0]).p0 - m.node(p[1]).p0)) for p in pair}
+    if m.strut_attach in ("lca", "uca"):
+        driver = "UP1" if m.strut_attach == "lca" else "UP2"
+        d0[("UP4", driver)] = float(
+            np.linalg.norm(m.node("UP4").p0 - m.node(driver).p0))
     hinge_design: list[tuple] = []
     for c in m.axis_clusters:
         if c.kind != "hinge":
@@ -79,6 +89,9 @@ def _build_residual(m: Mechanism, travel: float, rack: float):
             out.append(float(np.dot(p - a.pos, u)) - ax0)
         for i, j in pair:
             out.append(float(np.linalg.norm(m.node(i).pos - m.node(j).pos)) - d0[(i, j)])
+        if m.strut_attach in ("lca", "uca"):
+            out.append(float(np.linalg.norm(m.node("UP4").pos - m.node(driver).pos))
+                       - d0[("UP4", driver)])
         out.append(float(np.linalg.norm(m.node(tie.a).pos - m.node(tie.b).pos)) - tie.L0)
         out.append(m.node(m.wheel).pos[2] - (z_p0 + travel))
         out.extend(m.node("FL1").pos - (m.steer_anchor + rack * m.steer_axis))
@@ -93,20 +106,34 @@ def residual(m: Mechanism, travel: float, rack: float) -> float:
 
 
 def solve_rocker(m: Mechanism) -> tuple[bool, float | None, float | None]:
-    """摇臂后处理：解 θ 使 |rotate_around_x(CH5.p0, pivot, θ) − UP4.current| = L_pr。
+    """摇臂后处理：解 θ 使 |rotate_axis(CH5.p0, pivot, axis, θ) − UP4.current| = L_pr。
 
     返回 (ok, theta_rad, damper_len_mm)。不可达时 ok=False。同时写回 CH5/RK_DAMPER。
+
+    P2（2026-08-22）：旋转轴改取机构 rocker 簇的 axis —— v3 层由
+    RCK_AX_B−RCK_AX_A 提供真实三维轴；缺省回退全局 X 轴（旧行为）。
+    旧实现 rotate_around_x 不改变 X 坐标，CH5→UP4 的 X 跨距（基线 358mm）
+    使压缩行程推杆长度不可达，bracket 恒失败 → 减振器长度不更新 →
+    引擎 MR 数值垃圾化（实测 3.98）；这正是"STRUT_OUT 拓扑 OpenItem"的
+    真实物理根源之一。
     """
     pivot = m.node("RK_PIVOT").p0
     ch5_0 = m.node("CH5").p0
     dmp_0 = m.node("RK_DAMPER").p0
+    axis = None
+    for c in m.axis_clusters:
+        if c.kind == "rocker" and c.axis is not None:
+            axis = c.axis
+            break
+    if axis is None:
+        axis = np.array([1.0, 0.0, 0.0])
     up4 = m.node("UP4").pos
     l_pr = float(np.linalg.norm(m.node("UP4").p0 - ch5_0))
     if l_pr < 1.0:
         return False, None, None
 
     def err(t: float) -> float:
-        return float(np.linalg.norm(rotate_around_x(ch5_0, pivot, t) - up4)) - l_pr
+        return float(np.linalg.norm(rotate_around_axis(ch5_0, pivot, axis, t) - up4)) - l_pr
 
     e0 = err(0.0)
     bracket: tuple[float, float] | None = None
@@ -124,8 +151,8 @@ def solve_rocker(m: Mechanism) -> tuple[bool, float | None, float | None]:
         else:
             lo = mid
     theta = 0.5 * (lo + hi)
-    m.node("CH5").pos = rotate_around_x(ch5_0, pivot, theta)
-    dmp = rotate_around_x(dmp_0, pivot, theta)
+    m.node("CH5").pos = rotate_around_axis(ch5_0, pivot, axis, theta)
+    dmp = rotate_around_axis(dmp_0, pivot, axis, theta)
     m.node("RK_DAMPER").pos = dmp
     damper_len = float(np.linalg.norm(dmp - m.node("DAMPER_CHASSIS").p0))
     return True, theta, damper_len

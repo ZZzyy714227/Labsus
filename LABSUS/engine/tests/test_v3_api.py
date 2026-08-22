@@ -136,12 +136,14 @@ def test_steer_sweep():
     b = r.json()
     assert b["case"] == "steer"
     assert len(b["curves"]["toe"]) == 17
-    # rack 输入 → toe/steer 方向合理。基线硬点横拉杆近轴向（X 416mm），
-    # 齿条行程对转角敏感性低（实测 ±8mm → ≈0.3°），是几何事实而非求解错误。
+    # rack 输入 → toe/steer 方向合理。2026-08-22 steer_axis 修正为 (-1,0,0)
+    # （齿条整体沿世界 −X 平移，与前端 setChassis RACK.x −= rack 逐位一致）：
+    # rack+ → FR toe 负向（实测 ±8mm ≈ ±3.9°，灵敏度 ~0.39°/mm，旧横拉杆式
+    # 轴向模型仅 ~0.019°/mm，差 20.8:1 —— 旧值不可信）。
     toe = b["curves"]["toe"]
     span = abs(toe[-1] - toe[0])
-    assert 0.05 < span < 20.0
-    assert toe[-1] > toe[0]                      # rack+ → toe+（方向一致性）
+    assert 1.0 < span < 20.0
+    assert toe[-1] < toe[0]                      # rack+ → toe−（方向一致性）
     assert "steer" in b["curves"]
     assert "toe_gain_per_unit" in b["gains"]
 

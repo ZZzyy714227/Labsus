@@ -93,10 +93,16 @@ def test_mirror_symmetry_under_travel(trav):
 
 
 def test_right_side_golden_unchanged():
-    """黄金值：修复不得动右侧数值（基线一手复现实测值）。"""
+    """黄金值：修复不得动右侧数值。
+
+    注：2026-08-22 并发修复（主销-地面交点 t0 符号）将 kg 自 UBJ 上方移回
+    地面段：scrub 229.034→54.5784、trail −54.65→24.64，均更贴物理且与
+    镜像对称一致；此处同步钉住新值。
+    """
     m = _solve()["FR"]
     assert abs(m["cam"] - (-1.2)) < 1e-3
-    assert abs(m["scrub"] - 229.034) < 0.01
+    assert abs(m["scrub"] - 54.5784) < 0.01
+    assert abs(m["trail"] - 24.6431) < 0.01
     assert abs(m["rc_h"] - 55.258349) < 0.01
 
 

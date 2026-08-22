@@ -45,8 +45,8 @@ def make_corners(vehicle: VehicleSpec) -> dict[str, dict]:
 
 def corner_pose(ax: AxleSpec, points: dict, travel: float, rack: float,
                 left: bool) -> tuple[dict, float, list[str]]:
-    """单角求解：返回 (metrics, residual, warnings)。"""
-    mech = _new_mech(points, left=left) if left else _new_mech(points)
+    """单角求解：返回 (metrics, residual, warnings)。P2：arch→strut 附着拓扑。"""
+    mech = _new_mech(points, left=left, arch=ax.arch)
     rep = solve_pose(mech, travel, rack)
     m = pose_metrics(mech, ax.tire_radius,
                      DesignSpec(camber_deg=ax.camber_deg, toe_deg=ax.toe_deg))
@@ -56,17 +56,27 @@ def corner_pose(ax: AxleSpec, points: dict, travel: float, rack: float,
 
 
 def mr_at_zero(ax: AxleSpec, points: dict, left: bool) -> float:
-    """MR@0：damper 对轮跳的中心差分导数（-ΔL/Δtravel，±2mm）。"""
-    mech = _new_mech(points, left=left) if left else _new_mech(points)
+    """MR@0：damper 对轮跳的中心差分导数绝对值（|ΔL/Δtravel|，±2mm）。
+
+    P2（2026-08-22）：依赖 rocker 真实三维轴 + strut_attach（ax.arch）；
+    旧固定 X 轴下压缩侧摇臂无解 → RK_DAMPER 不更新 → ±2mm 差分失真（3.98）。
+
+    MR 取绝对值：下游仅用 mr²（kw=kS·mr²、kphi∝mr²），符号无关。符号在
+    pullrod/uca 布局可为负（压缩行程减振器伸长，实测后轴 -0.167），若不加
+    abs 会被旧 max(0.05) 地板掩盖。分支/数值与前端 mrRef 常量的差距
+    （前 0.47 vs 0.75、后 0.17 vs 0.78）登记 OpenItem-B：摇臂双根分支选择
+    （最近根 vs 投影全局解）与 FE 弹簧力平衡分支的差异。
+    """
+    mech = _new_mech(points, left=left, arch=ax.arch)
     try:
         solve_pose(mech, 2.0, 0.0)
         d1 = mech.node("RK_DAMPER").pos - mech.node("DAMPER_CHASSIS").pos
         lp = float(np.linalg.norm(d1))
-        mech2 = _new_mech(points, left=left) if left else _new_mech(points)
+        mech2 = _new_mech(points, left=left, arch=ax.arch)
         solve_pose(mech2, -2.0, 0.0)
         d2 = mech2.node("RK_DAMPER").pos - mech2.node("DAMPER_CHASSIS").pos
         lm = float(np.linalg.norm(d2))
-        return max(0.05, -(lp - lm) / 4.0)
+        return max(0.02, abs(-(lp - lm) / 4.0))
     except Exception:
         return 0.75
 
@@ -124,11 +134,11 @@ def axle_rc_sweep(ax: AxleSpec, lim: float = 90.0, n: int = 21) -> dict:
     """
     key = (tuple(sorted((k, tuple(map(float, v))) for k, v in ax.points.items())),
            float(ax.tire_radius), float(ax.camber_deg), float(ax.toe_deg),
-           float(lim), int(n))
+           ax.arch, float(lim), int(n))
     hit = _RC_SWEEP_CACHE.get(key)
     if hit is not None:
         return hit
-    mech = _new_mech(ax.points)
+    mech = _new_mech(ax.points, arch=ax.arch)
     design = DesignSpec(camber_deg=ax.camber_deg, toe_deg=ax.toe_deg)
     xs = [float(v) for v in np.linspace(-lim, lim, n)]
     rc: list[float | None] = []
@@ -289,11 +299,23 @@ def solve_chassis(req: ChassisRequest) -> ChassisPoseResponse:
     warnings: list[str] = []
     statuses: set[str] = set()
     rcH: dict[str, float] = {}
-    # MR：显式参数优先；缺省用前端同源常量（SIM.mrRefF||0.75 / mrRefR||0.78）。
-    # 注：引擎 STRUT_OUT 固定于 knuckle 刚体（前端挂 LCA/UCA 铰链），拓扑差异使
-    # 引擎数值推导 MR 失真（实测 3.98 vs 前端 0.75）→ 采用前端常量回退（OpenItem）。
-    mr_f = req.vehicle.front.motion_ratio if req.vehicle.front.motion_ratio is not None else 0.75
-    mr_r = req.vehicle.rear.motion_ratio if req.vehicle.rear.motion_ratio is not None else 0.78
+    # MR 链（P2，2026-08-22）：显式参数 > 引擎数值推导 mr_at_zero（rocker 真实
+    # 三维轴 + strut_attach 对齐后恢复可信）> 前端同源常量回退（SIM.mrRefF||0.75 /
+    # mrRefR||0.78，仅解算异常时使用，并随警告上报）。
+    def _resolve_mr(ax: AxleSpec, points: dict) -> tuple[float, bool]:
+        if ax.motion_ratio is not None:
+            return round(float(ax.motion_ratio), 4), False
+        try:
+            v = round(mr_at_zero(ax, points, False), 4)
+            return v, False
+        except Exception:
+            c = 0.75
+            warnings.append(f"MR compute failed for {ax is req.vehicle.front and 'front' or 'rear'}"
+                            f"→ 回退常量 {c}")
+            return c, True
+
+    mr_f, _fb_f = _resolve_mr(req.vehicle.front, req.vehicle.front.points)
+    mr_r, _fb_r = _resolve_mr(req.vehicle.rear, req.vehicle.rear.points)
     mr = {"front": round(mr_f, 4), "rear": round(mr_r, 4)}
 
     for key in CORNER_KEYS:
