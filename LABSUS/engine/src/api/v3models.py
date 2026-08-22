@@ -139,8 +139,10 @@ class KwCurve(BaseModel):
     """轮端刚度-行程特性（quasi 侧倾耦合迭代用）。
 
     travel mm / kw N/mm；由前端随 payload 下发（前端扫掠 kw=kS·mr(tr)²）。
-    引擎 STRUT_OUT 拓扑与前端不一致（OpenItem），自身 damper 链推不出可信
-    kw 迁移 → 前端曲线优先，缺省回退常数 kS·motion_ratio²。拓扑对齐后可撤。
+    P2（2026-08-22）：STRUT_OUT OpenItem 关闭（rocker 真实三维轴 RCK_AX_A→B +
+    strut_attach 按 arch 对齐前端），引擎已可用 mr_at_zero 权威推导 MR 与
+    常数 kw；kw_curve 通道保留为**可选细化**（真实 mr(tr)² 曲率），缺省
+    回退常数 kS·(engine_mr)²，不再依赖前端曲线才能工作。
     """
     travel: list[float]
     kw: list[float]
@@ -155,17 +157,22 @@ class KwCurve(BaseModel):
 
 
 class AxleSpec(BaseModel):
-    """单轴（右轮）定义；左轮由镜像生成。"""
+    """单轴（右轮）定义；左轮由镜像生成。
+
+    arch（P2，2026-08-22 起为功能参数）：pushrod → STRUT_OUT 挂下臂（前端
+    FRONT strutOutAttach:"lca"）；pullrod → 挂上臂（REAR:"uca"）；其余 → knuckle
+    （up4 固定转向节，历史行为）。
+    """
     points: dict[str, list[float]]          # 15 键 DWB 命名
-    arch: str = "pushrod"
+    arch: str = "pushrod"                   # pushrod|pullrod（→ strut 附着拓扑）
     camber_deg: float = -1.2
     toe_deg: float = 0.05
     tire_radius: float = 325.0
     spring_rate: float = 110.0              # kS N/mm
     spring_mass_kg: float = 330.0           # 本轴簧载质量（CG 分配用）
     unsprung_kg: float = 38.0               # mU 单侧
-    motion_ratio: float | None = None       # 缺省 → 引擎推 MR@0
-    kw_curve: KwCurve | None = None         # 缺省 → 常数 kw（见 KwCurve）
+    motion_ratio: float | None = None       # 缺省 → 引擎 mr_at_zero 数值推导
+    kw_curve: KwCurve | None = None         # 缺省 → 常数 kw = kS·mr²（见 KwCurve）
     arb: ArbSpec = Field(default_factory=ArbSpec)
 
 

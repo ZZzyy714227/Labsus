@@ -141,8 +141,9 @@ def test_chassis_sweep_steer():
     b = r.json()
     assert "toe_FR" in b["curves"] and "toe_FL" in b["curves"]
     assert "steer_toe_gain_deg_per_mm" in b["gains"]
-    # 方向一致：rack+ → FR toe+（与单角 steer 一致）
-    assert b["curves"]["toe_FR"][-1] > b["curves"]["toe_FR"][0]
+    # 方向一致：rack+ → FR toe−（2026-08-22 steer_axis(-1,0,0) 前端对齐，
+    # 与单角 steer 一致；幅度 ~0.39°/mm）
+    assert b["curves"]["toe_FR"][-1] < b["curves"]["toe_FR"][0]
 
 
 def test_chassis_invalid_points_422():

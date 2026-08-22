@@ -172,7 +172,9 @@ def pose_metrics(m, tire_R: float, design: DesignSpec) -> dict:
     dz = float(ubj[2] - lbj[2]) or 1e-9
     kpi = math.atan2(side * (float(lbj[0]) - float(ubj[0])), dz) * R2D
     cast = math.atan2(-(float(ubj[1]) - float(lbj[1])), dz) * R2D
-    t0 = (float(cp[2]) - float(ubj[2])) / dz
+    # 主销-地面交点：t0>1（越过 LBJ 向下到地面）。2026-08-22 修复符号：
+    # 旧式 (cp.z−ubj.z)/dz 得 t0<0，kg 落到 UBJ 上方（scrub=229/trail=−54.7 均错）。
+    t0 = (float(ubj[2]) - float(cp[2])) / dz
     kg = _lerp3(ubj, lbj, t0)
     scrub = side * (float(cp[0]) - float(kg[0]))   # 外侧为正，两侧相同
     trail = float(kg[1]) - float(cp[1])
@@ -197,17 +199,37 @@ def pose_metrics(m, tire_R: float, design: DesignSpec) -> dict:
     }
 
 
-def _new_mech(points: dict[str, list[float]], *, left: bool = False):
+_ARCH_TO_ATTACH = {"pushrod": "lca", "pullrod": "uca"}
+
+
+def _arch_attach(arch: str) -> str:
+    """arch → STRUT_OUT 附着拓扑（P2，与前端 PRESETS strutOutAttach 对齐）。"""
+    return _ARCH_TO_ATTACH.get(arch, "knuckle")
+
+
+def _new_mech(points: dict[str, list[float]], *, left: bool = False, arch: str = "pushrod"):
+    """机构构造（2026-08-22 双修复 + P2）：
+
+    - steer_axis = (−1,0,0)：齿条沿世界 −X 横移，与前端 setChassis 的
+      `RACK.x −= rack` 逐位一致（两侧同向——真实齿条整体平移）。
+      旧值 (0,±1,0) 是"纵拉杆式"输入，同 rack 毫米数转向灵敏度差 20.8:1。
+    - rocker_axis = RCK_AX_A→RCK_AX_B 真实 3D 轴（旧默认 X 轴与枢轴几何不符，
+      是摇臂压缩侧无解/分支跳变/MR=0 的根因之一）。
+    - strut_attach 由 arch 映射（P2，2026-08-22）：pushrod→lca / pullrod→uca，
+      与前端 PRESETS strutOutAttach（FRONT:"lca", REAR:"uca"）一致；未知 arch → knuckle。
+    """
     eng = to_engine_points(points)
-    sa = np.array([0.0, -1.0, 0.0]) if left else np.array([0.0, 1.0, 0.0])
+    sa = np.array([-1.0, 0.0, 0.0])
+    raxis = np.asarray(points["RCK_AX_B"], float) - np.asarray(points["RCK_AX_A"], float)
     return build_mechanism(eng, wheel="UP5", tie_outer="UP3", tie_inner="FL1",
-                           pushrod_from="UP4", pushrod_to="CH5", steer_axis=sa)
+                           pushrod_from="UP4", pushrod_to="CH5", steer_axis=sa,
+                           rocker_axis=raxis, strut_attach=_arch_attach(arch))
 
 
 def _solve_point(points, bushings, case: CaseLoad, travel: float, rack: float,
-                 tire_R: float, design: DesignSpec):
+                 tire_R: float, design: DesignSpec, arch: str = "pushrod"):
     """单点求解：有衬套走 K&C 全链路，无衬套走纯运动学。返回 (metrics, status, warn)。"""
-    mech = _new_mech(points)
+    mech = _new_mech(points, arch=arch)
     if bushings:
         res = solve_compliance_full(mech, bushings=bushings, case=_qsload(case),
                                     travel=travel, rack=rack)
@@ -249,7 +271,7 @@ def run_bump(req: KandcRequest) -> KandcResponse:
     warnings: list[str] = []
     for tr in xs:
         m, st, warn, _ = _solve_point(points, bushings, req.case, float(tr), 0.0,
-                                      req.tire_radius, req.design)
+                                      req.tire_radius, req.design, arch=req.arch)
         statuses.add(st)
         warnings.extend(warn)
         for k, v in m.items():
@@ -295,9 +317,9 @@ def run_roll(req: KandcRequest) -> KandcResponse:
     for t in xs:
         roll_deg = math.degrees(math.atan2(2.0 * t, req.track_width))
         ml, sl, wl, _ = _solve_point(points_l, bush_l, req.case, float(-t), 0.0,
-                                     req.tire_radius, req.design)
+                                     req.tire_radius, req.design, arch=req.arch)
         mr, sr, wr, _ = _solve_point(points_r, bush_r, req.case, float(t), 0.0,
-                                     req.tire_radius, req.design)
+                                     req.tire_radius, req.design, arch=req.arch)
         statuses.update((sl, sr))
         warnings.extend(wl + wr)
         curves["travel"].append(round(float(t), 4))
@@ -330,7 +352,7 @@ def run_steer(req: KandcRequest) -> KandcResponse:
     warnings: list[str] = []
     for rk in xs:
         m, st, warn, _ = _solve_point(points, bushings, req.case, 0.0, float(rk),
-                                      req.tire_radius, req.design)
+                                      req.tire_radius, req.design, arch=req.arch)
         statuses.add(st)
         warnings.extend(warn)
         for k in ("cam", "toe", "cast", "kpi", "scrub", "trail"):
@@ -368,7 +390,7 @@ def run_compliance(req: KandcRequest) -> KandcResponse:
         else:
             case.mz = float(f)
         m, st, warn, res = _solve_point(points, bushings, case, 0.0, 0.0,
-                                        req.tire_radius, req.design)
+                                        req.tire_radius, req.design, arch=req.arch)
         statuses.add(st)
         warnings.extend(warn)
         for k in ("cam", "toe", "cast", "kpi", "scrub", "trail", "damper"):
@@ -395,7 +417,7 @@ def run_pose(req: PoseRequest) -> PoseResponse:
     points = req.points or DEFAULT_DWB_POINTS
     bushings = make_bushings([], points)
     t0 = time.perf_counter()
-    mech = _new_mech(points)
+    mech = _new_mech(points, arch=req.arch)
     rep = solve_pose(mech, req.travel, req.rack)
     m = pose_metrics(mech, req.tire_radius, req.design)
     pose = {k: [round(float(v), 6) for v in mech.node(k).pos] for k in _ENGINE_KEYS}

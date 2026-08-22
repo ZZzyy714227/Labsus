@@ -90,6 +90,26 @@ def rotate_around_x(pt, pivot, theta):
     ])
 
 
+def rotate_around_axis(pt, pivot, axis, theta):
+    """Rotate point around arbitrary axis line through pivot (Rodrigues).
+
+    axis 须为单位向量或非零向量（内部归一化）。θ=0 恒等。
+    """
+    pt = np.asarray(pt, float)
+    pivot = np.asarray(pivot, float)
+    ax = np.asarray(axis, float)
+    n = float(np.linalg.norm(ax))
+    if n < 1e-12:
+        return pt.copy()
+    ax = ax / n
+    v = pt - pivot
+    ct, st = math.cos(theta), math.sin(theta)
+    v_rot = (v * ct
+             + np.cross(ax, v) * st
+             + ax * float(np.dot(ax, v)) * (1.0 - ct))
+    return pivot + v_rot
+
+
 def rotate_around_z(pt, pivot, theta):
     """Rotate point around Z-axis line passing through pivot by theta radians."""
     ct = math.cos(theta)
