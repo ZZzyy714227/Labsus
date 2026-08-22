@@ -214,3 +214,31 @@ def test_chassis_kw_curve_validation_422():
     body2 = _req()
     body2["vehicle"]["front"]["kw_curve"] = {"travel": [0.0, 10.0], "kw": [60.0, -1.0]}
     assert client.post("/api/v3/chassis/solve", json=body2).status_code == 422
+
+
+def test_load_sensitivity_ls():
+    """LS 载荷敏感性：重载 μ 递减；LS=0 保持线性基线（2026-08-22 修复4）。"""
+    import numpy as np
+    from src.tire_mf import MagicFormulaSub
+    alphas = np.linspace(0, 25, 201)
+    base = {"Fy0": 8000.0, "By": 9.0, "Cy": 1.2, "Ey": -0.5, "Sh": 0.0, "Sv": 0.0, "FzNom": 3500.0}
+    mf0 = MagicFormulaSub({**base, "LS": 0.0})
+    lo = float(mf0.fy(alphas, 1750.0).max()) / 1750.0
+    hi = float(mf0.fy(alphas, 5250.0).max()) / 5250.0
+    assert abs(lo - hi) < 1e-6                       # 线性基线：μ 恒定
+    mf1 = MagicFormulaSub({**base, "LS": 0.15})
+    lo1 = float(mf1.fy(alphas, 1750.0).max()) / 1750.0
+    hi1 = float(mf1.fy(alphas, 5250.0).max()) / 5250.0
+    assert hi1 < lo1 - 0.05                          # 重载 μ 显著下降（Jensen 效应）
+    assert abs(mf1.mu - 8000.0 / 3500.0) < 1e-12     # μ 与 MF 峰值同源
+
+
+def test_chassis_hs_hcg_conservation_warning():
+    """hs/hcg 独立输入不自洽时给出守恒警告（2026-08-22 顺手项6）。"""
+    body = _req()
+    body["vehicle"]["hs_mm"] = 500.0                 # 与 hcg=350 严重不自洽
+    r = client.post("/api/v3/chassis/solve", json=body)
+    assert r.status_code == 200
+    assert any("hs/hcg" in w for w in r.json()["warnings"])
+    r2 = client.post("/api/v3/chassis/solve", json=_req())   # 基线（370 vs 350）不告警
+    assert not any("hs/hcg" in w for w in r2.json()["warnings"])

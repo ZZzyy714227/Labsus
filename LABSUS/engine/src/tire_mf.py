@@ -19,6 +19,7 @@ def load_tir_params(src: dict) -> dict[str, float]:
         "Cy": p.get("Cy", p.get("C", 1.2)), "Ey": p.get("Ey", p.get("E", -0.5)),
         "Sv": p.get("Sv", 0.0), "Sh": p.get("Sh", 0.0),
         "FzNom": p.get("FzNom", 3500.0),
+        "LS": p.get("LS", 0.0),
     }
 
 
@@ -27,7 +28,22 @@ class MagicFormulaSub:
         self.p = params
 
     def _d(self, fz: float) -> float:
-        return self.p["Fy0"] * (fz / self.p["FzNom"]) if fz > 0 else 0.0
+        """峰值尺度 D(Fz)。LS>0 时施加载荷敏感性（重载 μ 递减，Jensen 效应）：
+        D = Fy0·(Fz/FzNom)·(1 − LS·(Fz/FzNom − 1))，LS=0 保持线性基线。
+        """
+        if fz <= 0:
+            return 0.0
+        r = fz / self.p["FzNom"]
+        d = self.p["Fy0"] * r
+        ls = self.p.get("LS", 0.0)
+        if ls:
+            d *= max(0.1, 1.0 - ls * (r - 1.0))
+        return d
+
+    @property
+    def mu(self) -> float:
+        """摩擦圆预算（与 MF 标称峰值同源——修复 2026-08-22：不再独立硬编码 μ）。"""
+        return self.p["Fy0"] / self.p["FzNom"]
 
     def fy(self, alpha_deg, fz: float) -> np.ndarray:
         a = np.asarray(alpha_deg, float) * math.pi / 180.0 + self.p["Sh"]

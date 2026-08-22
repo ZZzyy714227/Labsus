@@ -279,6 +279,7 @@ class TireParams(BaseModel):
     Sh: float = 0.0
     Sv: float = 0.0
     FzNom: float = 3500.0
+    LS: float = 0.10               # 载荷敏感性（重载 μ 递减；0 = 线性基线）
 
 
 class TrackSimRequest(BaseModel):
