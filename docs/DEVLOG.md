@@ -1,5 +1,19 @@
 # 开发日志
 
+## 2026-08-22 — S2-1 引擎 /api/v3 服务层落地（隔离工作区 dwb-pro-dev/engine）
+- 定位：S2 = 前端 `dwb-pro-dev/web/dwb-pro-fullchassis.html`（唯一前端核心，不换文件）接入引擎 `dwb-pro-dev/engine/`。本轮交付服务层，前端引擎面板下一轮。
+- 新增：
+  - `src/api/v3models.py` — /api/v3 请求/响应模型；**前端 DWB 硬点命名直通**（LCA_F/LBJ/WC/TRO/RACK/STRUT_OUT/RCK_AX_A/STRUT_IN/RCK_DMP/DMP_BODY…），含 DesignSpec（cam0/toe0 基准）、BushingSpec、SweepSpec、CaseLoad。
+  - `src/api/v3service.py` — 业务层：DWB→引擎点映射表（LCA_F→CH1…DMP_BODY→DAMPER_CHASSIS）、镜像（左轮 X 取负 + steer_axis 反号）、四工况驱动器（bump 平行轮跳 / roll 双侧合成 / steer rack 扫掠 / compliance 力扫掠）、增益表复用 S1 `metrics/kandc.py`。
+  - `server.py` — FastAPI 入口：`GET /api/v3/health|version`、`POST /api/v3/solve/pose`、`POST /api/v3/kandc/{bump|roll|steer|compliance}`；CORS 全开（file:// 前端直连）；端口 **8001**（避开冻结的 8000）；`python server.py` 即起。
+  - `tests/test_v3_api.py` — 17 项端点测试（health/pose/四工况/衬套装配/非法键 422/未知工况 404）。
+- 关键工程决策：
+  1. **轮轴姿态恢复**：引擎求解器只输出节点位置（distance-only 约束，无刚体四元数），而前端 camber/toe 由 knuckle 标签轴（cam0/toe0）旋转定义 → 服务层用 **Kabsch/SVD 最小二乘姿态估计**恢复 knuckle 旋转，再施加设计轮轴。镜像对称实测误差 ~0.15°（测试容差 0.3°）。
+  2. **转向增益几何事实**：基线硬点横拉杆近轴向（RACK→TRO ≈ X 向 416mm），齿条行程对转角敏感性低（±8mm → ≈0.3° toe）——是硬点几何而非求解错误（测试注明）。
+  3. roll 工况 = 左轮镜像机构 + 反向行程双侧合成（track_width 换算 roll_deg）；左轮齿条方向反号（steer_axis=[0,−1,0]）。
+- 验收：38 tests 全绿（23 S1 + 15 新增）；真实 HTTP 冒烟：bump 带衬套 9 点 VALID 733ms（~80ms/点 <300ms 预算），cam −40→+40mm 单调 +0.12→−2.81°，增益表与衬套形变输出正常。
+- Open Items：摇臂转轴用 RCK_AX_A 单点近似（引擎 solve_rocker 固定绕 X 轴，精确轴方向待升级）；多衬套/非垂直载荷扩展测试；前端引擎面板（S2-2）与 WebSocket 求解流（S2-3，设计文档 §6.1）。
+
 ## 2026-08-21 — 工业级设计 S1 引擎内核落地（隔离工作区 dwb-pro-dev/engine）
 - 里程碑：K&C 弹性运动学分水岭打通——衬套 6DOF 元件 + 两层迭代求解器（TRF 外层力平衡 ⇄ 内层机构投影）+ 二力杆静力链 + MF 轮胎子集 + K&C 增益层，Subagent-Driven 双审查全流程通过。
 - 隔离规则：开发仅写 `dwb-pro-dev/`（Gemini v4 为前端主线副本 + engine 引擎基线快照）；主仓库其余文件冻结；引擎任务提交前缀 `feat(engine)`。一次违规（T8 误改主仓库 DEVLOG，e5e6121）已 revert（b3ad00b）并确立 T10 controller 统一同步约定。

@@ -389,6 +389,25 @@ ws://solve-stream 拖拽实时
 
 ---
 
+## 15. S2-1 落地记录（2026-08-22，隔离工作区 dwb-pro-dev/engine）
+
+> S2 起点：前端明文锁定 `dwb-pro-dev/web/dwb-pro-fullchassis.html`（Gemini v4 副本）为**唯一前端核心**，拒绝"modeler 迁移"提法（与隔离决策冲突）。S2 = 该 HTML 接入引擎。
+
+| 计划项（§9 S2） | 落地 | 偏差/说明 |
+|---|---|---|
+| K&C 四工况组 | `src/api/v3service.py` run_bump/roll/steer/compliance | roll 用双侧镜像合成（左轮 X 取负 + steer_axis 反号）；compliance 支持 fx/fy/mz 轴扫掠 |
+| /api/v3 版本化 | `server.py` FastAPI（health/version/solve/pose/kandc/{case}） | 端口 8001；CORS 全开支持 file:// 前端直连；请求硬点直接用前端 DWB 命名（映射表内置于服务层） |
+| WebSocket 求解流 | — | S2-3（拖拽实时流，设计 §6.1 预算 <100ms）；当前 REST 单点 ~80ms 已达标 |
+| 缓存 | — | 待 S2-3（结果按 geometric-hash 缓存） |
+| 前端迁移 v3 | — | S2-2：前端引擎连接面板（双模：连引擎走 /api/v3，断开回退内置 JS）；只改 `dwb-pro-fullchassis.html` |
+
+**关键决策固化**：
+- 轮轴 camber/toe 基准 = DesignSpec（cam0/toe0，默认 -1.2/+0.05 与前端 PRESETS 一致）；knuckle 姿态用 **Kabsch/SVD 估计**恢复（引擎无四元数输出），镜像对称实测 0.15°；
+- 转向增益低（±8mm rack → 0.3° toe）为基线硬点几何事实（横拉杆近轴向）；
+- Open Items：摇臂轴精确方向（现用 RCK_AX_A 单点 + 引擎固定绕 X）；S2-2/3 前端面板与求解流；OptimumK 示例数值录入持续挂账。
+
+---
+
 ## 14. S1 落地记录（2026-08-21 完成，隔离工作区 dwb-pro-dev/engine）
 
 > S1 引擎内核已按计划 `docs/superpowers/plans/2026-08-21-chassis-analyzer-s1.md` 完成（T1–T10，Subagent-Driven + 双审查）。与主仓库其余文件隔离（`dwb-pro-dev/` 为唯一开发区）。
