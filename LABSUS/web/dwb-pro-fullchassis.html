@@ -1091,6 +1091,7 @@ function travelR(half, deg){return clamp(S.travel+rollOffset(half,deg),S.trMin,S
 function travelL(half, deg){return clamp(S.travel-rollOffset(half,deg),S.trMin,S.trMax);}
 
 function simulate(dt){
+  if(TRK.active){trackStep(dt);return;}
   const MF=SIM.FR, NF=SIM.FL, MR=SIM.RR, NR=SIM.RL;
   if(S.mode==="kin"){
     const z0F=MF.n[MF.idx.WC].p0[2], z0R=MR.n[MR.idx.WC].p0[2];
@@ -1555,6 +1556,7 @@ function angArc(ctx,O,r,a0,a1,txt,col){
 }
 
 function drawOverlay(v){
+  if(v.key==="top")drawTrackOverlay(v);
   const ctx = v.ctx;
   const yF = S.wb/2, yR = -S.wb/2;
 
@@ -1851,6 +1853,7 @@ function buildLeft(){
   host.innerHTML="";
   buildEnginePanel(host);
   buildChassisPanel(host);
+  buildTrackPanel(host);
 
   let b=sec(host,"悬架底盘模块编辑","CHASSIS EDITOR");
   rowBtns(b,[["编辑前悬架 (FRONT)",()=>{S.axis='front'; UI.sync.forEach(f=>f());},()=>S.axis==='front'],
@@ -2013,6 +2016,7 @@ function buildRight(){
   b.appendChild(pb);
   buildEngineResults(host);
   buildChassisResults(host);
+  buildTrackTelemetry(host);
 
   b=sec(host,"多体求解器状态","SOLVER RESIDUALS",true);
   ro(b,"活动节点数","NODES","","roNodes");
@@ -2595,6 +2599,252 @@ function loop(ts){
   if(_ft>0.4){_fps=_fc/_ft;_fc=0;_ft=0;document.getElementById("tbFps").textContent=fmt(_fps,0);}
   requestAnimationFrame(loop);
 }
+
+
+/* ================================ 14b. 赛道瞬态仿真（S3-2 前端闭环） ================================ */
+/* 数据链：本面板调校状态 → trackPayload()（复用整车 vehicle + 前端扫掠 K&C 查表）
+   → POST /api/v3/chassis/simulate_track → trace 时序 → 回放（俯视轨迹 + 3D 侧倾联动
+   + 遥测 HUD）。回放时 simulate() 被 trackStep 接管（roll 来自引擎准静态内核）。 */
+const TRK={
+  res:null, req:null, mu:8000/3500,
+  playing:false, i:0, speed:1.0, active:false, ready:false,
+  preset:"skidpad", custom:null
+};
+const TRACK_PRESETS={
+  skidpad:{zh:"稳态定圆 R=30m",closed:true,v:12.0,pts:(function(){
+    const o=[];for(let k=0;k<64;k++){const t=2*PI*k/64;o.push([30*Math.cos(t),30*Math.sin(t)]);}return o;})()},
+  slalom:{zh:"蛇形绕桩 30m 桩距",closed:false,v:13.0,pts:(function(){
+    const o=[[0,0]];for(let k=0;k<5;k++)o.push([15+30*k,(k%2?3.6:-3.6)]);o.push([180,0]);return o;})()},
+  minigp:{zh:"Mini GP 短道（发卡+S弯）",closed:true,v:0,pts:[
+    [0,0,15],[50,0,17],[80,2,13],[95,15,10],[92,35,9],[75,45,10],
+    [50,42,13],[35,48,11],[18,42,10],[5,28,9],[0,12,12]]}
+};
+
+function trackPayload(){
+  const base=chassisPayload();
+  const lut=sw=>({travel:sw.rows.map(r=>r.tr),toe:sw.rows.map(r=>r.toe),cam:sw.rows.map(r=>r.cam)});
+  let pts,closed=false;
+  if(TRK.preset==="custom"&&TRK.custom){pts=TRK.custom;closed=false;}
+  else{const P=TRACK_PRESETS[TRK.preset];closed=P.closed;
+    pts=P.pts.map(p=>({x:p[0],y:p[1],target_speed:(p[2]!==undefined?p[2]:P.v)}));}
+  return {vehicle:base.vehicle,
+    kc_luts:{front:lut(SIM.swF),rear:lut(SIM.swR)},
+    track:pts, dt:0.01, sim_time:25.0,
+    lookahead_gain:parseFloat(document.getElementById("trkLook").value)||0.9,
+    start_speed:parseFloat(document.getElementById("trkV0").value)||6.0, _closed:closed};
+}
+async function trackRun(){
+  if(!ENG.ok){setTrkStatus("未连接引擎 → 先连接（赛道仿真走 /api/v3/chassis/simulate_track）",C.ela);return;}
+  const btn=document.getElementById("trkRun");if(btn)btn.textContent="仿真中…";
+  setTrkStatus("赛道瞬态仿真中…（平面 3-DOF + 四轮 MF + 准静态载荷）",C.txt2);
+  try{
+    const body=trackPayload();TRK.req=body;
+    const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),120000);
+    const r=await fetch(ENG.url+"/api/v3/chassis/simulate_track",
+      {method:"POST",headers:{"Content-Type":"application/json"},
+       body:JSON.stringify(body),signal:ctl.signal});
+    clearTimeout(to);
+    if(!r.ok){const t=await r.text();throw new Error("HTTP "+r.status+" "+t.slice(0,140));}
+    TRK.res=await r.json();
+    if(TRK.res.status!=="VALID")throw new Error(TRK.res.status+" "+(TRK.res.warnings||[]).join(";"));
+    TRK.i=0;TRK.playing=true;TRK.active=true;TRK.ready=true;
+    fitTopViewToTrack();
+    const sm=TRK.res.summary;
+    setTrkStatus(`完成：${sm.path_length_m}m · v_max ${sm.v_max}m/s · max ${sm.max_ay_g}g · ${TRK.res.ms|0}ms`+
+      (TRK.res.finished?"（到达终点）":"（限时截止）"),C.ok);
+  }catch(err){setTrkStatus("仿真失败："+err.message,C.nodeFix);}
+  finally{if(btn)btn.textContent="运行赛道仿真 RUN";}
+  syncTrackUI();
+}
+function trackExit(){TRK.active=false;TRK.playing=false;syncTrackUI();setTrkStatus("已退出回放（恢复本地求解模式）",C.txt3);}
+
+function applyTrackFrame(i){
+  const tr=TRK.res.trace;if(!tr||!tr[i])return;
+  const row=tr[i],rDeg=row.roll||0;
+  const MF=SIM.FR,MR=SIM.RR,NF=SIM.FL,NR=SIM.RL;
+  const z0F=MF.n[MF.idx.WC].p0[2],z0R=MR.n[MR.idx.WC].p0[2];
+  const rack=clamp((row.delta||0)*R2D/0.5,-20,20);      /* 自行车转角→齿条 mm（显示用近似） */
+  driveTo(MF,z0F+travelR(SIM.halfF,rDeg),rack,'front');  SIM.mFR=metrics(MF,'front');
+  driveTo(MR,z0R+travelR(SIM.halfR,rDeg),0,'rear');      SIM.mRR=metrics(MR,'rear');
+  if(S.show.mirror){
+    driveTo(NF,z0F+travelL(SIM.halfF,rDeg),-rack,'front');SIM.mFL=metrics(NF,'front');
+    driveTo(NR,z0R+travelL(SIM.halfR,rDeg),0,'rear');     SIM.mRL=metrics(NR,'rear');
+  }
+  TRK.i=i;renderTrackTelemetry(row,i);
+}
+function trackStep(dt){
+  if(!TRK.res||!TRK.playing)return;
+  const n=TRK.res.trace.length;
+  const adv=Math.max(1,Math.round(dt*TRK.speed/TRK.res.t[1]||0.01));
+  const ni=Math.min(n-1,TRK.i+adv);
+  applyTrackFrame(ni);
+  if(ni>=n-1){TRK.playing=false;}
+  syncTrackUI();
+}
+function fitTopViewToTrack(){
+  const v=VW.find(q=>q.key==="top");if(!v)return;
+  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+  const acc=p=>{x0=Math.min(x0,p.x*1000);x1=Math.max(x1,p.x*1000);y0=Math.min(y0,p.y*1000);y1=Math.max(y1,p.y*1000);};
+  TRK.req.track.forEach(acc);TRK.res.trace.forEach(acc);
+  v.cx=(x0+x1)/2;v.cy=(y0+y1)/2;
+  v.s=Math.min((v.w-44)/Math.max(1,x1-x0),(v.h-44)/Math.max(1,y1-y0));
+}
+function drawTrackOverlay(v){
+  if(!TRK.res)return;const ctx=v.ctx;
+  const W=p=>P2(v,[p[0]*1000,p[1]*1000,0]);
+  ctx.setLineDash([9,6]);ctx.strokeStyle=C.dim;ctx.lineWidth=2;ctx.beginPath();
+  TRK.req.track.forEach((p,k)=>{const s=W([p.x,p.y]);k?ctx.lineTo(s[0],s[1]):ctx.moveTo(s[0],s[1]);});
+  if(TRK.req._closed){const s=W([TRK.req.track[0].x,TRK.req.track[0].y]);ctx.lineTo(s[0],s[1]);}
+  ctx.stroke();ctx.setLineDash([]);
+  const tr=TRK.res.trace,gRef=2.0;
+  for(let k=1;k<=TRK.i;k++){
+    const a=tr[k-1],b=tr[k],g=Math.min(1,Math.abs(b.ay)/(gRef*9.81));
+    ctx.strokeStyle="hsl("+(120-120*g|0)+",72%,55%)";ctx.lineWidth=1.6;
+    const A=W([a.x,a.y]),B=W([b.x,b.y]);
+    ctx.beginPath();ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();
+  }
+  const row=tr[TRK.i];if(!row)return;
+  const psi=row.psi,L=S.wb,T=Math.abs(S.front.hp.WC[0])+Math.abs(S.rear.hp.WC[0]);
+  const c=[row.x*1000,row.y*1000],cp=Math.cos(psi),sp=Math.sin(psi);
+  const rot=(dx,dy)=>[c[0]+dx*cp-dy*sp,c[1]+dx*sp+dy*cp,0];
+  ctx.strokeStyle=C.node;ctx.lineWidth=2;ctx.beginPath();
+  [[L/2,T/2],[-L/2,T/2],[-L/2,-T/2],[L/2,-T/2]].forEach((d,k)=>{
+    const q=P2(v,rot(d[0],d[1]));k?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]);});
+  ctx.closePath();ctx.stroke();
+  const cc=P2(v,rot(L/2,0)),hh=P2(v,rot(L/2+700,0));
+  ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(cc[0],cc[1]);ctx.lineTo(hh[0],hh[1]);ctx.stroke();
+  ctx.fillStyle=C.txt2;ctx.font="9px ui-monospace,monospace";
+  const tNow=TRK.res.t[TRK.i]||0;
+  ctx.fillText("t="+tNow.toFixed(1)+"s  v="+row.vx.toFixed(1)+"m/s  ay="+(row.ay/9.81).toFixed(2)+"g",10,16);
+}
+function renderTrackTelemetry(row,i){
+  const tr=TRK.res.trace;
+  /* G-G 图（ax 数值微分） */
+  const gg=document.getElementById("trkGG");
+  if(gg){const tArr=TRK.res.t;const dpr=Math.min(2,devicePixelRatio||1),w=gg.clientWidth||200,h=gg.clientHeight||200;
+    if(gg.width!==w*dpr){gg.width=w*dpr;gg.height=h*dpr;}
+    const ctx=gg.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,w,h);ctx.fillStyle=C.bg;ctx.fillRect(0,0,w,h);
+    const cx0=w/2,cy0=h/2,sc=Math.min(w,h)/2/(TRK.mu*1.15);
+    ctx.strokeStyle=C.grid2;ctx.beginPath();ctx.moveTo(0,cy0);ctx.lineTo(w,cy0);
+    ctx.moveTo(cx0,0);ctx.lineTo(cx0,h);ctx.stroke();
+    ctx.strokeStyle=C.kp;ctx.setLineDash([4,3]);ctx.beginPath();
+    ctx.arc(cx0,cy0,TRK.mu*sc,0,6.2832);ctx.stroke();ctx.setLineDash([]);
+    for(let k=1;k<=i;k++){
+      const axk=(tr[k].vx-tr[Math.max(0,k-1)].vx)/((tArr[k]-tArr[Math.max(0,k-1)])||0.01)/9.81;
+      const ayk=tr[k].ay/9.81;
+      ctx.fillStyle="hsla("+(120-120*Math.min(1,Math.hypot(axk,ayk)/TRK.mu))+",70%,55%,.45)";
+      ctx.fillRect(cx0+axk*sc-1.2,cy0-ayk*sc-1.2,2.4,2.4);
+    }
+    const ax=(tr[i].vx-tr[Math.max(0,i-1)].vx)/((tArr[i]-tArr[Math.max(0,i-1)])||0.01)/9.81;
+    ctx.fillStyle=C.nodeSel;ctx.beginPath();
+    ctx.arc(cx0+ax*sc,cy0-(row.ay/9.81)*sc,3.6,0,6.2832);ctx.fill();
+    ctx.fillStyle=C.txt3;ctx.font="8.5px ui-monospace,monospace";
+    ctx.fillText("G-G (μ="+TRK.mu.toFixed(2)+")",6,11);}
+  /* 四轮载荷柱 */
+  const fz=document.getElementById("trkFZ");
+  if(fz){const dpr=Math.min(2,devicePixelRatio||1),w=fz.clientWidth||280,h=fz.clientHeight||64;
+    if(fz.width!==w*dpr){fz.width=w*dpr;fz.height=h*dpr;}
+    const ctx=fz.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,w,h);ctx.fillStyle=C.bg;ctx.fillRect(0,0,w,h);
+    const ks=["FL","FR","RL","RR"],mx=8000;
+    ks.forEach((k,q)=>{
+      const v0=Math.max(0,row["fz_"+k]||0),bw=(w-24)/4;
+      const bh=v0/mx*(h-18);
+      ctx.fillStyle=q<2?C.arb:C.tie;ctx.fillRect(12+q*bw+4,h-12-bh,bw-8,bh);
+      ctx.fillStyle=C.txt2;ctx.font="8.5px ui-monospace,monospace";
+      ctx.fillText(k,12+q*bw+bw/2-6,h-3);
+      ctx.fillText((v0|0)+"",12+q*bw+4,h-16-bh);});}
+  /* 三联曲线 */
+  const t=TRK.res.t,xr=[t[0],t[t.length-1]||1];
+  const mk=(id,title,unit,key,fn)=>{
+    const cv=document.getElementById(id);if(!cv)return;
+    plotXYMulti(cv,title,unit,[{c:C.strut,pts:tr.map((p,k)=>[t[k],fn?fn(p):(p[key]||0)])}],xr,t[i]);};
+  mk("trkC1","车速 SPEED","m/s","vx");
+  mk("trkC2","侧向加速度 LAT ACC","m/s²","ay");
+  mk("trkC3","转向角 STEER","rad","delta");
+}
+function syncTrackUI(){
+  const pb=document.getElementById("trkPlay"),sc=document.getElementById("trkScrub");
+  if(pb)pb.textContent=TRK.playing?"⏸ 暂停":"▶ 播放";
+  if(sc&&TRK.res){sc.max=TRK.res.trace.length-1;sc.value=TRK.i;}
+}
+function setTrkStatus(t,c){const e=document.getElementById("trkStatus");if(e){e.textContent=t;e.style.color=c||C.txt3;}}
+function trackCSV(){
+  if(!TRK.res){setTrkStatus("先运行一次仿真",C.ela);return;}
+  const tr=TRK.res.trace,ks=Object.keys(tr[0]);
+  const csv=[ks.join(",")].concat(tr.map(p=>ks.map(k=>p[k]).join(","))).join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="labsus_telemetry_"+TRK.preset+".csv";a.click();
+}
+function buildTrackPanel(host){
+  const b=sec(host,"赛道瞬态仿真 (引擎)","TRACK TRANSIENT SIM · S3-2",false,"purp");
+  const row=E("div","ctl");
+  row.appendChild(E("label",null,'赛道预设 <u>PRESET</u>'));
+  const sel=E("select");sel.id="trkPreset";sel.style.flex="1";
+  Object.keys(TRACK_PRESETS).forEach(k=>{
+    const o=E("option",null,TRACK_PRESETS[k].zh);o.value=k;sel.appendChild(o);});
+  const oc=E("option",null,"自定义路点…");oc.value="custom";sel.appendChild(oc);
+  sel.onchange=()=>{TRK.preset=sel.value;};
+  row.appendChild(sel);b.appendChild(row);
+  const fr=E("input");fr.type="file";fr.accept=".json,.csv";fr.style.display="none";
+  fr.onchange=()=>{const f=fr.files[0];if(!f)return;const rd=new FileReader();
+    rd.onload=()=>{try{
+      let pts=[];
+      if(/\.json$/i.test(f.name)){pts=JSON.parse(rd.result);}
+      else{pts=rd.result.trim().split(/\r?\n/).slice(1).map(ln=>{
+        const c=ln.split(/[;,\t]/).map(parseFloat);return {x:c[0],y:c[1],target_speed:c[2]||12};});}
+      if(!Array.isArray(pts)||pts.length<2)throw new Error("至少 2 个路点");
+      TRK.custom=pts;TRK.preset="custom";sel.value="custom";
+      setTrkStatus("自定义赛道已载入 "+pts.length+" 点",C.ok);
+    }catch(e){setTrkStatus("导入失败："+e.message,C.nodeFix);}};
+    rd.readAsText(f);};
+  b.appendChild(fr);
+  rowBtns(b,[["导入 JSON/CSV 路点",()=>fr.click(),()=>TRK.preset==="custom"]]);
+  rowSlider(b,"预瞄增益","LOOKAHEAD GAIN","",0.4,1.5,0.05,()=>0.9,v=>{},2);
+  const ls=b.querySelectorAll("input[type=range]");ls[0].id="trkLook";
+  const rowV=E("div","ctl");
+  rowV.appendChild(E("label",null,'初速 <u>START V</u> [m/s]'));
+  const vi=E("input");vi.type="number";vi.id="trkV0";vi.value="6";vi.step="0.5";vi.min="2";vi.max="20";
+  rowV.appendChild(vi);b.appendChild(rowV);
+  const run=E("button","eng-run");run.id="trkRun";run.textContent="运行赛道仿真 RUN";
+  run.onclick=trackRun;b.appendChild(run);
+  const pb=E("button","eng-run");pb.id="trkPlay";pb.textContent="▶ 播放";pb.onclick=()=>{if(TRK.res){TRK.playing=!TRK.playing;syncTrackUI();}};
+  const ex=E("button","eng-run");ex.textContent="退出回放";ex.onclick=trackExit;
+  const csvb=E("button","eng-run");csvb.textContent="导出 CSV";csvb.onclick=trackCSV;
+  const pr=E("div");pr.style.cssText="display:flex;gap:6px;margin:6px 0";
+  pr.appendChild(pb);pr.appendChild(ex);pr.appendChild(csvb);b.appendChild(pr);
+  const sc=E("input");sc.id="trkScrub";sc.type="range";sc.min=0;sc.max=100;sc.value=0;sc.step=1;
+  sc.style.width="100%";
+  sc.oninput=()=>{if(!TRK.res)return;TRK.playing=false;applyTrackFrame(parseInt(sc.value||0));syncTrackUI();};
+  b.appendChild(sc);
+  const spd=E("div","ctl");
+  spd.appendChild(E("label",null,'回放速率 <u>RATE</u>'));
+  const ss=E("select");ss.style.flex="1";
+  [["0.5×",0.5],["1.0×",1.0],["2.0×",2.0]].forEach(o=>{const q=E("option",null,o[0]);q.value=o[1];ss.appendChild(q);});
+  ss.onchange=()=>{TRK.speed=parseFloat(ss.value);};
+  spd.appendChild(ss);b.appendChild(spd);
+  const st=E("div","eng-status");st.id="trkStatus";
+  st.textContent="选预设 → 连接引擎 → RUN：俯视图回放轨迹、3D 侧倾联动、右侧遥测 HUD";
+  b.appendChild(st);
+}
+function buildTrackTelemetry(host){
+  const b2=sec(host,"赛道动态遥测","TRACK TELEMETRY · HUD",false,"purp");
+  const gg=E("canvas","plot");gg.id="trkGG";gg.style.height="200px";gg.style.width="100%";
+  b2.appendChild(gg);
+  const fz=E("canvas","plot");fz.id="trkFZ";fz.style.height="64px";fz.style.width="100%";
+  b2.appendChild(fz);
+  [["trkC1",110],["trkC2",96],["trkC3",96]].forEach(q=>{
+    const cv=E("canvas","plot");cv.id=q[0];cv.style.height=q[1]+"px";cv.style.width="100%";
+    b2.appendChild(cv);});
+}
+window.addEventListener("keydown",e=>{
+  if(e.code!=="Space")return;
+  const t=e.target;
+  if(t&&(t.tagName==="INPUT"||t.tagName==="SELECT"||t.tagName==="TEXTAREA"||t.isContentEditable))return;
+  if(TRK.res){e.preventDefault();TRK.playing=!TRK.playing;syncTrackUI();}
+});
 
 /* ================================ 15. 初始化与启动 ================================ */
 /* 液态玻璃双主题：自动跟随系统偏好，手动切换后持久化 */
