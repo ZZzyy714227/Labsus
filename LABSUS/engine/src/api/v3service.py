@@ -109,11 +109,18 @@ def _axis_at_y(a, b, y):
     return _lerp3(a, b, t)
 
 
-def _wheel_axis(design: DesignSpec) -> np.ndarray:
-    """设计位轮轴（前端同款：axW = [cos(toe)cos(cam), sin(toe), -sin(cam)]）。"""
+def _wheel_axis(design: DesignSpec, side: float = 1.0) -> np.ndarray:
+    """设计位轮轴（前端同款 axW 的侧别泛化，2026-08-22 镜像修复）。
+
+    side=+1 右角（+X=外侧）；side=-1 左角（镜像轴，-X=外侧）。
+    Toe-in 正 / Camber 顶向内负在 X 镜像下保持车辆全局约定
+    （core/convention.py：两侧统一），与前端"右框架计算 + 渲染镜像"
+    （SIM.FL=buildMech('front')）语义对齐。
+    """
     cam = design.camber_deg * math.pi / 180.0
     toe = design.toe_deg * math.pi / 180.0
-    v = np.array([math.cos(toe) * math.cos(cam), math.sin(toe), -math.sin(cam)])
+    v = np.array([side * math.cos(toe) * math.cos(cam),
+                  math.sin(toe), -math.sin(cam)])
     return v / (float(np.linalg.norm(v)) or 1.0)
 
 
@@ -139,13 +146,21 @@ def _estimate_rotation(m) -> np.ndarray:
 
 
 def pose_metrics(m, tire_R: float, design: DesignSpec) -> dict:
-    """从已求解机构提取定位指标（与前端 metrics() 同数学，纯 numpy 重写）。"""
+    """从已求解机构提取定位指标（与前端 metrics() 同数学，纯 numpy 重写）。
+
+    侧别约定（2026-08-22 镜像修复，P0）：按轮心 X 符号判别左右角；
+    左角（WC.x<0，X 轴外侧为负）对设计轮轴取镜像，且 kpi / scrub 按
+    convention.py"两侧相同"的车辆全局约定翻号 —— 镜像几何输入下六项
+    定位角左右相等。此前左角复用右框架公式导致 scrub 偏差
+    2·tireR·sin(|camber|)（基线 13.61mm）、kpi 符号反转。
+    """
     P = {k: m.node(k).pos for k in _ENGINE_KEYS}
     wc, lbj, ubj = P["UP5"], P["UP1"], P["UP2"]
-    ax = _estimate_rotation(m) @ _wheel_axis(design)
+    side = 1.0 if float(wc[0]) >= 0.0 else -1.0   # +1 右角 / -1 左角
+    ax = _estimate_rotation(m) @ _wheel_axis(design, side)
 
     cam = -math.asin(float(np.clip(ax[2], -1.0, 1.0))) * R2D
-    toe = math.atan2(float(ax[1]), float(ax[0])) * R2D
+    toe = math.atan2(float(ax[1]), side * float(ax[0])) * R2D
 
     # 接地点：沿主销轴水平投影（前端同款）
     z_hat = np.array([0.0, 0.0, 1.0])
@@ -155,11 +170,11 @@ def pose_metrics(m, tire_R: float, design: DesignSpec) -> dict:
     cp = wc - rad * tire_R
 
     dz = float(ubj[2] - lbj[2]) or 1e-9
-    kpi = math.atan2(-(ubj[0] - lbj[0]), dz) * R2D
-    cast = math.atan2(-(ubj[1] - lbj[1]), dz) * R2D
+    kpi = math.atan2(side * (float(lbj[0]) - float(ubj[0])), dz) * R2D
+    cast = math.atan2(-(float(ubj[1]) - float(lbj[1])), dz) * R2D
     t0 = (float(cp[2]) - float(ubj[2])) / dz
     kg = _lerp3(ubj, lbj, t0)
-    scrub = float(cp[0]) - float(kg[0])
+    scrub = side * (float(cp[0]) - float(kg[0]))   # 外侧为正，两侧相同
     trail = float(kg[1]) - float(cp[1])
 
     # 侧倾中心高度（侧视瞬心 → 接地点垂线交点）

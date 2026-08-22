@@ -116,12 +116,16 @@ def test_roll_both_sides():
     assert b["case"] == "roll"
     assert "cam_r" in b["curves"] and "cam_l" in b["curves"]
     assert len(b["curves"]["roll_deg"]) == 13
-    # 对称性：左轮行程 = -t，故 cam_l[i]（left at -t）应与 cam_r[i]（right at +t）
-    # 一致（镜像同行程）；容许 0.3°（Kabsch 姿态估计 + 机构镜像数值误差，实测 ~0.15°）
+    # 对称性不变量（2026-08-22 P0 修复后收紧）：左轮行程 = -t →
+    # cam_l[i]（left at -t）应与反转行程索引 cam_r[n-1-i]（right at -t）
+    # 逐点相等——机构镜像精确。旧断言 cam_l[i]≈cam_r[i] 比较的是不同行程，
+    # 物理上不成立（差值=外倾增益×2t）；其曾以 <0.3° 通过是因左角设计轮轴
+    # 未镜像的缺陷恰好污染抵消（见 r2 研究报告发现 B）。
     cam_r = b["curves"]["cam_r"]
     cam_l = b["curves"]["cam_l"]
-    dcam = [abs(cam_l[i] - cam_r[i]) for i in range(len(cam_r))]
-    assert max(dcam) < 0.3
+    n = len(cam_r)
+    dcam = [abs(cam_l[i] - cam_r[n - 1 - i]) for i in range(n)]
+    assert max(dcam) < 1e-6
     assert "roll_camber_gain_deg_per_deg" in b["gains"]
 
 
