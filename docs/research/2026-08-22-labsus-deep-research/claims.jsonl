@@ -1,0 +1,16 @@
+{"id": "C1", "claim": "LABSUS 是 2026-08-21 从主仓库冻结隔离出的独立开发工作区，承载对标 OptimumK/ADAMS 的工业级底盘分析软件全部后续开发", "support": ["E01", "E22"], "status": "verified"}
+{"id": "C2", "claim": "引擎弹性运动学核心为两层迭代求解器：外层衬套位移力平衡（TRF+Anderson 兜底），内层机构 least_squares 运动学重解", "support": ["E07", "E08", "C4"], "status": "verified"}
+{"id": "C3", "claim": "机构运动学收敛采用 scipy least_squares(TRF) 联合最小二乘而非纯投影交替迭代，因后者在真实几何下不收缩（残差停在 43–84mm）", "support": ["E05", "E32"], "status": "verified"}
+{"id": "C4", "claim": "当前测试套件 47 项全部通过（8.04s，Python 3.13 环境，本报告一手复跑）", "support": ["E18"], "status": "verified_first_hand"}
+{"id": "C5", "claim": "K&C 全链路单点求解一手复现 VALID 状态、运动学残差 ~3.6e-14mm、耗时 50–91ms，满足设计预算 <300ms/点", "support": ["E19", "E27"], "status": "verified_first_hand"}
+{"id": "C6", "claim": "整车 MR（运动速比）在引擎侧数值推导失真（3.98 vs 前端 0.75），根因 STRUT_OUT 拓扑差异，现以显式参数+常量 0.75/0.78 回退，登记 OpenItem", "support": ["E14"], "status": "verified"}
+{"id": "C7", "claim": "TLLTD 侧倾耦合非线性化修复目前仅落地于前端 JS solveQuasiStatic；引擎 quasi_loads 仍为线性镜像版本，两端存在实现漂移风险", "support": ["E20", "E21", "E15"], "status": "verified"}
+{"id": "C8", "claim": "OptimumKinematics 对照基准尚未建立，benchmarks/optimumk_examples.py 为显式空占位，等待 PDF 解析录入", "support": ["E31"], "status": "verified"}
+{"id": "C9", "claim": "/api/v3 服务层以 Kabsch/SVD 最小二乘姿态估计恢复转向节旋转，因引擎求解器仅输出节点位置无四元数；镜像对称实测误差约 0.15°（容差 0.3°）", "support": ["E12"], "status": "verified"}
+{"id": "C10", "claim": "产品设计强制结果可信度七状态标注与版本绑定铁律，禁止未验证结果伪装成精确值（含 MR 固定值禁令）", "support": ["E26", "E30"], "status": "verified"}
+{"id": "C11", "claim": "项目演化经历三代：V1 FastAPI+Three.js 原型（6 月）→ dwb-mod 单文件系列（8 月中）→ LABSUS 前后端分离工作区（8-21 起）；仓库共 195 提交，其中 08-20~22 三日 144 提交", "support": ["E29", "E22"], "status": "verified"}
+{"id": "C12", "claim": "机构求解器基准：4 角×7 行程×2 齿条 56 例 worst 残差 3.5e-11mm、单姿态 p95 21.95ms（DEVLOG 记录，未在本报告独立复跑全矩阵）", "support": ["E23"], "status": "documented_not_reproduced"}
+{"id": "C13", "claim": "轮胎模型为 Pacejka MF 降阶子集：无复合滑移/压力温度项，Mz 用固定 60mm 拖距近似并标注 APPROXIMATE", "support": ["E11"], "status": "verified"}
+{"id": "C14", "claim": "符号规范（camber/toe/caster 等 P2-0 冻结）以 convention.py 为单一真源并声明由测试固定；旧线 K-4 polish 残差问题在负行程区仍未达标（已锁定基线待 P1 议程）", "support": ["E02", "E03"], "status": "verified"}
+{"id": "C15", "claim": "二力杆静力层超静定时取最小范数解并暴露残差；球铰不传纯力矩；接地点外载经 corner_to_anchor_loads 映射为锚点合力进入 K&C 外层", "support": ["E10"], "status": "verified"}
+{"id": "C16", "claim": "前端为约 2400+ 行单文件应用，含内置 JS 求解内核与引擎 v3 双模回退架构；引擎断开时页面原有功能零改动", "support": [], "status": "partially_supported"}

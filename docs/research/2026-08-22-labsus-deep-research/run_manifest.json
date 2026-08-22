@@ -1,0 +1,28 @@
+{
+  "query": "深入研究这个项目（LABSUS 悬架实验室：FSAE 底盘分析软件，engine Python 引擎 + web 单文件前端）",
+  "mode": "deep",
+  "date": "2026-08-22",
+  "subject_type": "local_codebase_research",
+  "research_questions": [
+    "项目的演化路径与当前架构是什么？",
+    "求解器技术路线如何演进、数学内核是什么？",
+    "K&C 弹性运动学链路与物理模型覆盖度如何？",
+    "前后端集成架构与契约是什么？",
+    "验证态势与性能是否达标（一手复现）？",
+    "已知债务、风险与下一步建议？"
+  ],
+  "assumptions": [
+    "研究对象以 LABSUS 工作区为主，父仓库文档/git 作为演化背景",
+    "本地文件引用作为引用源（非互联网检索），引用编号 [N] 对应 sources.jsonl 的 S 编号",
+    "CLAUDE.md 描述的是旧版 V1 结构，与 LABSUS 现状存在代差，报告中以实际代码为准"
+  ],
+  "verification": {
+    "pytest": "47 passed in 8.04s (first-hand)",
+    "kandc_cli": "VALID / kin_residual 3.553e-14mm / 50.3ms @ travel=10,fz=3000 (first-hand)",
+    "git_stats": "195 commits total; LABSUS 48 tracked files; engine py LOC 3549"
+  },
+  "provider_config": {
+    "agent": "ox-alpha (DeepSeek Harness)",
+    "subagents_note": "两个并行深挖子代理两轮均失败无输出，全部检索改由主线完成"
+  }
+}

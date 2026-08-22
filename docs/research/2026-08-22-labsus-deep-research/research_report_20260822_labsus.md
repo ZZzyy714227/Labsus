@@ -1,0 +1,195 @@
+# LABSUS 悬架实验室项目深度研究报告
+
+> **研究日期**：2026-08-22 ｜ **模式**：Deep（8 阶段） ｜ **研究对象**：`New_suspension/LABSUS`（engine + web）
+> **证据基座**：25 个来源（代码/测试/文档/git/一手运行），34 条证据引文，16 条原子断言（见同目录 sources.jsonl / evidence.jsonl / claims.jsonl）
+
+---
+
+## Executive Summary
+
+LABSUS（悬架实验室）是一个 FSAE 底盘分析软件项目，2026-08-21 从主仓库 `New_suspension` 冻结隔离而出，定位为"面向 FSAE 赛车底盘硬点快速迭代的整车准静态几何与轮边受力分析工具"，明确对标 OptimumKinematics/ADAMS [1][8]。项目由两部分组成：约 3,500 行 Python 的分析引擎（`engine/`，FastAPI :8001）与约 2,400 行的单文件 Web 前端（`web/dwb-pro-fullchassis.html`），通过 `/api/v3` REST 契约通信 [9][10]。
+
+本研究的核心结论有五点。**其一**，项目在 73 天内经历了三代技术形态（V1 FastAPI+Three.js 原型 → dwb-mod 单文件系列 → LABSUS 前后端分离），仅 2026-08-20 至 22 三日就产生 144 个提交，演化速度极快但方向收敛清晰 [7]。**其二**，求解器完成了两次关键跃迁：从顺序解（负行程残差最高 0.731mm 的 K-4 问题）到 DWB 式机构投影模型，再到 scipy `least_squares`(TRF) 联合最小二乘收敛——后者是"有据偏差"：纯投影交替迭代在真实几何下实测不收缩（残差停在 43–84mm）[4][5]。**其三**，K&C 弹性运动学采用两层迭代架构（外层衬套力平衡 TRF+Anderson 兜底 ⇄ 内层机构运动学重解），叠加二力杆静力链、6DOF 衬套与降阶 MF 轮胎子集，物理建模栈完整度已接近商用 K&C 工具的 V1 形态 [6]。**其四**，验证态势良好且可复现：本研究一手复跑测试套件 47 项全部通过（8.04s），CLI 复现 K&C 单点 VALID、残差 ~3.6e-14mm、耗时 50–91ms，满足设计预算 <300ms/点 [12][13]；但 OptimumK 对照基准仍是显式空占位 [17]。**其五**，主要技术风险集中在两端实现漂移：TLLTD 侧倾耦合非线性化修复目前只在前端 JS 落地、引擎侧仍为线性版本 [11]；MR（运动速比）因 STRUT_OUT 拓扑差异引擎推导失真（3.98 vs 0.75），以常量回退并登记 OpenItem [9]。
+
+综合评价：这是一个工程纪律罕见严格的学生方程式软件项目——符号规范冻结为单一真源模块、结果七状态诚实标注、文档与代码同步密度极高；当前正处于"S1 引擎内核 + S2 服务层闭环完成、OptimumK 级对标验证尚未建立"的关口。建议优先级最高的三件事：统一前后端 quasi 静态内核（消除双真源）、录入 OptimumK PDF 示例建立外部基准、为 engine 建立 CI 门禁。
+
+---
+
+## Introduction
+
+### 研究范围
+
+本报告的研究对象是工作区 `C:\Users\zzy\Desktop\New_suspension\LABSUS`——一个包含 `engine/`（Python 分析引擎）与 `web/`（单文件前端）的隔离开发工作区。父仓库 `New_suspension`（git 根，195 个提交）中的 `docs/`、`dwb-mod/`、旧 `src/`/`web/` 作为演化背景与设计真源纳入考察，但依据 README 的隔离声明，它们自 2026-08-21 起"冻结隔离，不再被开发改动"[1]。需要说明的是，仓库根的 CLAUDE.md 描述的是 V1 阶段的目录结构（`src/main.py`、`web/index.html` 等），与 LABSUS 现状存在整整一代的代差；本研究以实际代码为准，CLAUDE.md 仅作历史参照。
+
+### 研究方法
+
+本研究按 Deep 模式八阶段流程执行：SCOPE → PLAN → RETRIEVE → TRIANGULATE → OUTLINE REFINEMENT → SYNTHESIZE → CRITIQUE → REFINE → PACKAGE。证据来源分五类：(1) 引擎源码精读（convention/models/mechanism/compliance/bushing/forces/tire_mf/metrics/api/server 全部核心模块）；(2) 测试代码与验收门禁；(3) 项目文档（README、DEVLOG 422 行、设计整合稿 293 行）；(4) git 历史（按日提交分布、最近 15 条提交语义）；(5) **一手验证运行**——本报告执行了 `pytest engine/tests`（47 passed in 8.04s）[12] 与 `python scripts/kandc_run.py` 两参数组冒烟（VALID / 残差 3.553e-14mm / 50.3ms 与 VALID / 8.527e-14mm / 91.4ms）[13]，这是本研究区别于纯文档研读的关键增量。
+
+### 关键假设
+
+其一，DEVLOG 与设计文档的自述（如"47 tests 全绿"、"worst 残差 3.5e-11mm"）默认可信但需标注是否经本报告独立复现：凡未经一手复现的记录均标注 documented_not_reproduced（如 C12）。其二，引用编号 [N] 对应本地文件来源而非互联网检索（本研究对象是代码库本身，无外部检索需求）；所有行号以 2026-08-22 工作区快照为准。其三，性能数字受本机环境（Windows、Python 3.13）影响，仅作数量级判断。
+
+---
+
+## Main Analysis
+
+### Finding 1 — 三代演化与隔离架构：73 天三次重定位，隔离纪律用 revert 制度化
+
+LABSUS 不是从零开始的项目，而是第三代形态。git 历史显示提交日期呈三个簇：2026-06-10/11（31 提交，V1 Web+Three.js 原型期）、2026-08-12~14（20 提交，快速迭代工作台与 PBR 重建期）、2026-08-20~22（144 提交，求解器与工业级引擎爆发期）[7]。DEVLOG 完整记录了这条演化线：8-20 的 P1-P6 攻坚冻结了"顺序预览 + 高精度校验"策略并暴露 K-4 问题（顺序解全行程残差最高 0.731mm）；8-21 用户裁定参考 DWB-SIM 建模更优，触发"按 DWB 建模升级"四子阶段计划，当日即产出机制求解器子阶段①（worst 残差 3.5e-11mm）[5]；同日深夜用户交付 Gemini 生成的单文件前端作为新基线；随后确立 S1（引擎内核 T1-T9）/ S2（服务层+前端接入）里程碑体系 [5]。
+
+隔离本身是被制度化管理的。README 开篇声明主仓其余文件冻结 [1]；DEVLOG 记录了一次违规及其处理："一次违规（T8 误改主仓库 DEVLOG，e5e6121）已 revert（b3ad00b）并确立 T10 controller 统一同步约定"[2]——用真实的 git revert 把边界变成可执行的规则。2026-08-22 项目定名 LABSUS（Laboratory + Suspension），目录经 `git mv` 保留历史，前端品牌与引擎标识（health 返回 `labsus-engine`）同步迁移 [5]。这种"改名不换语义"的处理（DWB 硬点命名、PRO_POINTS 等技术术语保留）显示了对数据契约稳定性的自觉。
+
+值得注意的结构性事实：三代产物至今共存于同一仓库（V1 的 src/web、dwb-mod 版本档案、LABSUS），LABSUS 仅 48 个跟踪文件、约 3.5k 行 Python 就承载了全部现役开发 [7]。隔离策略有效控制了认知负荷，但也埋下了 Finding 6 将讨论的双真源问题。
+
+### Finding 2 — 求解器两次跃迁：从"顺序解补丁"到"机构联合收敛"的方法论胜利
+
+引擎的运动学内核位于 `src/solver/mechanism/`，其数据模型明确拒绝了教科书式 DOF 计算："双叉臂空间机构是超静定空间连杆，不能靠「3N − Σ约束」的秩加和得到正确自由度……`dof()` 定义为「传动自由度」= 轮跳 + 齿条转向 = 2"，其可实现性交由求解器收敛测试验证（±30mm 与 ±rack 下 residual<1e-5）[3]。这个"传动自由度"概念是对工程问题的务实重定义，避免了约束力学秩分析的深水区。
+
+第一次跃迁发生在 2026-08-21：放弃顺序解（bump→steer 分步拼接），转向 DWB-SIM 式机构模型——节点/刚线/铰链簇/刚体簇（`models.py`），配投影原语库（`project.py`：距离投影、绕轴单参数最优旋转 θ=atan2(sn,cs)、质量加权协方差+极分解刚体投影、四元数热启动、SVD Procrustes 兜底）[4]。第二次跃迁在同日完成，而且是"有据偏差"：设计规格原本要求 DWB 式独立精确投影迭代，但实测"在真实几何、双闭环/强各向异性协方差下 Gauss-Seidel 不收缩（残差停在 43–84mm）"，于是改为对同一套约束残差向量做 scipy `least_squares` 联合最小二乘（TRF，tol=1e-10），配合 continuation 分步热启动保持分支连续性 [4][14]。摇臂/推杆闭环则保持纯运动学从动链：轮侧解完后再用区间套二分（60 次）事后求摇臂角 θ，不进状态向量 [4]。
+
+这一路线选择的意义在于：它承认了通用投影迭代器在病态几何前的脆弱性，把鲁棒性押注在成熟的信赖域最小二乘上，同时保留了投影原语作为未来 warm-start 资产。代价是每姿态一次稠密雅可比数值估计的计算开销——但实测 p95 21.95ms（预算 50ms）证明完全可行 [15]。本报告一手复现的 CLI 结果（travel=10mm 时 kin_residual=3.553e-14mm、50.3ms）[13] 与该基准同一量级，交叉验证成立。
+
+### Finding 3 — 两层 K&C 求解器与物理建模栈：从"纯几何"到"力-形变耦合"的分水岭
+
+S1 里程碑的核心交付 `src/solver/compliance.py` 实现了 K&C（Kinematics & Compliance）两层迭代求解器，DEVLOG 称之为"K&C 弹性运动学分水岭"[5]。其架构在模块 docstring 中一目了然："内层：衬套位移 δ 写入锚点（小角刚体变换）→ solve_pose（现有 least_squares TRF 机构投影）。外层：δ 上力平衡 r(δ) = f_ext − bush_force(δ)（TRF + 数值雅可比 + Anderson 兜底）"[6]。状态机四态诚实标注：VALID / APPROXIMATE / COMPLIANCE_DIVERGED / SOLVER_FAILED，阈值显式为常量（COST_VALID=1e-6、COST_DIVERGED=1e-3、Anderson 混合系数 0.5、历史深度 3、步长限幅 5mm）[6]。TRF 失败时 Anderson 加速不动点迭代作为兜底，两者都跑时取残差更小者——这种"主路径+兜底+择优"的防御性设计贯穿整个引擎。
+
+物理建模栈自下而上共五层。**元件层**：`bushing.py` 的 6DOF 衬套支持线性/查表/PCHIP 样条三种刚度曲线并带解析雅可比（`PchipInterpolator` 及其导数），外推钳制、预紧与 6×6 耦合刚度矩阵可选 [16]。**静力层**：`forces.py` 实现二力杆假设（轴向拉压）与球铰三向反力（"不传纯力矩"沿用 V1 设计 §4.4），超静定取最小范数最小二乘并暴露残差；T5 的 `corner_to_anchor_loads` 把接地点外载经转向节静力平衡映射为各杆轴向力再聚合为车身锚点合力，直接对接 K&C 外层的 per-bushing loads [8]。**链路层**：`solve_compliance_full` 串起"接地点外载 → 二力杆 → 锚点合力 → solve_compliance"，接地点相对轮心默认取 [0,0,-320] 并如实标注 APPROXIMATE [6]。**轮胎层**：`tire_mf.py` 提供 Pacejka 魔术公式子集 Fy/Fx/Mz（.tir 风格参数），但明确降阶："无复合滑移、无压力/温度项"；Mz 更是"简化拖距 60mm（S1 占位，标注 APPROXIMATE）"[17]。**指标层**：`metrics/kandc.py` 从扫掠曲线中心差分提取工业增益（camber gain °/25mm、bump steer °/25mm、compliance toe °/kN、MR、RC 高度迁移）[18]。
+
+这一栈的关键品质是**诚实的降级链条**：每一处近似都有命名（APPROXIMATE 标注）、有注释说明（如"S1: 外载仅作用于平移 DOF；旋转 DOF 无外部力矩"）、有测试锁定边界（G2 断言单锚点 900N/k=300 → 形变 2~4mm、力平衡残差 <20N）[19]。这使模型的可信边界对外可见，符合设计整合稿"禁止未实现结果用空白/默认值/伪精确数字隐藏"的铁律 [20]。
+
+### Finding 4 — 前后端集成：DWB 命名直通契约 + Kabsch 姿态补偿 + 双模回退
+
+`/api/v3` 服务层（S2）解决的核心问题是：如何让一个已经功能丰富的单文件前端（用户在 Gemini.html 上自行完成的四大维度增量）与新生引擎对接而不强迫任何一方重写。答案有三。
+
+第一，**命名直通契约**。服务层不发明新 schema，而是把前端的 DWB 硬点命名原样接受，用一张映射表翻译到引擎机构节点："LCA_F→CH1 … LBJ→UP1 … STRUT_OUT→UP4 … RCK_AX_A→RK_PIVOT"，基线硬点与 S1 测试常量同源（数值一致）[21]。前端 payload 直接 `points=S[axis].hp` 发送，引擎侧消化映射——契约成本被压缩到一个 dict。
+
+第二，**Kabsch/SVD 姿态补偿**。引擎求解器只输出节点位置（distance-only 约束，无刚体四元数），而前端 camber/toe 由 knuckle 标签轴定义。服务层的解法是用 Kabsch 算法从"knuckle 设计位 → 当前位"做最小二乘姿态估计恢复旋转矩阵，再施加设计轮轴方向；镜像对称实测误差约 0.15°（测试容差放宽到 0.3°）[22]。这是一个典型的"接口阻抗失配"工程解：不改求解器签名（隔离约定"复用不改签名"），在服务层补齐语义差。
+
+第三，**双模回退**。前端保持完整的内置 JS 内核（准静态载荷转移、4-Post 台架显式积分等），连接引擎时 K&C 与整车分析走 `/api/v3`（正式通道），断开或失败则"如实提示并回退内置 JS（页面原有功能零改动）"[23]。fetch 调用覆盖 health/kandc/chassis 三组端点 [24]，引擎侧 FastAPI 开放全 CORS、端口 8001 避开冻结的 8000 [10]。整车端点（S2-5）把四角装配（FR/FL/RR/RL，左侧镜像+steer_axis 反号）、准静态载荷转移三路径分解（非簧载直接 / RC 几何力矩 / 弹簧+ARB 弹性力矩）、TLLTD 与侧倾梯度全部镜像了前端 `solveQuasiStatic` 公式 [9]。playwright 真机验收记录显示单点 SOLVE 43.6ms、整车 BUMP 21 点 47.3ms [25]。
+
+这个集成架构的本质是**渐进迁移**：前端不必一次性信任引擎，用户可以逐工况对照两套实现的输出一致性，为最终收敛到单一真源铺路。
+
+### Finding 5 — 验证态势：门禁体系完整、一手复现全部通过、外部基准缺位
+
+项目的验证体系有四个层次。**单元与门禁层**：47 个 pytest 测试覆盖机构求解、衬套、静力链、两层求解器、K&C 指标、MF 轮胎、v3 API 与整车端点；其中 `test_s1_gate.py` 的四道门禁（G1 无衬套回归一致到 1e-6、G2 单锚点物理合理性、G3 全链路 10 点 <3s 性能预算、G4 静态定位角手算对照 Δ<0.5°）构成了回归底线 [19]。本报告在 Python 3.13 环境一手复跑：**47 passed, 1 warning in 8.04s**（唯一 warning 是 Starlette TestClient 的 httpx 弃用提示，非项目代码问题）[12]。**CLI 冒烟层**：`scripts/kandc_run.py` 一手复现两组参数均 VALID、运动学残差 e-14 量级、50–91ms [13]，与 DEVLOG 记录的 S1 门禁数字（残差 1e-14/60ms 量级）吻合 [5]。**浏览器验收层**：DEVLOG 的 S2 系列条目记录了多轮 playwright 真实浏览器+真实引擎的端到端验收（连接→SOLVE→扫掠→曲线像素采样→零 JS 错误），例如 TLLTD 修复轮验证"gy=0.05g→68.4% → 2g→64.4%，跨度 3.99pp 单调"[11][25]。**历史对照层**：机制求解器切主时曾在主仓跑过全量 412 passed / 33 skipped / 3 xfailed，并做了顺序解头对头对比（caster 最高差 1.03°，归因于顺序解极端行程残差传导）[15]。
+
+但验证版图有一个显式缺口：**外部基准**。设计整合稿把"OptimumKinematics 参考对照"列为七级验证层的第六级 [20]，而实际状态是 `tests/benchmarks/optimumk_examples.py` 中 `OPTIMUMK_CORNER = {"points": {}, "expected": {}, …}`——一个等待 PDF 解析录入的空占位 [26]。换言之，当前所有正确性锚点都是内部的（手算对照、双路径一致性、镜像对称），还没有任何一个数字与业界工具对标过。对一个"对标 OptimumK/ADAMS"定位的项目[1]，这是 S2 闭环之后最顺理成章的下一步。
+
+性能维度同样有两面性：单点指标全面达标（CLI 50–91ms vs 预算 300ms；四角 chassis/solve 12.2ms；p95 21.95ms vs 预算 50ms）[13][15][25]，但带衬套的 K&C 扫掠在早期记录中达到过 2183ms/21 点（~104ms/点）[25]，若未来做拖拽实时流（S2-3 WebSocket 计划）仍需优化余量。
+
+### Finding 6 — 已知债务登记册：每个 OpenItem 都有名有姓，但三个结构性风险值得升级
+
+LABSUS 的债务管理方式是把 OpenItem 写进代码注释与 DEVLOG。逐项盘点如下：(1) **MR 推导失真**——引擎 STRUT_OUT 固定于 knuckle 刚体而前端挂在 LCA/UCA 铰链，拓扑差异使引擎数值推导 MR 得到 3.98（前端 0.75），现以"motion_ratio 显式参数优先，缺省用前端同源常量 0.75/0.78"回退并登记 OpenItem [27]；(2) **solve_rocker 分支连续性**——二分法区间表在 0 附近存在分支跳变风险 [25]；(3) **摇臂轴单点近似**——引擎 solve_rocker 固定绕 X 轴，RCK_AX_B 精确轴方向待升级 [22]；(4) **后轴拉杆拓扑**——引擎沿用推杆闭式近似拉杆拓扑，STRUT_OUT 挂点对齐未做 [25]；(5) **K-4 polish 残差**——旧线负行程区（-10mm≈0.10mm、-15mm≈0.19mm）仍未达 ≤0.02mm 目标，已锁定基线归入 P1 议程 [28]；(6) **cp_rel 固定 [0,0,-320]** 与 **Mz 60mm 拖距占位** [6][17]；(7) **衬套阻尼 cT/cR 仅存储占位** [16]；(8) OptimumK 基准空缺 [26]。
+
+其中有三个值得从"条目"升级为"结构性风险"。**其一，quasi 内核双真源漂移已成事实**：TLLTD 侧倾耦合迭代（3 轮、外侧压缩轮 rcH 迁移、kw 均值迁移）只在前端 JS 实现，引擎 `quasi_loads` 明示"暂为线性版本（镜像原公式）；如需两端一致，后续按同方案同步"[11]——双模架构的代价开始显现：同一物理量在两端会给出不同答案，且前端更准。**其二，测试容差的隐性放宽点**：Kabsch 姿态恢复的 0.3° 容差、G4 手算对照的 0.5° 容差都合理，但它们叠加在 e-14mm 的几何精度之上，说明误差主源已从几何求解转移到语义恢复环节，未来对角度类指标的断言不宜再放宽。**其三，工程化基础设施缺位**：engine 目录无 CI 配置、无 lint/type 配置文件（父仓有 pyproject 但 LABSUS 隔离后未自带）、conftest 靠 sys.path 注入而非包安装 [29]——48 个文件的规模尚可手工维持，但"Subagent-Driven 执行 + 双审查"的开发节奏恰恰最需要可自动执行的门禁。
+
+---
+
+## Synthesis & Insights
+
+**模式一：规范先行是本项目最深的护城河。** `convention.py` 把坐标/符号/角度约定做成冻结基线数据类（spec_revision="v1-p2-0"），声明"本模块是规范的唯一真源；tests/test_convention.py 固定全部条款；修改规范必须同时修改本模块、测试与设计文档"[30]，并内置 Known Issues 登记（K-1~K-4 及其修复状态）。设计整合稿则用"铁律""禁止"级别的措辞固化了版本绑定、伪精确禁令、MR 固定值禁令 [20]。学生方程式项目最常见的死法是符号混乱引发的返工循环，这个项目用工程手段提前拆掉了这颗雷。
+
+**模式二："有据偏差"文化让架构决策可审计。** 求解器放弃纯投影改用 least_squares，不是悄悄改实现，而是在 docstring 里写明偏差内容与实测依据（GS 不收缩、残差停在 43–84mm）[4][14]；DEVLOG 同步记录"关键决策（有据偏差，已记录）"[15]。这与研究方法论中的 ADR（Architecture Decision Record）实践暗合，但落地成本更低——决策证据就住在代码里。
+
+**模式三：双模回退是迁移期的正确形态，但必须设终点。** 前端内置内核+引擎正式通道的双模设计让项目在引擎不可用时永不瘫痪，也让用户可以逐工况交叉验证。然而 Finding 6 显示两端已经出现行为分叉（TLLTD 非线性化只在 JS 侧）。若不主动收敛，双模会从"安全网"退化为"两个真源"。合理的终点状态是：JS 内核降级为离线演示模式，所有正式数字出自引擎。
+
+**模式四：单文件前端是刻意的战术选择，且尚未到期。** 约 2,400 行的 `dwb-pro-fullchassis.html` 承载了 3D 渲染、四机构求解、台架积分、准静态分析与完整 UI [31]。README 明确"前端后续开发仅修改此文件……稳定后入档"的落版约定 [1]，dwb-mod/versions/ 已归档四个历史版本。在单人+AI 协作的开发形态下，单文件的全文可见性优于过早模块化；但它与引擎的 payload 契约（15 键硬点+车辆参数）正持续变宽，一旦引入 WebSocket 流（S2-3）或结果缓存，拆分压力会真实到来。
+
+**洞察：项目的真正瓶颈已从"能不能算对"转移到"和谁对表"。** e-14mm 的几何残差、47 绿测试、四道门禁说明内部一致性已经过剩；而 OptimumK 空占位意味着所有"准确"都还是自证。下一个里程碑的价值排序应向外部基准倾斜——哪怕只录入 PDF 示例的几个硬点对照 KPI/Caster/Scrub/Trail 四个数，对标主张就从口号变成了可检验命题。
+
+---
+
+## Limitations & Caveats
+
+本研究存在如下边界。**覆盖边界**：前端 HTML 仅精读了 solveQuasiStatic 内核与端点调用区段（约 130 行）并用 grep 定位结构标记，未逐行审读全部约 2,400 行（渲染/台架积分/交互层仅凭 DEVLOG 与抽样）；`v3models.py`、`metrics/kinematics.py` 仅读头部，`from_legacy.py`、`pose.py`、`bench.py` 未读。**复现边界**：一手验证限于 pytest 全套与 CLI 两组参数；DEVLOG 记录的 playwright 浏览器验收、56 例机制基准矩阵（worst 3.5e-11mm / p95 21.95ms）、412 passed 主仓全量回归均未独立复现，标注为 documented_not_reproduced [15]。**时效边界**：工作区快照为 2026-08-22，行号与结论随开发推进可能失效；git 统计基于父仓 HEAD=015d117。**环境边界**：性能数字来自本机（Windows/Python 3.13），不同硬件上数量级不变但绝对值会漂移。**视角边界**：本研究未运行任何浏览器端端到端验证（未启动 8001 服务实测 HTTP），API 层判断基于代码与测试而非线上观测；亦未进行轮胎模型数值精度或衬套曲线外推行为的专项校核。
+
+---
+
+## Recommendations
+
+按优先级排列，每项均给出依据与验收信号。
+
+**P0-1 统一 quasi 静态内核：把前端侧倾耦合迭代移植进引擎 `quasi_loads`。** 依据 Finding 6 结构性风险一：TLLTD 双端漂移已成事实 [11]。做法：引擎已有每角 rc_h/kw 扫掠能力（DEVLOG 自评"引擎已具备"）[11]，将三迭代循环镜像为 Python，前端引擎模式下改调 `/api/v3/chassis/solve` 的非线性版。验收：同一 vehicle/quasi payload 下两端 TLLTD 差 <0.5pp（gy 从 0.05g 到 2g 扫描），并在 test_v3_chassis.py 加单调性断言。
+
+**P0-2 录入 OptimumK 对照基准，激活第六级验证层。** 依据 Synthesis 洞察与空占位现状 [26]。做法：解析 `ref/OptimumKinematics - Help File.pdf` 双叉臂示例硬点表，填入 `OPTIMUMK_CORNER["points"]/["expected"]`，先对照静态 KPI/Caster/Scrub/Trail，容差参照 G4 手算门禁。验收：新增 test_optimumk_benchmark 且通过；把"对标 OptimumK"从 README 口号变为绿色测试 [1]。
+
+**P1-3 为 engine 建立 CI 门禁。** 依据 Finding 6 风险三。最小可行：GitHub Actions 或本地 pre-push 钩子跑 `pytest engine/tests -q` + ruff check（当前 0 配置）。验收：任何绕过测试的提交在推送时被拦截；隔离违规类事故（如 e5e6121）有自动化防线 [2]。
+
+**P1-4 关闭 MR 拓扑 OpenItem 而非永久常量化。** 依据 [27]：常量回退是止血不是治疗。做法：把 STRUT_OUT 挂点从前端 LCA/UCA 铰链拓扑对齐到引擎 knuckle 刚体拓扑（或反之），使引擎差分推导 MR 与前端一致；保留 motion_ratio 显式参数作为用户覆盖。验收：删除 0.75/0.78 缺省后，test_v3_chassis 的 MR 断言仍绿。
+
+**P2-5 solve_rocker 分支连续性与摇臂精确轴。** 依据 [25][22]：区间表二分在 0 附近有跳变风险，RCK_AX_B 单点近似待升级。建议以延拓法（continuation）替代裸二分，摇臂轴改为 axA→axB 两点定义。
+
+**P2-6 补齐物理占位并同步 CLAUDE.md。** cp_rel 接地点由运动学姿态实时计算（替换固定 [0,0,-320]）、Mz 拖距参数化、衬套阻尼激活 [6][17][16]；同时把仓库根 CLAUDE.md 更新为 LABSUS 现状（当前描述的是 V1 结构，会误导任何新会话的 AI 协作者）。
+
+---
+
+## Claims-Evidence Table
+
+| Claim | 断言 | 状态 | 支持证据 |
+|---|---|---|---|
+| C1 | LABSUS 为冻结隔离工作区，承载对标 OptimumK/ADAMS 的全部后续开发 | verified | E01,E22 |
+| C2 | 引擎核心为两层迭代求解器（外层力平衡 TRF+Anderson ⇄ 内层机构重解） | verified | E07,E08,C4 |
+| C3 | 收敛用 least_squares(TRF) 联合最小二乘，因纯投影 GS 在真实几何下不收缩 | verified | E05,E32 |
+| C4 | 测试套件 47 项全绿（一手复跑） | verified_first_hand | E18 |
+| C5 | K&C 单点 CLI 复现 VALID / 残差 e-14mm / 50–91ms，满足预算 | verified_first_hand | E19,E27 |
+| C6 | MR 引擎推导失真（3.98 vs 0.75），常量回退+OpenItem 登记 | verified | E14 |
+| C7 | TLLTD 侧倾耦合非线性化仅在前端 JS，引擎 quasi_loads 仍线性 | verified | E20,E21,E15 |
+| C8 | OptimumK 对照基准为空占位待 PDF 解析 | verified | E31 |
+| C9 | /api/v3 用 Kabsch/SVD 姿态估计补偿引擎无四元数输出（误差 ~0.15°/容差 0.3°） | verified | E12 |
+| C10 | 七状态可信度标注与版本绑定铁律、MR 固定值禁令 | verified | E26,E30 |
+| C11 | 三代演化：V1→dwb-mod→LABSUS；195 提交中 08-20~22 占 144 | verified | E29,E22 |
+| C12 | 机构基准 56 例 worst 3.5e-11mm / p95 21.95ms | documented_not_reproduced | E23 |
+| C13 | MF 轮胎降阶子集，Mz 固定 60mm 拖距 APPROXIMATE | verified | E11 |
+| C14 | 符号规范单一真源冻结；旧线 K-4 负行程残差未达标已锁基线 | verified | E02,E03 |
+| C15 | 二力杆超静定最小范数解；球铰不传力矩；corner_to_anchor_loads 链路 | verified | E10 |
+| C16 | 前端单文件双模架构（内置内核+引擎 v3 回退零改动） | partially_supported | E33,E34 |
+
+---
+
+## Methodology Appendix
+
+**流程**：本研究按 Deep 模式执行八阶段管线。SCOPE 将研究对象界定为 LABSUS 工作区本体+父仓背景；PLAN 制定五路检索策略（引擎源码/测试/文档/git/一手运行）；RETRIEVE 阶段精读引擎 14 个核心模块全文、前端关键区段约 130 行、文档约 700 行，并执行两项一手验证；TRIANGULATE 对每项关键结论做代码↔测试↔文档↔git↔运行输出五源交叉（如性能结论同时有设计预算[20]、DEVLOG 记录[15]、一手 CLI[13]三个独立锚点）；OUTLINE REFINEMENT 依据证据把"验证态势"与"债务登记册"从计划中的附属段落升格为独立 Finding（Finding 5/6），因为检索显示这是当前项目状态信息密度最高的两个切面；SYNTHESIZE 提炼四个跨源模式与一项核心洞察；CRITIQUE 以红队视角复核（"怀疑的从业者"视角检验了性能数字的环境依赖性，"对抗评审员"视角要求所有 documented_not_reproduced 项显式标注）；REFINE 补齐了 C16 的证据链并修正了引用映射。
+
+**证据管理**：25 个来源注册于 sources.jsonl（含可信度评分），34 条证据引文持久化于 evidence.jsonl（每条含精确原文引文与文件行号定位器），16 条原子断言及其支持状态登记于 claims.jsonl（verified / verified_first_hand / documented_not_reproduced / partially_supported 四级）。断言 C16（前端单文件双模架构）因子代理失败改由主线 grep 定点取证，标注 partially_supported。
+
+**过程异常记录**：按方法论 Phase 3 并行协议派出的两个深挖子代理（前端结构、文档脉络）两轮均中途失败且无输出；全部检索工作改由主线完成，未影响证据覆盖度，但前端文件的逐行审读深度因此受限（已在 Limitations 如实申报）。
+
+**可复现性**：本报告的一手验证命令与输出完整记录于 run_manifest.json 与参考文献 [12][13]，任何持有同工作区快照者可在数分钟内复跑核对。
+
+---
+
+## Bibliography
+
+以下编号与正文引用一一对应；全部为本地文件/git/一手运行来源，行号以 2026-08-22 快照为准。完整元数据见 `sources.jsonl`，引文见 `evidence.jsonl`。
+
+[1] `LABSUS/README.md` —— 隔离声明、对标定位、结构与迭代约定（L3-4、L28-32）。
+[2] `docs/DEVLOG.md` L95 —— 隔离违规 revert 记录与 T10 controller 约定。
+[3] `LABSUS/engine/src/solver/mechanism/models.py` L3-6 —— 超静定机构与传动自由度定义。
+[4] `LABSUS/engine/src/solver/mechanism/solver.py` L1-11、L95-131、L143 —— least_squares 有据偏差说明、摇臂后处理二分、TRF 求解调用。
+[5] `docs/DEVLOG.md` L93-107 —— S1 里程碑条目（T1-T9、22 提交、门禁数字、"K&C 分水岭"）。
+[6] `LABSUS/engine/src/solver/compliance.py` L1-58、L272-338 —— 两层求解器架构、阈值常量、solve_compliance_full 全链路与 cp_rel 近似。
+[7] Git 历史（父仓 HEAD=015d117，195 提交）—— 按日分布 06-10/11:31、08-12~14:20、08-20~22:144；LABSUS 48 跟踪文件、engine Python 约 3549 行。
+[8] `docs/chassis-analyzer-design-consolidated.md` L10-12 —— 产品一句话定位。
+[9] `LABSUS/engine/src/api/chassis.py` L1-29、L113-193 —— 四角装配、quasi_loads 三路径镜像。
+[10] `LABSUS/engine/server.py` L1-53、L99-127 —— 端点清单、CORS、端口 8001、ENGINE_VERSION 0.3.0。
+[11] `docs/DEVLOG.md` L3-11 —— TLLTD 侧倾耦合迭代修复条目（含引擎侧暂线性说明与验证数据）。
+[12] 一手运行：`python -m pytest engine\tests -q` → "47 passed, 1 warning in 8.04s"（2026-08-22，Python 3.13）。
+[13] 一手运行：`python scripts\kandc_run.py --travel 10 --fz 3000` → VALID / kin_residual 3.553e-14mm / force_balance 3.553e-15N / 50.3ms；第二组 --travel 0 --bush-k 300 → VALID / 8.527e-14mm / 91.4ms。
+[14] `docs/DEVLOG.md` L232 —— GS 投影不收缩实测（残差停在 43–84mm），LS 收敛到 1e-11。
+[15] `docs/DEVLOG.md` L223-238 —— 机制求解器切主条目：基准矩阵 56 例 worst 3.5e-11mm、p95 21.95ms、顺序解头对头 delta、v2 集成与 412 passed 回归、"有据偏差已记录"。
+[16] `LABSUS/engine/src/components/bushing.py` L1-83 —— Curve/PCHIP、解析雅可比、cT/cR 占位字段。
+[17] `LABSUS/engine/src/tire_mf.py` L1-46 —— MF 子集降阶声明与 Mz 60mm 拖距占位。
+[18] `LABSUS/engine/src/metrics/kandc.py` L1-34 —— 增益指标层（°/25mm、°/kN、MR、RC 迁移）。
+[19] `LABSUS/engine/tests/test_s1_gate.py` L55-138 —— G1-G4 门禁断言细节。
+[20] `docs/chassis-analyzer-design-consolidated.md` L138-181、L167-170 —— 七状态可信度、验证层级（OptimumK 为第六级）、验收阈值与性能预算。
+[21] `LABSUS/engine/src/api/v3service.py` L32-67 —— DWB_TO_ENGINE 映射表与缺省基线同源说明。
+[22] `LABSUS/engine/src/api/v3service.py` L120-138、L66 —— Kabsch/SVD 姿态估计动机与 RCK_AX_A 单点 OpenItem。
+[23] `docs/DEVLOG.md` L66-77 —— S2-2 双模语义与验收记录。
+[24] `LABSUS/web/dwb-pro-fullchassis.html` L2039、L2068、L2200 —— 三组 /api/v3 fetch 调用。
+[25] `docs/DEVLOG.md` L37-49、L51-64 —— S2-5/S2-4 条目：MR 失真发现（3.98 vs 0.75）、后轴拉杆近似、rocker 分支遗留、playwright 验收数字（12.2ms/43.6ms/47.3ms/2183ms）。
+[26] `LABSUS/engine/tests/benchmarks/optimumk_examples.py` L1-13 —— OPTIMUMK_CORNER 空占位与待办清单。
+[27] `LABSUS/engine/src/api/chassis.py` L205-211 —— MR 回退策略注释（拓扑差异、OpenItem 登记）。
+[28] `LABSUS/engine/src/core/convention.py` L37-48 —— K-4 已知规范问题登记（负行程 polish 残差超标）。
+[29] `LABSUS/engine/tests/conftest.py` L1-10 —— sys.path 注入式隔离边界（无包安装/CI 配置佐证：engine 目录无 lint/CI 文件）。
+[30] `LABSUS/engine/src/core/convention.py` L1-29、L52-70 —— 规范唯一真源声明与 CoordinateConvention 冻结基线。
+[31] `LABSUS/web/dwb-pro-fullchassis.html`（全文约 2400+ 行）—— 单文件前端形态；落版约定见来源 1。

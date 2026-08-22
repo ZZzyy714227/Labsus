@@ -1,5 +1,24 @@
 # 开发日志
 
+## 2026-08-22 — 前端 UI 重做：Apple 液态玻璃拟态 + 浅色/深色双主题
+- 交付（`LABSUS/web/dwb-pro-fullchassis.html`，+295/-185）：界面从深色精密工业风整体重做为 Liquid Glass 风格——大圆角卡片 / 磨砂玻璃（backdrop-filter blur+saturate）/ 柔和弥散阴影 / 三色弥散渐变背景；保留普鲁士蓝·奶杏·酒红主色 + 低饱和复古辅助色组（灰靛蓝/陶土棕/鼠尾灰绿/雾蓝灰/暗铜金/蜜橘赭/灰薰紫/雾茶）。
+- 双主题机制：
+  - CSS：`:root` 深色默认 + `[data-theme="light"]` 变量覆盖（背景/玻璃/文字/语义色/阴影/旋钮全套）；顶栏新增 `#themeTg` ☀/☾ 滑块开关；
+  - JS：画布调色板由单套常量 `C` 升级为 `PAL.light` / `PAL.dark` 双套（3D 视图与图表全套色随主题切换，`applyTheme` 动态 `Object.assign`）；
+  - `initTheme` 自动跟随系统 `prefers-color-scheme`，手动切换后 `localStorage("labsus-theme")` 持久化。
+- 工具：新增 `LABSUS/web/serve_nocache.py`（:8921 禁缓存开发静态服务，刷新即最新文件）。
+- 验证：内嵌 JS 语法 OK；playwright 真浏览器——加载零 JS 错误、双向切换 light↔dark 生效、localStorage 持久化（重开保持）、8/10 画布有渲染（2 空白为求解后才出现的曲线区）、浅色截图布局无异常。
+
+## 2026-08-22 — 深度研究：LABSUS 项目全量深研报告（deep-research）
+- 需求：用户指令"深入研究这个项目"+ /deep-research，产出可引用、可复核的项目研究报告。
+- 产出（`docs/research/2026-08-22-labsus-deep-research/`，同步副本在 `~/Documents/LABSUS_Research_20260822/`）：
+  - `research_report_20260822_labsus.md` / `.html`（McKinsey 模板）/ `.pdf`
+  - `sources.jsonl`(25 来源) / `evidence.jsonl`(34 引文) / `claims.jsonl`(16 断言四级状态) / `run_manifest.json`
+- 方法：deep 模式八阶段；证据五路——引擎 14 核心模块精读 + 文档 + git(195 提交按日分布) + **一手运行**（pytest 47 passed / 8.04s 复现；kandc_run CLI 两组参数 VALID、残差 3.553e-14mm、50.3ms/91.4ms 复现）。
+- 核心结论：①三代演化 V1→dwb-mod→LABSUS（08-20~22 三日 144 提交）；②求解器两次跃迁：顺序解 K-4 → DWB 机构投影 → least_squares(TRF) 联合收敛（有据偏差：GS 不收缩 43–84mm）；③两层 K&C 分水岭（外层力平衡 TRF+Anderson ⇄ 内层机构重解）+ 二力杆静力链 + 6DOF 衬套 + MF 子集；④集成三件套：DWB 命名直通契约、Kabsch/SVD 姿态补偿、前端双模回退；⑤验证态势良好但 OptimumK 对照基准为空占位。
+- 三大结构性风险：quasi 内核双真源漂移（TLLTD 侧倾耦合迭代仅在前端 JS，引擎 quasi_loads 仍线性）；测试容差叠加语义恢复误差（Kabsch 0.3°/G4 0.5°）；engine 无 CI/lint 门禁。
+- 建议 P0：统一前后端 quasi 静态内核；解析 OptimumKinematics PDF 示例录入 benchmarks 建立外部基准。
+
 ## 2026-08-22 — 修复：TLLTD 随 gy 恒定 → 侧倾耦合迭代（前端 solveQuasiStatic 非线性化）
 - 现象（用户报告）：gy=0 显示 50/50（占位回退），任何非零 gy 直接跳 7:3（≈71%）且不随 gy 变化。
 - 根因一（数学）：三路径（UNS/GEO/ELA）全部 ∝ ay → 分子分母齐次 → TLLTD 为纯刚度/几何常数，与 gy 无关；gy=0 的 50% 是 `sumTransfer≤1 → 50` 占位。这不是计算错误，是线性模型的固有性质。
