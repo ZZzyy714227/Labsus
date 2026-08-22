@@ -2,8 +2,11 @@
 import { state, loadSnapshots, pushSnapshot } from './state.js';
 import { api } from './api.js';
 import {
-  initScene, setCarStatic, setCarDynamic, setView, exportPointSet, getPointSetSummary,
+  initScene, setCarStatic, setCarDynamic, setView, exportPointSet, getPointSetSummary, setSceneBackground,
 } from './scene3d.js';
+import {
+  loadTheme, saveTheme, resetTheme, applyUI, apply3D, sceneBackgroundHex, PANEL_SECTIONS, get,
+} from './theme.js';
 import { renderGeometryPanel, renderVehiclePanel, renderTargetsPanel } from './panels.js';
 import { renderDashboard } from './dashboard.js';
 import { renderHistory, revertToPrevious } from './history.js';
@@ -32,6 +35,7 @@ async function init() {
   renderVehiclePanel(document.getElementById('panel-vehicle'));
   renderTargetsPanel(document.getElementById('panel-targets'));
   renderHistory(document.getElementById('snapshotList'));
+  initTheme();
 
   // tabs
   document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
@@ -185,7 +189,7 @@ export async function runAnalyze() {
       : nRed === 0
         ? `● ${total - nYellow}/${total} ⚠`
         : `✗ ${total - nRed}/${total}`;
-    badge.style.background = nRed ? '#ff1744' : nYellow ? '#ffd600' : '#00e676';
+    badge.style.background = nRed ? get('bad') : nYellow ? get('warn') : get('good');
     if (!document.getElementById('rightCol').classList.contains('collapsed')) {
       renderDashboard(document.getElementById('dashboard'));
     }
@@ -204,3 +208,87 @@ export async function finishDesignChange() {
 }
 
 init();
+
+/* ================= 统一配色入口 ================= */
+
+/** 把当前主题一次性应用到位（CSS 变量 + 3D 材质 + 场景背景） */
+function applyThemeAll() {
+  applyUI();
+  apply3D();
+  setSceneBackground(sceneBackgroundHex());
+}
+
+/** 构建配色编辑器浮层，绑定切换 / 编辑 / 导出 / 重置 */
+function initTheme() {
+  loadTheme();
+  applyThemeAll();
+
+  const overlay = document.getElementById('themeOverlay');
+  const list = document.getElementById('themeList');
+
+  // 渲染三个分组的颜色行
+  list.innerHTML = PANEL_SECTIONS.map((sec) => {
+    const rows = sec.keys.map(([key, label]) => {
+      const seg = key in loadTheme().ui ? loadTheme().ui
+        : key in loadTheme().semantic ? loadTheme().semantic : loadTheme().mat;
+      const val = seg[key];
+      return `<label class="theme-row">
+        <span class="theme-name">${label}</span>
+        <span class="theme-swatch" data-swatch="${key}" style="background:${val}"></span>
+        <input type="color" class="theme-input" data-key="${key}" value="${val}">
+        <span class="theme-hex" data-hex="${key}">${val}</span>
+      </label>`;
+    }).join('');
+    return `<div class="theme-grp"><div class="theme-grp-title">${sec.title}</div>${rows}</div>`;
+  }).join('');
+
+  // 打开 / 关闭
+  const openBtn = document.getElementById('btnTheme');
+  const setOpen = (on) => overlay.classList.toggle('hidden', !on);
+  openBtn.addEventListener('click', () => setOpen(overlay.classList.contains('hidden')));
+  document.getElementById('btnThemeClose').addEventListener('click', () => setOpen(false));
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) setOpen(false); });
+
+  // 实时改色 → 更新数据源 + 应用 + 持久化
+  list.addEventListener('input', (e) => {
+    const input = e.target;
+    if (!input.classList.contains('theme-input')) return;
+    const t = loadTheme();
+    const key = input.dataset.key;
+    const seg = key in t.ui ? t.ui : key in t.semantic ? t.semantic : t.mat;
+    seg[key] = input.value.toUpperCase();
+    const swatch = list.querySelector(`[data-swatch="${key}"]`);
+    const hex = list.querySelector(`[data-hex="${key}"]`);
+    if (swatch) swatch.style.background = input.value;
+    if (hex) hex.textContent = input.value.toUpperCase();
+    applyThemeAll();
+    saveTheme();
+  });
+
+  // 导出为 JSON（复制到剪贴板）
+  document.getElementById('btnThemeExport').addEventListener('click', async () => {
+    const json = JSON.stringify(loadTheme(), null, 2);
+    try {
+      await navigator.clipboard.writeText(json);
+      alert('配色 JSON 已复制到剪贴板');
+    } catch {
+      alert(json);
+    }
+  });
+
+  // 重置为默认配色
+  document.getElementById('btnThemeReset').addEventListener('click', () => {
+    resetTheme();
+    applyThemeAll();
+    list.querySelectorAll('.theme-input').forEach((i) => {
+      const t = loadTheme();
+      const key = i.dataset.key;
+      const seg = key in t.ui ? t.ui : key in t.semantic ? t.semantic : t.mat;
+      i.value = seg[key];
+      const swatch = list.querySelector(`[data-swatch="${key}"]`);
+      const hexEl = list.querySelector(`[data-hex="${key}"]`);
+      if (swatch) swatch.style.background = seg[key];
+      if (hexEl) hexEl.textContent = seg[key];
+    });
+  });
+}

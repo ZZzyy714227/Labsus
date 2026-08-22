@@ -40,8 +40,8 @@ ENGINE_VERSION = "0.3.0"          # 引擎（S1 内核 + S2 服务层）
 API_VERSION = "v3"
 
 app = FastAPI(
-    title="DWB-PRO Engine /api/v3",
-    description="工业级底盘 K&C 分析引擎（S1 衬套两层求解器 + S2 工况/API 服务层）",
+    title="LABSUS Engine /api/v3",
+    description="LABSUS 悬架实验室分析引擎（S1 衬套两层求解器 + S2 工况/API 服务层）",
     version=ENGINE_VERSION,
 )
 
@@ -57,7 +57,7 @@ app.add_middleware(
 def health() -> dict:
     return {
         "status": "ok",
-        "engine": "dwb-pro-engine",
+        "engine": "labsus-engine",
         "engine_version": ENGINE_VERSION,
         "api": API_VERSION,
         "kandc": ["bump", "roll", "steer", "compliance"],

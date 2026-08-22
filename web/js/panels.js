@@ -25,7 +25,7 @@ export function renderGeometryPanel(el) {
           <input type="number" step="0.1" data-axle="${axle}" data-field="${f}"
                  value="${state.designParams?.[axle]?.[f] ?? ''}">
         </label>`).join('')}`).join('') +
-    '<button id="btnApplyGeom" class="btn btn-lime" style="width:100%; margin-top:6px;">应用参数</button>';
+    '<button id="btnApplyGeom" class="btn btn-silver" style="width:100%; margin-top:6px;">应用参数</button>';
 
   el.querySelectorAll('input[data-field]').forEach(inp => {
     inp.addEventListener('change', () => {
@@ -55,7 +55,7 @@ export function renderVehiclePanel(el) {
     <label class="field">${f}
       <input type="number" step="0.1" data-field="${f}" value="${state.vehicle[f] ?? ''}">
     </label>`).join('') +
-    '<button id="btnSaveVehicle" class="btn btn-cyan" style="width:100%; margin-top:6px;">保存整车参数</button>';
+    '<button id="btnSaveVehicle" class="btn btn-teal" style="width:100%; margin-top:6px;">保存整车参数</button>';
 
   el.querySelector('#btnSaveVehicle').addEventListener('click', async () => {
     const params = {};
@@ -75,7 +75,7 @@ export function renderTargetsPanel(el) {
     <label class="field">绿带 hi <input type="number" step="0.1" data-key="${k}" data-idx="1" value="${band[1]}"></label>
     <label class="field">黄带 hi <input type="number" step="0.1" data-key="${k}" data-idx="3" value="${band[3]}"></label>
   `).join('') +
-  '<button id="btnSaveTargets" class="btn btn-orange" style="width:100%; margin-top:6px;">保存目标带</button>';
+  '<button id="btnSaveTargets" class="btn btn-purple" style="width:100%; margin-top:6px;">保存目标带</button>';
 
   el.querySelector('#btnSaveTargets').addEventListener('click', async () => {
     const bands = {};

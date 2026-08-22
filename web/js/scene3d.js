@@ -11,6 +11,13 @@ import { downloadPointSet, pointSetSummary } from './car3d/pointset.js';
 let scene, camera, renderer, controls;
 let car = null;
 
+/** 主题联动：改 3D 场景背景 + 雾色（跟随 UI.paper） */
+export function setSceneBackground(hex) {
+  if (!scene) return;
+  scene.background = new THREE.Color(hex);
+  scene.fog = new THREE.Fog(hex, 6000, 16000);
+}
+
 // View presets — camera position + target in CAR-FRAME coordinates
 const VIEWS = {
   default: { pos: [1300, 1700, 1100], tgt: [-775, 0, 300] },
@@ -24,8 +31,8 @@ const toWorld = (x, y, z) => new THREE.Vector3(x, z, -y);
 
 export function initScene(container) {
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xc9cfd4);
-  scene.fog = new THREE.Fog(0xc9cfd4, 6000, 16000);
+  scene.background = new THREE.Color(0xE8EAED);
+  scene.fog = new THREE.Fog(0xE8EAED, 6000, 16000);
 
   camera = new THREE.PerspectiveCamera(50, 1, 1, 20000);
   camera.position.copy(toWorld(...VIEWS.default.pos));

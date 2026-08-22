@@ -1,11 +1,12 @@
 // Bottom snapshot timeline — data rows, select/compare, revert
 import { state, restoreSnapshot, worstLightOf } from './state.js';
 import { runSolve, runAnalyze, refreshPanels } from './main.js';
+import { get } from './theme.js';
 
 const KEY_VALUES = ['bump_steer_f', 'roll_gradient', 'ride_freq_r', 'pushrod_force'];
 
 function worstColor(w) {
-  return w === 'red' ? '#ff1744' : w === 'yellow' ? '#ffd600' : '#00e676';
+  return w === 'red' ? get('bad') : w === 'yellow' ? get('warn') : get('good');
 }
 
 export function renderHistory(el) {
