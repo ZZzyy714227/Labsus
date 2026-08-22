@@ -1,5 +1,20 @@
 # 开发日志
 
+## 2026-08-22 — S2-4 前端基线升级：用户 Gemini 增量全量移植 + 引擎双模保留
+- 交付：用户在 `dwb-pro-dev/Gemini.html`（单文件版，2154 行）自行完成四大维度工业级增量，按约定交付后由我方学习移植进前后端分离版 `dwb-pro-dev/web/dwb-pro-fullchassis.html`。
+- 移植策略：**Gemini.html 直接成为新前端基线**（官方 v4→Gemini diff 731+/276-，逐块手工合并风险高），再把 S2-2 引擎面板移植回新基线。引擎面板适配点：`sec()` 增加 cls 参数（兼容）、`plotXY` 升级为单线 `plotXYOverlay` → 新增独立多线 `plotXYMulti`（引擎结果面板用，不改用户函数）、buildLeft/buildRight 整体重建（`host.innerHTML=""`）→ 引擎区块抽成独立 `buildEnginePanel(host)` / `buildEngineResults(host)` 防 `let b` 重复声明与重建丢失。
+- 用户增量确认（四维度，全部保留）：
+  1. `solveQuasiStatic` 准静态载荷转移内核——非簧载直接/RC 几何力矩/弹簧+ARB 弹性力矩三路径解耦、稳态侧倾角+侧倾梯度代数反解、四轮 Fz（气动+纵向+侧向综合）、TLLTD 双色平衡条 + 操稳倾向判断；
+  2. `mode:"quasi"` 第三求解模式——稳态侧倾角映射双侧差动位移，KIN/RIG/QUASI 三模式并存；
+  3. `takeBaselineSnapshot` 基准快照——双线 Overlay（`plotXYOverlay` 实线 Active/虚线 Baseline）+ Delta 差异表（CG/BS/MR/RC/WR）；
+  4. 扩展输入——Gy/Gx/车速/气动下压力及分配/整车总质量/簧载质量滑条 + 状态栏 TLLTD% 与侧倾梯度；另含防倾杆 ARB（直径/位置比/偏置 + 3D 渲染 + 扭转刚度读数）与 LCA/UCA 衬套渲染。
+- 验收（playwright 真实浏览器）：
+  - 页面加载零 JS 错误；引擎面板/右面板 ARB·载荷转移·TLLTD/左面板 QUASI 输入·ARB·Baseline 控件齐全；
+  - QUASI 模式切换 ✓、Baseline 快照锁定（tbBase→"已锁定"）+ **buildLeft/buildRight 重建后引擎面板不丢失**（Delta 面板出现）✓、sbTLLTD=71.4% ✓；
+  - 引擎双模：连接 8001 → bump 21 点 VALID 2278ms、增益表渲染 ✓。
+- 提交：`dwb-pro-dev/Gemini.html`（用户交付源档）+ `dwb-pro-dev/web/dwb-pro-fullchassis.html`（新基线）+ DEVLOG。
+- 遗留：引擎侧 `/api/v3/chassis/*` 整车端点（四角装配+载荷转移镜像实现）待做——用户 JS 实现可作为契约参照。
+
 ## 2026-08-22 — S2-2 前端引擎面板落地：dwb-pro-fullchassis.html 双模接入 /api/v3
 - 前端主线 = `dwb-pro-dev/web/dwb-pro-fullchassis.html`（唯一前端核心，与用户决策对齐；"modeler 迁移"提法正式废弃）。
 - 新增（同一文件内）：
