@@ -100,7 +100,7 @@ def test_gate_full_chain_and_perf():
                                     case=QSLoad(fz=3000.0),
                                     travel=0.0, rack=0.0)
     elapsed_s = time.perf_counter() - t0
-    avg_ms = elapsed_s * 100.0  # 10 次均值（百分位）
+    avg_ms = elapsed_s * 100.0  # 10 次均值（ms/点）
     assert avg_ms < 300.0, \
         f"K&C 单点解超预算: avg={avg_ms:.1f}ms（预算 <300ms/点 全链路）"
     assert res.status in ("VALID", "APPROXIMATE"), \
