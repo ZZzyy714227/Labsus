@@ -1,5 +1,16 @@
 # 开发日志
 
+## 2026-08-22 — S3-2 前端闭环：赛道瞬态仿真接入（面板/数据桥/时间轴回放/遥测 HUD）
+- 交付（`LABSUS/web/dwb-pro-fullchassis.html`，+~330 行）：
+  - **左面板「赛道瞬态仿真」**：预设（稳态定圆 R=30 / 蛇形绕桩 30m / Mini GP 短道 / 自定义 JSON·CSV 路点导入）、预瞄增益、初速、RUN / 播放·暂停 / 退出回放 / 导出 Telemetry CSV、进度条拖动（Scrubber）、0.5×/1×/2× 速率、空格快捷键；
+  - **数据桥 trackPayload()**：复用 chassisPayload 的整车 vehicle（含 kw_curve）+ 前端扫掠 K&C 查表（travel/toe/cam）→ POST /api/v3/chassis/simulate_track；
+  - **时间轴回放**：simulate() 顶部 TRK 分支接管——每帧推进 trace 索引，applyTrackFrame 以引擎准静态 roll 驱动四角 driveTo（QUASI 同款管线），δ→齿条近似映射让 3D 视口转向轮同步摆动；
+  - **俯视图赛道渲染 drawTrackOverlay**：赛道中心线（闭合预设自动闭合）+ 按 |ay| 渐变着色的轮胎轨迹（绿→红 / 2g 满量程）+ 车辆包络矩形与航向箭头 + HUD 读数；运行后自动 fit 俯视视口；
+  - **右侧「赛道动态遥测」HUD**：G-G 摩擦圆散点（μ=2.29 圆 + 历史渐变 + 当前点，ax 数值微分）、四轮 Fz 柱状、v-t / ay-t / δ-t 三联曲线（plotXYMulti + 游标线）。
+- 调试记录：初版 HUD 读 `row.t`——引擎 trace 行不含 t（时间戳在独立数组），undefined.toFixed 抛异常**杀死整个 rAF 循环**（回放冻结在 i=5 的假象）；改用 TRK.res.t 索引后全通。
+- 验证（playwright 真实浏览器 ↔ 真实引擎）：定圆 177.2m·0.668g 完整回放，播放推进 258→499/2.5s（≈1×）、空格暂停、scrub 到 75%（roll=1.25°、ay=4.11m/s²）；**3D 联动实证**（scrub 前后轮跳 4.36→−39.17mm，悬架随跑圈姿态动画）；Mini GP 全程 221.6m·v_max 17·1.585g；G-G/Fz/三联曲线画布非空白；零 JS 错误。
+- 语义：全链闭环 = 硬点调校（本页面）→ K&C 查表 → 引擎瞬态（MF+准静态载荷+摩擦圆+LS 载荷敏感性）→ 回放可视化。改一个硬点重新 RUN 即见圈速/载荷/侧倾行为变化。
+
 ## 2026-08-22 — 修复序列：r2 深研四发现落地（P0–P5 全部执行，71 绿）
 - 需求：r2 深度研究报告（docs/research/…_r2，同日晚间）的发现与修复清单——用户指令"开始逐一修复"。
 - 研究新增确证（r2 报告，见 docs/research/2026-08-22-labsus-deep-research/）：①P0 quasi 内核统一已于早间报告后落地（C7 关闭）；②**新缺陷**：左角复用右框架公式，轮轴未镜像，FL/FR scrub 偏差恰 2·tireR·sin(|cam|)=13.61mm（解析 13.6126 vs 实测 13.613 精确吻合）；③bench/v2adapter/from_legacy 三快照依赖父仓 config/hardpoints/routes，隔离区内 import 即失败（C12 不可复现）；④四套指标管线并存（angles.py / pose_metrics / kinematics.py / 前端 JS）。
