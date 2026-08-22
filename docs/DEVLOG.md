@@ -1,5 +1,15 @@
 # 开发日志
 
+## 2026-08-22 — 修复：TLLTD 随 gy 恒定 → 侧倾耦合迭代（前端 solveQuasiStatic 非线性化）
+- 现象（用户报告）：gy=0 显示 50/50（占位回退），任何非零 gy 直接跳 7:3（≈71%）且不随 gy 变化。
+- 根因一（数学）：三路径（UNS/GEO/ELA）全部 ∝ ay → 分子分母齐次 → TLLTD 为纯刚度/几何常数，与 gy 无关；gy=0 的 50% 是 `sumTransfer≤1 → 50` 占位。这不是计算错误，是线性模型的固有性质。
+- 根因二（代码缺陷）：前端 `sw.rows[k].kw` 单位 N/mm（772 行），而 `kwF0=(kS·1000)·mr²` 为 N/m——单位错位 1000 倍，插值迁移被吞。
+- 修复（`LABSUS/web/dwb-pro-fullchassis.html` 的 `solveQuasiStatic`）：
+  - **侧倾耦合迭代**（3 次）：每轮由当前侧倾重解 rollAngleRad → 左右轮行程差 dt=roll·半轮距 → `zrc_f/zrc_r` 取**外侧压缩轮**的扫掠 rcH（GEO 项非线性化）→ `kwAt` 取左右扫掠 kw 均值（修复 ×1000 单位后，ELA 项非线性化）→ 更新 kphi_f/kphi_r/kphi_tot；
+  - dFz_geo / dFz_elas 全部使用迁移后的最终 zrc/kphi → TLLTD 随 gy 真实单调变化。
+- 验证（真实浏览器 playwright）：gy=0→50 占位；0.05g→68.4% → 2g→64.4%，**跨度 3.99pp 单调**；kphiF 1041→852 随行程迁移；roll 3.09°@1g；零 JS 错误；simulate 主流程正常。
+- 说明：引擎侧 `quasi_loads`（/api/v3/chassis/*）暂为线性版本（镜像原公式）；如需两端一致，后续按同方案同步（引擎已具备每角 rc_h/kw 扫掠能力）。
+
 ## 2026-08-22 — 项目重命名：dwb-pro-dev → LABSUS（悬架实验室）
 - 用户拍板：项目定名 **LABSUS / 悬架实验室**（Laboratory + Suspension）。
 - 执行（全套改名，git mv 保留历史，文件级迁移绕过句柄占用）：
