@@ -42,5 +42,10 @@ class MagicFormulaSub:
         x = b * k
         return self._d(fz) * np.sin(c * np.arctan(x - e * (x - np.arctan(x))))
 
-    def mz(self, alpha_deg, fz: float) -> np.ndarray:
-        return self.fy(alpha_deg, fz) * 0.06      # 简化拖距 60mm（S1 占位，标注 APPROXIMATE）
+    def mz(self, alpha_deg, fz: float, trail_mm: float = 60.0) -> np.ndarray:
+        """MZ = Fy × 简化拖距（P5 参数化；默认 60mm 保持历史 APPROXIMATE 语义）。
+
+        trail_mm：简化气动拖距（mm）。仍为单点近似 —— 无 Mz 峰值/形变耦合，
+        标注 APPROXIMATE；调用方应显式传入真实值以撤除占位。
+        """
+        return self.fy(alpha_deg, fz) * (trail_mm / 1000.0)
