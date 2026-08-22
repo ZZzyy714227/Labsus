@@ -51,9 +51,12 @@ app = FastAPI(
     version=ENGINE_VERSION,
 )
 
+# CORS：默认全开（前端 file:// 双击直连）。部署时可收紧：
+#   LABSUS_CORS_ORIGINS="http://127.0.0.1:8921,http://localhost:8921" python server.py
+_cors_origins = [o.strip() for o in os.environ.get("LABSUS_CORS_ORIGINS", "*").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

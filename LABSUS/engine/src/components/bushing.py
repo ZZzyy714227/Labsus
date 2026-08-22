@@ -1,4 +1,11 @@
-"""6DOF 橡胶衬套元件：逐自由度刚度/阻尼曲线 + 耦合项 + 预紧（S1 首批线性/查表/样条）。"""
+"""6DOF 橡胶衬套元件：逐自由度刚度/阻尼曲线 + 耦合项 + 预紧（S1 首批线性/查表/样条）。
+
+使用状态（2026-08-22 登记）：S1 K&C 主路径仅使用平移刚度（kT）+ 预紧；
+cT/cR 阻尼为存储占位（静态求解不使用）；coupled 6x6 耦合矩阵虽在
+bush_force / bush_force_jac 中完整生效，但尚未有工况向求解器注入非零
+耦合项（compliance.solve_compliance 的 S1 外载仅平移 3 分量、旋转 DOF 无
+外部力矩 —— 见 M5 注释）。耦合/阻尼/旋转力矩属于 S3+ 载荷阶段能力。
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
