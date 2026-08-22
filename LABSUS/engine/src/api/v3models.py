@@ -135,6 +135,25 @@ class ArbSpec(BaseModel):
     G: float = 79000.0           # 剪切模量 MPa
 
 
+class KwCurve(BaseModel):
+    """轮端刚度-行程特性（quasi 侧倾耦合迭代用）。
+
+    travel mm / kw N/mm；由前端随 payload 下发（前端扫掠 kw=kS·mr(tr)²）。
+    引擎 STRUT_OUT 拓扑与前端不一致（OpenItem），自身 damper 链推不出可信
+    kw 迁移 → 前端曲线优先，缺省回退常数 kS·motion_ratio²。拓扑对齐后可撤。
+    """
+    travel: list[float]
+    kw: list[float]
+
+    @model_validator(mode="after")
+    def _check(self):
+        if len(self.travel) != len(self.kw) or len(self.travel) < 2:
+            raise ValueError("kw_curve travel/kw must be equal length >= 2")
+        if any(k <= 0 for k in self.kw):
+            raise ValueError("kw_curve values must be > 0 (N/mm)")
+        return self
+
+
 class AxleSpec(BaseModel):
     """单轴（右轮）定义；左轮由镜像生成。"""
     points: dict[str, list[float]]          # 15 键 DWB 命名
@@ -146,6 +165,7 @@ class AxleSpec(BaseModel):
     spring_mass_kg: float = 330.0           # 本轴簧载质量（CG 分配用）
     unsprung_kg: float = 38.0               # mU 单侧
     motion_ratio: float | None = None       # 缺省 → 引擎推 MR@0
+    kw_curve: KwCurve | None = None         # 缺省 → 常数 kw（见 KwCurve）
     arb: ArbSpec = Field(default_factory=ArbSpec)
 
 

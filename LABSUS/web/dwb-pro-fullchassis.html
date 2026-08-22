@@ -2171,15 +2171,21 @@ function buildChassisResults(host){
 function chassisPayload(){
   const f=S.front,r=S.rear;
   const halfF=Math.abs(f.hp.WC[0]),halfR=Math.abs(r.hp.WC[0]);
+  const kwCurve=sw=>(sw&&sw.rows&&sw.rows.length>=2)
+    ?{travel:sw.rows.map(q=>q.tr),kw:sw.rows.map(q=>q.kw)}:undefined;
   return {
     vehicle:{
       wheelbase_mm:S.wb,mass_kg:S.mTotal,sprung_mass_kg:S.mSprung,hcg_mm:S.hcg,hs_mm:S.hs,
       front:{points:JSON.parse(JSON.stringify(f.hp)),arch:f.arch,camber_deg:f.cam0,toe_deg:f.toe0,
         tire_radius:f.tire.R,spring_rate:f.kS,spring_mass_kg:f.mS,unsprung_kg:f.mU,
-        motion_ratio:SIM.mrRefF||0.75,arb:{d:f.arb.d,t:f.arb.t,dy:f.arb.dy,dz:f.arb.dz,G:f.arb.G}},
+        motion_ratio:SIM.mrRefF||0.75,
+        kw_curve:kwCurve(SIM.swF),
+        arb:{d:f.arb.d,t:f.arb.t,dy:f.arb.dy,dz:f.arb.dz,G:f.arb.G}},
       rear:{points:JSON.parse(JSON.stringify(r.hp)),arch:r.arch,camber_deg:r.cam0,toe_deg:r.toe0,
         tire_radius:r.tire.R,spring_rate:r.kS,spring_mass_kg:r.mS,unsprung_kg:r.mU,
-        motion_ratio:SIM.mrRefR||0.78,arb:{d:r.arb.d,t:r.arb.t,dy:r.arb.dy,dz:r.arb.dz,G:r.arb.G}}
+        motion_ratio:SIM.mrRefR||0.78,
+        kw_curve:kwCurve(SIM.swR),
+        arb:{d:r.arb.d,t:r.arb.t,dy:r.arb.dy,dz:r.arb.dz,G:r.arb.G}}
     },
     quasi:{gy:S.qs.gy,gx:S.qs.gx,aero_force_n:S.qs.aeroF,aero_bias:S.qs.aeroBias},
     travel:{fl:travelL(halfF,S.roll),fr:travelR(halfF,S.roll),

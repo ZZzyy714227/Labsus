@@ -167,3 +167,46 @@ def test_chassis_solve_with_arb():
     w_arb = r2.json()["loads"]
     assert w_arb["arb_share_f"] > 0 and w_arb["arb_share_r"] > 0
     assert abs(w_arb["roll_deg"]) < abs(n_arb["roll_deg"])   # ARB 减小侧倾
+
+
+# ── P0 quasi 内核统一：侧倾耦合迭代（2026-08-22） ──────────────────────
+
+def _kw_curve(kw0: float, quad: float = 8e-5, lin: float = 0.0):
+    """前端同源形态的合成 kw 曲线（N/mm，随压缩变软）。线性项经 ±dt 均值抵消，
+    二次项是迁移主效应——与真实机构 mr² 曲率一致。"""
+    xs = [round(-80.0 + 160.0 * k / 44.0, 2) for k in range(45)]
+    return {"travel": xs,
+            "kw": [round(kw0 * (1.0 - quad * t * t - lin * t), 4) for t in xs]}
+
+
+def test_chassis_tlltd_varies_with_gy():
+    """TLLTD 随 gy 单调变化 + kphi 随行程迁移（修复线性恒定，对齐前端）。"""
+    gys = [0.05, 0.5, 1.0, 1.5, 2.0]
+    loads = []
+    for gy in gys:
+        body = _req(quasi={"gy": gy, "gx": 0.0, "aero_force_n": 0.0, "aero_bias": 0.5})
+        body["vehicle"]["front"]["motion_ratio"] = 0.75
+        body["vehicle"]["rear"]["motion_ratio"] = 0.78
+        body["vehicle"]["front"]["kw_curve"] = _kw_curve(110.0 * 0.75 * 0.75)
+        body["vehicle"]["rear"]["kw_curve"] = _kw_curve(130.0 * 0.78 * 0.78, quad=3e-5)
+        r = client.post("/api/v3/chassis/solve", json=body)
+        assert r.status_code == 200
+        loads.append(r.json()["loads"])
+    ts = [L["tlltd_pct"] for L in loads]
+    assert abs(ts[-1] - ts[0]) > 0.3            # 不再是常数
+    assert all(a >= b for a, b in zip(ts, ts[1:])), ts   # 随 gy 单调（软前轴 → 前轴占比降）
+    # kphi 随侧倾行程迁移（压缩 → 变软）
+    assert loads[-1]["kphi_f"] < loads[0]["kphi_f"]
+    assert loads[-1]["kphi_r"] < loads[0]["kphi_r"]
+    # 侧倾角随 gy 增长
+    rolls = [L["roll_deg"] for L in loads]
+    assert all(a < b for a, b in zip(rolls, rolls[1:]))
+
+
+def test_chassis_kw_curve_validation_422():
+    body = _req()
+    body["vehicle"]["front"]["kw_curve"] = {"travel": [0.0, 10.0], "kw": [60.0]}
+    assert client.post("/api/v3/chassis/solve", json=body).status_code == 422
+    body2 = _req()
+    body2["vehicle"]["front"]["kw_curve"] = {"travel": [0.0, 10.0], "kw": [60.0, -1.0]}
+    assert client.post("/api/v3/chassis/solve", json=body2).status_code == 422
