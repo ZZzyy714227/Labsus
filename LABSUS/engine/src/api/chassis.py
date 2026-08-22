@@ -334,6 +334,15 @@ def solve_chassis(req: ChassisRequest) -> ChassisPoseResponse:
 
     rc_sw = {"front": axle_rc_sweep(req.vehicle.front),
              "rear": axle_rc_sweep(req.vehicle.rear)}
+    # 守恒记账检查（2026-08-22）：hs 与 hcg 是独立输入，若
+    # (mS·hs + mU·hu)/mT ≠ hcg，轴转移之和与整车力矩公式不严格闭合（第 9 讲发现）。
+    v_ = req.vehicle
+    h_weighted = (v_.sprung_mass_kg * v_.hs_mm
+                  + v_.front.unsprung_kg * 2 * v_.front.tire_radius
+                  + v_.rear.unsprung_kg * 2 * v_.rear.tire_radius) / v_.mass_kg
+    if abs(h_weighted - v_.hcg_mm) > 20.0:
+        warnings.append(f"hs/hcg 记账不自洽：加权高度 {h_weighted:.0f}mm vs hcg "
+                        f"{v_.hcg_mm:.0f}mm（载荷转移之和与整车公式将有偏差）")
     loads = quasi_loads(req.vehicle, req.quasi, mr, rcH, rc_sw)
     attitude = _attitude(trav, req.vehicle)
     return ChassisPoseResponse(
