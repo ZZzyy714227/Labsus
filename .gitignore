@@ -43,3 +43,6 @@ nul
 
 # Git worktrees
 .worktrees/
+
+# Agent tool runtime
+.workbuddy/
