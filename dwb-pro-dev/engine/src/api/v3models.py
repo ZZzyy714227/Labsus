@@ -122,3 +122,113 @@ class PoseResponse(BaseModel):
     metrics: dict[str, float] = Field(default_factory=dict)      # cam/toe/kpi/cast/scrub/trail/...
     rocker: dict | None = None
     warnings: list[str] = Field(default_factory=list)
+
+
+# ── 整车分析（S2-5：四角装配 + 准静态载荷转移，镜像单文件版 solveQuasiStatic） ──
+
+class ArbSpec(BaseModel):
+    """横向稳定杆（每轴）。d<=0.5 视为拆除。"""
+    d: float = 18.0              # 直径 mm
+    t: float = 0.55              # 连杆位置比（LCA_F→LBJ 插值）
+    dy: float = 50.0             # 纵向偏置 mm
+    dz: float = 120.0            # 高度偏置 mm
+    G: float = 79000.0           # 剪切模量 MPa
+
+
+class AxleSpec(BaseModel):
+    """单轴（右轮）定义；左轮由镜像生成。"""
+    points: dict[str, list[float]]          # 15 键 DWB 命名
+    arch: str = "pushrod"
+    camber_deg: float = -1.2
+    toe_deg: float = 0.05
+    tire_radius: float = 325.0
+    spring_rate: float = 110.0              # kS N/mm
+    spring_mass_kg: float = 330.0           # 本轴簧载质量（CG 分配用）
+    unsprung_kg: float = 38.0               # mU 单侧
+    motion_ratio: float | None = None       # 缺省 → 引擎推 MR@0
+    arb: ArbSpec = Field(default_factory=ArbSpec)
+
+
+class VehicleSpec(BaseModel):
+    wheelbase_mm: float = 2750.0
+    mass_kg: float = 1420.0                 # mTotal
+    sprung_mass_kg: float = 1260.0          # mS
+    hcg_mm: float = 350.0
+    hs_mm: float = 370.0                    # 簧载质心高
+    front: AxleSpec
+    rear: AxleSpec
+
+
+class QuasiInputs(BaseModel):
+    gy: float = 0.0                         # 侧向加速度 g
+    gx: float = 0.0                         # 纵向加速度 g（+ 加速）
+    aero_force_n: float = 0.0
+    aero_bias: float = 0.5                  # 前轴气动分配
+
+
+class CornerTravel(BaseModel):
+    fl: float = 0.0
+    fr: float = 0.0
+    rl: float = 0.0
+    rr: float = 0.0
+
+
+class ChassisRequest(BaseModel):
+    """整车分析请求（solve 单点 / kandc 扫掠共用）。"""
+    vehicle: VehicleSpec
+    quasi: QuasiInputs = Field(default_factory=QuasiInputs)
+    travel: CornerTravel = Field(default_factory=CornerTravel)
+    rack: float = 0.0
+    sweep: SweepSpec = Field(default_factory=lambda: SweepSpec(min=-50, max=50, n=21))
+
+    @model_validator(mode="after")
+    def _check(self):
+        for ax in (self.vehicle.front, self.vehicle.rear):
+            bad = set(ax.points) - DWB_KEYS
+            if bad:
+                raise ValueError(f"unknown axle hardpoint keys: {sorted(bad)}")
+            missing = DWB_KEYS - set(ax.points)
+            if missing:
+                raise ValueError(f"missing axle hardpoint keys: {sorted(missing)}")
+        return self
+
+
+class ChassisLoads(BaseModel):
+    """准静态载荷转移输出（镜像 solveQuasiStatic）。"""
+    roll_deg: float = 0.0
+    roll_grad_deg_per_g: float = 0.0
+    kphi_f: float = 0.0                      # N·m/°
+    kphi_r: float = 0.0
+    kphi_tot: float = 0.0
+    arb_share_f: float = 0.0                 # %
+    arb_share_r: float = 0.0
+    dFz_u_f: float = 0.0                     # 非簧载直接转移
+    dFz_geo_f: float = 0.0                   # RC 几何力矩
+    dFz_elas_f: float = 0.0                  # 弹性力矩
+    dFz_f_tot: float = 0.0
+    dFz_u_r: float = 0.0
+    dFz_geo_r: float = 0.0
+    dFz_elas_r: float = 0.0
+    dFz_r_tot: float = 0.0
+    dFz_long: float = 0.0                    # 纵向转移
+    tlltd_pct: float = 50.0
+    fz: dict[str, float] = Field(default_factory=dict)   # FL/FR/RL/RR
+
+
+class ChassisPoseResponse(BaseModel):
+    status: str
+    ms: float = 0.0
+    pose: dict[str, dict] = Field(default_factory=dict)     # FL/FR/RL/RR → 定位角
+    attitude: dict[str, float] = Field(default_factory=dict)  # heave/roll/pitch
+    loads: ChassisLoads = Field(default_factory=ChassisLoads)
+    mr: dict[str, float] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ChassisSweepResponse(BaseModel):
+    case: str
+    status: str
+    ms: float = 0.0
+    curves: dict[str, list] = Field(default_factory=dict)
+    gains: dict[str, float] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
