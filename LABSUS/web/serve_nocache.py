@@ -1,7 +1,7 @@
 # 开发用静态服务：禁用浏览器缓存，确保每次刷新拿到最新文件
 import http.server, functools, os
 
-ROOT = r"c:\Users\zzy\Desktop\New_suspension\LABSUS\web"
+ROOT = os.path.dirname(os.path.abspath(__file__))
 
 class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
