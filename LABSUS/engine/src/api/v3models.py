@@ -280,6 +280,23 @@ class TireParams(BaseModel):
     Sv: float = 0.0
     FzNom: float = 3500.0
     LS: float = 0.10               # 载荷敏感性（重载 μ 递减；0 = 线性基线）
+    Cg: float = 0.5                # 外倾推力系数 1/rad（S3-1 升级：Fy += -Cg·γ·Fz）
+    Ls: float = 0.35               # 侧偏松弛长度 m（瞬态一阶滞后）
+
+
+class PowertrainParams(BaseModel):
+    """动力总成（S3-1 升级）：恒扭矩-恒功率包络 + 制动分配。"""
+    T_max: float = 250.0           # 峰值扭矩 N·m
+    P_kw: float = 80.0             # 峰值功率 kW
+    drive_split_f: float = 0.0     # 前轴驱动比例（0=纯后驱）
+    brake_split_f: float = 0.6     # 前轴制动分配（剩余给后轴）
+
+
+class AeroParams(BaseModel):
+    """气动（S3-1 升级）：下压力/阻力随 v²。k 单位 N/(m/s)²。"""
+    k_down_f: float = 0.55         # 前轴下压力系数
+    k_down_r: float = 0.45         # 后轴下压力系数
+    k_drag: float = 0.35           # 纵向阻力系数
 
 
 class TrackSimRequest(BaseModel):
@@ -295,6 +312,8 @@ class TrackSimRequest(BaseModel):
     sim_time: float = Field(30.0, gt=0.0, le=300.0)
     kc_luts: dict[str, dict[str, list[float]]] = Field(default_factory=dict)
     tire: TireParams = Field(default_factory=TireParams)
+    powertrain: PowertrainParams = Field(default_factory=PowertrainParams)
+    aero: AeroParams = Field(default_factory=AeroParams)
     iz_kg_m2: float | None = None          # 缺省 ≈ m(L²+t̄²)/12
     lookahead_gain: float = 0.9            # 纯追踪预视距离 = 3 + gain·vx（m）
     start_speed: float = 5.0               # 初始车速 m/s

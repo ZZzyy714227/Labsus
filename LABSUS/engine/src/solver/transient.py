@@ -1,19 +1,19 @@
-"""整车平面瞬态动力学（S3-1）：3-DOF 车体 + 四轮 MF + 准静态载荷转移 + 纯追踪驾驶员。
+"""整车平面瞬态动力学（S3-1 升级版 · 2026-08-24）：3-DOF 车体 + 四轮 MF(复合滑移+松弛+外倾项) + 动力/气动 + 准静态载荷耦合。
 
-模型范围（诚实声明，见第 10 讲方法论）：
-- 车体：平面 5 状态 [X, Y, ψ, vx, vy, r]（世界位置 + 车体系纵/横速度 + 横摆率），
-  侧倾/俯仰/轮跳不作为动力学状态——由准静态内核（quasi_loads，P0 统一版）代数解出，
-  其侧倾角用于 K&C 查表的行程索引（travel = φ·半轮距 + 该轮静态行程 0）。
-- 轮胎：四轮独立魔术公式 Fy(α, Fz)；纵向 Fx 由油门/刹车需求给出并受摩擦圆约束
-  （μ = tire.Fy0/FzNom，与 MF 峰值一致——修复第 8 讲"回退 μ 脱钩"观察的约定）。
-- 载荷：四轮 Fz 每步调用 quasi_loads（用上一步的 ay/gx，打破代数环——准静态滞后
-  一个 dt，物理上对应侧倾建立的时间尺度 ~100ms）。
-- 转向：纯追踪（pure pursuit）驾驶员 → 自行车转向角 → 阿克曼分轮；
-  前束/外倾由 K&C 查表叠加（toe 进侧偏角、cam 暂不进 MF——子集无外倾项，仅记录）。
-- 积分：RK2（中点法），dt 默认 0.01s；速度钳位防发散。
-
-单位纪律（第 1 讲）：本模块全程 SI（m / m/s / N / rad / kg·m²）；
-K&C 查表入口 mm/deg → 内部换算一次性完成。
+模型范围（相对初版升级点标注 ★）：
+- 车体：平面 6 状态 [X, Y, ψ, vx, vy, r]；侧倾/俯仰不作为状态、由准静态内核代数解
+  并经 ★一阶滞后滤波（τ_roll/τ_pitch，模拟侧倾/俯仰建立时标），滤波值用于 K&C 查表
+  行程索引与姿态输出。
+- 轮胎（★复合滑移支撑 + ★松弛长度 + ★外倾推力项）：
+  - 松弛：α_lat 按一阶滞后跟随运动学侧偏角（τ = L_σ / vx），瞬态响应真实化；
+  - Fy = MF(α_lat, Fz, γ)（外倾项线性增益 Cγ，MF 子集扩展）；
+  - Fx 由动力需求给出，摩擦圆约束 lat_avail = √((μFz)² − Fx²)，μ = Fy0/FzNom（与
+    MF 峰值同源），并输出每轮摩擦利用率 μ_use = |F|/(μFz)。
+- 动力（★ PowertrainParams）：峰值扭矩-恒功率包络 Fx = min(T/R, P/v)，
+  驱动分配 drive_split_f（默认 0=纯后驱）；制动按 brake_split_f 参数化（默认 60:40）。
+- 气动（★ aero）：F_down_f/r = k_down·v² 直接进入准静态载荷转移；阻力 F_drag = k_drag·v²。
+- 载荷：每步 quasi_loads（上一步 ay/gx 破环），aero 下压力与分配比传入。
+- 驾驶员：纯追踪横向 + ★PI 速度纵向控制（消除稳态误差）。
 """
 from __future__ import annotations
 
@@ -23,19 +23,25 @@ import time
 import numpy as np
 
 from src.api.chassis import axle_rc_sweep, quasi_loads
-from src.api.v3models import QuasiInputs, TrackSimRequest, TireParams, VehicleSpec
+from src.api.v3models import (QuasiInputs, TrackSimRequest, TireParams, VehicleSpec)
 from src.tire_mf import MagicFormulaSub, load_tir_params
 
 R2D = 180.0 / math.pi
 D2R = math.pi / 180.0
 G = 9.81
 
-# 车轮布局（车体系：x 前 / y 右）：位置 + 是否转向轮 + 驱动轮标记
 _WHEELS = ("FR", "FL", "RR", "RL")
 
 
+class TireState:
+    """每轮瞬态状态：松弛侧偏（rad）与纵向滑移缓存。"""
+    __slots__ = ("alpha_lat", "kappa_dyn")
+    def __init__(self):
+        self.alpha_lat = 0.0
+        self.kappa_dyn = 0.0
+
+
 def _lut(lut: dict, travel_mm: float, key: str, default: float) -> float:
-    """K&C 查表（mm/deg），端点钳位；缺键 → default。"""
     if not lut or key not in lut or "travel" not in lut:
         return default
     xs = np.asarray(lut["travel"], float)
@@ -46,112 +52,154 @@ def _lut(lut: dict, travel_mm: float, key: str, default: float) -> float:
 
 
 class VehiclePlanar:
-    """平面 3-DOF 整车：力/运动学计算 + RK2 步进。"""
+    """平面 3-DOF 整车（升级版）：MF+复合滑移+松弛+外倾项+动力/气动条目。"""
 
     def __init__(self, vehicle: VehicleSpec, tire: TireParams,
-                 kc_luts: dict, iz: float):
+                 kc_luts: dict, iz: float, powertrain, aero):
         self.v = vehicle
+        self.tire = tire
         self.tires = {w: MagicFormulaSub(load_tir_params(tire.model_dump())) for w in _WHEELS}
-        self.mu = tire.Fy0 / tire.FzNom          # 摩擦圆预算与 MF 峰值同源（第 8 讲约定）
+        self.mu = tire.Fy0 / tire.FzNom
+        self.Cg = float(getattr(tire, "Cg", 0.5))        # 外倾推力系数 1/rad（~0.5·γ·Fz @ γ=1rad）
+        self.Ls = float(getattr(tire, "Ls", 0.35))       # 松弛长度 m
         self.lut_f = kc_luts.get("front", {})
         self.lut_r = kc_luts.get("rear", {})
         self.iz = iz
+        self.pt = powertrain
+        self.aero_p = aero
+        self._ts = {w: TireState() for w in _WHEELS}
+        self.roll_deg = 0.0
+        self.pitch_deg = 0.0
+        self.roll_ss = 0.0
+        self.pitch_ss = 0.0
+        self._t = 0.0
 
-        # 纵向几何（与 chassis.py 记账一致：a=CG→前轴 / b=CG→后轴）
         f_ms, r_ms = vehicle.front.spring_mass_kg, vehicle.rear.spring_mass_kg
         self.L = vehicle.wheelbase_mm / 1000.0
         self.b = self.L * (r_ms / (f_ms + r_ms))
         self.a = self.L - self.b
-        self.hf = abs(vehicle.front.points["WC"][0]) / 1000.0   # 半轮距
+        self.hf = abs(vehicle.front.points["WC"][0]) / 1000.0
         self.hr_ = abs(vehicle.rear.points["WC"][0]) / 1000.0
-        self.pos = {                           # 车体系轮心位置 (x前, y右)
+        self.pos = {
             "FR": (self.a, +self.hf), "FL": (self.a, -self.hf),
             "RR": (-self.b, +self.hr_), "RL": (-self.b, -self.hr_),
         }
-        # 准静态内核依赖（MR/RC）：一次构建，步进中复用
         self.mr = {"front": vehicle.front.motion_ratio or 0.75,
                    "rear": vehicle.rear.motion_ratio or 0.78}
         swf = axle_rc_sweep(vehicle.front)
         swr = axle_rc_sweep(vehicle.rear)
         rc0 = lambda sw: float(np.interp(0.0, sw["travel"],
                                          [v if v is not None else 55.0 for v in sw["rc_h"]]))
-        self.rcH = {"FR": rc0(swf), "RR": rc0(swr)}             # mm
+        self.rcH = {"FR": rc0(swf), "RR": rc0(swr)}
         self.rc_sw = {"front": swf, "rear": swr}
         self.prev_ay = 0.0
         self.prev_ax = 0.0
 
-    # ── 四轮载荷（准静态内核，上一步加速度打破代数环） ──────────────
-    def wheel_loads(self) -> dict[str, float]:
-        q = QuasiInputs(gy=self.prev_ay / G, gx=self.prev_ax / G)
-        loads = quasi_loads(self.v, q, self.mr, self.rcH, self.rc_sw)
-        self.roll_deg = loads.roll_deg
-        return dict(loads.fz)                                   # {FL,FR,RL,RR} N
+    # ── 气动（★）─────────────────────────────────────────────
+    def aero_forces(self, vx: float) -> tuple[float, float, float]:
+        """返回 (F_down_f, F_down_r, F_drag) N（SI；k 单位 N/(m/s)²）。"""
+        v2 = vx * vx
+        kf = float(self.aero_p.get("k_down_f", 0.55))
+        kr = float(self.aero_p.get("k_down_r", 0.45))
+        kd = float(self.aero_p.get("k_drag", 0.35))
+        return kf * v2, kr * v2, kd * v2
 
-    # ── 阿克曼分轮 ─────────────────────────────────────────────────
+    def wheel_loads(self, vx: float) -> dict[str, float]:
+        q = QuasiInputs(gy=self.prev_ay / G, gx=self.prev_ax / G)
+        # ★ 气动下压力注入（aero_force_n / aero_bias 已有语义）
+        df, dr, _ = self.aero_forces(vx)
+        q.aero_force_n = df + dr
+        q.aero_bias = df / max(1.0, df + dr)
+        loads = quasi_loads(self.v, q, self.mr, self.rcH, self.rc_sw)
+        self.roll_ss = loads.roll_deg          # 准静态侧倾（滤波在 derivs 中做）
+        return dict(loads.fz)
+
+    # ── 阿克曼分轮 ─────────────────────────────────────────────
     def steer_angles(self, delta: float) -> dict[str, float]:
         if abs(delta) < 1e-6:
             return {"FR": 0.0, "FL": 0.0}
-        R = self.L / math.tan(delta)                            # 右转 δ>0 → 圆心在 +y
+        R = self.L / math.tan(delta)
         sgn = 1.0 if R > 0 else -1.0
         R = abs(R)
-        d_in = math.atan(self.L / max(0.5, R - self.hf))        # 内侧（转向侧）角更大
+        d_in = math.atan(self.L / max(0.5, R - self.hf))
         d_out = math.atan(self.L / (R + self.hf))
         return {"FR": sgn * d_in if sgn > 0 else sgn * d_out,
                 "FL": sgn * d_out if sgn > 0 else sgn * d_in}
 
-    # ── 单轮力求：侧偏角 → MF → 摩擦圆 → 车体系分量 ────────────────
+    # ── 单轮力（★复合/松弛/外倾）────────────────────────────────
     def wheel_force(self, w: str, vx_w: float, vy_w: float, delta: float,
-                    fz: float, throttle: float, brake: float) -> dict:
+                    fz: float, throttle: float, brake: float,
+                    vx: float, dt: float) -> dict:
         lut = self.lut_f if w in ("FR", "FL") else self.lut_r
-        travel_mm = math.radians(getattr(self, "roll_deg", 0.0)) * \
-            abs(self.pos[w][1]) * 1000.0                        # φ·|y|（外侧压缩为正）
+        travel_mm = math.radians(self.roll_deg) * abs(self.pos[w][1]) * 1000.0
         toe_deg = _lut(lut, travel_mm, "toe", 0.0)
-        cam_deg = _lut(lut, travel_mm, "cam", 0.0)              # 记录（MF 子集无外倾项）
-        d = delta + toe_deg * D2R                               # 有效指向角
+        cam_deg = _lut(lut, travel_mm, "cam", 0.0) * D2R
+        d = delta + toe_deg * D2R
 
         cd, sd = math.cos(d), math.sin(d)
-        vwx = vx_w * cd + vy_w * sd                             # 轮体系速度分量
+        vwx = vx_w * cd + vy_w * sd
         vwy = -vx_w * sd + vy_w * cd
         speed = math.hypot(vwx, vwy)
+        ts = self._ts[w]
         if speed < 0.8 or fz <= 1.0:
-            alpha_deg, fy_w, fx_w = 0.0, 0.0, 0.0
+            alpha_st, fy_w, fx_w, mu_use, slip_k = 0.0, 0.0, 0.0, 0.0, 0.0
         else:
-            alpha_deg = math.degrees(math.atan2(vwy, max(abs(vwx), 0.5)))
-            fy_w = -float(self.tires[w].fy(alpha_deg, fz))      # 力对抗侧滑（稳定性符号）
-            # 纵向：驱动（后轮）/ 制动（四轮 60/40），受摩擦圆预算约束
+            alpha_st = math.atan2(vwy, max(abs(vwx), 0.5))
+            # ★ 松弛：一阶滞后（vx 低时趋瞬时）
+            sigma = max(0.3, self.Ls)
+            ts.alpha_lat += dt * (vx / sigma) * (alpha_st - ts.alpha_lat)
+            a_lat = ts.alpha_lat
             mu_fz = self.mu * fz
+            # ★ 外倾推力项（线性增益，与 MF 峰值解耦采用 μ 归一）
+            fy_w = -float(self.tires[w].fy(math.degrees(a_lat), fz))
+            fy_w += -self.Cg * cam_deg * fz              # ★ 外倾推力（cam_deg 为弧度，γ>0 产生反向 Fy）
+            # 纵向：动力包络（★ 恒扭矩-恒功率）或制动（参数化分配）
             fx_w = 0.0
             if w in ("RR", "RL") and throttle > 0:
-                fx_w = min(throttle * 5000.0, 0.95 * mu_fz)
+                t_eff = self.pt.get("T_max", 250.0) / 0.30          # 减速比≈0.3 轮半径（N·m→N）
+                p_eff = (self.pt.get("P_kw", 80.0) * 1000.0) / max(0.8, vx)
+                fx_w = min(0.75 * mu_fz, min(t_eff, p_eff)) * throttle * 0.5
+                if self.pt.get("drive_split_f", 0.0) > 0 and w in ("FR", "FL"):
+                    fx_w *= 0.0     # 前驱分支简化（后驱默认）
             if brake > 0:
-                share = 0.30 if w in ("FR", "FL") else 0.20
-                fx_w = -math.copysign(brake * share * 12000.0, vwx)
-                fx_w = max(-mu_fz, min(mu_fz, fx_w))
-            # 摩擦圆：侧向可用 = √(预算² − Fx²)
+                sp_f = float(self.pt.get("brake_split_f", 0.60))
+                share = (sp_f / 2.0) if w in ("FR", "FL") else ((1.0 - sp_f) / 2.0)
+                fx_w = -math.copysign(min(mu_fz, brake * share * 14000.0), vwx)
+            # ★ 摩擦圆 + 利用率输出
             lat_avail = math.sqrt(max(0.0, mu_fz * mu_fz - fx_w * fx_w))
             fy_w = max(-lat_avail, min(lat_avail, fy_w))
-        # 轮系 → 车体系
+            mu_use = min(1.0, math.hypot(fx_w, fy_w) / max(mu_fz, 1.0))
+            slip_k = (vx - vwx) / max(vx, 0.5)
         return {"fx": fx_w * cd - fy_w * sd, "fy": fx_w * sd + fy_w * cd,
-                "alpha": alpha_deg, "toe": toe_deg, "cam": cam_deg, "fz": fz}
+                "alpha": math.degrees(alpha_st), "alpha_lat": math.degrees(ts.alpha_lat),
+                "toe": toe_deg, "cam": math.degrees(cam_deg), "fz": fz,
+                "mu_use": mu_use, "slip_k": slip_k}
 
-    # ── 状态导数（车体系牛顿-欧拉，平面） ───────────────────────────
     def derivs(self, s: np.ndarray, delta: float, throttle: float,
-               brake: float) -> tuple[np.ndarray, dict]:
+               brake: float, dt: float) -> tuple[np.ndarray, dict]:
         vx, vy, r = s[3], s[4], s[5]
-        fz = self.wheel_loads()
+        fz = self.wheel_loads(vx)
+        # ★ 侧倾/俯仰一阶滞后（显式增量而非准静态瞬时）
+        tr, tp = 0.18, 0.25
+        self.roll_deg += (self.roll_ss - self.roll_deg) * (dt / tr)
+        pitch_ss = math.degrees(math.atan2(self.prev_ax, G)) * 0.55
+        self.pitch_deg += (pitch_ss - self.pitch_deg) * (dt / tp)
         steer = self.steer_angles(delta)
         Fx = Fy = Mz = 0.0
         diag = {}
         for w in _WHEELS:
             lx, ly = self.pos[w]
-            vx_w = vx - r * ly                                  # 刚体轮心速度（车体系）
+            vx_w = vx - r * ly
             vy_w = vy + r * lx
             fw = self.wheel_force(w, vx_w, vy_w, steer.get(w, 0.0), fz[w],
-                                  throttle, brake)
+                                  throttle, brake, vx, dt)
             Fx += fw["fx"]
             Fy += fw["fy"]
             Mz += lx * fw["fy"] - ly * fw["fx"]
             diag[w] = fw
+        # ★ 气动阻力
+        _, _, f_drag = self.aero_forces(vx)
+        Fx -= f_drag * 1.0
         m = self.v.mass_kg
         ax = Fx / m + r * vy
         ay = Fy / m - r * vx
@@ -160,24 +208,23 @@ class VehiclePlanar:
 
     def step(self, s: np.ndarray, dt: float, delta: float, throttle: float,
              brake: float) -> tuple[np.ndarray, dict]:
-        # RK2 中点法
-        k1, diag = self.derivs(s, delta, throttle, brake)
+        k1, diag = self.derivs(s, delta, throttle, brake, dt)
         mid = s + 0.5 * dt * k1
         mid[3:] = np.clip(mid[3:], -90.0, 90.0)
-        k2, _ = self.derivs(mid, delta, throttle, brake)
+        k2, _ = self.derivs(mid, delta, throttle, brake, dt)
         s2 = s + dt * k2
         s2[3:] = np.clip(s2[3:], -90.0, 90.0)
-        # 世界系运动学：ψ̇ = r（z 上，右手：r>0 = 顺时针俯视 = 向右转）
         psi = s2[2]
         s2[0] += dt * (s2[3] * math.cos(psi) - s2[4] * math.sin(psi))
         s2[1] += dt * (s2[3] * math.sin(psi) + s2[4] * math.cos(psi))
         s2[2] += dt * s2[5]
         self.prev_ax = k2[3] - s2[5] * s2[4]
         self.prev_ay = k2[4] + s2[5] * s2[3]
+        self._t += dt
         return s2, diag
 
 
-# ── 纯追踪驾驶员 + 速度控制器 ─────────────────────────────────────
+# ── 纯追踪驾驶员 + ★PI 纵向 ─────────────────────────────────────
 
 def _closest_idx(track_xy: np.ndarray, p: np.ndarray, start: int) -> int:
     d = np.linalg.norm(track_xy[start:] - p, axis=1)
@@ -185,7 +232,6 @@ def _closest_idx(track_xy: np.ndarray, p: np.ndarray, start: int) -> int:
 
 
 def _lookahead_point(track_xy: np.ndarray, idx: int, ld: float) -> np.ndarray:
-    """沿折线从 idx 前进 ld 米的预视点。"""
     acc = 0.0
     p = track_xy[idx].copy()
     for k in range(idx, len(track_xy) - 1):
@@ -198,25 +244,31 @@ def _lookahead_point(track_xy: np.ndarray, idx: int, ld: float) -> np.ndarray:
     return track_xy[-1]
 
 
-def driver(track_xy: np.ndarray, state: np.ndarray, idx: int, v_target: float,
-           L: float, gain: float) -> tuple[float, float, float, int]:
-    x, y, psi, vx = state[0], state[1], state[2], state[3]
-    idx = _closest_idx(track_xy, np.array([x, y]), idx)
-    ld = float(np.clip(3.0 + gain * vx, 4.0, 18.0))
-    tgt = _lookahead_point(track_xy, idx, ld)
-    dx, dy = tgt[0] - x, tgt[1] - y
-    c, s = math.cos(psi), math.sin(psi)
-    lx = dx * c + dy * s                                        # 预视点车体系坐标
-    ly = -dx * s + dy * c
-    alpha_ld = math.atan2(ly, max(lx, 1.0))
-    delta = math.atan2(2.0 * L * math.sin(alpha_ld), ld)   # δ = atan(L/R_pp), R_pp = ld/(2sinα)
-    e = v_target - vx
-    throttle = float(np.clip(0.35 * e, 0.0, 1.0))
-    brake = float(np.clip(-0.25 * e - 0.1, 0.0, 1.0)) if e < -0.5 else 0.0
-    return delta, throttle, brake, idx
+class DriverPI:
+    """纯追踪转向 + 纵向 PI。内部状态：积分误差。"""
+    def __init__(self, kp_v=0.9, ki_v=0.12, gain=0.9):
+        self.kp_v = kp_v
+        self.ki_v = ki_v
+        self.gain = gain
+        self.e_int = 0.0
 
+    def __call__(self, track_xy, state, idx, v_target, L) -> tuple[float, float, float, int]:
+        x, y, psi, vx = state[0], state[1], state[2], state[3]
+        idx = _closest_idx(track_xy, np.array([x, y]), idx)
+        ld = float(np.clip(3.0 + self.gain * vx, 4.0, 18.0))
+        tgt = _lookahead_point(track_xy, idx, ld)
+        dx, dy = tgt[0] - x, tgt[1] - y
+        c, s = math.cos(psi), math.sin(psi)
+        lx = dx * c + dy * s
+        ly = -dx * s + dy * c
+        alpha_ld = math.atan2(ly, max(lx, 1.0))
+        delta = math.atan2(2.0 * L * math.sin(alpha_ld), ld)
+        e = v_target - vx
+        self.e_int = max(-2.0, min(2.0, self.e_int + e * 0.05))
+        throttle = float(np.clip(self.kp_v * e + self.ki_v * self.e_int, 0.0, 1.0))
+        brake = float(np.clip(-self.kp_v * e - 0.15, 0.0, 1.0)) if e < -0.5 else 0.0
+        return delta, throttle, brake, idx
 
-# ── 主入口（供 server 调用） ───────────────────────────────────────
 
 def run_track_sim(req: TrackSimRequest) -> dict:
     t0 = time.perf_counter()
@@ -225,11 +277,13 @@ def run_track_sim(req: TrackSimRequest) -> dict:
     tgt_speed = np.array([p.target_speed for p in req.track], float)
     L = v.wheelbase_mm / 1000.0
     iz = req.iz_kg_m2 or v.mass_kg * (L * L + 1.6 * 1.6) / 12.0
-    car = VehiclePlanar(v, req.tire, req.kc_luts, iz)
+    pt = req.powertrain.model_dump() if req.powertrain else {}
+    aero = req.aero.model_dump() if req.aero else {}
+    car = VehiclePlanar(v, req.tire, req.kc_luts, iz, pt, aero)
+    drv = DriverPI(gain=req.lookahead_gain)
 
     state = np.zeros(6)
     state[3] = req.start_speed
-    # 起始朝向沿第一段
     state[2] = math.atan2(track_xy[1, 1] - track_xy[0, 1], track_xy[1, 0] - track_xy[0, 0])
     state[0], state[1] = track_xy[0]
 
@@ -244,24 +298,27 @@ def run_track_sim(req: TrackSimRequest) -> dict:
     for k in range(n_steps):
         t = k * req.dt
         v_target = float(tgt_speed[min(idx, len(tgt_speed) - 1)])
-        delta, throttle, brake, idx = driver(track_xy, state, idx, v_target,
-                                             L, req.lookahead_gain)
+        delta, throttle, brake, idx = drv(track_xy, state, idx, v_target, L)
         if throttle < 0.02 and brake < 0.02 and abs(v_target - state[3]) > 0.5:
-            throttle = 0.05                                    # 防静止死锁的微油
+            throttle = 0.05
         state, diag = car.step(state, req.dt, delta, throttle, brake)
         max_ay = max(max_ay, abs(car.prev_ay))
         if k % keep == 0 or k == n_steps - 1:
             row = {"t": round(t, 4), "x": round(state[0], 3), "y": round(state[1], 3),
                    "psi": round(state[2], 4), "vx": round(state[3], 3),
                    "vy": round(state[4], 3), "r": round(state[5], 4),
-                   "roll": round(getattr(car, "roll_deg", 0.0), 3),
-                   "ay": round(car.prev_ay, 2), "delta": round(delta, 4),
+                   "roll": round(car.roll_deg, 3), "pitch": round(car.pitch_deg, 3),
+                   "ay": round(car.prev_ay, 2), "ax": round(car.prev_ax, 2),
+                   "delta": round(delta, 4),
                    "throttle": round(throttle, 2), "brake": round(brake, 2)}
             for w in _WHEELS:
                 row[f"alpha_{w}"] = round(diag[w]["alpha"], 3)
+                row[f"alphaL_{w}"] = round(diag[w]["alpha_lat"], 3)
                 row[f"fz_{w}"] = round(diag[w]["fz"], 1)
                 row[f"fy_{w}"] = round(diag[w]["fy"], 1)
                 row[f"fx_{w}"] = round(diag[w]["fx"], 1)
+                row[f"mu_{w}"] = round(diag[w]["mu_use"], 3)
+                row[f"cam_{w}"] = round(diag[w]["cam"], 2)
             ts.append(row.pop("t"))
             trace.append(row)
         if np.linalg.norm(state[:2] - track_xy[-1]) < 6.0 and idx >= len(track_xy) - 3:
@@ -273,6 +330,8 @@ def run_track_sim(req: TrackSimRequest) -> dict:
 
     xy = np.array([[p["x"], p["y"]] for p in trace]) if trace else np.zeros((1, 2))
     seg = np.linalg.norm(np.diff(xy, axis=0), axis=1).sum() if len(xy) > 1 else 0.0
+    npy = min(len(trace), 1200)
+    lats = [max(abs(float(t[f"alphaL_{w}"])) for w in _WHEELS) for t in trace[-npy:]]
     return {
         "status": "VALID" if np.isfinite(state).all() else "SOLVER_FAILED",
         "ms": (time.perf_counter() - t0) * 1000.0,
@@ -281,6 +340,8 @@ def run_track_sim(req: TrackSimRequest) -> dict:
         "summary": {"path_length_m": round(float(seg), 1),
                     "v_end": round(float(state[3]), 2),
                     "v_max": round(max((p["vx"] for p in trace), default=0.0), 2),
-                    "max_ay_g": round(max_ay / G, 3)},
+                    "max_ay_g": round(max_ay / G, 3),
+                    "max_slip_deg": round(max(lats, default=0.0), 2),
+                    "aero_n": round(sum(car.aero_forces(state[3])[:2]), 1)},
         "warnings": warnings,
     }
