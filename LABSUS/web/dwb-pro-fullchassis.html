@@ -3639,7 +3639,7 @@ function trackStageRun(){
     STAGE.res=res;STAGE.trace=res.trace;STAGE.req=body;
     STAGE.tMax=res.t[res.t.length-1]||1;
     console.log("STAGE-READY", document.getElementById("fcGrid")?"both":document.getElementById("stCams")?"part":"none", res.trace.length, res.summary.v_max, res.summary.max_ay_g);
-    STAGE.i=0;STAGE.playing=true;
+    STAGE.open=true;STAGE.i=0;STAGE.playing=true;
     document.getElementById("stageSetup").style.display="none";
     document.getElementById("stageWrap").style.display="block";
     _stageSize();_stageOpen();STAGE.last=performance.now();requestAnimationFrame(stageTick);
@@ -3677,10 +3677,16 @@ function stageCam(row){
   const k=0.22;
   v.eye=[v.eye[0]+(eye[0]-v.eye[0])*k,v.eye[1]+(eye[1]-v.eye[1])*k,v.eye[2]+(eye[2]-v.eye[2])*k];
   v.tgt=[v.tgt[0]+(tgt[0]-v.tgt[0])*k,v.tgt[1]+(tgt[1]-v.tgt[1])*k,v.tgt[2]+(tgt[2]-v.tgt[2])*k];
-  camIso(v);
+  // inline camera basis (camIso needs az/elv which stage-cam object lacks)
   v.dist=Math.max(2,Math.hypot(v.eye[0]-v.tgt[0],v.eye[1]-v.tgt[1],v.eye[2]-v.tgt[2]));
   v.s=Math.min(0.9, 140/v.dist);
-  camIso(v);
+  const fw=[v.tgt[0]-v.eye[0],v.tgt[1]-v.eye[1],v.tgt[2]-v.eye[2]];
+  const fl=Math.hypot(fw[0],fw[1],fw[2])||1;
+  v.fw=[fw[0]/fl,fw[1]/fl,fw[2]/fl];
+  let rt=[v.fw[1],-v.fw[0],0.0001];
+  const rl=Math.hypot(rt[0],rt[1])||1e-6;
+  v.rt=[rt[0]/rl,rt[1]/rl,0];
+  v.up=[v.rt[1]*v.fw[2]-v.rt[2]*v.fw[1], v.rt[2]*v.fw[0]-v.rt[0]*v.fw[2], v.rt[0]*v.fw[1]-v.rt[1]*v.fw[0]];
 }
 function stageTick(ts){
   if(!STAGE.open)return;
