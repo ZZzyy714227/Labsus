@@ -1,5 +1,17 @@
 # 开发日志
 
+## 2026-08-23 — feat(web)：gemini 全底盘建模完美移植 + 硬点永久保存 + 五系统分色（b777ab3）
+- 需求：用户交付 `C:/Users/zzy/Desktop/gemini-code-.html`（1719 行 DWB-SIM PRO 增量版）——"完美移植，点位移动后可永久保存，给各类系统管架设置默认颜色"。按 README 前端唯一开发文件约定，以 `web/dwb-pro-fullchassis.html`（2875 行）为主干，脚本化手术合并（非手工粘贴）。
+- 移植内容（程序化：抽段→改名命名空间→注入→wrapper→挂点）：
+  - **四大系统 3D 建模**：定形防撞区/乘员舱/主滚架桁架车架（FBH/IA/Front Hoop/RSB2/REF 固定 + 悬架舱过渡管件锚定硬点随动重构）；EDU 电驱+差速器箱体；半轴+三柱槽/Rzeppa CV 防尘套；中置蝴蝶方向盘+快拆+万向节管柱+齿轮齿条箱+防尘波纹管；双回路总泵+踏板平衡杆+液压硬管/软管；制动通风盘+径向卡钳+油管；轮端增强装配（胎面/轮毂/五辐条）。
+  - **紧凑宽体比例**：轴距 2750→1620mm、hcg 350→320、前 235/40R18·后 285/35R18 新 PRESETS（前端 JS 内核与新硬点收敛正常）。
+  - **五系统默认分色**：`SYSTEM_COLORS` 固定规范（不随主题）——车架钛灰/金橙节点、转向碳纤盘+阳极蓝快拆+阳极金万向节+银铬轴、传动深蓝 EDU+亮橙半轴、制动 Brembo 红+铸钢盘+金主缸、行驶薄荷青转向节+天蓝推拉杆+橙黄弹簧；`buildScene→buildScenePRO` wrapper（旧渲染函数保留死代码待清）。
+  - **硬点永久保存（新增功能）**：localStorage `labsus.hp.v1`——拖拽释放自动写盘、启动自动载入；面板新增 SAVE/RESET（恢复出厂预设）/EXPORT（JSON 下载）/IMPORT（JSON 上传）四按钮 + "系统显示·分色" 图例开关组（21 项）。
+- 验证：node --check 语法通过；serve_nocache :8921 + Edge headless 两次运行 **零 console 错误**，DOM 命中新面板/引擎"内置 JS"回退正常；截图 36,359 色非空白（渲染丰富）；持久化纯逻辑 Node 单测（保存→篡改→载入恢复 LCA_F/wb/LBJ ✓）。
+- 遗留：旧 addShared/drawSubframe/addInstance 死代码（后续清理轮）；kpsw/path 扫掠轨迹调试线未并入 PRO 装配（旧入口保留）；引擎侧 DEFAULT_DWB_POINTS 仍为旧比例（前端渲染/JS 内核已切换 1620 宽体——单点 K&C 引擎接入不受影响，整车 quasi payload 需前端侧同步 wb 后自然对齐）。
+
+# 开发日志
+
 ## 2026-08-22 — S3-2 前端闭环：赛道瞬态仿真接入（面板/数据桥/时间轴回放/遥测 HUD）
 - 交付（`LABSUS/web/dwb-pro-fullchassis.html`，+~330 行）：
   - **左面板「赛道瞬态仿真」**：预设（稳态定圆 R=30 / 蛇形绕桩 30m / Mini GP 短道 / 自定义 JSON·CSV 路点导入）、预瞄增益、初速、RUN / 播放·暂停 / 退出回放 / 导出 Telemetry CSV、进度条拖动（Scrubber）、0.5×/1×/2× 速率、空格快捷键；
