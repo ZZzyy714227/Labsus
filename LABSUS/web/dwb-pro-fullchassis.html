@@ -387,27 +387,28 @@ function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
 const PRESETS={
   "后悬架 (拉杆 Pullrod 架构)":{
     arch:"pullrod", hp:{
-      LCA_F:[230.0, 180.0, 125.0], LCA_R:[230.0, -170.0, 135.0], LBJ:  [720.0, 10.0, 145.0],
-      UCA_F:[340.0, 140.0, 360.0], UCA_R:[340.0, -140.0, 370.0], UBJ:  [660.0, -15.0, 435.0],
-      WC:   [790.0, 0.0, 330.0], TRO:  [670.0, -150.0, 185.0], RACK: [230.0, -160.0, 175.0],
-      STRUT_OUT:[645.0, -15.0, 425.0], RCK_AX_A: [377.0, 30.0, 318.9], RCK_AX_B: [376.7, 90.0, 320.1],
-      STRUT_IN: [414.7, 55.0, 282.5], RCK_DMP:  [337.8, 75.0, 297.6], DMP_BODY: [18.5, 78.4, 346.4]
-    }, strutOutAttach:"uca", tire:{R:330,W:305,rim:228.6,disc:185,label:"305/35R18 REAR"},
-    cam0:-1.5,toe0:0.10,mS:380,kS:130,kT:250,cB:9,cR:14,wb:2750,hcg:350,
-    arb:{d:18, dy:40, dz:110, t:0.55, G:79000}
+      LCA_F:[250.0, 140.0, 115.0], LCA_R:[250.0, -130.0, 125.0], LBJ:  [630.0, 10.0, 135.0],
+      UCA_F:[340.0, 110.0, 320.0], UCA_R:[340.0, -110.0, 330.0], UBJ:  [580.0, -15.0, 390.0],
+      WC:   [700.0, 0.0, 290.0],  TRO:  [590.0, -120.0, 170.0], RACK: [210.0, -130.0, 160.0],
+      STRUT_OUT:[570.0, -15.0, 380.0], RCK_AX_A: [340.0, 25.0, 290.0], RCK_AX_B: [340.0, 75.0, 292.0],
+      STRUT_IN: [370.0, 45.0, 255.0], RCK_DMP:  [305.0, 60.0, 270.0], DMP_BODY: [25.0, 62.0, 310.0]
+    }, strutOutAttach:"uca", tire:{R:310,W:285,rim:228.6,disc:175,label:"285/35R18 REAR"},
+    cam0:-1.5,toe0:0.10,mS:340,kS:130,kT:250,cB:9,cR:14,wb:1620,hcg:320,
+    arb:{d:18, dy:35, dz:95, t:0.55, G:79000}
   },
   "前悬架 (推杆 Pushrod 架构)":{
     arch:"pushrod", hp:{
-      LCA_F:[240.0, 180.0, 145.0], LCA_R:[240.0, -160.0, 155.0], LBJ:  [730.0, 10.0, 165.0],
-      UCA_F:[360.0, 140.0, 380.0], UCA_R:[360.0, -130.0, 390.0], UBJ:  [675.0, -15.0, 455.0],
-      WC:   [810.0, 0.0, 320.0], TRO:  [685.0, -145.0, 205.0], RACK: [269.2, -165.0, 198.1],
-      STRUT_OUT:[683.4, 12.0, 205.5], RCK_AX_A: [305.3, 20.0, 366.4], RCK_AX_B: [306.1, 90.0, 365.0],
-      STRUT_IN: [324.4, 57.9, 445.6], RCK_DMP:  [234.8, 60.0, 385.0], DMP_BODY: [29.3, 60.1, 181.1]
-    }, strutOutAttach:"lca", tire:{R:325,W:245,rim:228.6,disc:180,label:"245/40R18 FRONT"},
-    cam0:-1.2,toe0:0.05,mS:330,kS:110,kT:220,cB:8,cR:12,wb:2750,hcg:380,
-    arb:{d:22, dy:50, dz:120, t:0.62, G:79000}
+      LCA_F:[260.0, 140.0, 130.0], LCA_R:[260.0, -120.0, 140.0], LBJ:  [640.0, 10.0, 150.0],
+      UCA_F:[350.0, 110.0, 340.0], UCA_R:[350.0, -100.0, 350.0], UBJ:  [590.0, -15.0, 410.0],
+      WC:   [710.0, 0.0, 280.0],  TRO:  [600.0, -120.0, 185.0], RACK: [220.0, -135.0, 180.0],
+      STRUT_OUT:[595.0, 10.0, 185.0], RCK_AX_A: [300.0, 15.0, 330.0], RCK_AX_B: [300.0, 70.0, 328.0],
+      STRUT_IN: [315.0, 45.0, 400.0], RCK_DMP:  [230.0, 48.0, 345.0], DMP_BODY: [30.0, 48.0, 170.0]
+    }, strutOutAttach:"lca", tire:{R:305,W:235,rim:228.6,disc:170,label:"235/40R18 FRONT"},
+    cam0:-1.2,toe0:0.05,mS:300,kS:110,kT:220,cB:8,cR:12,wb:1620,hcg:320,
+    arb:{d:20, dy:40, dz:100, t:0.62, G:79000}
   }
 };
+
 
 const HP_META=[
   ["LCA_F","下摆臂前铰点","LWR ARM FRT PIVOT","chassis",1,0],
@@ -431,7 +432,7 @@ const HP_META=[
 const S={
   axis: "front", front: null, rear: null,
   mode:"kin", // 'kin' | 'rig' | 'quasi'
-  play:true, travel:0, roll:0, rack:0,
+  play:true, travel:0, roll:0, rack:0, swAngle:0, driveTorque:250, brakePedal:35,
   exc:"sine", excA:50, excF:0.25, steerExc:"off", stA:40, stF:0.12,
   bsU:70, bsD:75, kBS:1000,
   road:"none", rA:15, rF:2.0, wb:2750, hcg:350, hs:370, brkF:0.60,
@@ -452,7 +453,8 @@ const S={
   hasBaseline: false,
 
   show:{node:1,label:1,rigid:1,elastic:1,face:1,wheel:1,disc:1,chassis:1,steer:1,ground:1,
-        dim:1,kp:1,kpsw:1,path:1,ic:1,force:0,mirror:1,axis:1,tirefill:0,arb:1,rocker:1},
+        dim:1,kp:1,kpsw:1,path:1,ic:1,force:0,mirror:1,axis:1,tirefill:0,arb:1,rocker:1,
+        frame_main:1,frame_front:1,frame_side:1,frame_rear:1,powertrain:1,halfshaft:1,cv_boot:1,disc_vent:1,caliper:1,brake_hyd:1,master_cyl:1,steer_rack:1,steer_col:1,steer_wheel:1},
   t:0, simT:0, dyn:{on:false,z:0,v:0,load:0,fs:0,fd:0,pen:0,acc:0}
 };
 
@@ -1220,16 +1222,599 @@ function springPts(a,b,r,turns,seg){
   pts.push(b); return pts;
 }
 
-function buildScene(){
-  const sc=[]; addShared(sc);
+const SYSTEM_COLORS={
+  bg:"#05070a",grid:"#12161c",grid2:"#1a212a",axis:"#242d38",
+  frameMain:"#7a8d9f", frameSec:"#4d5e6e", frameDiag:"#3b4855", frameNode:"#e0a040",
+  swRim:"#23282f", swGrip:"#181b20", swHubBlue:"#0099ff", swHubPlate:"#2fa9d6",
+  colShaft:"#c8d2dc", uJointGold:"#f1c40f", rackBody:"#3e4751", rackClevis:"#5a6775",
+  tie:"#43c9c0", bellows:"#15191d",
+  rig:"#808e9d", rigArm:"#98abbd", arm:"rgba(140,165,190,0.06)",
+  strut:"#2fa9d6", rocker:"#d9a238", rockerF:"rgba(217,162,56,0.25)",
+  spring:"#f39c12", damper:"#5c6b77",
+  knu:"#36bca8", knuF:"rgba(54,188,168,0.10)",
+  tire:"#404852", tread:"#22272e", rim:"#6d7987", kp:"#e0603f",
+  motor:"#22425d", motorBody:"#15293a", diff:"#3c566e", shaft:"#e67e22", cvBoot:"#15191d",
+  caliper:"#d24d3e", caliperPin:"#e67e22", disc:"#95a5a6", discSlot:"#3b464f",
+  masterCyl:"#d9a238", brakeLine:"#b0bcc6", hose:"#1b1f23"
+};
+
+function circPts(c,ax,r,n,e1,e2){
+  const u=e1||perpOf(ax),v=e2||cross(nrm(ax),u),o=[];
+  for(let k=0;k<=n;k++){const a=2*PI*k/n;o.push(add(c,add(mul(u,r*cos(a)),mul(v,r*sin(a)))));}
+  return o;
+}
+function cylinder(sc,a,b,r,col,w,nseg,fillCol){
+  const ax=nrm(sub(b,a)),u=perpOf(ax),v=cross(ax,u);
+  const cA=circPts(a,ax,r,nseg||14,u,v), cB=circPts(b,ax,r,nseg||14,u,v);
+  PL(sc,cA,col,w||1,null,fillCol); PL(sc,cB,col,w||1,null,fillCol);
+  for(let k=0;k<4;k++){const an=PI/4+k*PI/2;
+    const o=add(mul(u,r*cos(an)),mul(v,r*sin(an)));
+    L3(sc,add(a,o),add(b,o),col,w||1);}
+}
+function box3D(sc,c,sz,col,w,fillCol){
+  const hx=sz[0]/2, hy=sz[1]/2, hz=sz[2]/2;
+  const P=[
+    add(c,[-hx,-hy,-hz]), add(c,[hx,-hy,-hz]), add(c,[hx,hy,-hz]), add(c,[-hx,hy,-hz]),
+    add(c,[-hx,-hy, hz]), add(c,[hx,-hy, hz]), add(c,[hx,hy, hz]), add(c,[-hx,hy, hz])
+  ];
+  const E=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+  E.forEach(e=>L3(sc,P[e[0]],P[e[1]],col,w||1));
+  if(fillCol){
+    PL(sc,[P[0],P[1],P[2],P[3],P[0]],col,1,null,fillCol);
+    PL(sc,[P[4],P[5],P[6],P[7],P[4]],col,1,null,fillCol);
+  }
+}
+function springPts(a,b,r,turns,seg){
+  const d=sub(b,a),L=len(d)||1,u=mul(d,1/L);
+  let ref=[0,1,0]; if(abs(dot(ref,u))>0.9)ref=[1,0,0];
+  const e1=nrm(sub(ref,mul(u,dot(ref,u)))),e2=cross(u,e1);
+  const pts=[a]; const t0=0.08,t1=0.92;
+  for(let k=0;k<=seg;k++){
+    const t=t0+(t1-t0)*k/seg,an=2*PI*turns*(k/seg);
+    pts.push(add(add(a,mul(u,L*t)),add(mul(e1,r*cos(an)),mul(e2,r*sin(an)))));
+  }
+  pts.push(b); return pts;
+}
+function bellows3D(sc,a,b,rMin,rMax,folds,col){
+  const d=sub(b,a), L=len(d)||1, u=mul(d,1/L);
+  const u1=perpOf(u), u2=cross(u,u1);
+  const total = folds*2;
+  for(let i=0;i<total;i++){
+    const t=i/total, p=add(a,mul(u,L*t));
+    const r = (i%2===0)?rMax:rMin;
+    PL(sc,circPts(p,u,r,12,u1,u2),col,1);
+    if(i>0){
+      const pPrev=add(a,mul(u,L*(i-1)/total)), rPrev=(i%2===1)?rMax:rMin;
+      L3(sc,add(pPrev,mul(u1,rPrev)),add(p,mul(u1,r)),col,1);
+      L3(sc,add(pPrev,mul(u1,-rPrev)),add(p,mul(u1,-r)),col,1);
+    }
+  }
+}
+function arcTube(sc, pts, r, col, w){
+  for(let i=0; i<pts.length-1; i++){
+    cylinder(sc, pts[i], pts[i+1], r, col, w||1.2, 10);
+  }
+}
+
+/* ================================ 5. 定形防撞区与自适应悬架舱总装 ================================ */
+function buildScenePRO(){
+  const sc=[];
   const yF = S.wb/2, yR = -S.wb/2;
-  addInstance(sc, SIM.FR, SIM.mFR, SIM.swF, 1, yF, 'front');
-  addInstance(sc, SIM.RR, SIM.mRR, SIM.swR, 1, yR, 'rear');
+
+  // 1. 定形乘员舱/前后定形防撞区 + 悬架动联过渡舱
+  buildDecoupledImpactSpaceframe(sc, yF, yR);
+
+  // 2. 传动系：EDU 电驱动总成与差速器
+  if(S.show.powertrain) buildPowertrainEDU(sc, yF, yR);
+
+  // 3. 转向系：中置单座方程式转向总成
+  if(S.show.steer_col) buildFormulaCentralSteering(sc, yF);
+
+  // 4. 制动系：中置双回路主缸与踏板
+  if(S.show.master_cyl) buildBrakeHydraulicSystem(sc, yF, yR);
+
+  // 5. 悬架与车轮端各系统实例装配
+  addAxleAssemblyPRO(sc, SIM.FR, SIM.mFR, 1, yF, 'front');
+  addAxleAssemblyPRO(sc, SIM.RR, SIM.mRR, 1, yR, 'rear');
   if(S.show.mirror){
-    addInstance(sc, SIM.FL, SIM.mFL, SIM.swF, -1, yF, 'front');
-    addInstance(sc, SIM.RL, SIM.mRL, SIM.swR, -1, yR, 'rear');
+    addAxleAssemblyPRO(sc, SIM.FL, SIM.mFL, -1, yF, 'front');
+    addAxleAssemblyPRO(sc, SIM.RL, SIM.mRL, -1, yR, 'rear');
   }
   return sc;
+}
+
+/* 核心车架建模：前后防撞吸能区与乘员舱完全定形，仅悬架舱过渡管件随硬点自适应 */
+function buildDecoupledImpactSpaceframe(sc, yF, yR){
+  const hF = S.front.hp, hR = S.rear.hp;
+
+  const T = (a, b, r, col) => cylinder(sc, a, b, r||13, col||SYSTEM_COLORS.frameMain, 1.2, 10);
+  const D = (a, b, r, col) => cylinder(sc, a, b, r||10, col||SYSTEM_COLORS.frameDiag, 1.1, 8);
+
+  // =========================================================================
+  // 1. 前防撞区与前隔框 (Decoupled & Fixed Front Impact Cell)
+  // 尺寸与位置绝对固定，完全解耦，不随任何悬架硬点改变！
+  // =========================================================================
+  const FBH_Y = yF + 270;
+  const FBH_W_Top = 155;
+  const FBH_W_Bot = 170;
+  const FBH_Z_Top = 310;
+  const FBH_Z_Bot = 95;
+
+  const FBH_TL = [-FBH_W_Top, FBH_Y, FBH_Z_Top], FBH_TR = [FBH_W_Top, FBH_Y, FBH_Z_Top];
+  const FBH_BL = [-FBH_W_Bot, FBH_Y, FBH_Z_Bot], FBH_BR = [FBH_W_Bot, FBH_Y, FBH_Z_Bot];
+
+  const IA_Y = FBH_Y + 140;
+  const IA_W_Top = 110, IA_W_Bot = 120;
+  const IA_Z_Top = 270, IA_Z_Bot = 115;
+  const IA_TL = [-IA_W_Top, IA_Y, IA_Z_Top], IA_TR = [IA_W_Top, IA_Y, IA_Z_Top];
+  const IA_BL = [-IA_W_Bot, IA_Y, IA_Z_Bot], IA_BR = [IA_W_Bot, IA_Y, IA_Z_Bot];
+
+  if(S.show.frame_front){
+    // 前隔框闭合主框架
+    T(FBH_TL, FBH_TR, 14); T(FBH_BL, FBH_BR, 14);
+    T(FBH_TL, FBH_BL, 14); T(FBH_TR, FBH_BR, 14);
+    D(FBH_TL, FBH_BR, 10);
+
+    // 吸能盒框架
+    T(IA_TL, IA_TR, 8, SYSTEM_COLORS.frameSec); T(IA_BL, IA_BR, 8, SYSTEM_COLORS.frameSec);
+    T(IA_TL, IA_BL, 8, SYSTEM_COLORS.frameSec); T(IA_TR, IA_BR, 8, SYSTEM_COLORS.frameSec);
+    T(FBH_TL, IA_TL, 8, SYSTEM_COLORS.frameSec); T(FBH_TR, IA_TR, 8, SYSTEM_COLORS.frameSec);
+    T(FBH_BL, IA_BL, 8, SYSTEM_COLORS.frameSec); T(FBH_BR, IA_BR, 8, SYSTEM_COLORS.frameSec);
+  }
+
+  // =========================================================================
+  // 2. 定形独立乘员舱 (Fixed Cockpit Cell - 侧向高度提升 10%)
+  // =========================================================================
+  const FH_Y = yF - 260;
+  const FH_Z_Top = 640;
+  const FH_Z_Mid = 400;
+  const FH_Z_Bot = 80;
+  const FH_W = 260;
+
+  const FH_TopL = [-190, FH_Y, FH_Z_Top], FH_TopR = [190, FH_Y, FH_Z_Top];
+  const FH_ML   = [-FH_W, FH_Y, FH_Z_Mid], FH_MR   = [FH_W, FH_Y, FH_Z_Mid];
+  const FH_BL   = [-FH_W, FH_Y, FH_Z_Bot], FH_BR   = [FH_W, FH_Y, FH_Z_Bot];
+
+  const CC_Y = (yF + yR)/2 + 50;
+  const CC_Z_Top = 420;
+  const CC_Z_Bot = 75;
+  const CC_W = 320;
+
+  const CC_TL = [-CC_W, CC_Y, CC_Z_Top], CC_TR = [CC_W, CC_Y, CC_Z_Top];
+  const CC_BL = [-CC_W, CC_Y, CC_Z_Bot], CC_BR = [CC_W, CC_Y, CC_Z_Bot];
+
+  const MH_Y = yR + 580;
+  const MH_Z_Apex = 1200;
+  const MH_Z_Top = 1140;
+  const MH_Z_Mid = 440;
+  const MH_Z_Bot = 70;
+  const MH_W = 340;
+
+  const MH_Apex = [0, MH_Y, MH_Z_Apex];
+  const MH_TopL = [-180, MH_Y, MH_Z_Top], MH_TopR = [180, MH_Y, MH_Z_Top];
+  const MH_ML   = [-MH_W, MH_Y, MH_Z_Mid], MH_MR   = [MH_W, MH_Y, MH_Z_Mid];
+  const MH_BL   = [-MH_W, MH_Y, MH_Z_Bot], MH_BR   = [MH_W, MH_Y, MH_Z_Bot];
+
+  if(S.show.frame_front){
+    arcTube(sc, [FH_BL, FH_ML, FH_TopL, FH_TopR, FH_MR, FH_BR], 15, SYSTEM_COLORS.frameMain);
+    T(FH_BL, FH_BR, 15);
+    T(FH_ML, FH_MR, 12, SYSTEM_COLORS.frameSec);
+  }
+
+  if(S.show.frame_side){
+    T(FH_ML, CC_TL, 14); T(FH_MR, CC_TR, 14);
+    T(CC_TL, MH_ML, 14); T(CC_TR, MH_MR, 14);
+    T(FH_BL, CC_BL, 15); T(FH_BR, CC_BR, 15);
+    T(CC_BL, MH_BL, 15); T(CC_BR, MH_BR, 15);
+
+    D(FH_ML, CC_BL, 12); D(FH_MR, CC_BR, 12);
+    D(FH_BL, CC_TL, 12); D(FH_BR, CC_TR, 12);
+    D(CC_TL, MH_BL, 12); D(CC_TR, MH_BR, 12);
+    D(CC_BL, MH_ML, 12); D(CC_BR, MH_MR, 12);
+    T(CC_TL, CC_BL, 12); T(CC_TR, CC_BR, 12);
+
+    T(CC_BL, CC_BR, 14); T(MH_BL, MH_BR, 15);
+    D(FH_BL, CC_BR, 11); D(FH_BR, CC_BL, 11);
+    D(CC_BL, MH_BR, 11); D(CC_BR, MH_BL, 11);
+  }
+
+  if(S.show.frame_main){
+    arcTube(sc, [MH_BL, MH_ML, MH_TopL, MH_Apex, MH_TopR, MH_MR, MH_BR], 18, SYSTEM_COLORS.frameMain);
+    T(MH_ML, MH_MR, 14, SYSTEM_COLORS.frameSec);
+    D(MH_ML, MH_BR, 12); D(MH_MR, MH_BL, 12);
+  }
+
+  // =========================================================================
+  // 3. 后防撞尾框 (Decoupled & Fixed Rear Impact Structure) - 完全固定
+  // =========================================================================
+  const RSB2_Y = yR - 180;
+  const RSB2_W_Top = 160, RSB2_W_Bot = 175;
+  const RSB2_Z_Top = 320, RSB2_Z_Bot = 90;
+  const RSB2_TL = [-RSB2_W_Top, RSB2_Y, RSB2_Z_Top], RSB2_TR = [RSB2_W_Top, RSB2_Y, RSB2_Z_Top];
+  const RSB2_BL = [-RSB2_W_Bot, RSB2_Y, RSB2_Z_Bot], RSB2_BR = [RSB2_W_Bot, RSB2_Y, RSB2_Z_Bot];
+
+  const REF_Y = RSB2_Y - 130;
+  const REF_W_Top = 110, REF_W_Bot = 120;
+  const REF_Z_Top = 280, REF_Z_Bot = 115;
+  const REF_TL = [-REF_W_Top, REF_Y, REF_Z_Top], REF_TR = [REF_W_Top, REF_Y, REF_Z_Top];
+  const REF_BL = [-REF_W_Bot, REF_Y, REF_Z_Bot], REF_BR = [REF_W_Bot, REF_Y, REF_Z_Bot];
+
+  if(S.show.frame_rear){
+    T(RSB2_TL, RSB2_TR, 13); T(RSB2_BL, RSB2_BR, 14);
+    T(RSB2_TL, RSB2_BL, 13); T(RSB2_TR, RSB2_BR, 13);
+    D(RSB2_TL, RSB2_BR, 10);
+
+    T(REF_TL, REF_TR, 10); T(REF_BL, REF_BR, 10);
+    T(REF_TL, REF_BL, 10); T(REF_TR, REF_BR, 10);
+    T(RSB2_TL, REF_TL, 10); T(RSB2_TR, REF_TR, 10);
+    T(RSB2_BL, REF_BL, 10); T(RSB2_BR, REF_BR, 10);
+    D(RSB2_TL, REF_BL, 9); D(RSB2_TR, REF_BR, 9);
+  }
+
+  // =========================================================================
+  // 4. 自适应前后悬架承力舱 (Adaptive Suspension Bays - 动态吸纳硬点变动)
+  // =========================================================================
+  const R_LCA_F = [hF.LCA_F[0], hF.LCA_F[1] + yF, hF.LCA_F[2]];
+  const L_LCA_F = [-hF.LCA_F[0], hF.LCA_F[1] + yF, hF.LCA_F[2]];
+  const R_LCA_R = [hF.LCA_R[0], hF.LCA_R[1] + yF, hF.LCA_R[2]];
+  const L_LCA_R = [-hF.LCA_R[0], hF.LCA_R[1] + yF, hF.LCA_R[2]];
+
+  const R_UCA_F = [hF.UCA_F[0], hF.UCA_F[1] + yF, hF.UCA_F[2]];
+  const L_UCA_F = [-hF.UCA_F[0], hF.UCA_F[1] + yF, hF.UCA_F[2]];
+  const R_UCA_R = [hF.UCA_R[0], hF.UCA_R[1] + yF, hF.UCA_R[2]];
+  const L_UCA_R = [-hF.UCA_R[0], hF.UCA_R[1] + yF, hF.UCA_R[2]];
+
+  const R_RCK_A = [hF.RCK_AX_A[0], hF.RCK_AX_A[1] + yF, hF.RCK_AX_A[2]];
+  const L_RCK_A = [-hF.RCK_AX_A[0], hF.RCK_AX_A[1] + yF, hF.RCK_AX_A[2]];
+  const R_RCK_B = [hF.RCK_AX_B[0], hF.RCK_AX_B[1] + yF, hF.RCK_AX_B[2]];
+  const L_RCK_B = [-hF.RCK_AX_B[0], hF.RCK_AX_B[1] + yF, hF.RCK_AX_B[2]];
+
+  const R_DMP_B = [hF.DMP_BODY[0], hF.DMP_BODY[1] + yF, hF.DMP_BODY[2]];
+  const L_DMP_B = [-hF.DMP_BODY[0], hF.DMP_BODY[1] + yF, hF.DMP_BODY[2]];
+
+  if(S.show.frame_front){
+    // 过渡管件：定形前隔框(FBH) ──> 动联前悬架硬点(UCA_F / LCA_F)
+    T(FBH_TL, L_UCA_F, 13); T(FBH_TR, R_UCA_F, 13);
+    T(FBH_BL, L_LCA_F, 14); T(FBH_BR, R_LCA_F, 14);
+    D(FBH_TL, L_LCA_F, 11); D(FBH_TR, R_LCA_F, 11);
+    D(FBH_BL, L_UCA_F, 11); D(FBH_BR, R_UCA_F, 11);
+
+    // 前悬架舱内侧自适应刚性结构
+    T(L_UCA_F, L_UCA_R, 13); T(R_UCA_F, R_UCA_R, 13);
+    T(L_LCA_F, L_LCA_R, 14); T(R_LCA_F, R_LCA_R, 14);
+    T(L_UCA_F, L_LCA_F, 12); T(R_UCA_F, R_LCA_F, 12);
+    T(L_UCA_R, L_LCA_R, 12); T(R_UCA_R, R_LCA_R, 12);
+    D(L_UCA_F, L_LCA_R, 11); D(R_UCA_F, R_LCA_R, 11);
+    D(L_LCA_F, L_UCA_R, 11); D(R_LCA_F, R_UCA_R, 11);
+    T(L_LCA_F, R_LCA_F, 13); T(L_LCA_R, R_LCA_R, 13);
+    D(L_LCA_F, R_LCA_R, 11); D(R_LCA_F, L_LCA_R, 11);
+
+    // 摇臂轴承座与推杆避震安装塔架
+    T(L_UCA_F, L_RCK_A, 11, SYSTEM_COLORS.frameSec); T(R_UCA_F, R_RCK_A, 11, SYSTEM_COLORS.frameSec);
+    T(L_UCA_R, L_RCK_B, 11, SYSTEM_COLORS.frameSec); T(R_UCA_R, R_RCK_B, 11, SYSTEM_COLORS.frameSec);
+    T(L_RCK_A, L_RCK_B, 12, SYSTEM_COLORS.frameSec); T(R_RCK_A, R_RCK_B, 12, SYSTEM_COLORS.frameSec);
+    T(L_RCK_A, R_RCK_A, 10, SYSTEM_COLORS.frameSec);
+    T(L_DMP_B, [0, L_DMP_B[1], L_DMP_B[2]-40], 11, SYSTEM_COLORS.frameSec);
+    T(R_DMP_B, [0, R_DMP_B[1], R_DMP_B[2]-40], 11, SYSTEM_COLORS.frameSec);
+
+    // 过渡管件：动联前悬架后硬点(UCA_R / LCA_R) ──> 定形前防滚架(FH)
+    T(L_UCA_R, FH_ML, 14); T(R_UCA_R, FH_MR, 14);
+    T(L_LCA_R, FH_BL, 15); T(R_LCA_R, FH_BR, 15);
+    D(L_UCA_R, FH_BL, 11); D(R_UCA_R, FH_BR, 11);
+    D(L_LCA_R, FH_ML, 11); D(R_LCA_R, FH_MR, 11);
+    D(L_UCA_F, FH_TopL, 11); D(R_UCA_F, FH_TopR, 11);
+  }
+
+  // 后悬架承力舱
+  const R_RLCA_F = [hR.LCA_F[0], hR.LCA_F[1] + yR, hR.LCA_F[2]];
+  const L_RLCA_F = [-hR.LCA_F[0], hR.LCA_F[1] + yR, hR.LCA_F[2]];
+  const R_RLCA_R = [hR.LCA_R[0], hR.LCA_R[1] + yR, hR.LCA_R[2]];
+  const L_RLCA_R = [-hR.LCA_R[0], hR.LCA_R[1] + yR, hR.LCA_R[2]];
+
+  const R_RUCA_F = [hR.UCA_F[0], hR.UCA_F[1] + yR, hR.UCA_F[2]];
+  const L_RUCA_F = [-hR.UCA_F[0], hR.UCA_F[1] + yR, hR.UCA_F[2]];
+  const R_RUCA_R = [hR.UCA_R[0], hR.UCA_R[1] + yR, hR.UCA_R[2]];
+  const L_RUCA_R = [-hR.UCA_R[0], hR.UCA_R[1] + yR, hR.UCA_R[2]];
+
+  const R_RRCK_A = [hR.RCK_AX_A[0], hR.RCK_AX_A[1] + yR, hR.RCK_AX_A[2]];
+  const L_RRCK_A = [-hR.RCK_AX_A[0], hR.RCK_AX_A[1] + yR, hR.RCK_AX_A[2]];
+  const R_RRCK_B = [hR.RCK_AX_B[0], hR.RCK_AX_B[1] + yR, hR.RCK_AX_B[2]];
+  const L_RRCK_B = [-hR.RCK_AX_B[0], hR.RCK_AX_B[1] + yR, hR.RCK_AX_B[2]];
+
+  const R_RDMP_B = [hR.DMP_BODY[0], hR.DMP_BODY[1] + yR, hR.DMP_BODY[2]];
+  const L_RDMP_B = [-hR.DMP_BODY[0], hR.DMP_BODY[1] + yR, hR.DMP_BODY[2]];
+
+  if(S.show.frame_rear){
+    // 过渡管件：定形主防滚架(MH) ──> 动联后悬架前硬点
+    T(MH_TopL, L_RUCA_F, 16, SYSTEM_COLORS.frameMain);
+    T(MH_TopR, R_RUCA_F, 16, SYSTEM_COLORS.frameMain);
+    T(MH_ML, L_RUCA_F, 14); T(MH_MR, R_RUCA_F, 14);
+    T(MH_BL, L_RLCA_F, 15); T(MH_BR, R_RLCA_F, 15);
+    D(MH_ML, L_RLCA_F, 12); D(MH_MR, R_RLCA_F, 12);
+    D(MH_BL, L_RUCA_F, 12); D(MH_BR, R_RUCA_F, 12);
+
+    // 后悬架舱内部管架结构
+    T(L_RUCA_F, L_RUCA_R, 14); T(R_RUCA_F, R_RUCA_R, 14);
+    T(L_RLCA_F, L_RLCA_R, 15); T(R_RLCA_F, R_RLCA_R, 15);
+    T(L_RUCA_F, L_RLCA_F, 13); T(R_RUCA_F, R_RLCA_F, 13);
+    T(L_RUCA_R, L_RLCA_R, 13); T(R_RUCA_R, R_RLCA_R, 13);
+    D(L_RUCA_F, L_RLCA_R, 12); D(R_RUCA_F, R_RLCA_R, 12);
+    D(L_RLCA_F, L_RUCA_R, 12); D(R_RLCA_F, R_RUCA_R, 12);
+    T(L_RLCA_F, R_RLCA_F, 14); T(L_RLCA_R, R_RLCA_R, 14);
+    D(L_RLCA_F, R_RLCA_R, 12); D(R_RLCA_F, L_RLCA_R, 12);
+
+    // 后摇臂与拉杆避震安装塔架
+    T(L_RUCA_F, L_RRCK_A, 11, SYSTEM_COLORS.frameSec); T(R_RUCA_F, R_RRCK_A, 11, SYSTEM_COLORS.frameSec);
+    T(L_RUCA_R, L_RRCK_B, 11, SYSTEM_COLORS.frameSec); T(R_RUCA_R, R_RRCK_B, 11, SYSTEM_COLORS.frameSec);
+    T(L_RRCK_A, L_RRCK_B, 12, SYSTEM_COLORS.frameSec); T(R_RRCK_A, R_RRCK_B, 12, SYSTEM_COLORS.frameSec);
+    T(L_RRCK_A, R_RRCK_A, 10, SYSTEM_COLORS.frameSec);
+    T(L_RDMP_B, [0, L_RDMP_B[1], L_RDMP_B[2]+30], 11, SYSTEM_COLORS.frameSec);
+    T(R_RDMP_B, [0, R_RDMP_B[1], R_RDMP_B[2]+30], 11, SYSTEM_COLORS.frameSec);
+
+    // 过渡管件：动联后悬架后硬点 ──> 定形后隔框(RSB2)
+    T(L_RUCA_R, RSB2_TL, 13); T(R_RUCA_R, RSB2_TR, 13);
+    T(L_RLCA_R, RSB2_BL, 14); T(R_RLCA_R, RSB2_BR, 14);
+    D(L_RUCA_R, RSB2_BL, 11); D(R_RUCA_R, RSB2_BR, 11);
+    D(L_RLCA_R, RSB2_TL, 11); D(R_RLCA_R, RSB2_TR, 11);
+  }
+
+  // 悬架硬点金属安装支耳
+  if(S.show.bushing){
+    const renderNodeTabs = (nodes) => {
+      nodes.forEach(pt => {
+        cylinder(sc, sub(pt,[12,0,0]), add(pt,[12,0,0]), 16, SYSTEM_COLORS.frameNode, 1.2, 10, "rgba(224,160,64,0.45)");
+      });
+    };
+    renderNodeTabs([R_LCA_F, L_LCA_F, R_LCA_R, L_LCA_R, R_UCA_F, L_UCA_F, R_UCA_R, L_UCA_R]);
+    renderNodeTabs([R_RLCA_F, L_RLCA_F, R_RLCA_R, L_RLCA_R, R_RUCA_F, L_RUCA_F, R_RUCA_R, L_RUCA_R]);
+  }
+}
+
+/* 2. 传动系：EDU 电驱动单元与差速器几何 */
+function buildPowertrainEDU(sc, yF, yR){
+  box3D(sc, [0, yF-30, 250], [220, 170, 150], SYSTEM_COLORS.motor, 1.3, SYSTEM_COLORS.motorBody);
+  cylinder(sc, [-110, yF-30, 250], [110, yF-30, 250], 75, SYSTEM_COLORS.motor, 1.2, 14);
+  cylinder(sc, [-140, yF, 260], [-110, yF, 260], 40, SYSTEM_COLORS.diff, 1.2, 12);
+  cylinder(sc, [110, yF, 260], [140, yF, 260], 40, SYSTEM_COLORS.diff, 1.2, 12);
+
+  box3D(sc, [0, yR+60, 250], [250, 200, 170], SYSTEM_COLORS.motor, 1.3, SYSTEM_COLORS.motorBody);
+  cylinder(sc, [-120, yR+60, 250], [120, yR+60, 250], 85, SYSTEM_COLORS.motor, 1.2, 16);
+  box3D(sc, [0, yR+130, 320], [200, 130, 70], SYSTEM_COLORS.motor, 1, "rgba(25,45,65,0.6)");
+  cylinder(sc, [-150, yR, 260], [-120, yR, 260], 44, SYSTEM_COLORS.diff, 1.2, 12);
+  cylinder(sc, [120, yR, 260], [150, yR, 260], 44, SYSTEM_COLORS.diff, 1.2, 12);
+}
+
+/* 3. 转向系：单座方程式中置横向蝴蝶方向盘与转向管柱 */
+function buildFormulaCentralSteering(sc, yF){
+  const swAngle = S.swAngle * D2R;
+  const rackY = S.front.hp.RACK[1] + yF;
+  const rackZ = S.front.hp.RACK[2];
+
+  if(S.show.steer_rack){
+    cylinder(sc, [-160, rackY, rackZ], [160, rackY, rackZ], 18, SYSTEM_COLORS.rackBody, 1.3, 14, "rgba(45,55,65,0.7)");
+    cylinder(sc, [0, rackY, rackZ], [0, rackY + 25, rackZ + 45], 22, SYSTEM_COLORS.rackBody, 1.3, 12, "rgba(60,70,80,0.8)");
+    box3D(sc, [-130, rackY, rackZ], [35, 45, 40], SYSTEM_COLORS.rackClevis, 1.2, "rgba(90,105,120,0.5)");
+    box3D(sc, [130, rackY, rackZ], [35, 45, 40], SYSTEM_COLORS.rackClevis, 1.2, "rgba(90,105,120,0.5)");
+    bellows3D(sc, [-160, rackY, rackZ], [-S.front.hp.RACK[0]-S.rack, rackY, rackZ], 12, 19, 5, SYSTEM_COLORS.bellows);
+    bellows3D(sc, [160, rackY, rackZ], [S.front.hp.RACK[0]-S.rack, rackY, rackZ], 12, 19, 5, SYSTEM_COLORS.bellows);
+  }
+
+  const pPinionTop = [0, rackY + 25, rackZ + 45];
+  const pUJoint = [0, yF - 260, rackZ + 200];
+  const pWheelCenter = [0, yF - 460, rackZ + 360];
+
+  cylinder(sc, pPinionTop, pUJoint, 11, SYSTEM_COLORS.colShaft, 1.3, 10);
+  box3D(sc, pUJoint, [22, 22, 22], SYSTEM_COLORS.uJointGold, 1.5, "rgba(241,196,15,0.45)");
+  cylinder(sc, sub(pUJoint,[12,0,0]), add(pUJoint,[12,0,0]), 7, SYSTEM_COLORS.uJointGold, 1.2, 8);
+  cylinder(sc, sub(pUJoint,[0,12,0]), add(pUJoint,[0,12,0]), 7, SYSTEM_COLORS.uJointGold, 1.2, 8);
+  cylinder(sc, pUJoint, sub(pWheelCenter, [0,15,12]), 14, SYSTEM_COLORS.colShaft, 1.4, 12);
+
+  const colAxis = nrm(sub(pWheelCenter, pUJoint));
+  const pQR_Base = sub(pWheelCenter, mul(colAxis, 30));
+  cylinder(sc, pQR_Base, pWheelCenter, 28, SYSTEM_COLORS.swHubBlue, 1.4, 16, "rgba(0,153,255,0.6)");
+  cylinder(sc, sub(pWheelCenter, mul(colAxis, 8)), pWheelCenter, 36, SYSTEM_COLORS.swHubPlate, 1.3, 16);
+
+  const u0 = [1, 0, 0];
+  const v0 = nrm(cross(colAxis, u0));
+  
+  const uRot = sub(mul(u0, cos(swAngle)), mul(v0, sin(swAngle)));
+  const vRot = add(mul(u0, sin(swAngle)), mul(v0, cos(swAngle)));
+
+  for(let i=0; i<6; i++){
+    const ang = i*PI/3;
+    const pPin = add(pWheelCenter, add(mul(uRot, 24*cos(ang)), mul(vRot, 24*sin(ang))));
+    cylinder(sc, sub(pPin, mul(colAxis, 6)), add(pPin, mul(colAxis, 4)), 3.5, SYSTEM_COLORS.colShaft, 1, 6);
+  }
+
+  if(S.show.steer_wheel){
+    const ptsWheel = [
+      add(pWheelCenter, add(mul(uRot, -135), mul(vRot, 55))),
+      add(pWheelCenter, add(mul(uRot, -55),  mul(vRot, 55))),
+      add(pWheelCenter, add(mul(uRot, 0),    mul(vRot, 35))),
+      add(pWheelCenter, add(mul(uRot, 55),   mul(vRot, 55))),
+      add(pWheelCenter, add(mul(uRot, 135),  mul(vRot, 55))),
+      add(pWheelCenter, add(mul(uRot, 142),  mul(vRot, 15))),
+      add(pWheelCenter, add(mul(uRot, 138),  mul(vRot, -50))),
+      add(pWheelCenter, add(mul(uRot, 120),  mul(vRot, -75))),
+      add(pWheelCenter, add(mul(uRot, 45),   mul(vRot, -75))),
+      add(pWheelCenter, add(mul(uRot, 0),    mul(vRot, -50))),
+      add(pWheelCenter, add(mul(uRot, -45),  mul(vRot, -75))),
+      add(pWheelCenter, add(mul(uRot, -120), mul(vRot, -75))),
+      add(pWheelCenter, add(mul(uRot, -138), mul(vRot, -50))),
+      add(pWheelCenter, add(mul(uRot, -142), mul(vRot, 15)))
+    ];
+    ptsWheel.push(ptsWheel[0]);
+    PL(sc, ptsWheel, SYSTEM_COLORS.swRim, 3.2, null, "rgba(25,30,36,0.35)");
+
+    const ptsCutL = [
+      add(pWheelCenter, add(mul(uRot, -115), mul(vRot, 38))),
+      add(pWheelCenter, add(mul(uRot, -45),  mul(vRot, 38))),
+      add(pWheelCenter, add(mul(uRot, -35),  mul(vRot, -18))),
+      add(pWheelCenter, add(mul(uRot, -115), mul(vRot, -18)))
+    ];
+    ptsCutL.push(ptsCutL[0]);
+    PL(sc, ptsCutL, SYSTEM_COLORS.swGrip, 1.4);
+
+    const ptsCutR = [
+      add(pWheelCenter, add(mul(uRot, 115),  mul(vRot, 38))),
+      add(pWheelCenter, add(mul(uRot, 45),   mul(vRot, 38))),
+      add(pWheelCenter, add(mul(uRot, 35),   mul(vRot, -18))),
+      add(pWheelCenter, add(mul(uRot, 115),  mul(vRot, -18)))
+    ];
+    ptsCutR.push(ptsCutR[0]);
+    PL(sc, ptsCutR, SYSTEM_COLORS.swGrip, 1.4);
+
+    cylinder(sc, add(pWheelCenter, add(mul(uRot, -132), mul(vRot, 40))), add(pWheelCenter, add(mul(uRot, -132), mul(vRot, -60))), 13, SYSTEM_COLORS.swGrip, 1.4, 10, "rgba(15,18,22,0.85)");
+    cylinder(sc, add(pWheelCenter, add(mul(uRot, 132),  mul(vRot, 40))), add(pWheelCenter, add(mul(uRot, 132),  mul(vRot, -60))), 13, SYSTEM_COLORS.swGrip, 1.4, 10, "rgba(15,18,22,0.85)");
+  }
+}
+
+/* 4. 制动系：中置双回路总泵、踏板平衡杆与管网 */
+function buildBrakeHydraulicSystem(sc, yF, yR){
+  const pMC_L = [-40, yF + 120, S.front.hp.LCA_F[2] + 45];
+  const pMC_R = [40,  yF + 120, S.front.hp.LCA_F[2] + 45];
+  const pBalanceBar = [0, yF + 190, S.front.hp.LCA_F[2] + 45];
+
+  cylinder(sc, [-60, yF + 190, S.front.hp.LCA_F[2] + 45], [60, yF + 190, S.front.hp.LCA_F[2] + 45], 10, SYSTEM_COLORS.colShaft, 1.2, 8);
+  cylinder(sc, pBalanceBar, [0, yF + 190, S.front.hp.LCA_F[2] + 160], 12, SYSTEM_COLORS.colShaft, 1.3, 10);
+  box3D(sc, [0, yF + 190, S.front.hp.LCA_F[2] + 160], [45, 20, 55], SYSTEM_COLORS.swGrip, 1.2, "rgba(20,25,30,0.8)");
+
+  cylinder(sc, add(pBalanceBar,[-40,0,0]), pMC_L, 16, SYSTEM_COLORS.masterCyl, 1.2, 10, "rgba(217,162,56,0.4)");
+  cylinder(sc, add(pBalanceBar,[40,0,0]),  pMC_R, 16, SYSTEM_COLORS.masterCyl, 1.2, 10, "rgba(217,162,56,0.4)");
+  
+  box3D(sc, add(pMC_L, [0, -30, 45]), [36, 48, 32], SYSTEM_COLORS.masterCyl, 1.1, "rgba(217,162,56,0.45)");
+  box3D(sc, add(pMC_R, [0, -30, 45]), [36, 48, 32], SYSTEM_COLORS.masterCyl, 1.1, "rgba(217,162,56,0.45)");
+
+  if(S.show.brake_hyd){
+    const hF = S.front.hp, hR = S.rear.hp;
+    L3(sc, pMC_L, [-hF.UCA_F[0], yF, hF.UCA_F[2]+20], SYSTEM_COLORS.brakeLine, 1.3);
+    L3(sc, pMC_L, [hF.UCA_F[0], yF, hF.UCA_F[2]+20], SYSTEM_COLORS.brakeLine, 1.3);
+    L3(sc, pMC_R, [0, yF-100, hF.LCA_F[2]], SYSTEM_COLORS.brakeLine, 1.4);
+    L3(sc, [0, yF-100, hF.LCA_F[2]], [0, yR+140, hR.LCA_F[2]], SYSTEM_COLORS.brakeLine, 1.4);
+    L3(sc, [0, yR+140, hR.LCA_F[2]], [-hR.UCA_F[0], yR, hR.UCA_F[2]+20], SYSTEM_COLORS.brakeLine, 1.2);
+    L3(sc, [0, yR+140, hR.LCA_F[2]], [hR.UCA_F[0], yR, hR.UCA_F[2]+20], SYSTEM_COLORS.brakeLine, 1.2);
+  }
+}
+
+/* 5. 车轮端与悬架总成装配 */
+function addAxleAssemblyPRO(sc, M, m, sx, yOff, axis){
+  const state = S[axis];
+  const T=p=>[p[0]*sx, p[1]+yOff, p[2]];
+  const N=id=>T(M.n[M.idx[id]].p);
+  const LBJ=N("LBJ"), UBJ=N("UBJ"), WC=N("WC"), TRO=N("TRO");
+  const LAF=N("LCA_F"), LAR=N("LCA_R"), UAF=N("UCA_F"), UAR=N("UCA_R");
+  const ST_O=N("STRUT_OUT"), ST_I=N("STRUT_IN");
+  const RK_A=N("RCK_AX_A"), RK_B=N("RCK_AX_B"), RK_D=N("RCK_DMP"), DMP_B=N("DMP_BODY");
+
+  const ax=nrm([m.ax[0]*sx, m.ax[1], m.ax[2]]);
+  const kg=T(m.kg);
+  const tR=state.tire.R, tW=state.tire.W, rimR=state.tire.rim, dR=state.tire.disc;
+  const eU=nrm(sub([0,0,1],mul(ax,dot([0,0,1],ax)))), eV=cross(ax,eU);
+
+  if(S.show.face){
+    PL(sc,[LAF,LBJ,LAR,LAF],SYSTEM_COLORS.rigArm,1,null,SYSTEM_COLORS.arm);
+    PL(sc,[UAF,UBJ,UAR,UAF],SYSTEM_COLORS.rigArm,1,null,SYSTEM_COLORS.arm);
+    PL(sc,[LBJ,UBJ,WC,LBJ],SYSTEM_COLORS.knu,1,null,SYSTEM_COLORS.knuF);
+  }
+
+  if(S.show.rocker){
+    const rckCenter=lerp3(RK_A,RK_B,0.5);
+    PL(sc,[rckCenter,ST_I,RK_D,rckCenter],SYSTEM_COLORS.rocker,1.5,null,SYSTEM_COLORS.rockerF);
+    cylinder(sc,RK_A,RK_B,11,SYSTEM_COLORS.rocker,1.2,12);
+  }
+
+  cylinder(sc,ST_O,ST_I,8.5,SYSTEM_COLORS.strut,1.5,12);
+
+  if(S.show.elastic){
+    const u=nrm(sub(DMP_B,RK_D)), L=dst(RK_D,DMP_B);
+    cylinder(sc,add(RK_D,mul(u,L*0.06)),add(RK_D,mul(u,L*0.54)),19,SYSTEM_COLORS.damper,1,12);
+    PL(sc,springPts(add(RK_D,mul(u,L*0.08)),add(DMP_B,mul(u,-L*0.05)),36,7.5,130),SYSTEM_COLORS.spring,1.8);
+  }
+
+  if(S.show.halfshaft){
+    const diffP = [140*sx, yOff, 260];
+    const hubP = sub(WC, mul(ax, 20*sx));
+    cylinder(sc, add(diffP, mul(nrm(sub(hubP,diffP)), 40)), sub(hubP, mul(nrm(sub(hubP,diffP)), 35)), 12.5, SYSTEM_COLORS.shaft, 1.4, 10);
+    if(S.show.cv_boot){
+      bellows3D(sc, diffP, add(diffP, mul(nrm(sub(hubP,diffP)), 40)), 15, 25, 4, SYSTEM_COLORS.cvBoot);
+      bellows3D(sc, sub(hubP, mul(nrm(sub(hubP,diffP)), 35)), hubP, 17, 27, 4, SYSTEM_COLORS.cvBoot);
+    }
+  }
+
+  if(S.show.disc_vent){
+    const d1 = add(WC, mul(ax, -14)), d2 = add(WC, mul(ax, 4));
+    PL(sc, circPts(d1, ax, dR, 28, eU, eV), SYSTEM_COLORS.disc, 1.2);
+    PL(sc, circPts(d2, ax, dR, 28, eU, eV), SYSTEM_COLORS.disc, 1.2);
+    for(let k=0; k<6; k++){
+      const an = k*PI/3;
+      const pInner = add(WC, add(mul(eU, dR*0.55*cos(an)), mul(eV, dR*0.55*sin(an))));
+      const pOuter = add(WC, add(mul(eU, dR*0.92*cos(an+0.35)), mul(eV, dR*0.92*sin(an+0.35))));
+      L3(sc, add(pInner, mul(ax,4)), add(pOuter, mul(ax,4)), SYSTEM_COLORS.discSlot, 1.1);
+    }
+  }
+
+  if(S.show.caliper){
+    const ang = axis==='front' ? -2.1 : 2.1;
+    const ca = add(mul(eU, cos(ang)), mul(eV, sin(ang)));
+    const cb = cross(ax, ca);
+    const cc = add(WC, mul(ca, dR*0.88));
+    box3D(sc, cc, [65, 85, 40], SYSTEM_COLORS.caliper, 1.5, "rgba(210,77,62,0.4)");
+    cylinder(sc, add(cc, mul(ax, -20)), add(cc, mul(ax, 20)), 15, SYSTEM_COLORS.caliperPin, 1.1, 10);
+    if(S.show.brake_hyd){
+      const hoseChassis = [state.hp.UCA_F[0]*sx, yOff, state.hp.UCA_F[2]+20];
+      const pMid = lerp3(hoseChassis, cc, 0.5); pMid[2] -= 25;
+      PL(sc, [hoseChassis, pMid, cc], SYSTEM_COLORS.hose, 2.2);
+    }
+  }
+
+  if(S.show.wheel){
+    const ci=add(WC,mul(ax,-tW/2)), co=add(WC,mul(ax,tW/2));
+    const ro=add(WC,mul(ax,tW/2-14));
+    PL(sc,circPts(ci,ax,tR,36,eU,eV),SYSTEM_COLORS.tire,1.3);
+    PL(sc,circPts(co,ax,tR,36,eU,eV),SYSTEM_COLORS.tire,1.3);
+    for(let k=0;k<18;k++){const an=2*PI*k/18;
+      const o=add(mul(eU,tR*cos(an)),mul(eV,tR*sin(an)));
+      L3(sc,add(ci,o),add(co,o),SYSTEM_COLORS.tread,1);}
+    PL(sc,circPts(ro,ax,rimR,28,eU,eV),SYSTEM_COLORS.rim,1.2);
+    for(let k=0;k<5;k++){const an=2*PI*k/5;
+      const o=add(mul(eU,rimR*0.88*cos(an)),mul(eV,rimR*0.88*sin(an)));
+      L3(sc,add(ro,mul(ax,-6)),add(ro,o),SYSTEM_COLORS.rim,1.5);}
+  }
+
+  // ARB merged from legacy addInstance
+  if(S.show.arb && state.arb.d > 0.5){
+    const g = arbGeom(state.hp.LBJ, state);
+    const A0 = T([g.xa, g.ay, g.az]), E = T(g.E), Pd = T(g.P);
+    L3(sc, A0, E, SYSTEM_COLORS.arb, 3.0);
+    cylinder(sc, E, Pd, 7, SYSTEM_COLORS.arb, 1, 8);
+    PL(sc, circPts(Pd, [1,0,0], 9, 10), SYSTEM_COLORS.arb, 1);
+    PL(sc, circPts(E, [1,0,0], 9, 10), SYSTEM_COLORS.arb, 1);
+  }
+
+  if(axis==='front'){
+    const RCK = [S.front.hp.RACK[0]*sx - S.rack, S.front.hp.RACK[1]+yOff, S.front.hp.RACK[2]];
+    cylinder(sc, RCK, TRO, 8.5, SYSTEM_COLORS.tie, 1.3, 10);
+  }
+
+  if(S.show.kp){
+    const d=nrm(sub(LBJ,UBJ));
+    const a=add(UBJ,mul(d,-55)), b=add(UBJ,mul(d,dst(UBJ,LBJ)+dst(LBJ,kg)+12));
+    L3(sc,a,b,SYSTEM_COLORS.kp,1.5,[5,3]);
+  }
+
+  M.L.forEach(l=>{
+    const a=T(M.n[l.a].p),b=T(M.n[l.b].p);
+    if(l.type==="R") L3(sc,a,b,l.grp==="strut"?SYSTEM_COLORS.strut:(l.grp==="steer"?SYSTEM_COLORS.tie:SYSTEM_COLORS.rig),1.1);
+  });
+  if(S.show.node) M.n.forEach(n=>ND(sc,T(n.p),n.fix,n.id,n.zh,sx,axis));
+}
+
+
+
+function buildScene(){
+  /* 2026-08-23 PRO merged: full-chassis 4-system models (from gemini);
+     legacy addShared/drawSubframe/addInstance kept as dead code for later cleanup. */
+  return buildScenePRO();
 }
 
 function drawSubframe(sc, h, yOff, bx, mir, state){
@@ -1854,6 +2439,8 @@ function buildLeft(){
   buildEnginePanel(host);
   buildChassisPanel(host);
   buildTrackPanel(host);
+  buildPersistencePanel(host);
+  buildSystemShowPanel(host);
 
   let b=sec(host,"悬架底盘模块编辑","CHASSIS EDITOR");
   rowBtns(b,[["编辑前悬架 (FRONT)",()=>{S.axis='front'; UI.sync.forEach(f=>f());},()=>S.axis==='front'],
@@ -2502,6 +3089,63 @@ function drawPlots(){
   });
 }
 
+/* ================================ 12b. 硬点永久保存（2026-08-23 移植新增） ================================ */
+const HP_SAVE_KEY="labsus.hp.v1";
+function hpSnapshot(){return {front:S.front.hp, rear:S.rear.hp,
+  tieTrimF:S.front.tieTrim, tieTrimR:S.rear.tieTrim, wb:S.wb, hcg:S.hcg, t:Date.now()};}
+function hpSave(quiet){try{localStorage.setItem(HP_SAVE_KEY, JSON.stringify(hpSnapshot()));
+  if(!quiet)setKcStatus("硬点已保存 "+new Date().toLocaleTimeString(), C.pathC);}
+  catch(e){console.warn("hpSave failed",e);}}
+function hpLoad(){try{const raw=localStorage.getItem(HP_SAVE_KEY); if(!raw)return;
+  const d=JSON.parse(raw); if(!d||!d.front||!d.rear)return;
+  for(const ax of ["front","rear"]){const hp=S[ax].hp, saved=d[ax];
+    for(const k in hp) if(saved[k]&&Array.isArray(saved[k])&&saved[k].length===3) hp[k]=saved[k].map(Number);}
+  if(typeof d.tieTrimF==="number")S.front.tieTrim=d.tieTrimF;
+  if(typeof d.tieTrimR==="number")S.rear.tieTrim=d.tieTrimR;
+  if(typeof d.wb==="number")S.wb=d.wb; if(typeof d.hcg==="number")S.hcg=d.hcg;
+  setKcStatus("已载入永久保存的硬点（localStorage）", C.pathC);}
+  catch(e){console.warn("hpLoad failed",e);}}
+function hpReset(){try{localStorage.removeItem(HP_SAVE_KEY);}catch(e){}
+  initData(); rebuild(); UI.sync.forEach(f=>f());
+  setKcStatus("已恢复出厂预设硬点（紧凑宽体 1620mm 比例）", C.nodeFix);}
+function hpExport(){const blob=new Blob([JSON.stringify(hpSnapshot(),null,1)],
+  {type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="labsus-hardpoints-"+new Date().toISOString().slice(0,10)+".json";
+  a.click(); URL.revokeObjectURL(a.href);
+  setKcStatus("硬点已导出为 JSON 文件", C.pathC);}
+function hpImport(){const inp=document.createElement("input");
+  inp.type="file"; inp.accept=".json,application/json";
+  inp.onchange=()=>{const f=inp.files&&inp.files[0]; if(!f)return;
+    const rd=new FileReader();
+    rd.onload=()=>{try{const d=JSON.parse(rd.result);
+      if(!d||!d.front||!d.rear)throw new Error("bad file");
+      for(const ax of ["front","rear"]){const hp=S[ax].hp;
+        for(const k in hp) if(d[ax][k]&&d[ax][k].length===3) hp[k]=d[ax][k].map(Number);}
+      if(typeof d.wb==="number")S.wb=d.wb; if(typeof d.hcg==="number")S.hcg=d.hcg;
+      hpSave(true); rebuild(); UI.sync.forEach(f=>f());
+      setKcStatus("硬点导入成功并已保存", C.pathC);}
+      catch(e){setKcStatus("导入失败：非有效硬点文件", C.nodeFix);}};
+    rd.readAsText(f);};
+  inp.click();}
+function buildPersistencePanel(host){
+  let b=sec(host,"硬点永久保存","HARDPOINT PERSISTENCE",false,"grn");
+  rowBtns(b,[["保存 SAVE",()=>hpSave()],["复位 RESET",hpReset],
+             ["导出 EXPORT",hpExport],["导入 IMPORT",hpImport]]);
+  const st=E("div","ro"); st.appendChild(E("span",null,'自动保存 <u>AUTO</u>'));
+  const v=E("b",null,"拖拽/编辑后即时写盘"); st.appendChild(v); b.appendChild(st);
+  b.appendChild(E("div",null,'<i style="opacity:.65">localStorage 永久保存（刷新不丢）；导出 JSON 可跨机器备份。</i>'));
+}
+function buildSystemShowPanel(host){
+  let b=sec(host,"系统显示·默认分色","SYSTEM LAYERS",false,"amb");
+  chkList(b,[
+    ["frame_main","车架·主滚架/乘员舱"],["frame_front","车架·前防撞吸能"],["frame_side","车架·侧防撞梁"],["frame_rear","车架·后防撞尾框"],
+    ["powertrain","传动·EDU 电驱"],["halfshaft","传动·半轴"],["cv_boot","传动·CV 防尘套"],
+    ["steer_rack","转向·齿条箱"],["steer_col","转向·管柱万向节"],["steer_wheel","转向·方向盘"],
+    ["disc_vent","制动·通风盘"],["caliper","制动·卡钳"],["brake_hyd","制动·管路"],["master_cyl","制动·总泵踏瓣"],
+    ["rocker","行驶·摇臂"],["elastic","行驶·弹簧减振"],["wheel","行驶·轮胎轮毂"],["face","行驶·臂面/转向节"],["arb","行驶·防倾杆"],["rigid","连杆刚线"],["node","硬点标记"]]);
+}
+
 /* ================================ 13. 交互系统 ================================ */
 function hookView(v){
   const cv=v.cv;
@@ -2564,7 +3208,7 @@ window.addEventListener("mousemove",e=>{
     if(v.type==="o"){v.cx=d.cx-(e.clientX-d.x0)/v.s;v.cy=d.cy+(e.clientY-d.y0)/v.s;}
   }
 });
-window.addEventListener("mouseup",()=>{UI.drag=null;});
+window.addEventListener("mouseup",()=>{if(UI.drag&&UI.drag.mode==="hp")hpSave();UI.drag=null;});
 
 /* ================================ 14. 主仿真循环 ================================ */
 function updateSweeps(){
@@ -2863,6 +3507,7 @@ function applyTheme(t){
   if(tg)tg.onclick=()=>applyTheme(document.documentElement.getAttribute("data-theme")==="light"?"dark":"light");
 })();
 
+hpLoad();
 buildLeft();
 buildRight();
 rebuild();
