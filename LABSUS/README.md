@@ -8,7 +8,8 @@
 ```
 LABSUS/
 ├── web/
-│   └── dwb-pro-fullchassis.html      ← 前端起点（Gemini v4 版复制，后续前端开发只在这里）
+│   ├── dwb-pro-fullchassis.html      ← 前端起点（Gemini v4 版复制，后续前端开发只在这里）
+│   └── dwb-pro-allinone.html          ← 综合版单文件（内置 JS 赛道物理引擎，免 Python 服务）
 ├── engine/                           ← Python 引擎（S1 起，Subagent-Driven 执行）
 │   ├── src/
 │   │   ├── components/               bushing 6DOF 元件（T1）
@@ -28,5 +29,5 @@ LABSUS/
 ## 迭代约定
 
 - 引擎任务按 `docs/superpowers/plans/2026-08-21-chassis-analyzer-s1.md` 执行（T1–T10），工作区根 = `engine/`；
-- 前端后续开发仅修改 `web/dwb-pro-fullchassis.html`（复制当前主力 → 改 → 稳定后入档）；
+- 前端后续开发仅修改 `web/dwb-pro-fullchassis.html`；`web/dwb-pro-allinone.html` 为综合版快照（含内置赛道物理 TPHYS，可直接双击运行，赛道仿真无需引擎服务，其余功能与原版一致）；
 - 提交信息沿用 `feat(engine)/feat(web)` 前缀；本目录内提交与其他文件互不牵扯。
