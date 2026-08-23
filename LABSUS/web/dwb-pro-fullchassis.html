@@ -15,29 +15,29 @@
 :root{
   color-scheme:dark;
   /* 圆角体系 */
-  --r-xl:6px; --r-lg:5px; --r-md:4px; --r-sm:3px; --r-xs:2px; --r-pill:999px;
+  --r-xl:20px; --r-lg:16px; --r-md:12px; --r-sm:9px; --r-xs:7px; --r-pill:999px;
   /* 专属分类色（两套模式共享色相，深浅随主题微调，见 JS PAL） */
   --s-prus:#405A78; --s-terra:#A66B58; --s-sage:#7A8C7E; --s-mist:#637B94;
   --s-copper:#C98C65; --s-honey:#C99C65; --s-lav:#8B7A9E; --s-tea:#8F988A;
   --s-wine:#943948; --s-oat:#E8D4BF;
   /* —— 深色主题（默认）：低饱和深普鲁士蓝灰基底 —— */
-  --bg-base:#11141A;
-  --bg-blob-a:rgba(70,151,230,.14); --bg-blob-b:rgba(217,83,79,.10); --bg-blob-c:rgba(217,154,67,.08);
-  --glass:rgba(22,27,34,.92); --glass-2:rgba(28,34,44,.90); --glass-3:rgba(34,42,54,.92);
+  --bg-base:#12161F;
+  --bg-blob-a:rgba(64,90,120,.32); --bg-blob-b:rgba(148,57,72,.14); --bg-blob-c:rgba(201,156,101,.09);
+  --glass:rgba(31,38,51,.60); --glass-2:rgba(38,46,62,.48); --glass-3:rgba(48,58,76,.50);
   --glass-hov:rgba(60,71,92,.55);
-  --glass-bd:#323E52; --glass-bd-2:#3E4E68; --glass-hi:rgba(255,255,255,.07);
-  --ink-1:#E6E9EF; --ink-2:#9AA4B5; --ink-3:#6C788A;
-  --cream:#D99A43;
-  --pri:#4697E6; --pri-strong:#5CA8F2; --pri-fill:rgba(70,151,230,.16); --pri-bd:rgba(143,176,212,.50);
-  --ok:#45B374; --warn:#D99A43; --err:#D9534F;
+  --glass-bd:rgba(255,255,255,.09); --glass-bd-2:rgba(255,255,255,.17); --glass-hi:rgba(255,255,255,.07);
+  --ink-1:#F2EDE4; --ink-2:#BAB3A6; --ink-3:#7E7A70;
+  --cream:#E8D4BF;
+  --pri:#8FB0D4; --pri-strong:#6E96BE; --pri-fill:rgba(64,90,120,.42); --pri-bd:rgba(143,176,212,.50);
+  --ok:#9CC4A8; --warn:#D9B98A; --err:#D27886;
   --ok-fill:rgba(122,140,126,.22); --warn-fill:rgba(201,156,101,.16); --err-fill:rgba(148,57,72,.28);
   --track:rgba(255,255,255,.14); --well:rgba(255,255,255,.05);
-  --shadow:0 2px 0 rgba(0,0,0,.35),0 8px 24px rgba(0,0,0,.25),0 2px 8px rgba(4,7,13,.32);
+  --shadow:0 14px 38px rgba(4,7,13,.45),0 2px 8px rgba(4,7,13,.32);
   --shadow-sm:0 3px 12px rgba(4,7,13,.30);
   --ring:0 0 0 3px rgba(143,176,212,.25);
   --knob:linear-gradient(180deg,#F7F1E6,#D9CDB9);
-  --font-ui:"Styrene A","Styrene B",Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-  --font-mono:"Styrene Mono","SF Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --font-ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-mono:"SF Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
   /* 语义别名（兼容 JS 内联引用） */
   --txt2:var(--ink-2); --txt3:var(--ink-3);
 }
@@ -60,17 +60,7 @@
   --ring:0 0 0 3px rgba(64,90,120,.18);
   --knob:linear-gradient(180deg,#FFFFFF,#EDE3D3);
 }
-
-/* —— Soft Industrial Brutalism · Alabaster 浅色覆写 —— */
-[data-theme="light"]{
-  --bg-base:#E9E4DA; --bg-panel:#F3EFE6; --bg-card:#E4DECE; --bg-card-sub:#DAD3C1;
-  --bg-input:#F9F7F2; --bd-hard:#B0A690; --bd-subtle:#D0C8B6;
-  --c-pri:#2B6CB0; --c-brass:#B87A28; --c-sage:#2E8555; --c-rust:#BE3E3A;
-  --c-lavender:#704EC2; --c-base-line:#8C96A4; --ink-1:#232A33; --ink-2:#4A5462; --ink-3:#8C96A4;
-  --glass:rgba(243,239,230,.94); --glass-bd:#B0A690; --pri:#2B6CB0; --ok:#2E8555;
-  --warn:#B87A28; --err:#BE3E3A; --cream:#B87A28;
-}
-
+*{margin:0;padding:0;box-sizing:border-box;outline:none}
 html,body{height:100%;width:100%;overflow:hidden}
 body{
   color:var(--ink-1);
@@ -302,73 +292,6 @@ canvas.plot{display:block;width:100%;height:84px;background:var(--well);border:1
 .eng-run.ch:hover{border-color:var(--ok);box-shadow:0 0 12px var(--ok-fill)}
 .eng-status{padding:4px 10px 6px;font-size:9px;color:var(--txt3);line-height:1.45;font-family:var(--font-mono);white-space:pre-line}
 .pose-cell{padding:1px 4px;text-align:right;color:var(--ink-1);font-variant-numeric:tabular-nums;font-family:var(--font-mono)}
-
-/* ============ Soft Industrial Brutalism (2026-08-23) ============ */
-:root{
-  --bg-panel:#161B22; --bg-card:#1C222C; --bg-card-sub:#222A36; --bg-input:#12161D;
-  --bd-hard:#323E52; --bd-subtle:#252E3D;
-  --c-pri:#4697E6; --c-brass:#D99A43; --c-sage:#45B374; --c-rust:#D9534F;
-  --c-lavender:#9D80E8; --c-base-line:#6C788A;
-}
-#app{padding:0;gap:0;background:var(--bg-base)}
-#tb{height:44px;border-radius:0;border-left:none;border-right:none;border-top:none}
-#sb{height:26px;border-radius:0;border-left:none;border-right:none;border-bottom:none}
-#main{gap:0;border-top:1px solid var(--bd-hard);border-bottom:1px solid var(--bd-hard)}
-#lp{width:330px;flex:0 0 330px;border-right:1px solid var(--bd-hard);background:var(--bg-panel)}
-#rp{width:360px;flex:0 0 360px;border-left:1px solid var(--bd-hard);background:var(--bg-panel)}
-#vp{gap:1.5px;background:var(--bd-hard)}
-#vp .vw{border-radius:0;border:none}
-#tb .brand{border-radius:0}
-#tb .cell:last-child{border-radius:0}
-#sb .c:first-child{border-radius:0}#sb .c:last-child{border-radius:0}
-#lp .sec,#rp .sec{background:var(--bg-card);border:1px solid var(--bd-subtle);border-radius:2px}
-#lp .sec .sh,#rp .sec .sh{background:var(--bg-card-sub)}
-body{letter-spacing:.01em}
-/* 硬点表系统色标 */
-table.hp td.fx input{color:var(--c-rust)}
-table.hp td.fr input{color:var(--c-pri)}
-table.hp td.rk input{color:var(--c-brass)}
-/* 左侧四段 Tab */
-.tabbar{display:flex;gap:2px;padding:8px 8px 0;position:sticky;top:0;background:var(--bg-panel);z-index:8}
-.tab{flex:1;padding:7px 4px 6px;text-align:center;cursor:pointer;border:1px solid var(--bd-subtle);
-  border-bottom:none;background:var(--bg-card-sub);user-select:none;transition:background .12s}
-.tab b{display:block;font:600 9px/1 var(--font-ui);letter-spacing:.14em;color:var(--c-pri)}
-.tab span{display:block;font:11px/1.5 var(--font-ui);color:var(--ink-2);margin-top:2px}
-.tab:hover{background:var(--bg-card)}
-.tab.on{background:var(--bg-card);border-color:var(--bd-hard);box-shadow:inset 0 2px 0 var(--c-pri)}
-.tab.on b{color:var(--ink-1)}
-.tabp{overflow-y:auto;scrollbar-width:thin}
-.tabp.hide{display:none}
-/* 驱动滑条 [0] 复位微键 */
-.zbtn{flex:0 0 24px;height:20px;align-self:center;margin-left:6px;border:1px solid var(--bd-hard);
-  background:var(--bg-input);color:var(--c-brass);font:700 10px/1 var(--font-mono);cursor:pointer;border-radius:1px}
-.zbtn:hover{background:var(--c-brass);color:#10131A}
-/* Hero KPI 卡片 */
-.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 8px 0}
-.kpi{border:1px solid var(--bd-hard);background:var(--bg-card);padding:8px 10px;position:relative;overflow:hidden}
-.kpi::after{content:"";position:absolute;left:0;top:0;bottom:0;width:2.5px;background:var(--c-brass)}
-.kpi.pri::after{background:var(--c-pri)}.kpi.sage::after{background:var(--c-sage)}.kpi.violet::after{background:var(--c-lavender)}
-.kpi i{font-style:normal;display:block;font:8.5px/1.6 var(--font-ui);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
-.kpi i u{text-decoration:none;color:var(--c-base-line)}
-.kpi b{display:block;font:600 21px/1.25 var(--font-mono);color:var(--ink-1);font-variant-numeric:tabular-nums;margin-top:2px}
-.kpi span{display:block;font:9px/1.5 var(--font-ui);color:var(--ink-3);margin-top:1px;white-space:nowrap;overflow:hidden}
-.kpi-bar{height:5px;margin:0 8px;border:1px solid var(--bd-subtle);background:var(--bg-input);display:flex}
-.kpi-bar .bar-fill-f{background:linear-gradient(90deg,var(--c-pri),var(--c-brass));height:100%}
-/* Chart Hub 选项卡 */
-.chub{border-top:1px solid var(--bd-hard)}
-.chub-bar{display:flex;gap:2px;padding:8px 8px 0;position:sticky;top:0;background:var(--bg-panel);z-index:8}
-.chub-tab{flex:1;padding:5px 2px;text-align:center;cursor:pointer;border:1px solid var(--bd-subtle);
-  font:600 8.5px/1.4 var(--font-ui);letter-spacing:.12em;color:var(--ink-3);background:var(--bg-card-sub);user-select:none}
-.chub-tab:hover{color:var(--ink-1)}
-.chub-tab.on{background:var(--bg-card);border-color:var(--bd-hard);color:var(--c-pri);box-shadow:inset 0 2px 0 var(--c-pri)}
-.chub-pane{padding:8px;display:none}
-.chub-pane:first-of-type{display:block}
-.chub-pane .plotcap{font:8.5px/1.6 var(--font-ui);letter-spacing:.08em;color:var(--ink-3);text-transform:uppercase;margin-bottom:4px}
-/* 滚动条 */
-.tabp::-webkit-scrollbar,#rp::-webkit-scrollbar{width:5px}
-.tabp::-webkit-scrollbar-thumb,#rp::-webkit-scrollbar-thumb{background:var(--bd-hard);border-radius:2px}
-.tabp,.pnl{scrollbar-width:thin}
-
 </style>
 </head>
 <body>
@@ -378,7 +301,6 @@ table.hp td.rk input{color:var(--c-brass)}
     <div class="tt"><span>全车底盘 高性能悬架 · 运动学 / 动力学 / 准静态操稳分析台</span><span>Full Chassis Inboard Suspension K&C, Rig Dynamics & Quasi-Static Handling</span></div>
     <div class="sp"></div>
     <div id="themeTg" class="theme-tg" title="切换浅色 / 深色模式"><i></i></div>
-    <div class="cell act" style="flex-direction:row;gap:4px;align-items:center"><button id="tbSnap" style="height:22px;padding:0 8px;font:600 9px/1 var(--font-ui);border:1px solid var(--bd-hard);background:var(--bg-card-sub);color:var(--c-brass);cursor:pointer">📸 快照</button><button id="tbClear" style="height:22px;padding:0 8px;font:600 9px/1 var(--font-ui);border:1px solid var(--bd-subtle);background:var(--bg-input);color:var(--ink-3);cursor:pointer">✕ 清除</button></div>
     <div class="cell"><i>正在调校</i><b class="a" id="tbArch">前悬架 PUSHROD</b></div>
     <div class="cell"><i>Baseline 快照</i><b id="tbBase">未锁定 (无比对)</b></div>
     <div class="cell"><i>求解内核</i><b class="c" id="tbSolver">闭式几何 + 静力平衡</b></div>
@@ -1241,34 +1163,33 @@ function clearBaselineSnapshot(){
    数据分类专属映射：普鲁士蓝=主操作/速比 · 陶土棕=外倾/转向节 · 鼠尾灰绿=前束/拉杆 ·
    蜜橘赭=摇臂/弹性 · 灰薰紫=轨迹 · 雾蓝灰=稳定杆 · 暗铜金=瞬心 · 酒红=固定点/力 */
 const PAL={
-light:{bg:"#E9E4DA",grid:"#DDD5C3",grid2:"#CFC6B0",axis:"#B0A690",
- rig:"#2B6CB0",rigArm:"#4A7FC0",arm:"rgba(43,108,176,0.06)",
- strut:"#B87A28",rocker:"#B87A28",rockerF:"rgba(184,122,40,0.18)",
- ela:"#2E8555",elaF:"rgba(46,133,85,0.12)",
- node:"#2B6CB0",nodeFix:"#BE3E3A",nodeSel:"#232A33",
- knu:"#2E8555",knuF:"rgba(46,133,85,0.10)",
- tire:"#6F7884",tread:"#565E68",rim:"#8C96A4",disc:"#7E8791",cal:"#BE3E3A",
- kp:"#BE3E3A",kpsw:"rgba(190,62,58,0.18)",kpg:"#BE3E3A",
- tie:"#2B6CB0",rack:"#8C96A4",
- chas:"#9A978D",chas2:"#B3B0A4",
- gnd:"#D5CCBA",path:"#704EC2",pathC:"#2E8555",pathK:"#B87A28",
- ic:"#B87A28",rc:"#2B6CB0",dim:"#8C96A4",dimT:"#6F7884",
- arb:"#2B6CB0",frc:"#BE3E3A",txt:"#232A33",txt2:"#4A5462",txt3:"#8C96A4",base:"#A9A69B"},
-dark:{bg:"#11141A",grid:"#1A212B",grid2:"#242E3C",axis:"#323E52",
- rig:"#4697E6",rigArm:"#5CA8F2",arm:"rgba(70,151,230,0.07)",
- strut:"#D99A43",rocker:"#D99A43",rockerF:"rgba(217,154,67,0.18)",
- ela:"#45B374",elaF:"rgba(69,179,116,0.12)",
- node:"#4697E6",nodeFix:"#D9534F",nodeSel:"#E6E9EF",
- knu:"#45B374",knuF:"rgba(69,179,116,0.10)",
- tire:"#4A525E",tread:"#353B44",rim:"#6C788A",disc:"#5A6572",cal:"#D9534F",
- kp:"#D9534F",kpsw:"rgba(217,83,79,0.18)",kpg:"#D9534F",
- tie:"#4697E6",rack:"#6C788A",
- chas:"#323E52",chas2:"#2A3442",
- gnd:"#242C38",path:"#9D80E8",pathC:"#45B374",pathK:"#D99A43",
- ic:"#D99A43",rc:"#4697E6",dim:"#6C788A",dimT:"#9AA4B5",
- arb:"#4697E6",frc:"#D9534F",txt:"#E6E9EF",txt2:"#9AA4B5",txt3:"#6C788A",base:"#4A5462"}
+light:{bg:"#F5EFE4",grid:"#E9DFCE",grid2:"#DCD0BA",axis:"#C6B89F",
+ rig:"#8C96A2",rigArm:"#6E7883",arm:"rgba(64,90,120,0.05)",
+ strut:"#405A78",rocker:"#B98A4F",rockerF:"rgba(185,138,79,0.14)",
+ ela:"#B98A4F",elaF:"rgba(185,138,79,0.10)",
+ node:"#405A78",nodeFix:"#943948",nodeSel:"#292E36",
+ knu:"#A66B58",knuF:"rgba(166,107,88,0.08)",
+ tire:"#7C828B",tread:"#5C626B",rim:"#9A9FA7",disc:"#8A9098",cal:"#B07A52",
+ kp:"#943948",kpsw:"rgba(148,57,72,0.14)",kpg:"#943948",
+ tie:"#7A8C7E",rack:"#8A9098",
+ chas:"#A9AEB5",chas2:"#B9BDC3",
+ gnd:"#C4BBA9",path:"#8B7A9E",pathC:"#6E8F77",pathK:"#B98A4F",
+ ic:"#C98C65",rc:"#6E8F77",dim:"#9A9FA7",dimT:"#5C626B",
+ arb:"#637B94",frc:"#943948",txt:"#292E36",txt2:"#5C626B",txt3:"#9A9FA7",base:"#A9AEB5"},
+dark:{bg:"#111621",grid:"#1C2432",grid2:"#273246",axis:"#3A4658",
+ rig:"#8C96A2",rigArm:"#A5AFBB",arm:"rgba(165,175,187,0.06)",
+ strut:"#8FB0D4",rocker:"#E0BE8E",rockerF:"rgba(224,190,142,0.14)",
+ ela:"#E0BE8E",elaF:"rgba(224,190,142,0.10)",
+ node:"#8FB0D4",nodeFix:"#D27886",nodeSel:"#F2EDE4",
+ knu:"#D89A83",knuF:"rgba(216,154,131,0.08)",
+ tire:"#5A6470",tread:"#383F47",rim:"#76828F",disc:"#636E7A",cal:"#B07A52",
+ kp:"#D27886",kpsw:"rgba(210,120,134,0.16)",kpg:"#D27886",
+ tie:"#A3BCA9",rack:"#4A5663",
+ chas:"#3D4752",chas2:"#2F3740",
+ gnd:"#363E46",path:"#B3A3C6",pathC:"#9CC4A8",pathK:"#E0BE8E",
+ ic:"#DDAE85",rc:"#9CC4A8",dim:"#7E7A70",dimT:"#BAB3A6",
+ arb:"#96B1C6",frc:"#D27886",txt:"#F2EDE4",txt2:"#BAB3A6",txt3:"#7E7A70",base:"#6A7280"}
 };
-
 const C=Object.assign({},PAL.dark);
 
 const L3=(sc,a,b,c,w,d,al)=>sc.push({k:"l",a:a,b:b,c:c,w:w||1,d:d,al:al});
@@ -2469,12 +2390,10 @@ function sec(host,zh,en,col,cls){
 }
 function rowSlider(b,zh,en,unit,min,max,step,get,set,dec){
   const r=E("div","ctl");
-  const lab=E("label",null,zh+' <u>'+en+(unit?" ["+unit+"]":"")+'</u>');
-  r.appendChild(lab);
+  r.appendChild(E("label",null,zh+' <u>'+en+(unit?" ["+unit+"]":"")+'</u>'));
   const sl=E("input");sl.type="range";sl.min=min;sl.max=max;sl.step=step;
   const nb=E("input");nb.type="number";nb.step=step;
-  const zb=E("button","zbtn","0");zb.title="一键归零";zb.onclick=()=>push("0");
-  r.appendChild(sl);r.appendChild(nb);r.appendChild(zb);b.appendChild(r);
+  r.appendChild(sl);r.appendChild(nb);b.appendChild(r);
   const push=v=>{set(clamp(parseFloat(v),typeof min==="function"?min():min,typeof max==="function"?max():max));};
   sl.oninput=()=>push(sl.value);
   nb.onchange=()=>push(nb.value);
@@ -2517,27 +2436,73 @@ function setRO(id,txt,warn){const e=UI.ro[id];if(!e)return;e.textContent=txt;
 function buildLeft(){
   const host=document.getElementById("lp");
   host.innerHTML="";
-  const TABDEF=[["几何硬点","GEOMETRY"],["工况驱动","MOTION"],["引擎/赛道","ENGINE"],["图层显示","LAYERS"]];
-  const tabbar=E("div","tabbar");
-  const panes=[];
-  TABDEF.forEach((d,i)=>{
-    const t=E("div","tab"+(i===0?" on":""),'<b>'+d[1]+'</b><span>'+d[0]+'</span>');
-    t.onclick=()=>{tabbar.querySelectorAll(".tab").forEach((q,j)=>q.classList.toggle("on",j===i));
-      panes.forEach((p,j)=>{p.style.display=j===i?"":"none";});
-      UI.sync.forEach(f=>f());};
-    tabbar.appendChild(t);
-    const p=E("div","tabp"+(i===0?"":" hide"));panes.push(p);host.appendChild(p);
-  });
-  host.insertBefore(tabbar,host.firstChild);
-  const h1=panes[0],h2=panes[1],h3=panes[2],h4=panes[3];
+  buildEnginePanel(host);
+  buildChassisPanel(host);
+  buildTrackPanel(host);
+  buildPersistencePanel(host);
+  buildSystemShowPanel(host);
 
-  // ════ Tab 1 · 几何硬点 ════
-  let b=sec(h1,"悬架轴向选择","AXIS SELECT",false,"grn");
-  rowBtns(b,[["前悬架 PUSHROD (FRONT)",()=>{S.axis='front';UI.sync.forEach(f=>f());},()=>S.axis==='front'],
-             ["后悬架 PULLROD (REAR)",()=>{S.axis='rear';UI.sync.forEach(f=>f());},()=>S.axis==='rear']]);
-  b=sec(h1,"3D 空间硬点表","3D HARDPOINTS [mm]",false,"amb");
-  const hpcap=E("div","plotcap",'X 横向 · Y 纵向 · Z 垂向  —  色标: 红=固定铰点 蓝=摆臂铰点 铜=摇臂/避震');
-  b.appendChild(hpcap);
+  let b=sec(host,"悬架底盘模块编辑","CHASSIS EDITOR");
+  rowBtns(b,[["编辑前悬架 (FRONT)",()=>{S.axis='front'; UI.sync.forEach(f=>f());},()=>S.axis==='front'],
+             ["编辑后悬架 (REAR)",()=>{S.axis='rear'; UI.sync.forEach(f=>f());},()=>S.axis==='rear']]);
+
+  b=sec(host,"多体求解模式控制","SOLVER CONTROLS",false,"grn");
+  rowBtns(b,[["运动学 KIN",()=>{S.mode="kin";},()=>S.mode==="kin"],
+             ["4-Post 台架 RIG",()=>{S.mode="rig";S.simT=0;},()=>S.mode==="rig"],
+             ["准静态操稳 QS",()=>{S.mode="quasi";},()=>S.mode==="quasi"]]);
+  rowBtns(b,[["运行 / 暂停",()=>{S.play=!S.play;},()=>S.play],
+             ["复位 RESET",()=>{S.travel=0;S.roll=0;S.rack=0;rebuild();}]]);
+  rowSlider(b,"轮跳幅值","TRAVEL AMP","mm",0,75,1,()=>S.excA,v=>S.excA=v,0);
+  rowSlider(b,"轮跳频率","FREQ","Hz",0.05,1.5,0.01,()=>S.excF,v=>S.excF=v,2);
+
+  b=sec(host,"几何与转向输入 (整车关联)","INPUT DRIVERS");
+  rowSlider(b,"轮心垂向行程","WHEEL TRAVEL","mm",()=>S.trMin,()=>S.trMax,0.5,()=>S.travel,
+    v=>{S.travel=v;S.exc="off";},1);
+  rowSlider(b,"车身侧倾角","BODY ROLL","°",-5,5,0.1,()=>S.roll,v=>S.roll=v,2);
+  rowSlider(b,"前轮转向位移","FRONT RACK","mm",-60,60,0.5,()=>S.rack,
+    v=>{S.rack=v;SIM.dirtySweep=true;},1);
+  rowSlider(b,"单侧前束微调","TOE TRIM","mm",-15,15,0.1,()=>S[S.axis].tieTrim,
+    v=>{S[S.axis].tieTrim=v;rebuild();},2);
+
+  b=sec(host,"Baseline 基准快照比对","BASELINE SNAPSHOT",false,"amb");
+  rowBtns(b,[["快照基准线 SAVE",()=>{takeBaselineSnapshot();buildRight();},null,"hl"],
+             ["清除基准线 CLEAR",()=>{clearBaselineSnapshot();buildRight();},null,"danger"]]);
+
+  b=sec(host,"准静态操稳工况输入","QUASI-STATIC CONDITIONS",false,"amb");
+  rowSlider(b,"侧向加速度","LATERAL ACC","g",-1.8,1.8,0.05,()=>S.qs.gy,v=>{S.qs.gy=v;simulate(0.016);},2);
+  rowSlider(b,"纵向加速度","LONG ACC","g",-1.5,1.5,0.05,()=>S.qs.gx,v=>{S.qs.gx=v;simulate(0.016);},2);
+  rowSlider(b,"气动总下压力","AERO DOWNFORCE","N",0,5000,50,()=>S.qs.aeroF,v=>{S.qs.aeroF=v;simulate(0.016);},0);
+  rowSlider(b,"气动前轴分配比","AERO FRONT BIAS","-",0.2,0.8,0.01,()=>S.qs.aeroBias,v=>{S.qs.aeroBias=v;simulate(0.016);},2);
+  rowSlider(b,"整车总质量","TOTAL MASS","kg",800,2200,10,()=>S.mTotal,v=>{S.mTotal=v;refreshDerived(false);},0);
+  rowSlider(b,"簧载总质量","SPRUNG MASS","kg",700,2000,10,()=>S.mSprung,v=>{S.mSprung=v;refreshDerived(false);},0);
+
+  b=sec(host,"内置弹性与阻尼元件","INBOARD SPRINGS & DAMPERS");
+  rowSlider(b,"主弹簧刚度","SPRING RATE","N/mm",40,300,5,()=>S[S.axis].kS,v=>{S[S.axis].kS=v;refreshDerived(false);},0);
+  rowSlider(b,"压缩阻尼系数","BUMP DAMP","N·s/mm",1,30,0.5,()=>S[S.axis].cB,v=>S[S.axis].cB=v,1);
+  rowSlider(b,"复原阻尼系数","REB DAMP","N·s/mm",1,40,0.5,()=>S[S.axis].cR,v=>S[S.axis].cR=v,1);
+  rowSlider(b,"轮胎垂向刚度","TIRE RATE","N/mm",100,450,10,()=>S[S.axis].kT,v=>{S[S.axis].kT=v;refreshDerived(false);},0);
+  rowSlider(b,"角簧上质量","SPRUNG MASS","kg",150,700,5,()=>S[S.axis].mS,v=>{S[S.axis].mS=v;refreshDerived(false);},0);
+  
+  b=sec(host,"横向稳定杆 (ARB)","ANTI-ROLL BAR");
+  rowSlider(b,"稳定杆直径 (0=拆除)","ARB DIA","mm",0,34,0.5,()=>S[S.axis].arb.d,v=>S[S.axis].arb.d=v,1);
+  rowSlider(b,"稳定杆连杆位置比","ARB LINK POS","-",0.25,0.92,0.01,()=>S[S.axis].arb.t,v=>{S[S.axis].arb.t=v;SIM.dirtySweep=true;},2);
+  rowSlider(b,"稳定杆纵向偏置","ARB OFFSET Y","mm",-60,180,2,()=>S[S.axis].arb.dy,v=>{S[S.axis].arb.dy=v;SIM.dirtySweep=true;},0);
+  rowSlider(b,"稳定杆高度偏置","ARB OFFSET Z","mm",40,300,2,()=>S[S.axis].arb.dz,v=>{S[S.axis].arb.dz=v;SIM.dirtySweep=true;},0);
+
+  b=sec(host,"4-Post 台架路面激励","4-POST RIG ROAD PROFILE",true);
+  const roadSel=E("div","ctl");
+  roadSel.innerHTML='<label>路面输入信号 <u>ROAD INPUT</u></label>';
+  const sel=E("select");
+  [["none","平整路面 (NONE)"],["step","阶跃冲击 (STEP)"],["sine","连续正弦 (SINE)"],["pulse","单次脉冲 (PULSE)"],["chirp","扫频激励 (CHIRP)"],["rand","随机粗糙路面 (RAND)"]].forEach(it=>{
+    const opt=E("option",null,it[1]);opt.value=it[0];sel.appendChild(opt);
+  });
+  sel.onchange=()=>{S.road=sel.value;};
+  roadSel.appendChild(sel);b.appendChild(roadSel);
+  UI.sync.push(()=>{sel.value=S.road;});
+  rowSlider(b,"路面位移幅值","ROAD AMP","mm",1,40,1,()=>S.rA,v=>S.rA=v,0);
+  rowSlider(b,"路面输入频率","ROAD FREQ","Hz",0.2,8.0,0.1,()=>S.rF,v=>S.rF=v,1);
+
+  b=sec(host,"3D 空间硬点表 (右侧)","3D HARDPOINTS [mm]");
   const tb=E("table","hp");
   tb.innerHTML="<thead><tr><th>硬点 ID</th><th>X 横向</th><th>Y 纵向</th><th>Z 垂向</th></tr></thead>";
   const tbody=E("tbody");
@@ -2557,78 +2522,9 @@ function buildLeft(){
     tbody.appendChild(tr);
   });
   tb.appendChild(tbody);b.appendChild(tb);
-  buildPersistencePanel(h1);
 
-  // ════ Tab 2 · 工况驱动 ════
-  b=sec(h2,"多体求解模式","SOLVER MODE",false,"grn");
-  rowBtns(b,[["运动学 KIN",()=>{S.mode="kin";},()=>S.mode==="kin"],
-             ["4-Post 台架 RIG",()=>{S.mode="rig";S.simT=0;},()=>S.mode==="rig"],
-             ["准静态操稳 QS",()=>{S.mode="quasi";},()=>S.mode==="quasi"]]);
-  rowBtns(b,[["运行 / 暂停",()=>{S.play=!S.play;},()=>S.play],
-             ["复位 RESET",()=>{S.travel=0;S.roll=0;S.rack=0;rebuild();}]]);
-  b=sec(h2,"高频驱动输入","DRIVERS",false,"amb");
-  rowSlider(b,"轮心垂直行程","WHEEL TRAVEL","mm",()=>S.trMin,()=>S.trMax,0.5,()=>S.travel,
-    v=>{S.travel=v;S.exc="off";},1);
-  rowSlider(b,"车身侧倾角","BODY ROLL","°",-5,5,0.1,()=>S.roll,v=>S.roll=v,2);
-  rowSlider(b,"转向齿条位移","FRONT RACK","mm",-60,60,0.5,()=>S.rack,
-    v=>{S.rack=v;SIM.dirtySweep=true;},1);
-  rowSlider(b,"单侧前束微调","TOE TRIM","mm",-15,15,0.1,()=>S[S.axis].tieTrim,
-    v=>{S[S.axis].tieTrim=v;rebuild();},2);
-  rowSlider(b,"轮跳幅值","TRAVEL AMP","mm",0,75,1,()=>S.excA,v=>S.excA=v,0);
-  rowSlider(b,"轮跳频率","FREQ","Hz",0.05,1.5,0.01,()=>S.excF,v=>S.excF=v,2);
-  b=sec(h2,"环境力学与载荷","QUASI CONDITIONS",false,"amb");
-  rowSlider(b,"侧向加速度","LATERAL ACC","g",-1.8,1.8,0.05,()=>S.qs.gy,v=>{S.qs.gy=v;simulate(0.016);},2);
-  rowSlider(b,"纵向加速度","LONG ACC","g",-1.5,1.5,0.05,()=>S.qs.gx,v=>{S.qs.gx=v;simulate(0.016);},2);
-  rowSlider(b,"气动总下压力","AERO DOWNFORCE","N",0,5000,50,()=>S.qs.aeroF,v=>{S.qs.aeroF=v;simulate(0.016);},0);
-  rowSlider(b,"气动前轴分配比","AERO FRONT BIAS","-",0.2,0.8,0.01,()=>S.qs.aeroBias,v=>{S.qs.aeroBias=v;simulate(0.016);},2);
-  b=sec(h2,"弹性元件与刚度","SPRINGS & DAMPERS");
-  rowSlider(b,"主弹簧刚度","SPRING RATE","N/mm",40,300,5,()=>S[S.axis].kS,v=>{S[S.axis].kS=v;refreshDerived(false);},0);
-  rowSlider(b,"压缩阻尼系数","BUMP DAMP","N·s/mm",1,30,0.5,()=>S[S.axis].cB,v=>S[S.axis].cB=v,1);
-  rowSlider(b,"复原阻尼系数","REB DAMP","N·s/mm",1,40,0.5,()=>S[S.axis].cR,v=>S[S.axis].cR=v,1);
-  rowSlider(b,"轮胎垂向刚度","TIRE RATE","N/mm",100,450,10,()=>S[S.axis].kT,v=>{S[S.axis].kT=v;refreshDerived(false);},0);
-  rowSlider(b,"稳定杆直径 (0=拆除)","ARB DIA","mm",0,34,0.5,()=>S[S.axis].arb.d,v=>S[S.axis].arb.d=v,1);
-  rowSlider(b,"稳定杆连杆位置比","ARB LINK POS","-",0.25,0.92,0.01,()=>S[S.axis].arb.t,v=>{S[S.axis].arb.t=v;SIM.dirtySweep=true;},2);
-  rowSlider(b,"整车总质量","TOTAL MASS","kg",800,2200,10,()=>S.mTotal,v=>{S.mTotal=v;refreshDerived(false);},0);
-  rowSlider(b,"簧载总质量","SPRUNG MASS","kg",700,2000,10,()=>S.mSprung,v=>{S.mSprung=v;refreshDerived(false);},0);
-  b=sec(h2,"4-Post 台架路面激励","ROAD PROFILE",true);
-  const roadSel=E("div","ctl");
-  roadSel.innerHTML='<label>路面输入信号 <u>ROAD INPUT</u></label>';
-  const sel=E("select");
-  [["none","平整路面 (NONE)"],["step","阶跃冲击 (STEP)"],["sine","连续正弦 (SINE)"],["pulse","单次脉冲 (PULSE)"],["chirp","扫频激励 (CHIRP)"],["rand","随机粗糙路面 (RAND)"]].forEach(it=>{
-    const opt=E("option",null,it[1]);opt.value=it[0];sel.appendChild(opt);
-  });
-  sel.onchange=()=>{S.road=sel.value;};
-  roadSel.appendChild(sel);b.appendChild(roadSel);
-  UI.sync.push(()=>{sel.value=S.road;});
-  rowSlider(b,"路面位移幅值","ROAD AMP","mm",1,40,1,()=>S.rA,v=>S.rA=v,0);
-  rowSlider(b,"路面输入频率","ROAD FREQ","Hz",0.2,8.0,0.1,()=>S.rF,v=>S.rF=v,1);
-
-  // ════ Tab 3 · 引擎 / 赛道 ════
-  buildEnginePanel(h3);
-  buildTrackPanel(h3);
-
-  // ════ Tab 4 · 图层显示 ════
-  b=sec(h4,"预设场景过滤","SCENE PRESETS",false,"grn");
-  const scene=(m)=>{
-    const S0={frame_main:1,frame_front:1,frame_side:1,frame_rear:1,powertrain:1,halfshaft:1,cv_boot:1,
-      steer_rack:1,steer_col:1,steer_wheel:1,disc_vent:1,caliper:1,brake_hyd:1,master_cyl:1,
-      rocker:1,elastic:1,wheel:1,face:1,arb:1,rigid:1,node:1,label:1,kp:1,chassis:1,steer:1,disc:1,
-      path:0,kpsw:0,ic:0,dim:0,mirror:1,axis:1};
-    const SETS={
-      full:Object.assign({},S0),
-      links:Object.assign({},S0,{frame_main:0,frame_front:0,frame_side:0,frame_rear:0,powertrain:0,
-        halfshaft:0,cv_boot:0,steer_rack:0,steer_col:0,steer_wheel:0,disc_vent:0,caliper:0,brake_hyd:0,master_cyl:0}),
-      aux:Object.assign({},S0,{face:0,wheel:0,rocker:0,elastic:1,arb:1,kp:1,path:1,kpsw:1,ic:1,dim:1,node:1,label:1}),
-      wire:Object.assign({},S0,{face:0,wheel:1,rocker:0,elastic:0,arb:0,kp:0,path:0,kpsw:0,ic:0,dim:0,node:1,label:0,frame_front:0,frame_side:0,frame_rear:0})
-    };
-    const v=SETS[m]||SETS.full; for(const k in v)S.show[k]=v[k]; UI.sync.forEach(f=>f()); rebuild();
-  };
-  rowBtns(b,[["整车完整装配",()=>scene("full")],["纯悬架连杆",()=>scene("links")],
-             ["运动学辅助线",()=>scene("aux")],["极简线框",()=>scene("wire")]]);
-  b=sec(h4,"系统显示·分色","SYSTEM LAYERS");
-  buildSystemShowPanel(h4);
-  b=sec(h4,"运动学辅助开关","AUX & VECTORS");
-  chkList(b,[["node","节点标记"],["label","硬点标号"],["rigid","刚体杆件"],["elastic","内置弹簧"],
+  b=sec(host,"显示图层控制","DISPLAY LAYERS");
+  chkList(b,[["node","节点"],["label","硬点标号"],["rigid","刚体杆件"],["elastic","内置弹簧"],
     ["face","摆臂三角面"],["rocker","摇臂总成"],["wheel","车轮与轮胎"],["disc","制动盘/卡钳"],
     ["arb","横向稳定杆"],["chassis","副车架/机架"],["steer","转向拉杆"],["kp","主销轴线"],
     ["kpsw","主销扫掠"],["path","运动轨迹"],["dim","尺寸/角度辅助"],["ic","瞬心/侧倾中心"],["mirror","对侧镜像悬架"]]);
@@ -2639,58 +2535,15 @@ function buildRight(){
   host.innerHTML="";
   UI.plots.length=0;
 
-  // ── 1. HERO KPI 2×2 ──
-  const hero=E("div","kpi-grid");
-  const mk=(zh,en,id,sub,cls)=>'<div class="kpi '+(cls||"")+'"><i>'+zh+' <u>'+en+'</u></i><b id="'+id+'">--</b><span id="'+sub+'">--</span></div>';
-  hero.innerHTML=
-    mk("整车侧倾梯度","ROLL GRADIENT","heroRollGrad","heroRollGradSub","brass")+
-    mk("前轴载荷转移占比","TLLTD","heroTlltd","heroTlltdSub","pri")+
-    mk("轮端等效刚度","WHEEL RATE","heroWR","heroWRSub","sage")+
-    mk("瞬态运动速比","MOTION RATIO","heroMR","heroMRSub","violet");
-  host.appendChild(hero);
-  host.appendChild(E("div","kpi-bar",'<div class="bar-fill-f" id="heroBar" style="width:50%"></div>'));
+  let b=sec(host,"推拉杆与摇臂高阶读数","PUSH/PULL & ROCKER METRICS");
+  ro(b,"构型模式","ARCH MODE","","roArch","k");
+  ro(b,"摇臂转角","ROCKER ANGLE","°","roRckDeg","hl");
+  ro(b,"瞬态运动速比","MOTION RATIO","-","roMR","k");
+  ro(b,"减振器行程","DAMPER DISP","mm","roDmpDisp");
+  ro(b,"内置弹簧弹力","SPRING FORCE","N","roSprF","hl");
+  ro(b,"轮端等效刚度","WHEEL RATE","N/mm","roWR","k");
 
-  // ── 2. CHART HUB 选项卡集 ──
-  const hub=E("div","chub");
-  const hbar=E("div","chub-bar");
-  const panes=[];
-  [["K&C 特性扫掠","KC"],["引擎/整车结果","ENG"],["赛道遥测","TRK"],["Baseline 差异","DELTA"]].forEach((d,i)=>{
-    const t=E("div","chub-tab"+(i===0?" on":""),d[1]);
-    t.onclick=()=>{hbar.querySelectorAll(".chub-tab").forEach((q,j)=>q.classList.toggle("on",j===i));
-      panes.forEach((p,j)=>{p.style.display=j===i?"":"none";});};
-    hbar.appendChild(t);
-    const p=E("div","chub-pane");panes.push(p);hub.appendChild(p);
-  });
-  hub.insertBefore(hbar,hub.firstChild);
-  host.appendChild(hub);
-  const pk=panes[0],pe=panes[1],pt=panes[2],pd=panes[3];
-
-  pk.appendChild(E("div","plotcap",'CAMBER / TOE ← WHEEL TRAVEL [mm] · 实线=当前 虚线=Baseline'));
-  const pb=E("div","plotbox");
-  for(let i=0;i<4;i++){
-    const cv=E("canvas","plot");pb.appendChild(cv);UI.plots.push(cv);
-    if(i<3) pb.appendChild(E("div",null,'<div style="height:3px"></div>'));
-  }
-  pk.appendChild(pb);
-
-  buildEngineResults(pe);
-  buildChassisResults(pe);
-  buildTrackTelemetry(pt);
-  if(S.hasBaseline){
-    pd.appendChild(E("div","plotcap",'ACTIVE vs BASELINE · DELTA'));
-    const db=E("div",null);
-    db.innerHTML='<div class="diffbox head"><span>项目 PARAM</span><b>ACTIVE</b><b>BASE</b><b>DELTA</b></div>';
-    const items=[["外倾增益 CG","cg","°/25mm"],["跳动转向 BS","bs","°/25mm"],["运动速比 MR","mr","-"],["侧倾中心 RC","rcH","mm"],["轮端刚度 WR","kw","N/mm"]];
-    items.forEach(it=>{
-      const row=E("div","diffbox");
-      row.innerHTML='<span>'+it[0]+'</span><b class="act" id="df_a_'+it[1]+'">--</b><b class="base" id="df_b_'+it[1]+'">--</b><b class="delta" id="df_d_'+it[1]+'">--</b>';
-      db.appendChild(row);
-    });
-    pd.appendChild(db);
-  }
-
-  // ── 3. 明细抽屉 ──
-  let b=sec(host,"车轮定位参数","WHEEL ALIGNMENT");
+  b=sec(host,"车轮定位参数","WHEEL ALIGNMENT");
   ro(b,"车轮外倾角","CAMBER","°","roCam","k");
   ro(b,"车轮前束角","TOE","°","roToe","k");
   ro(b,"主销内倾角","KPI / SAI","°","roKpi");
@@ -2707,7 +2560,7 @@ function buildRight(){
   ro(b,"轴总侧倾刚度","AXLE ROLL K","N·m/°","roArbTot","k");
   ro(b,"稳定杆占比","ARB SHARE","%","roArbSh","hl");
 
-  b=sec(host,"准静态载荷转移","LOAD TRANSFER",false,"amb");
+  b=sec(host,"准静态载荷转移分析","LOAD TRANSFER BREAKDOWN",false,"amb");
   ro(b,"稳态车身侧倾角","ROLL ANGLE","°","roQsRoll","hl");
   ro(b,"整车侧倾梯度","ROLL GRADIENT","°/g","roQsRollGrad","k");
   ro(b,"前轴侧倾刚度","FRONT ROLL K","Nm/°","roQsKf");
@@ -2721,20 +2574,36 @@ function buildRight(){
   b.appendChild(bb);
   ro(b,"操稳倾向判断","HANDLING BIAS","","roHandling","g");
 
-  b=sec(host,"运动学导数与瞬心","KINEMATICS DERIVATIVES");
+  if(S.hasBaseline){
+    b=sec(host,"基准线差异分析 (Delta Diff)","BASELINE DELTA",false,"purp");
+    const db=E("div",null);
+    db.innerHTML='<div class="diffbox head"><span>项目 PARAM</span><b>ACTIVE</b><b>BASE</b><b>DELTA</b></div>';
+    const items=[["外倾增益 CG","cg","°/25mm"],["跳动转向 BS","bs","°/25mm"],["运动速比 MR","mr","-"],["侧倾中心 RC","rcH","mm"],["轮端刚度 WR","kw","N/mm"]];
+    items.forEach(it=>{
+      const row=E("div","diffbox");
+      row.innerHTML='<span>'+it[0]+'</span><b class="act" id="df_a_'+it[1]+'">--</b><b class="base" id="df_b_'+it[1]+'">--</b><b class="delta" id="df_d_'+it[1]+'">--</b>';
+      db.appendChild(row);
+    });
+    b.appendChild(db);
+  }
+
+  b=sec(host,"运动学导数与动态","KINEMATICS DERIVATIVES");
   ro(b,"外倾角增益","CAMBER GAIN","°/25","roCG","hl");
   ro(b,"跳动转向","BUMP STEER","°/25","roBS");
   ro(b,"侧倾中心高度","ROLL CTR H","mm","roRC","k");
   ro(b,"抗俯仰率","ANTI-DIVE","%","roAnti");
   ro(b,"簧载固有频率","RIDE FREQ","Hz","roFreq");
 
-  b=sec(host,"推拉杆与摇臂读数","ROCKER METRICS",true);
-  ro(b,"构型模式","ARCH MODE","","roArch","k");
-  ro(b,"摇臂转角","ROCKER ANGLE","°","roRckDeg","hl");
-  ro(b,"瞬态运动速比","MOTION RATIO","-","roMR","k");
-  ro(b,"减振器行程","DAMPER DISP","mm","roDmpDisp");
-  ro(b,"内置弹簧弹力","SPRING FORCE","N","roSprF","hl");
-  ro(b,"轮端等效刚度","WHEEL RATE","N/mm","roWR","k");
+  b=sec(host,"运动学特性曲线扫掠 (含双线对比)","CHARACTERISTIC CURVES");
+  const pb=E("div","plotbox");
+  for(let i=0;i<4;i++){
+    const cv=E("canvas","plot");pb.appendChild(cv);UI.plots.push(cv);
+    if(i<3) pb.appendChild(E("div",null,'<div style="height:3px"></div>'));
+  }
+  b.appendChild(pb);
+  buildEngineResults(host);
+  buildChassisResults(host);
+  buildTrackTelemetry(host);
 
   b=sec(host,"多体求解器状态","SOLVER RESIDUALS",true);
   ro(b,"活动节点数","NODES","","roNodes");
@@ -3047,11 +2916,9 @@ function updateReadouts(){
   setRO("roArch", state.arch==="pushrod"?"推杆 (Pushrod)":"拉杆 (Pullrod)");
   setRO("roRckDeg", sfmt(m.rockerDeg, 2));
   setRO("roMR", fmt(mr, 3));
-  {const e=document.getElementById("heroMR");if(e)e.textContent=fmt(mr,3);}
   setRO("roDmpDisp", sfmt(M.damperL0 - m.damperL, 1));
   setRO("roSprF", fmt(M.springF0/FS + state.kS*(M.damperL0 - m.damperL), 0));
   setRO("roWR", fmt(wr, 1));
-  {const e=document.getElementById("heroWR");if(e)e.textContent=fmt(wr,1);}
 
   setRO("roCam", fmt(m.cam, 2));
   setRO("roToe", sfmt(m.toe, 3));
@@ -3095,7 +2962,6 @@ function updateReadouts(){
     const tb=document.getElementById("tlltdBar");
     if(tb){
       tb.style.width=qs.tlltd.toFixed(1)+"%";
-      {const e=document.getElementById("heroBar");if(e)e.style.width=qs.tlltd.toFixed(1)+"%";}
       document.getElementById("tlltdLblF").textContent="前轴: "+qs.tlltd.toFixed(1)+"%";
       document.getElementById("tlltdLblR").textContent="后轴: "+(100-qs.tlltd).toFixed(1)+"%";
     }
@@ -3104,7 +2970,6 @@ function updateReadouts(){
 
     document.getElementById("sbTLLTD").textContent = qs.tlltd.toFixed(1)+"%";
     document.getElementById("sbRollGrad").textContent = qs.rollGrad.toFixed(2)+" °/g";
-    {const e=document.getElementById("heroRollGrad");if(e)e.textContent=qs.rollGrad.toFixed(2)+" °/g";const e2=document.getElementById("heroTlltd");if(e2)e2.textContent=qs.tlltd.toFixed(1)+"%";const e3=document.getElementById("heroWRSub");if(e3)e3.textContent="簧载频率 "+fmt(frq,2)+" Hz";}
   }
 
   /* Baseline 差异读数 */
@@ -3642,22 +3507,7 @@ function applyTheme(t){
   if(tg)tg.onclick=()=>applyTheme(document.documentElement.getAttribute("data-theme")==="light"?"dark":"light");
 })();
 
-// —— 2026-08-23 交互增强：Space 启停 + 顶栏快照/清除 + 状态拨档 ——
-window.addEventListener("keydown",e=>{
-  if(e.code==="Space"&&!e.repeat){
-    const t=e.target;
-    if(t&&(t.tagName==="INPUT"||t.tagName==="SELECT"||t.tagName==="TEXTAREA"))return;
-    e.preventDefault();S.play=!S.play;
-  }
-});
-{const b1=document.getElementById("tbSnap"),b2=document.getElementById("tbClear");
- if(b1)b1.onclick=()=>{takeBaselineSnapshot();buildRight();};
- if(b2)b2.onclick=()=>{clearBaselineSnapshot();buildRight();};
- const st=document.getElementById("tbStateBox");
- if(st)st.style.cursor="pointer",st.title="点击 启停仿真 (Space)";
- if(st)st.onclick=()=>{S.play=!S.play;};}
 hpLoad();
-
 buildLeft();
 buildRight();
 rebuild();
