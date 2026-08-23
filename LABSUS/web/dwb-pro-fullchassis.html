@@ -292,6 +292,44 @@ canvas.plot{display:block;width:100%;height:84px;background:var(--well);border:1
 .eng-run.ch:hover{border-color:var(--ok);box-shadow:0 0 12px var(--ok-fill)}
 .eng-status{padding:4px 10px 6px;font-size:9px;color:var(--txt3);line-height:1.45;font-family:var(--font-mono);white-space:pre-line}
 .pose-cell{padding:1px 4px;text-align:right;color:var(--ink-1);font-variant-numeric:tabular-nums;font-family:var(--font-mono)}
+#stageWrap,#stageSetup{position:fixed;inset:6vh 7vw;display:none;z-index:200;background:#11141A;border:1.5px solid #323E52;flex-direction:column;color:#E6E9EF;font-family:var(--font-ui)}
+#stageTop{height:44px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid #323E52;background:#161B22}
+.st-bt{font:600 13px/1 var(--font-ui);letter-spacing:.08em}
+.st-st{font:10px var(--font-mono);color:#9AA4B5;margin-left:6px}
+#stageTop .sp{flex:1}
+.st-cams{display:flex;gap:4px}
+.st-btn{height:22px;padding:0 10px;font:600 9px/1 var(--font-ui);border:1px solid #323E52;background:#1C222C;color:#9AA4B5;cursor:pointer;border-radius:1px}
+.st-btn:hover{background:#222A36;color:#E6E9EF}
+.st-btn.on{background:#4697E6;color:#0E1218}
+.st-btn.danger{border-color:#D9534F;color:#D9534F}
+.st-btn.go{background:#45B374;color:#0E1218;height:30px;font-size:11px;margin-top:8px}
+.st-sel{height:22px;background:#12161D;border:1px solid #323E52;color:#9AA4B5;font:9px var(--font-mono)}
+#stScrub{flex:1;height:16px;accent-color:#4697E6;margin:0 8px}
+#stageBody{flex:1;display:flex;min-height:0}
+#stageCanvasBox{flex:1;min-width:0;position:relative}
+#stageCanvas{width:100%;height:100%}
+#stageSide{width:300px;flex:0 0 300px;border-left:1px solid #323E52;overflow-y:auto;padding:8px;background:#0F141B}
+#stageWrap .ss-t,#stageSetup .ss-t{font:600 8.5px/1 var(--font-ui);letter-spacing:.14em;text-transform:uppercase;color:#6C788A;margin:8px 0 6px}
+#fcGrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.fc-cell{border:1px solid #252E3D;background:#0F141B}
+.fc-t{font:600 8px/1 var(--font-mono);color:#4697E6;padding:3px 5px}
+.fc-c{width:100%;height:auto}
+.telg{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.telg-item{display:flex;justify-content:space-between;align-items:center;border:1px solid #252E3D;background:#12161D;padding:5px 7px}
+.telg-item span{font:8.5px var(--font-ui);color:#6C788A;letter-spacing:.05em;white-space:nowrap}
+.telg-item u{text-decoration:none;color:#4A5462;margin-left:3px}
+.telg-item b{font:600 11px var(--font-mono);color:#E6E9EF;font-variant-numeric:tabular-nums}
+#stageSetup{overflow:auto;background:#161B22}
+#ssHead{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid #323E52;background:#161B22}
+#ssHead b{font:600 14px/1 var(--font-ui)}
+#ssBody{display:flex;gap:16px;padding:16px}
+.ss-col{flex:1;border:1px solid #252E3D;background:#12161D;padding:12px}
+.selrow{display:flex;align-items:center;gap:8px;margin:6px 0}
+.selrow label{font:9px var(--font-ui);color:#9AA4B5;width:90px}
+.selrow select,.selrow input{flex:1;height:24px;background:#0E1319;border:1px solid #323E52;color:#E6E9EF;font:10px var(--font-mono)}
+#ssPreview{display:block;margin:6px 0;border:1px solid #252E3D;background:#0e1218}
+.ss-st{font:9px var(--font-mono);color:#9AA4B5;margin-top:10px}
+
 </style>
 </head>
 <body>
@@ -2092,6 +2130,7 @@ function fitPoints(){
   pts.push([0,0,0]); return pts;
 }
 function fitView(v){
+  if(v.w<20||v.h<20){v.s=0.5;return;}   // 防初次布局竞态 (2026-08-24)
   const pts=fitPoints();
   if(v.type==="o"){
     let a0=1e9,a1=-1e9,b0=1e9,b1=-1e9;
@@ -2133,6 +2172,7 @@ function dimLine(ctx,A,B,txt,off,col){
 }
 
 function angArc(ctx,O,r,a0,a1,txt,col){
+  if(!O||!(r>0))return;   // 防负半径竞态 (2026-08-24)
   ctx.strokeStyle=col||C.dim;ctx.lineWidth=1;dash(ctx,[3,2]);
   ctx.beginPath();ctx.arc(O[0],O[1],r,Math.min(a0,a1),Math.max(a0,a1));ctx.stroke();dash(ctx,[]);
   const am=(a0+a1)/2;
@@ -3242,6 +3282,7 @@ function loop(ts){
   _fc++;_ft+=dt;
   if(_ft>0.4){_fps=_fc/_ft;_fc=0;_ft=0;document.getElementById("tbFps").textContent=fmt(_fps,0);}
   requestAnimationFrame(loop);
+if(location.search.indexOf("stagedemo")>=0){setTimeout(function(){_stageOpenSetup();setTimeout(function(){trackStageRun();},300);},800);}else if(location.search.indexOf("stage")>=0){setTimeout(function(){_stageOpenSetup();},800);}
 }
 
 
@@ -3422,8 +3463,332 @@ function trackCSV(){
   a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
   a.download="labsus_telemetry_"+TRK.preset+".csv";a.click();
 }
+/* ================================================================
+   S3-1 Track Stage (2026-08-24 standalone): setup -> engine sim ->
+   80% fullscreen stage with follow cams + live friction circles
+   ================================================================ */
+const STAGE={
+  open:false, res:null, req:null, i:0, speed:1.0, playing:false,
+  cam:"behind", trace:null, v:null, tMax:1, raf:0, last:0, built:false
+};
+const STAGE_CAMS=[
+  ["behind","尾部跟随"],["front","前部跟随"],["threeq","斜45deg跟随"],
+  ["top","顶视跟随"],["trackside","固定机位(起点)"]
+];
+const STAGE_CAM_OFF={
+  behind:[0,-8.6,2.9], front:[0,8.6,2.3], threeq:[5.8,-7.0,3.1],
+  top:[0.01,-0.02,42.0], trackside:null
+};
+
+function _stageOpenSetup(){
+  _stageBuild();
+  document.getElementById("stageSetup").style.display="block";
+  document.getElementById("stageWrap").style.display="none";
+  drawStageSetupPreview();
+  console.log("STAGE-SETUP-OPENED");
+}
+function _stageCloseSetup(){
+  document.getElementById("stageSetup").style.display="none";
+}
+function _stageBuild(){
+  if(STAGE.built)return; STAGE.built=true;
+  const body=document.body;
+  const w=document.createElement("div");w.id="stageWrap";
+  w.innerHTML=
+    '<div id="stageTop">'+
+      '<b class="st-bt">LABSUS - 赛道瞬态舞台</b><span class="st-st" id="stStatus">--</span>'+
+      '<span class="sp"></span><span class="st-cams" id="stCams"></span>'+
+      '<button class="st-btn" id="stPlay">PAUSE</button>'+
+      '<select class="st-sel" id="stRate"><option value="0.5">0.5x</option><option value="1" selected>1.0x</option><option value="2">2.0x</option></select>'+
+      '<input id="stScrub" type="range" min="0" max="1000" value="0">'+
+      '<button class="st-btn danger" id="stExit">X 退出</button>'+
+    '</div>'+
+    '<div id="stageBody">'+
+      '<div id="stageCanvasBox"><canvas id="stageCanvas"></canvas></div>'+
+      '<div id="stageSide">'+
+        '<div class="ss-t">四轮摩擦圆 TIRE FRICTION CIRCLES</div>'+
+        '<div id="fcGrid"></div>'+
+        '<div class="ss-t">关键物理 LIVE TELEMETRY</div>'+
+        '<div id="telGrid" class="telg"></div>'+
+      '</div>'+
+    '</div>';
+  body.appendChild(w);
+  const st=document.createElement("div");st.id="stageSetup";
+  st.innerHTML=
+    '<div id="ssHead"><b>赛道仿真 - 初始属性设置</b><button class="st-btn danger" id="ssCancel">取消</button></div>'+
+    '<div id="ssBody">'+
+      '<div class="ss-col">'+
+        '<div class="ss-t">赛道图 TRACK</div>'+
+        '<div class="selrow"><label>预设</label><select id="ssPreset"></select></div>'+
+        '<canvas id="ssPreview" width="320" height="200"></canvas>'+
+        '<div class="selrow"><button class="st-btn" id="ssImport">导入 JSON/CSV 路点</button></div>'+
+        '<div class="selrow"><label>模拟时长 s</label><input id="ssTime" type="number" value="25" step="1" min="5" max="120"></div>'+
+      '</div>'+
+      '<div class="ss-col">'+
+        '<div class="ss-t">车辆与动力 VEHICLE and POWERTRAIN</div>'+
+        '<div class="telg">'+
+          '<label>初速 m/s</label><input id="ssV0" type="number" value="6" step="0.5" min="2" max="30">'+
+          '<label>预瞄增益</label><input id="ssLook" type="number" value="0.9" step="0.05" min="0.4" max="1.5">'+
+          '<label>峰值扭矩 Nm</label><input id="ssTq" type="number" value="250" step="10" min="40" max="800">'+
+          '<label>峰值功率 kW</label><input id="ssPw" type="number" value="80" step="5" min="20" max="400">'+
+          '<label>前轴制动 %</label><input id="ssBrk" type="number" value="60" step="5" min="0" max="100">'+
+        '</div>'+
+        '<div class="ss-t">气动 AERO</div>'+
+        '<div class="telg">'+
+          '<label>前下压 k</label><input id="ssAkf" type="number" value="0.55" step="0.05" min="0" max="4">'+
+          '<label>后下压 k</label><input id="ssAkr" type="number" value="0.45" step="0.05" min="0" max="4">'+
+          '<label>阻力 k</label><input id="ssAkd" type="number" value="0.35" step="0.05" min="0" max="4">'+
+        '</div>'+
+        '<div class="ss-t">轮胎 TIRE (MF)</div>'+
+        '<div class="telg">'+
+          '<label>Fy0 N</label><input id="ssFy0" type="number" value="8000" step="500" min="2000" max="20000">'+
+          '<label>FzNom N</label><input id="ssFzN" type="number" value="3500" step="100" min="1000" max="8000">'+
+          '<label>松弛长度 m</label><input id="ssLs" type="number" value="0.35" step="0.05" min="0.05" max="1">'+
+          '<label>外倾系数 /rad</label><input id="ssCg" type="number" value="0.5" step="0.1" min="0" max="2">'+
+        '</div>'+
+        '<button class="st-btn go" id="ssGo">开始赛道仿真</button>'+
+        '<div class="ss-st" id="ssStatus">选择预设或导入路点 - 设置参数 - 开始仿真（需引擎在线）</div>'+
+      '</div>'+
+    '</div>';
+  body.appendChild(st);
+  STAGE.v={cv:document.getElementById("stageCanvas"),w:10,h:10,dpr:1,ctx:null,
+    eye:[0,0,40],tgt:[0,0,0],fw:[1,0,0],rt:[0,1,0],up:[0,0,1],dist:40,s:1};
+  const cams=document.getElementById("stCams");
+  STAGE_CAMS.forEach((a)=>{
+    const b=document.createElement("button");b.className="st-btn cam"+(a[0]==="behind"?" on":"");
+    b.textContent=a[1];b.dataset.cam=a[0];
+    b.onclick=()=>{STAGE.cam=a[0];cams.querySelectorAll(".st-btn").forEach(q=>q.classList.toggle("on",q.dataset.cam===a[0]));};
+    cams.appendChild(b);
+  });
+  const fg=document.getElementById("fcGrid");
+  ["FL","FR","RL","RR"].forEach(wv=>{
+    const cell=document.createElement("div");cell.className="fc-cell";
+    cell.innerHTML="<div class='fc-t'>"+wv+"</div><canvas class='fc-c' width='130' height='130'></canvas>";
+    fg.appendChild(cell);
+  });
+  const tg=document.getElementById("telGrid");
+  [["telV","车速 v","m/s"],["telAx","纵向 ax","m/s2"],["telAy","侧向 ay","g"],
+   ["telYaw","横摆 yaw","rad/s"],["telRoll","侧倾 roll","deg"],["telPitch","俯仰 pitch","deg"],
+   ["telDelta","转向 delta","deg"],["telMuMax","mu 利用率",""],["telThr","油门",""],
+   ["telBrk","制动",""],["telSlipMax","松弛滑移 max","deg"],["telDist","时间","s"]].forEach(d=>{
+    const g=document.createElement("div");g.className="telg-item";
+    g.innerHTML="<span>"+d[1]+" <u>"+d[2]+"</u></span><b id='"+d[0]+"'>--</b>";
+    tg.appendChild(g);
+  });
+  document.getElementById("stExit").onclick=()=>{STAGE.open=false;document.getElementById("stageWrap").style.display="none";_stageCloseSetup();};
+  document.getElementById("stPlay").onclick=()=>{STAGE.playing=!STAGE.playing;document.getElementById("stPlay").textContent=STAGE.playing?"PAUSE":"PLAY";};
+  document.getElementById("stRate").onchange=e=>{STAGE.speed=parseFloat(e.target.value);};
+  document.getElementById("stScrub").oninput=e=>{if(STAGE.res){STAGE.playing=false;STAGE.i=Math.round(parseFloat(e.target.value)/1000*(STAGE.trace.length-1));}};
+  document.getElementById("ssCancel").onclick=_stageCloseSetup;
+  const pr=document.getElementById("ssPreset");
+  Object.keys(TRACK_PRESETS).forEach(k=>{const o=document.createElement("option");o.value=k;o.textContent=TRACK_PRESETS[k].zh;pr.appendChild(o);});
+  pr.onchange=()=>drawStageSetupPreview();
+  document.getElementById("ssGo").onclick=trackStageRun;
+  STAGE.v.ctx=STAGE.v.cv.getContext("2d");
+}
+
+function drawStageSetupPreview(){
+  const cv=document.getElementById("ssPreview");if(!cv)return;
+  const ctx=cv.getContext("2d");const w=cv.width,h=cv.height;
+  ctx.clearRect(0,0,w,h);ctx.fillStyle="#0d1016";ctx.fillRect(0,0,w,h);
+  const key=document.getElementById("ssPreset").value;
+  const P=TRACK_PRESETS[key]||{};const pts=P.pts||[];
+  if(!pts.length)return;
+  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+  pts.forEach(p=>{x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0]);y0=Math.min(y0,p[1]);y1=Math.max(y1,p[1]);});
+  const sc=Math.min((w-34)/Math.max(1,x1-x0),(h-34)/Math.max(1,y1-y0));
+  const cx=(x0+x1)/2,cy=(y0+y1)/2;
+  ctx.strokeStyle="#4697E6";ctx.beginPath();
+  pts.forEach((p,k)=>{const X=w/2+(p[0]-cx)*sc,Y=h/2-(p[1]-cy)*sc;k?ctx.lineTo(X,Y):ctx.moveTo(X,Y);});
+  if(P.closed)ctx.closePath();
+  ctx.stroke();
+  ctx.fillStyle="#9AA4B5";ctx.font="9px monospace";
+  ctx.fillText(pts.length+" pts  v="+(P.v||"-")+"m/s",8,12);
+}
+function trackStageRun(){
+  _stageBuild();
+  if(!ENG.ok){document.getElementById("ssStatus").textContent="未连接引擎 -> 请先连接";return;}
+  const st=document.getElementById("ssStatus");
+  st.textContent="仿真中...(MF 松弛/复合滑移 + 动力/气动包络)";
+  const base=chassisPayload();
+  const lut=sw=>({travel:sw.rows.map(r=>r.tr),toe:sw.rows.map(r=>r.toe),cam:sw.rows.map(r=>r.cam)});
+  const key=document.getElementById("ssPreset").value;
+  const PP=TRACK_PRESETS[key];
+  const pts=PP.pts.map(p=>({x:p[0],y:p[1],target_speed:(p[2]!==undefined?p[2]:PP.v)}));
+  const body={vehicle:base.vehicle,
+    kc_luts:{front:lut(SIM.swF),rear:lut(SIM.swR)},
+    track:pts, dt:0.01,
+    sim_time:parseFloat(document.getElementById("ssTime").value)||25,
+    lookahead_gain:parseFloat(document.getElementById("ssLook").value)||0.9,
+    start_speed:parseFloat(document.getElementById("ssV0").value)||6.0,
+    powertrain:{T_max:parseFloat(document.getElementById("ssTq").value)||250,
+      P_kw:parseFloat(document.getElementById("ssPw").value)||80,
+      brake_split_f:(parseFloat(document.getElementById("ssBrk").value)||60)/100},
+    aero:{k_down_f:parseFloat(document.getElementById("ssAkf").value)||0.55,
+      k_down_r:parseFloat(document.getElementById("ssAkr").value)||0.45,
+      k_drag:parseFloat(document.getElementById("ssAkd").value)||0.35},
+    tire:{Fy0:parseFloat(document.getElementById("ssFy0").value)||8000,
+      FzNom:parseFloat(document.getElementById("ssFzN").value)||3500,
+      Ls:parseFloat(document.getElementById("ssLs").value)||0.35,
+      Cg:parseFloat(document.getElementById("ssCg").value)||0.5}};
+  fetch(ENG.url+"/api/v3/chassis/simulate_track",
+    {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+  .then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
+  .then(res=>{
+    if(res.status!=="VALID")throw new Error(res.status+" "+(res.warnings||[]).join(";"));
+    STAGE.res=res;STAGE.trace=res.trace;STAGE.req=body;
+    STAGE.tMax=res.t[res.t.length-1]||1;
+    console.log("STAGE-READY", document.getElementById("fcGrid")?"both":document.getElementById("stCams")?"part":"none", res.trace.length, res.summary.v_max, res.summary.max_ay_g);
+    STAGE.i=0;STAGE.playing=true;
+    document.getElementById("stageSetup").style.display="none";
+    document.getElementById("stageWrap").style.display="block";
+    _stageSize();_stageOpen();STAGE.last=performance.now();requestAnimationFrame(stageTick);
+    const sm=res.summary;
+    document.getElementById("stStatus").textContent=
+      sm.path_length_m+"m - v_max "+sm.v_max+"m/s - max "+sm.max_ay_g+"g - "+(res.ms|0)+"ms"+(res.finished?" (完赛)":"");
+  })
+  .catch(err=>{document.getElementById("ssStatus").textContent="仿真失败："+err.message;});
+}
+function _stageSize(){
+  const v=STAGE.v,cv=v.cv,r=cv.getBoundingClientRect();
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  v.w=Math.max(10,r.width);v.h=Math.max(10,r.height);v.dpr=dpr;
+  cv.width=v.w*dpr;cv.height=v.h*dpr;v.ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+function _stageOpen(){
+  if(STAGE.trace&&STAGE.trace.length)stageCam(STAGE.trace[STAGE.i]);
+}
+function stageCam(row){
+  const v=STAGE.v;if(!row)return;
+  const psi=row.psi,x=row.x,y=row.y;
+  const off=STAGE_CAM_OFF[STAGE.cam];
+  let eye,tgt;
+  if(STAGE.cam==="trackside"){
+    const P=TRACK_PRESETS[document.getElementById("ssPreset").value]||{pts:[[0,0]]};
+    const p0=P.pts[0];
+    eye=[(p0[0]||0)+16,(p0[1]||0)-14,9];
+    tgt=[x,y,0.6];
+  }else{
+    const c=Math.cos(psi),sn=Math.sin(psi);
+    const hx=c,hy=sn,rx=sn,ry=-c;
+    eye=[x+rx*off[0]+hx*off[1], y+ry*off[0]+hy*off[1], off[2]];
+    tgt=[x,y,0.5];
+  }
+  const k=0.22;
+  v.eye=[v.eye[0]+(eye[0]-v.eye[0])*k,v.eye[1]+(eye[1]-v.eye[1])*k,v.eye[2]+(eye[2]-v.eye[2])*k];
+  v.tgt=[v.tgt[0]+(tgt[0]-v.tgt[0])*k,v.tgt[1]+(tgt[1]-v.tgt[1])*k,v.tgt[2]+(tgt[2]-v.tgt[2])*k];
+  camIso(v);
+  v.dist=Math.max(2,Math.hypot(v.eye[0]-v.tgt[0],v.eye[1]-v.tgt[1],v.eye[2]-v.tgt[2]));
+  v.s=Math.min(0.9, 140/v.dist);
+  camIso(v);
+}
+function stageTick(ts){
+  if(!STAGE.open)return;
+  const dt=(ts-STAGE.last)/1000;STAGE.last=ts;
+  if(STAGE.playing&&STAGE.trace){
+    const n=STAGE.trace.length;
+    const adv=Math.max(1,Math.round(dt*STAGE.speed/(STAGE.tMax/Math.max(1,n-1))));
+    STAGE.i=Math.min(n-1,STAGE.i+adv);
+    if(STAGE.i>=n-1)STAGE.playing=false;
+  }
+  const row=STAGE.trace[STAGE.i];
+  stageCam(row);
+  drawStage(row);
+  drawStageTelemetry(row);
+  const sc=document.getElementById("stScrub");
+  if(sc&&STAGE.trace.length>1)sc.value=Math.round(STAGE.i/(STAGE.trace.length-1)*1000);
+  requestAnimationFrame(stageTick);
+}
+
+function drawStage(row){
+  const v=STAGE.v,ctx=v.ctx;if(!row)return;
+  const w=v.w,h=v.h;
+  ctx.fillStyle="#0E1218";ctx.fillRect(0,0,w,h);
+  const P3=p=>{
+    const q=[p[0]-v.eye[0],p[1]-v.eye[1],p[2]-v.eye[2]];
+    const z=q[0]*v.fw[0]+q[1]*v.fw[1]+q[2]*v.fw[2];
+    if(z<2)return null;
+    const f=v.dist/z;
+    return [w/2+(q[0]*v.rt[0]+q[1]*v.rt[1]+q[2]*v.rt[2])*f*v.s,
+            h/2-(q[0]*v.up[0]+q[1]*v.up[1]+q[2]*v.up[2])*f*v.s];
+  };
+  ctx.strokeStyle="rgba(70,86,110,0.22)";ctx.lineWidth=1;
+  for(let g=-140;g<=140;g+=10){
+    let a=P3([g,-140,-0.85]),b=P3([g,140,-0.85]);
+    if(a&&b){ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();}
+    a=P3([-140,g,-0.85]);b=P3([140,g,-0.85]);
+    if(a&&b){ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();}
+  }
+  const tr=STAGE.trace,reqT=STAGE.req.track;
+  ctx.strokeStyle="#6C788A";ctx.setLineDash([9,6]);ctx.lineWidth=1.6;
+  ctx.beginPath();
+  reqT.forEach((p,k)=>{const pt=P3([p.x,p.y,0]);if(!pt)return;if(k===0)ctx.moveTo(pt[0],pt[1]);else ctx.lineTo(pt[0],pt[1]);});
+  ctx.stroke();ctx.setLineDash([]);
+  for(let k=1;k<=STAGE.i;k++){
+    const a=tr[k-1],b=tr[k],g=Math.min(1,Math.abs(b.ay)/19.62);
+    const A=P3([a.x,a.y,0]),B=P3([b.x,b.y,0]);
+    if(!A||!B)continue;
+    ctx.strokeStyle="hsl("+(120-120*g|0)+",76%,55%)";ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();
+  }
+  const psi=row.psi,c=Math.cos(psi),sn=Math.sin(psi);
+  const x=row.x,y=row.y;
+  const W=p=>[x+p[1]*c+p[0]*sn, y+p[1]*sn-p[0]*c, p[2]];
+  const sc=buildScenePRO();
+  const drawPoly=(pts,cl,w2,d2,f2)=>{ctx.strokeStyle=cl;ctx.lineWidth=w2||1;ctx.setLineDash(d2||[]);
+    ctx.beginPath();let first=true;
+    pts.forEach(p=>{const q=P3(W(p));if(!q)return;if(first){ctx.moveTo(q[0],q[1]);first=false;}else ctx.lineTo(q[0],q[1]);});
+    ctx.setLineDash([]);
+    if(!first&&f2){ctx.fillStyle=f2;ctx.fill();}
+    ctx.stroke();};
+  for(const el of sc){
+    if(el.k==="l"){const A=P3(W(el.a)),B=P3(W(el.b));
+      if(A&&B){ctx.strokeStyle=el.c;ctx.lineWidth=el.w||1;ctx.setLineDash(el.d||[]);
+        ctx.beginPath();ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();ctx.setLineDash([]);}}
+    else if(el.k==="p"){drawPoly(el.pts,el.c,el.w,el.d,el.f);}
+    else if(el.k==="n"){const p=P3(W(el.p));if(p){ctx.fillStyle=el.fix?"#D9534F":"#4697E6";
+      ctx.beginPath();ctx.arc(p[0],p[1],el.sx||2.2,0,6.2832);ctx.fill();}}
+  }
+  ctx.fillStyle="rgba(10,13,18,0.72)";ctx.fillRect(0,0,w,20);
+  ctx.fillStyle="#E6E9EF";ctx.font="10px ui-monospace,monospace";
+  ctx.fillText("t="+(STAGE.res.t[STAGE.i]||0).toFixed(1)+"s  v="+row.vx.toFixed(1)+"m/s  ay="+(row.ay/9.81).toFixed(2)+"g  yaw="+row.r.toFixed(2)+"rad/s  cam="+STAGE.cam, 10, 13);
+}
+function drawStageTelemetry(row){
+  if(!row)return;
+  const set=(id,t)=>{const e=document.getElementById(id);if(e)e.textContent=t;};
+  set("telV",row.vx.toFixed(1));set("telAx",(row.ax||0).toFixed(2));
+  set("telAy",(row.ay/9.81).toFixed(2)+" g");set("telYaw",row.r.toFixed(3));
+  set("telRoll",(row.roll||0).toFixed(2));set("telPitch",(row.pitch||0).toFixed(2));
+  set("telDelta",(row.delta*57.2958).toFixed(1));set("telThr",(row.throttle*100).toFixed(0)+"%");
+  set("telBrk",(row.brake*100).toFixed(0)+"%");
+  set("telSlipMax",Math.max(Math.abs(row.alphaL_FR||0),Math.abs(row.alphaL_FL||0),Math.abs(row.alphaL_RR||0),Math.abs(row.alphaL_RL||0)).toFixed(2));
+  set("telDist",((STAGE.res&&STAGE.res.t[STAGE.i])||0).toFixed(1));
+  const maxMu=Math.max(row.mu_FR||0,row.mu_FL||0,row.mu_RR||0,row.mu_RL||0);
+  set("telMuMax",(maxMu*100).toFixed(0)+"%");
+  const fc=["FL","FR","RL","RR"];
+  const gr=document.getElementById("fcGrid").querySelectorAll(".fc-c");
+  const mu=8000/3500;
+  fc.forEach((wk,idx)=>{
+    const cv=gr[idx];if(!cv)return;const ctx=cv.getContext("2d");
+    const w=cv.width,h=cv.height,cx=w/2,cy=h/2,R=Math.min(w,h)/2-8;
+    ctx.clearRect(0,0,w,h);ctx.fillStyle="#0F141B";ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle="#323E52";ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(0,cy);ctx.lineTo(w,cy);ctx.moveTo(cx,0);ctx.lineTo(cx,h);ctx.stroke();
+    ctx.strokeStyle="#6C788A";ctx.setLineDash([4,3]);
+    ctx.beginPath();ctx.arc(cx,cy,R,0,6.2832);ctx.stroke();ctx.setLineDash([]);
+    const fxN=row["fx_"+wk]||0,fyN=row["fy_"+wk]||0,fz=row["fz_"+wk]||1;
+    const px=cx+(fxN/(fz*mu))*R, py=cy-(fyN/(fz*mu))*R;
+    ctx.strokeStyle="#4697E6";ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(px,py);ctx.stroke();
+    ctx.fillStyle="#D99A43";ctx.beginPath();ctx.arc(px,py,3.4,0,6.2832);ctx.fill();
+    ctx.fillStyle="#9AA4B5";ctx.font="8px monospace";
+    ctx.fillText("Fz "+(fz/1000).toFixed(1)+"kN",6,10);
+    ctx.fillText("a "+row["alpha_"+wk]+"  aL "+row["alphaL_"+wk],6,h-8);
+    ctx.fillText("mu "+(row["mu_"+wk]||0).toFixed(2),w-30,h-8);
+  });
+}
+
 function buildTrackPanel(host){
-  const b=sec(host,"赛道瞬态仿真 (引擎)","TRACK TRANSIENT SIM · S3-2",false,"purp");
+  const b=sec(host,"赛道瞬态仿真 (引擎)","TRACK SIM STAGE - S3-1",false,"purp");
   const row=E("div","ctl");
   row.appendChild(E("label",null,'赛道预设 <u>PRESET</u>'));
   const sel=E("select");sel.id="trkPreset";sel.style.flex="1";
@@ -3452,8 +3817,8 @@ function buildTrackPanel(host){
   rowV.appendChild(E("label",null,'初速 <u>START V</u> [m/s]'));
   const vi=E("input");vi.type="number";vi.id="trkV0";vi.value="6";vi.step="0.5";vi.min="2";vi.max="20";
   rowV.appendChild(vi);b.appendChild(rowV);
-  const run=E("button","eng-run");run.id="trkRun";run.textContent="运行赛道仿真 RUN";
-  run.onclick=trackRun;b.appendChild(run);
+  const run=E("button","eng-run");run.id="trkRun";run.textContent="进入赛道仿真大厅 [独立]";
+  run.onclick=_stageOpenSetup;b.appendChild(run);
   const pb=E("button","eng-run");pb.id="trkPlay";pb.textContent="▶ 播放";pb.onclick=()=>{if(TRK.res){TRK.playing=!TRK.playing;syncTrackUI();}};
   const ex=E("button","eng-run");ex.textContent="退出回放";ex.onclick=trackExit;
   const csvb=E("button","eng-run");csvb.textContent="导出 CSV";csvb.onclick=trackCSV;
