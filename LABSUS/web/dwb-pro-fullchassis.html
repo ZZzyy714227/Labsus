@@ -1132,6 +1132,7 @@ function travelL(half, deg){return clamp(S.travel-rollOffset(half,deg),S.trMin,S
 
 function simulate(dt){
   if(TRK.active){trackStep(dt);return;}
+  if(STAGE.open){requestAnimationFrame(loop);return;}   // 舞台打开时挂起主渲染（省帧率）
   const MF=SIM.FR, NF=SIM.FL, MR=SIM.RR, NR=SIM.RL;
   if(S.mode==="kin"){
     const z0F=MF.n[MF.idx.WC].p0[2], z0R=MR.n[MR.idx.WC].p0[2];
@@ -3469,7 +3470,7 @@ function trackCSV(){
    ================================================================ */
 const STAGE={
   open:false, res:null, req:null, i:0, speed:1.0, playing:false,
-  cam:"behind", trace:null, v:null, tMax:1, raf:0, last:0, built:false
+  cam:"behind", trace:null, v:null, tMax:1, raf:0, last:0, built:false, loop:true
 };
 const STAGE_CAMS=[
   ["behind","尾部跟随"],["front","前部跟随"],["threeq","斜45deg跟随"],
@@ -3694,13 +3695,12 @@ function stageTick(ts){
   if(STAGE.playing&&STAGE.trace){
     const n=STAGE.trace.length;
     const adv=Math.max(1,Math.round(dt*STAGE.speed/(STAGE.tMax/Math.max(1,n-1))));
-    STAGE.i=Math.min(n-1,STAGE.i+adv);
-    if(STAGE.i>=n-1)STAGE.playing=false;
+    STAGE.i+=adv;
+    if(STAGE.i>=n-1){STAGE.i=0;if(!STAGE.loop){STAGE.playing=false;STAGE.i=n-1;}}
   }
-  const row=STAGE.trace[STAGE.i];
-  stageCam(row);
-  drawStage(row);
-  drawStageTelemetry(row);
+  const row=STAGE.trace[Math.min(STAGE.i,STAGE.trace.length-1)];
+  try{stageCam(row);drawStage(row);}catch(e){console.warn("stageRender",e);}
+  try{drawStageTelemetry(row);}catch(e){console.warn("stageTel",e);}
   const sc=document.getElementById("stScrub");
   if(sc&&STAGE.trace.length>1)sc.value=Math.round(STAGE.i/(STAGE.trace.length-1)*1000);
   requestAnimationFrame(stageTick);
