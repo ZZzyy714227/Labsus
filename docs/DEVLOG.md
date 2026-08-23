@@ -1,5 +1,19 @@
 # 开发日志
 
+## 2026-08-23 — feat(web)：柔和工业新野兽派 UI 重构（Soft Industrial Brutalism, 84dba10）
+- 需求：用户交付《LABSUS 底盘工作台 · 柔和工业新野兽派界面设计与交互规范》+ 指定 Claude 公司字体（Styrene 栈）。
+- 落地（脚本化手术，dwb-pro-fullchassis.html 3520→3651 行）：
+  - **设计 Token**：Dark Slate（#11141A 底 / #161B22 面板 / #323E52 硬边框）与 Alabaster 浅色（#E9E4DA / #F3EFE6 / #B0A690）双主题；功能色阳极氧化系——普鲁士蓝钢 #4697E6、暗铜金 #D99A43、鼠尾草 #45B374、铁锈红 #D9534F、薰衣草 #9D80E8、中性 #6C788A；1.5px 锐利硬边框、去圆角（--r-* 收至 2-6px）、零模糊阴影；canvas PAL 同步氧化物色。
+  - **字体**：--font-ui/--font-mono → "Styrene A/B"（回退 Inter/PingFang）；微缩全大写标签 8-9px、等宽数字排版（说明：Styrene 为商业字体，未内嵌 woff2，用户提供字体文件后可用 @font-face 一键接入）。
+  - **布局**：顶栏 44px / 左栏 330px / 中央 2×2 视口（1px 分割）/ 右栏 360px / 底栏 26px；页面零滚动，滚动收敛于侧栏容器。
+  - **左侧四段工流 Tab**：1. 几何硬点（轴向拨档 + 3D 硬点表按系统色标：rust 固定铰/pri 摆臂/brass 摇臂 + 持久化四按钮）2. 工况驱动（KIN/RIG/QS + 驱动滑条+[0] 归零微键 + 环境力学/弹性刚度/4-Post 路面）3. 引擎/赛道 4. 图层显示（4 预设场景：整车/纯悬架/辅助线/极简线框 + 系统分色图例 + 辅助开关）。
+  - **右侧数据金字塔**：Hero KPI 2×2（Roll Grad/TLLTD+比例条/Wheel Rate+簧载频率/MR，实时同步 updateReadouts）；Chart Hub 选项卡（K&C 扫掠/引擎整车结果/赛道遥测/Baseline 差异）；明细折叠抽屉（车轮定位/转向 ARB/载荷转移/运动学导数/摇臂读数/求解器）。
+  - **交互**：rowSlider 全局 [0] 复位键；Space 启停（input 聚焦豁免）；顶栏 📸快照/✕清除 + 状态格点击启停；F/M 悬浮钮已有。
+- 验证：node --check 语法通过；Edge headless 零 JS 错误；DOM 断言 tabbar/kpi-grid/chub-bar/hero*/zbtn×24/tbSnap 全命中；截图 570KB 渲染正常（期间修复一次 rowBtns 参数错位导致的 UI.sync 递归爆栈）。
+- 遗留：Styrene 字体文件内嵌待用户提供；[data-theme=light] 浅色下个别 canvas 色微调随 PAL 已同步；旧加号面板函数（buildChassisPanel 等）部分仍被引用或成死代码（后续清理轮）。
+
+# 开发日志
+
 ## 2026-08-23 — feat(web)：gemini 全底盘建模完美移植 + 硬点永久保存 + 五系统分色（b777ab3）
 - 需求：用户交付 `C:/Users/zzy/Desktop/gemini-code-.html`（1719 行 DWB-SIM PRO 增量版）——"完美移植，点位移动后可永久保存，给各类系统管架设置默认颜色"。按 README 前端唯一开发文件约定，以 `web/dwb-pro-fullchassis.html`（2875 行）为主干，脚本化手术合并（非手工粘贴）。
 - 移植内容（程序化：抽段→改名命名空间→注入→wrapper→挂点）：
