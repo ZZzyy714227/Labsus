@@ -3477,8 +3477,8 @@ const STAGE_CAMS=[
   ["top","顶视跟随"],["trackside","固定机位(起点)"]
 ];
 const STAGE_CAM_OFF={
-  behind:[0,-8.6,2.9], front:[0,8.6,2.3], threeq:[5.8,-7.0,3.1],
-  top:[0.01,-0.02,42.0], trackside:null
+  behind:[0,-13.5,4.4], front:[0,13.5,3.6], threeq:[8.5,-10.5,4.8],
+  top:[0.01,-0.02,55.0], trackside:null
 };
 
 function _stageOpenSetup(){
@@ -3640,7 +3640,7 @@ function trackStageRun(){
     STAGE.res=res;STAGE.trace=res.trace;STAGE.req=body;
     STAGE.tMax=res.t[res.t.length-1]||1;
     console.log("STAGE-READY", document.getElementById("fcGrid")?"both":document.getElementById("stCams")?"part":"none", res.trace.length, res.summary.v_max, res.summary.max_ay_g);
-    STAGE.open=true;STAGE.i=0;STAGE.playing=true;
+    STAGE.open=true;STAGE.i=0;STAGE.playing=true;STAGE.scene=null;STAGE.mf=0;
     document.getElementById("stageSetup").style.display="none";
     document.getElementById("stageWrap").style.display="block";
     _stageSize();_stageOpen();STAGE.last=performance.now();requestAnimationFrame(stageTick);
@@ -3649,6 +3649,18 @@ function trackStageRun(){
       sm.path_length_m+"m - v_max "+sm.v_max+"m/s - max "+sm.max_ay_g+"g - "+(res.ms|0)+"ms"+(res.finished?" (完赛)":"");
   })
   .catch(err=>{document.getElementById("ssStatus").textContent="仿真失败："+err.message;});
+}
+function _stageUpdateModel(row){
+  const rDeg=row.roll||0;
+  const z0F=SIM.FR.n[SIM.FR.idx.WC].p0[2],z0R=SIM.RR.n[SIM.RR.idx.WC].p0[2];
+  const rack=clamp((row.delta||0)*57.2958/0.5,-20,20);
+  driveTo(SIM.FR,z0F+travelR(SIM.halfF,rDeg),rack,'front');SIM.mFR=metrics(SIM.FR,'front');
+  driveTo(SIM.RR,z0R+travelR(SIM.halfR,rDeg),0,'rear');SIM.mRR=metrics(SIM.RR,'rear');
+  if(S.show.mirror){
+    driveTo(SIM.FL,z0F+travelL(SIM.halfF,rDeg),-rack,'front');SIM.mFL=metrics(SIM.FL,'front');
+    driveTo(SIM.RL,z0R+travelL(SIM.halfR,rDeg),0,'rear');SIM.mRL=metrics(SIM.RL,'rear');
+  }
+  STAGE.scene=null;
 }
 function _stageSize(){
   const v=STAGE.v,cv=v.cv,r=cv.getBoundingClientRect();
@@ -3692,6 +3704,10 @@ function stageCam(row){
 function stageTick(ts){
   if(!STAGE.open)return;
   const dt=(ts-STAGE.last)/1000;STAGE.last=ts;
+  const row0=STAGE.trace?STAGE.trace[Math.min(STAGE.i,STAGE.trace.length-1)]:null;
+  if(row0&&((STAGE.mf=(STAGE.mf||0)+1)%6===0||!STAGE.scene)){
+    try{_stageUpdateModel(row0);}catch(e){console.warn("stageModel",e);}
+  }
   if(STAGE.playing&&STAGE.trace){
     const n=STAGE.trace.length;
     const adv=Math.max(1,Math.round(dt*STAGE.speed/(STAGE.tMax/Math.max(1,n-1))));
@@ -3740,7 +3756,7 @@ function drawStage(row){
   const psi=row.psi,c=Math.cos(psi),sn=Math.sin(psi);
   const x=row.x,y=row.y;
   const W=p=>[x+p[1]*c+p[0]*sn, y+p[1]*sn-p[0]*c, p[2]];
-  const sc=buildScenePRO();
+  const sc=STAGE.scene||buildScenePRO();
   const drawPoly=(pts,cl,w2,d2,f2)=>{ctx.strokeStyle=cl;ctx.lineWidth=w2||1;ctx.setLineDash(d2||[]);
     ctx.beginPath();let first=true;
     pts.forEach(p=>{const q=P3(W(p));if(!q)return;if(first){ctx.moveTo(q[0],q[1]);first=false;}else ctx.lineTo(q[0],q[1]);});
