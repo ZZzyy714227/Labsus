@@ -740,7 +740,7 @@ canvas.plot{display:block;width:100%;height:84px;background:var(--well);border:1
     </div>
 
     <div class="slope-hint-box">
-      🖱️ 提示：按住鼠标左键拖拽可自由 360° 环绕旋转机位 · 滚轮缩放视距 · 双击重置当前机位
+      🎮 交互驾驶：<b>W / ↑</b> 加速 · <b>S / ↓</b> 刹车 · <b>A / D / ← / →</b> 转向 · <b>空格</b> 手刹制动 · <b>鼠标拖拽</b> 360° 环绕机位 · <b>滚轮</b> 缩放视距
     </div>
   </div>
 </div>
@@ -4992,45 +4992,60 @@ function drawRadarChart(scores){
 /* =====================================================================
    LABSUS 15-DOF HARDCORE MULTI-BODY VEHICLE DYNAMICS ENGINE
    ===================================================================== */
+/* =====================================================================
+   LABSUS HARDCORE 15-DOF MULTI-BODY VEHICLE DYNAMICS ENGINE
+   Coordinate Frame: +Y Forward, +X Right, +Z Up (Pitch around X, Roll around Y, Yaw around Z)
+   ===================================================================== */
+/* =====================================================================
+   LABSUS HARDCORE 15-DOF MULTI-BODY VEHICLE DYNAMICS ENGINE
+   Coordinate Frame: +Y Forward, +X Right, +Z Up (Pitch around X, Roll around Y, Yaw around Z)
+   ===================================================================== */
 class VehicleDynamics15DOF {
   constructor(S_config, SIM_data, initSpeedMs = 0) {
     this.S = S_config;
     this.SIM = SIM_data;
     
-    this.m = Math.max(100, S_config.mTotal || 1000);
+    this.m = Math.max(150, S_config.mTotal || 1000);
     this.wb = (S_config.wb || 2600) / 1000;
-    this.a = this.wb * 0.45;
+    this.a = this.wb * 0.46;
     this.b = this.wb - this.a;
     this.h_cg = (S_config.hcg || 350) / 1000;
     
-    this.tF = Math.abs((S_config.front.hp.WC[0] || 800) * 2) / 1000;
-    this.tR = Math.abs((S_config.rear.hp.WC[0] || 800) * 2) / 1000;
+    const hF = (S_config.front && S_config.front.hp && S_config.front.hp.WC) ? S_config.front.hp.WC : [750,0,300];
+    const hR = (S_config.rear && S_config.rear.hp && S_config.rear.hp.WC) ? S_config.rear.hp.WC : [750,0,300];
+    this.tF = Math.abs(hF[0] * 2) / 1000;
+    this.tR = Math.abs(hR[0] * 2) / 1000;
 
-    this.tireF = S_config.front.tire;
-    this.tireR = S_config.rear.tire;
+    this.tireF = S_config.front ? S_config.front.tire : { R:330, W:280 };
+    this.tireR = S_config.rear ? S_config.rear.tire : { R:330, W:280 };
     this.ReF = (this.tireF.R || 330) / 1000;
     this.ReR = (this.tireR.R || 330) / 1000;
     
-    this.Ixx = this.m * 0.25; 
-    this.Iyy = this.m * 1.15;
-    this.Izz = this.m * 1.35;
-    this.Iw = 1.2;
+    this.I_pitch = this.m * (this.wb * 0.42) ** 2; 
+    this.I_roll = this.m * ((this.tF + this.tR) * 0.22) ** 2;
+    this.I_yaw = this.I_pitch + this.I_roll;
+    this.Iw = 1.2; // Wheel rotational inertia (kg*m^2)
     
     this.Fz0_F = (this.m * 9.81 * (this.b / this.wb)) / 2.0;
     this.Fz0_R = (this.m * 9.81 * (this.a / this.wb)) / 2.0;
     
-    const mrF = Math.abs(S_config.front.mr || 0.75);
-    const mrR = Math.abs(S_config.rear.mr || 0.78);
-    this.Kw_F = (S_config.front.kS * 1000 || 60000) * (mrF * mrF);
-    this.Kw_R = (S_config.rear.kS * 1000 || 65000) * (mrR * mrR);
-    this.Cw_F = (S_config.front.cR * 1000 || 3500) * (mrF * mrF);
-    this.Cw_R = (S_config.rear.cR * 1000 || 4000) * (mrR * mrR);
+    const mrF = Math.abs(S_config.front ? S_config.front.mr || 0.75 : 0.75);
+    const mrR = Math.abs(S_config.rear ? S_config.rear.mr || 0.78 : 0.78);
+    const kS_F = S_config.front ? S_config.front.kS : 60;
+    const kS_R = S_config.rear ? S_config.rear.kS : 65;
+    const cR_F = S_config.front ? S_config.front.cR : 3.5;
+    const cR_R = S_config.rear ? S_config.rear.cR : 4.0;
+
+    this.Kw_F = (kS_F * 1000) * (mrF * mrF);
+    this.Kw_R = (kS_R * 1000) * (mrR * mrR);
+    this.Cw_F = (cR_F * 1000) * (mrF * mrF);
+    this.Cw_R = (cR_R * 1000) * (mrR * mrR);
     
     this.state = {
-      X: 0, Y: 0, Z: 0, 
-      phi: 0, theta: 0, psi: 0,
-      u: initSpeedMs, v: 0, w: 0,
-      p: 0, q: 0, r: 0,
+      X: 0, Y: 0, Z: 0,           // World Position (m): X (Right), Y (Forward), Z (Up)
+      phi: 0, theta: 0, psi: 0,   // Euler Angles (rad): Roll (Y), Pitch (X), Yaw (Z)
+      u: initSpeedMs, v: 0, w: 0, // Body Velocities (m/s): u (Forward +Y), v (Right +X), w (Up +Z)
+      p: 0, q: 0, r: 0,           // Body Angular Rates (rad/s): p (Roll), q (Pitch), r (Yaw)
       omega: { 
         FL: initSpeedMs / this.ReF, 
         FR: initSpeedMs / this.ReF, 
@@ -5046,18 +5061,18 @@ class VehicleDynamics15DOF {
       tr: { FL: 0, FR: 0, RL: 0, RR: 0 },
       alpha: { FL: 0, FR: 0, RL: 0, RR: 0 }, 
       kappa: { FL: 0, FR: 0, RL: 0, RR: 0 },
-      ax: 0, ay: 0
+      ax: 0, ay: 0, az: 0
     };
   }
 
-  magicFormula(Fz, alpha, kappa, mu_peak = 1.3) {
-    if (Fz <= 10.0) return { Fx: 0, Fy: 0 };
-    const Cx = 1.65, Bx = 10.0, Ex = -0.1;
-    const Cy = 1.4, By = 12.0, Ey = -0.2;
-    const C_kappa = 150000.0, C_alpha = 100000.0;
+  magicFormula(Fz, alpha, kappa, mu_peak = 1.35) {
+    if (Fz <= 1.0) return { Fx: 0, Fy: 0 };
+    const Cx = 1.65, Bx = 11.0, Ex = -0.15;
+    const Cy = 1.45, By = 12.5, Ey = -0.20;
+    const C_kappa = 160000.0, C_alpha = 110000.0;
     
-    const s_x = (C_kappa * kappa) / (mu_peak * Fz);
-    const s_y = (C_alpha * Math.tan(alpha)) / (mu_peak * Fz);
+    const s_x = (C_kappa * kappa) / Math.max(1, mu_peak * Fz);
+    const s_y = (C_alpha * Math.tan(alpha)) / Math.max(1, mu_peak * Fz);
     const s = Math.max(1e-6, Math.hypot(s_x, s_y));
     
     const mu_x = mu_peak * Math.sin(Cx * Math.atan(Bx * s - Ex * (Bx * s - Math.atan(Bx * s))));
@@ -5069,20 +5084,23 @@ class VehicleDynamics15DOF {
   }
 
   step(ctrl, env, dt_sec) {
-    const MAX_DT = 0.001; // 1000Hz Sub-stepping
+    const MAX_SUB_DT = 0.001; // 1000Hz Sub-stepping
     let t_remain = Math.min(0.05, dt_sec);
     const alpha_slope = env.grade || 0;
     const cosA = Math.cos(alpha_slope);
     const sinA = Math.sin(alpha_slope);
     
     while(t_remain > 0) {
-      const dt = Math.min(MAX_DT, t_remain);
+      const dt = Math.min(MAX_SUB_DT, t_remain);
       const st = this.state;
       
-      const z_FL = st.Z - this.a * st.theta + (this.tF / 2.0) * st.phi;
-      const z_FR = st.Z - this.a * st.theta - (this.tF / 2.0) * st.phi;
-      const z_RL = st.Z + this.b * st.theta + (this.tR / 2.0) * st.phi;
-      const z_RR = st.Z + this.b * st.theta - (this.tR / 2.0) * st.phi;
+      // 1. Suspension Corner Displacements (Pitch theta > 0: nose up / rear squat)
+      // FL: x = -tF/2, y = +a;  FR: x = +tF/2, y = +a;
+      // RL: x = -tR/2, y = -b;  RR: x = +tR/2, y = -b;
+      const z_FL = st.Z + this.a * st.theta - (this.tF / 2.0) * st.phi;
+      const z_FR = st.Z + this.a * st.theta + (this.tF / 2.0) * st.phi;
+      const z_RL = st.Z - this.b * st.theta - (this.tR / 2.0) * st.phi;
+      const z_RR = st.Z - this.b * st.theta + (this.tR / 2.0) * st.phi;
       
       const bump = env.bumpNoise || 0;
       const tr_FL = -(z_FL - bump);
@@ -5090,26 +5108,29 @@ class VehicleDynamics15DOF {
       const tr_RL = -(z_RL - bump);
       const tr_RR = -(z_RR - bump);
       
-      const dz_FL = st.w - this.a * st.q + (this.tF / 2.0) * st.p;
-      const dz_FR = st.w - this.a * st.q - (this.tF / 2.0) * st.p;
-      const dz_RL = st.w + this.b * st.q + (this.tR / 2.0) * st.p;
-      const dz_RR = st.w + this.b * st.q - (this.tR / 2.0) * st.p;
+      // Suspension deflection velocities
+      const dz_FL = st.w + this.a * st.q - (this.tF / 2.0) * st.p;
+      const dz_FR = st.w + this.a * st.q + (this.tF / 2.0) * st.p;
+      const dz_RL = st.w - this.b * st.q - (this.tR / 2.0) * st.p;
+      const dz_RR = st.w - this.b * st.q + (this.tR / 2.0) * st.p;
       
       const dtr_FL = -dz_FL;
       const dtr_FR = -dz_FR;
       const dtr_RL = -dz_RL;
       const dtr_RR = -dz_RR;
       
+      // 2. Normal Forces Fz with equilibrium static pre-load
       const Fz0_F_slope = this.Fz0_F * cosA;
       const Fz0_R_slope = this.Fz0_R * cosA;
       
-      const Fz_FL = Math.max(10.0, Fz0_F_slope + this.Kw_F * tr_FL + this.Cw_F * dtr_FL);
-      const Fz_FR = Math.max(10.0, Fz0_F_slope + this.Kw_F * tr_FR + this.Cw_F * dtr_FR);
-      const Fz_RL = Math.max(10.0, Fz0_R_slope + this.Kw_R * tr_RL + this.Cw_R * dtr_RL);
-      const Fz_RR = Math.max(10.0, Fz0_R_slope + this.Kw_R * tr_RR + this.Cw_R * dtr_RR);
+      const Fz_FL = Math.max(5.0, Fz0_F_slope + this.Kw_F * tr_FL + this.Cw_F * dtr_FL);
+      const Fz_FR = Math.max(5.0, Fz0_F_slope + this.Kw_F * tr_FR + this.Cw_F * dtr_FR);
+      const Fz_RL = Math.max(5.0, Fz0_R_slope + this.Kw_R * tr_RL + this.Cw_R * dtr_RL);
+      const Fz_RR = Math.max(5.0, Fz0_R_slope + this.Kw_R * tr_RR + this.Cw_R * dtr_RR);
       
-      const K_arb_F = (this.S.front.arb && this.S.front.arb.d > 0) ? 25000.0 : 0.0;
-      const K_arb_R = (this.S.rear.arb && this.S.rear.arb.d > 0) ? 15000.0 : 0.0;
+      // Anti-roll bar torque
+      const K_arb_F = (this.S.front && this.S.front.arb && this.S.front.arb.d > 0) ? 28000.0 : 0.0;
+      const K_arb_R = (this.S.rear && this.S.rear.arb && this.S.rear.arb.d > 0) ? 18000.0 : 0.0;
       const F_arb_F = K_arb_F * (tr_FL - tr_FR);
       const F_arb_R = K_arb_R * (tr_RL - tr_RR);
       
@@ -5120,96 +5141,110 @@ class VehicleDynamics15DOF {
         RR: Fz_RR - F_arb_R
       };
       
-      let SumFx = 0.0, SumFy = 0.0, SumFz = 0.0;
-      let SumMx = 0.0, SumMy = 0.0, SumMz = 0.0;
-      
-      const v2 = st.u * st.u;
-      const F_drag = 0.5 * 1.225 * 0.35 * 2.0 * v2 * (st.u >= 0 ? 1.0 : -1.0);
-      const F_down = 0.5 * 1.225 * 1.2 * 2.0 * v2;
-      
-      SumFx -= (this.m * 9.81 * sinA + F_drag);
-      SumFz -= (this.m * 9.81 * cosA + F_down);
+      let SumFx_tire = 0.0, SumFy_tire = 0.0;
+      let SumMz_tire = 0.0;
       
       const wheels = [
-        { id: 'FL', x: this.a,  y: this.tF/2.0,  Re: this.ReF, axle: 'front', Fz: Fz_FL, tr: tr_FL },
-        { id: 'FR', x: this.a,  y: -this.tF/2.0, Re: this.ReF, axle: 'front', Fz: Fz_FR, tr: tr_FR },
-        { id: 'RL', x: -this.b, y: this.tR/2.0,  Re: this.ReR, axle: 'rear',  Fz: Fz_RL, tr: tr_RL },
-        { id: 'RR', x: -this.b, y: -this.tR/2.0, Re: this.ReR, axle: 'rear',  Fz: Fz_RR, tr: tr_RR }
+        { id: 'FL', x: -this.tF/2.0, y: this.a,  Re: this.ReF, axle: 'front', Fz: Fz_FL, tr: tr_FL },
+        { id: 'FR', x: this.tF/2.0,  y: this.a,  Re: this.ReF, axle: 'front', Fz: Fz_FR, tr: tr_FR },
+        { id: 'RL', x: -this.tR/2.0, y: -this.b, Re: this.ReR, axle: 'rear',  Fz: Fz_RL, tr: tr_RL },
+        { id: 'RR', x: this.tR/2.0,  y: -this.b, Re: this.ReR, axle: 'rear',  Fz: Fz_RR, tr: tr_RR }
       ];
       
       for(const w of wheels) {
-        SumFz += F_susp[w.id];
-        SumMx += F_susp[w.id] * w.y;
-        SumMy += -F_susp[w.id] * w.x;
+        // Wheel contact point velocities (+Y forward, +X right)
+        const v_cp_y = st.u - st.r * w.x;
+        const v_cp_x = st.v + st.r * w.y;
         
-        const v_cp_x = st.u - st.r * w.y;
-        const v_cp_y = st.v + st.r * w.x;
-        
+        // Steer angle delta (rad)
         const steer = (w.axle === 'front' ? (ctrl.steer * Math.PI / 180.0) : 0.0);
-        const v_tire_x = v_cp_x * Math.cos(steer) + v_cp_y * Math.sin(steer);
-        const v_tire_y = -v_cp_x * Math.sin(steer) + v_cp_y * Math.cos(steer);
         
-        const alpha = Math.atan2(v_tire_y, Math.max(0.5, Math.abs(v_tire_x)));
+        // Transform velocities into wheel heading frame
+        const v_tire_long = v_cp_y * Math.cos(steer) + v_cp_x * Math.sin(steer);
+        const v_tire_lat  = -v_cp_y * Math.sin(steer) + v_cp_x * Math.cos(steer);
+        
+        const alpha = Math.atan2(v_tire_lat, Math.max(0.5, Math.abs(v_tire_long)));
         const v_rot = st.omega[w.id] * w.Re;
-        const kappa = (v_rot - v_tire_x) / Math.max(0.5, Math.abs(v_tire_x));
+        const kappa = (v_rot - v_tire_long) / Math.max(0.5, Math.abs(v_tire_long));
         
+        // Pacejka tire forces (Fx_t: tractive/braking along tire rolling, Fy_t: cornering grip)
         const { Fx: Fx_t, Fy: Fy_t } = this.magicFormula(w.Fz, alpha, kappa);
         
-        const Fx_b = Fx_t * Math.cos(steer) - Fy_t * Math.sin(steer);
-        const Fy_b = Fx_t * Math.sin(steer) + Fy_t * Math.cos(steer);
+        // Transform tire forces back to vehicle body frame (+Y forward, +X right)
+        const Fx_body = -Fy_t * Math.cos(steer) + Fx_t * Math.sin(steer);
+        const Fy_body = Fx_t * Math.cos(steer) + Fy_t * Math.sin(steer);
         
-        SumFx += Fx_b;
-        SumFy += Fy_b;
-        SumMx += Fy_b * (-this.h_cg);
-        SumMy += -Fx_b * (-this.h_cg);
-        SumMz += Fx_b * w.y - Fy_b * w.x;
+        SumFx_tire += Fx_body;
+        SumFy_tire += Fy_body;
+        SumMz_tire += Fy_body * w.x - Fx_body * w.y;
         
-        const T_drive = (w.axle === 'rear' ? (ctrl.throttle * 400.0) : 0.0);
-        const T_brake = (ctrl.brake * 1200.0) * (w.axle === 'front' ? 0.6 : 0.4);
+        // Wheel spin acceleration
+        const T_drive = (w.axle === 'rear' ? (ctrl.throttle * 480.0) : (ctrl.throttle * 120.0));
+        const T_brake = (ctrl.brake * 1400.0) * (w.axle === 'front' ? 0.6 : 0.4);
         const sgn_w = st.omega[w.id] >= 0 ? 1.0 : -1.0;
         const T_net = T_drive - T_brake * sgn_w - Fx_t * w.Re;
         const d_omega = T_net / this.Iw;
         st.omega[w.id] += d_omega * dt;
         
         this.telemetry.Fz[w.id] = w.Fz;
-        this.telemetry.Fx[w.id] = Fx_t;
-        this.telemetry.Fy[w.id] = Fy_t;
+        this.telemetry.Fx[w.id] = Fx_body;
+        this.telemetry.Fy[w.id] = Fy_body;
         this.telemetry.tr[w.id] = w.tr;
         this.telemetry.kappa[w.id] = kappa;
         this.telemetry.alpha[w.id] = alpha;
       }
       
-      const d_u = SumFx / this.m + st.v * st.r - st.w * st.q;
-      const d_v = SumFy / this.m + st.w * st.p - st.u * st.r;
-      const d_w = SumFz / this.m + st.u * st.q - st.v * st.p;
+      // Gravity component and Aero
+      const v2 = st.u * st.u;
+      const F_drag = 0.5 * 1.225 * 0.35 * 1.8 * v2 * (st.u >= 0 ? 1.0 : -1.0);
+      const F_down = 0.5 * 1.225 * 1.2 * 1.8 * v2;
+      const F_gravity_slope = this.m * 9.81 * sinA;
       
-      const d_p = (SumMx + (this.Iyy - this.Izz) * st.q * st.r) / this.Ixx;
-      const d_q = (SumMy + (this.Izz - this.Ixx) * st.p * st.r) / this.Iyy;
-      const d_r = (SumMz + (this.Ixx - this.Iyy) * st.p * st.q) / this.Izz;
+      // Accelerations in body frame (+Y Forward, +X Right, +Z Up)
+      const SumFy = SumFy_tire - F_gravity_slope - F_drag;
+      const SumFx = SumFx_tire;
+      const SumFz = (F_susp.FL + F_susp.FR + F_susp.RL + F_susp.RR) - (this.m * 9.81 * cosA + F_down);
+      
+      // Restoring Pitch moment: front pushing up (+), rear pushing up (-), gravity on CG pushes nose up (+)
+      const SumM_pitch = (F_susp.FL + F_susp.FR) * this.a - (F_susp.RL + F_susp.RR) * this.b + (F_gravity_slope + F_drag) * this.h_cg;
+      // Restoring Roll moment: left pushing up (+), right pushing up (-)
+      const SumM_roll  = (F_susp.FL + F_susp.RL) * (this.tF / 2.0) - (F_susp.FR + F_susp.RR) * (this.tF / 2.0) - SumFx * this.h_cg;
+      const SumM_yaw   = SumMz_tire;
+      
+      const d_u = SumFy / this.m + st.v * st.r - st.w * st.q;
+      const d_v = SumFx / this.m + st.w * st.p - st.u * st.r;
+      const d_w = SumFz / this.m;
+      
+      const d_q = SumM_pitch / this.I_pitch;
+      const d_p = SumM_roll / this.I_roll;
+      const d_r = SumM_yaw / this.I_yaw;
       
       st.u += d_u * dt;
       st.v += d_v * dt;
       st.w += d_w * dt;
-      st.p += d_p * dt;
       st.q += d_q * dt;
+      st.p += d_p * dt;
       st.r += d_r * dt;
       
-      st.X += st.u * dt;
-      st.Y += st.v * dt;
+      // Update orientation and position
+      st.Y += st.u * dt;
+      st.X += st.v * dt;
       st.Z += st.w * dt;
-      st.phi += st.p * dt;
       st.theta += st.q * dt;
+      st.phi += st.p * dt;
       st.psi += st.r * dt;
       
       this.telemetry.ax = d_u / 9.81;
       this.telemetry.ay = d_v / 9.81;
+      this.telemetry.az = d_w / 9.81;
       
       t_remain -= dt;
     }
   }
 }
+window.VehicleDynamics15DOF = VehicleDynamics15DOF;
 
-/* ================================ 17. 直线爬坡测试与多机位 3D 舞台 ================================ */
+
 const SLOPE_STAGE = {
   active: false,
   playing: true,
@@ -5221,15 +5256,16 @@ const SLOPE_STAGE = {
   lastTime: 0,
   drag: null,
   scene: null,
-  rebuild: 0
+  rebuild: 0,
+  keys: { w: false, s: false, a: false, d: false, space: false }
 };
 
 const SLOPE_CAMS_CONFIG = {
-  behind:  { dx: 0,     dy: -4800, dz: 1600, lookDy: 1200, lookDz: 300 },
-  front:   { dx: 0,     dy: 4200,  dz: 1200, lookDy: -600, lookDz: 200 },
-  side:    { dx: 5500,  dy: 0,     dz: 1100, lookDy: 0,    lookDz: 200 },
-  threeq:  { dx: 4500,  dy: -5200, dz: 2800, lookDy: 600,  lookDz: 200 },
-  cockpit: { dx: 0,     dy: -350,  dz: 750,  lookDy: 2500, lookDz: 400 }
+  behind:  { dx: 0,     dy: -4800, dz: 1650, lookDy: 1200, lookDz: 320, fov: 1.6 },
+  front:   { dx: 0,     dy: 3800,  dz: 1100, lookDy: -600, lookDz: 280, fov: 1.6 },
+  side:    { dx: 5200,  dy: 0,     dz: 1100, lookDy: 0,    lookDz: 280, fov: 1.6 },
+  threeq:  { dx: 4200,  dy: -4600, dz: 2400, lookDy: 600,  lookDz: 280, fov: 1.5 },
+  cockpit: { dx: 0,     dy: -320,  dz: 680,  lookDy: 2600, lookDz: 380, fov: 1.4 }
 };
 
 function openSlopeStage(){
@@ -5240,7 +5276,8 @@ function openSlopeStage(){
   SLOPE_STAGE.lastTime = performance.now();
   SLOPE_STAGE.camOrbit = { az: 0, elv: 0, distFactor: 1.0 };
   
-  document.getElementById("slopeVehName").textContent = (VEHICLE_PRESETS[S.vehicleType]||{}).name || "FIA GT3";
+  const vehName = (VEHICLE_PRESETS[S.vehicleType]||{}).name || "FIA GT3";
+  document.getElementById("slopeVehName").textContent = vehName;
   modal.classList.add("show");
 
   const cv = document.getElementById("slopeCanvas");
@@ -5264,31 +5301,46 @@ function closeSlopeStage(){
 
 function slopeStageLoop(now){
   if(!SLOPE_STAGE.active) return;
-  const dt = Math.min(0.1, (now - (SLOPE_STAGE.lastTime || now)) / 1000);
+  const dt = Math.min(0.05, (now - (SLOPE_STAGE.lastTime || now)) / 1000);
   SLOPE_STAGE.lastTime = now;
 
   const env = { 
     grade: Math.atan(SLOPE_STAGE.grade), 
-    bumpNoise: SLOPE_STAGE.playing ? (Math.sin(SLOPE_STAGE.distTraveled * 0.008) * 0.015 + Math.cos(SLOPE_STAGE.distTraveled * 0.02) * 0.008) : 0 
+    bumpNoise: SLOPE_STAGE.playing ? (Math.sin(SLOPE_STAGE.distTraveled * 0.008) * 0.012 + Math.cos(SLOPE_STAGE.distTraveled * 0.022) * 0.006) : 0 
   };
   
-  const targetSpeed = (SLOPE_STAGE.speedKmh * 1000) / 3600;
-  const speedError = targetSpeed - (window.physicsEngine.state.u);
-  const ctrl = {
-    steer: 0,
-    throttle: Math.max(0, Math.min(1.0, speedError * 0.5)),
-    brake: speedError < -1.0 ? Math.max(0, Math.min(1.0, -speedError * 0.5)) : 0
-  };
+  // Interactive Keyboard / Slider Controls
+  let ctrl_steer = 0;
+  let ctrl_throttle = 0;
+  let ctrl_brake = 0;
 
-  if(SLOPE_STAGE.playing) {
+  if(SLOPE_STAGE.keys.a) ctrl_steer -= 12;
+  if(SLOPE_STAGE.keys.d) ctrl_steer += 12;
+  
+  if(SLOPE_STAGE.keys.w) {
+    ctrl_throttle = 1.0;
+  } else if(SLOPE_STAGE.keys.s || SLOPE_STAGE.keys.space) {
+    ctrl_brake = 1.0;
+  } else {
+    // Automated Cruise Speed Controller
+    const targetSpeed = (SLOPE_STAGE.speedKmh * 1000) / 3600;
+    const speedError = targetSpeed - (window.physicsEngine.state.u);
+    ctrl_throttle = Math.max(0, Math.min(1.0, speedError * 0.5));
+    ctrl_brake = speedError < -1.0 ? Math.max(0, Math.min(1.0, -speedError * 0.5)) : 0;
+  }
+
+  const ctrl = { steer: ctrl_steer, throttle: ctrl_throttle, brake: ctrl_brake };
+
+  if(SLOPE_STAGE.playing && window.physicsEngine) {
     window.physicsEngine.step(ctrl, env, dt);
-    SLOPE_STAGE.distTraveled += window.physicsEngine.state.u * dt * 1000;
+    SLOPE_STAGE.distTraveled += Math.max(0, window.physicsEngine.state.u) * dt * 1000;
   }
 
   try {
     const st = window.physicsEngine.state;
     const tel = window.physicsEngine.telemetry;
     
+    // Drive 3D multi-body suspension kinematics to the true physical travel
     const tr = tel.tr || { FL:0, FR:0, RL:0, RR:0 };
     const z0F = (SIM.FR && SIM.FR.n && SIM.FR.idx) ? SIM.FR.n[SIM.FR.idx.WC].p0[2] : 250;
     const z0R = (SIM.RR && SIM.RR.n && SIM.RR.idx) ? SIM.RR.n[SIM.RR.idx.WC].p0[2] : 250;
@@ -5331,23 +5383,32 @@ function renderSlopeScene(alpha, st){
   const w = cv.width / dpr, h = cv.height / dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  ctx.fillStyle = "#0a0e14";
+  // Background Sky / Horizon
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+  skyGrad.addColorStop(0, "#080c12");
+  skyGrad.addColorStop(0.5, "#121824");
+  skyGrad.addColorStop(1, "#05080c");
+  ctx.fillStyle = skyGrad;
   ctx.fillRect(0, 0, w, h);
 
+  // Road Orientation vectors (Slope angle alpha: pitch up around X)
   const cosA = Math.cos(alpha), sinA = Math.sin(alpha);
-  const u_road = [0, cosA, sinA];
-  const n_road = [0, -sinA, cosA];
-  const t_road = [1, 0, 0];
+  const u_road = [0, cosA, sinA];    // Road forward vector (+Y, +Z)
+  const n_road = [0, -sinA, cosA];   // Road normal vector (Up)
+  const t_road = [1, 0, 0];          // Road lateral vector (Right)
 
-  const T = [st.X * 1000, st.Y * 1000, st.Z * 1000];
+  // Keep car centered at [0, 0, Z_bounce]
+  const carZ_offset = (st.Z || 0) * 1000;
   
+  // Body Rotation Matrix (Pitch theta around X, Roll phi around Y, Yaw psi around Z)
   const cP = Math.cos(st.phi), sP = Math.sin(st.phi);
   const cT = Math.cos(st.theta), sT = Math.sin(st.theta);
   const cS = Math.cos(st.psi), sS = Math.sin(st.psi);
   
-  const R11 = cT*cS, R12 = sP*sT*cS - cP*sS, R13 = cP*sT*cS + sP*sS;
-  const R21 = cT*sS, R22 = sP*sT*sS + cP*cS, R23 = cP*sT*sS - sP*cS;
-  const R31 = -sT,   R32 = sP*cT,            R33 = cP*cT;
+  // R = Rz(psi) * Ry(phi) * Rx(theta)
+  const R11 = cS*cP, R12 = cS*sP*sT - sS*cT, R13 = cS*sP*cT + sS*sT;
+  const R21 = sS*cP, R22 = sS*sP*sT + cS*cT, R23 = sS*sP*cT - cS*sT;
+  const R31 = -sP,   R32 = cP*sT,            R33 = cP*cT;
   
   const bodyTransform = (p) => {
     return [
@@ -5369,16 +5430,17 @@ function renderSlopeScene(alpha, st){
     cam_dz = cam_dz + Math.tan(SLOPE_STAGE.camOrbit.elv) * rH;
   }
 
+  // Camera Eye and LookTarget relative to road plane
   const E = [
-    T[0] + cam_dx*t_road[0] + cam_dy*u_road[0] + cam_dz*n_road[0],
-    T[1] + cam_dx*t_road[1] + cam_dy*u_road[1] + cam_dz*n_road[1],
-    T[2] + cam_dx*t_road[2] + cam_dy*u_road[2] + cam_dz*n_road[2]
+    cam_dx*t_road[0] + cam_dy*u_road[0] + (cam_dz + carZ_offset)*n_road[0],
+    cam_dx*t_road[1] + cam_dy*u_road[1] + (cam_dz + carZ_offset)*n_road[1],
+    cam_dx*t_road[2] + cam_dy*u_road[2] + (cam_dz + carZ_offset)*n_road[2]
   ];
 
   const lookTarget = [
-    T[0] + camCfg.lookDy*u_road[0] + camCfg.lookDz*n_road[0],
-    T[1] + camCfg.lookDy*u_road[1] + camCfg.lookDz*n_road[1],
-    T[2] + camCfg.lookDy*u_road[2] + camCfg.lookDz*n_road[2]
+    camCfg.lookDy*u_road[0] + (camCfg.lookDz + carZ_offset)*n_road[0],
+    camCfg.lookDy*u_road[1] + (camCfg.lookDz + carZ_offset)*n_road[1],
+    camCfg.lookDy*u_road[2] + (camCfg.lookDz + carZ_offset)*n_road[2]
   ];
 
   const fw_un = [lookTarget[0]-E[0], lookTarget[1]-E[1], lookTarget[2]-E[2]];
@@ -5399,18 +5461,28 @@ function renderSlopeScene(alpha, st){
     rt[0]*fw[1] - rt[1]*fw[0]
   ];
 
-  const fovDist = Math.min(w, h) * 1.6;
+  const fovDist = Math.min(w, h) * (camCfg.fov || 1.6);
 
+  // Projection pipeline
   const project = (P_local, isBody = true) => {
-    const P_rot = isBody ? bodyTransform(P_local) : P_local;
-    const P_world = [
-      T[0] + P_rot[0]*t_road[0] + P_rot[1]*u_road[0] + P_rot[2]*n_road[0],
-      T[1] + P_rot[0]*t_road[1] + P_rot[1]*u_road[1] + P_rot[2]*n_road[1],
-      T[2] + P_rot[0]*t_road[2] + P_rot[1]*u_road[2] + P_rot[2]*n_road[2]
-    ];
+    let P_world;
+    if(isBody) {
+      const P_rot = bodyTransform(P_local);
+      P_world = [
+        P_rot[0]*t_road[0] + P_rot[1]*u_road[0] + (P_rot[2] + carZ_offset)*n_road[0],
+        P_rot[0]*t_road[1] + P_rot[1]*u_road[1] + (P_rot[2] + carZ_offset)*n_road[1],
+        P_rot[0]*t_road[2] + P_rot[1]*u_road[2] + (P_rot[2] + carZ_offset)*n_road[2]
+      ];
+    } else {
+      P_world = [
+        P_local[0]*t_road[0] + P_local[1]*u_road[0] + P_local[2]*n_road[0],
+        P_local[0]*t_road[1] + P_local[1]*u_road[1] + P_local[2]*n_road[1],
+        P_local[0]*t_road[2] + P_local[1]*u_road[2] + P_local[2]*n_road[2]
+      ];
+    }
     const q = [P_world[0]-E[0], P_world[1]-E[1], P_world[2]-E[2]];
     const z = q[0]*fw[0] + q[1]*fw[1] + q[2]*fw[2];
-    if(z < 150) return null;
+    if(z < 100) return null;
     const f = fovDist / z;
     return [
       w/2 + (q[0]*rt[0] + q[1]*rt[1] + q[2]*rt[2]) * f,
@@ -5418,8 +5490,9 @@ function renderSlopeScene(alpha, st){
     ];
   };
 
-  const roadHalfW = 4500;
-  const roadNearY = -12000, roadFarY = 80000;
+  // 1. Draw 3D Dynamic Slope Road & Curbs
+  const roadHalfW = 4200;
+  const roadNearY = -15000, roadFarY = 90000;
   const roadGridStep = 3000;
   const animOffset = (SLOPE_STAGE.distTraveled % roadGridStep);
 
@@ -5434,23 +5507,25 @@ function renderSlopeScene(alpha, st){
     ctx.lineTo(pL_far[0], pL_far[1]);
     ctx.closePath();
     const roadGrad = ctx.createLinearGradient(w/2, h, w/2, 0);
-    roadGrad.addColorStop(0, "#161b24");
+    roadGrad.addColorStop(0, "#1c222d");
+    roadGrad.addColorStop(0.6, "#141922");
     roadGrad.addColorStop(1, "#0d1117");
     ctx.fillStyle = roadGrad;
     ctx.fill();
-    ctx.strokeStyle = "rgba(78,161,211,0.2)";
+    ctx.strokeStyle = "rgba(78,161,211,0.25)";
     ctx.lineWidth = 1.5;
     ctx.stroke();
   }
 
+  // Red and White Track Kerbs & Centerlines
   for(let y = roadNearY; y <= roadFarY; y += roadGridStep){
     const curY = y - animOffset;
     const nextY = curY + roadGridStep;
     const isRed = (Math.floor((curY + SLOPE_STAGE.distTraveled) / roadGridStep) % 2 === 0);
     const kerbCol = isRed ? "#e74c3c" : "#ecf0f1";
 
-    const kL1 = project([-roadHalfW, curY, 20], false),       kL2 = project([-roadHalfW-600, curY, 30], false);
-    const kL3 = project([-roadHalfW-600, nextY, 30], false),  kL4 = project([-roadHalfW, nextY, 20], false);
+    const kL1 = project([-roadHalfW, curY, 15], false),       kL2 = project([-roadHalfW-650, curY, 25], false);
+    const kL3 = project([-roadHalfW-650, nextY, 25], false),  kL4 = project([-roadHalfW, nextY, 15], false);
     if(kL1 && kL2 && kL3 && kL4){
       ctx.beginPath();
       ctx.moveTo(kL1[0], kL1[1]); ctx.lineTo(kL2[0], kL2[1]); ctx.lineTo(kL3[0], kL3[1]); ctx.lineTo(kL4[0], kL4[1]);
@@ -5458,8 +5533,8 @@ function renderSlopeScene(alpha, st){
       ctx.fillStyle = kerbCol; ctx.fill();
     }
 
-    const kR1 = project([roadHalfW, curY, 20], false),       kR2 = project([roadHalfW+600, curY, 30], false);
-    const kR3 = project([roadHalfW+600, nextY, 30], false),  kR4 = project([roadHalfW, nextY, 20], false);
+    const kR1 = project([roadHalfW, curY, 15], false),       kR2 = project([roadHalfW+650, curY, 25], false);
+    const kR3 = project([roadHalfW+650, nextY, 25], false),  kR4 = project([roadHalfW, nextY, 15], false);
     if(kR1 && kR2 && kR3 && kR4){
       ctx.beginPath();
       ctx.moveTo(kR1[0], kR1[1]); ctx.lineTo(kR2[0], kR2[1]); ctx.lineTo(kR3[0], kR3[1]); ctx.lineTo(kR4[0], kR4[1]);
@@ -5467,17 +5542,32 @@ function renderSlopeScene(alpha, st){
       ctx.fillStyle = kerbCol; ctx.fill();
     }
 
+    // White Center Dash Line
     const d1 = project([0, curY + 600, 2], false);
     const d2 = project([0, curY + 2200, 2], false);
     if(d1 && d2){
       ctx.beginPath(); ctx.moveTo(d1[0], d1[1]); ctx.lineTo(d2[0], d2[1]);
-      ctx.strokeStyle = "rgba(255,255,255,0.45)"; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = 3; ctx.stroke();
     }
   }
 
-  if(SLOPE_STAGE.rebuild <= 0){ SLOPE_STAGE.scene = buildScenePRO(); SLOPE_STAGE.rebuild = 6; }
-  SLOPE_STAGE.rebuild--;
-  const sc = SLOPE_STAGE.scene || [];
+  // 2. Soft Contact Ground Shadow under the 4 wheels and chassis
+  const shadowW = Math.max(1200, (S.front.tire.R || 300) * 3);
+  const shadowL = (S.wb || 2600) + 800;
+  const s1 = project([-shadowW/2, -shadowL/2, 2], false);
+  const s2 = project([shadowW/2, -shadowL/2, 2], false);
+  const s3 = project([shadowW/2, shadowL/2, 2], false);
+  const s4 = project([-shadowW/2, shadowL/2, 2], false);
+  if(s1 && s2 && s3 && s4){
+    ctx.beginPath();
+    ctx.moveTo(s1[0], s1[1]); ctx.lineTo(s2[0], s2[1]); ctx.lineTo(s3[0], s3[1]); ctx.lineTo(s4[0], s4[1]);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+    ctx.fill();
+  }
+
+  // 3. Render 3D Full Chassis Multibody Scene
+  const sc = buildScenePRO();
   for(let i = 0; i < sc.length; i++){
     const prim = sc[i];
     if(prim.type === "poly"){
@@ -5485,7 +5575,7 @@ function renderSlopeScene(alpha, st){
         ctx.beginPath();
         let valid = true;
         for(let j = 0; j < prim.pts.length; j++){
-          const pt2d = project(prim.pts[j]);
+          const pt2d = project(prim.pts[j], true);
           if(!pt2d){ valid = false; break; }
           if(j === 0) ctx.moveTo(pt2d[0], pt2d[1]);
           else ctx.lineTo(pt2d[0], pt2d[1]);
@@ -5498,7 +5588,7 @@ function renderSlopeScene(alpha, st){
         }
       }
     } else if(prim.type === "line"){
-      const p1 = project(prim.a), p2 = project(prim.b);
+      const p1 = project(prim.a, true), p2 = project(prim.b, true);
       if(p1 && p2){
         ctx.beginPath();
         ctx.moveTo(p1[0], p1[1]);
@@ -5509,7 +5599,7 @@ function renderSlopeScene(alpha, st){
         ctx.stroke();
       }
     } else if(prim.type === "node"){
-      const p = project(prim.p);
+      const p = project(prim.p, true);
       if(p){
         ctx.beginPath();
         ctx.arc(p[0], p[1], prim.r || 3.5, 0, Math.PI * 2);
@@ -5525,26 +5615,37 @@ function renderSlopeScene(alpha, st){
 }
 
 function updateSlopeHUD(speedMs, alpha, F_gx, tel){
+  const speedKmh = Math.max(0, speedMs * 3.6);
   const gradePct = SLOPE_STAGE.grade * 100;
   const angleDeg = alpha * (180 / Math.PI);
   
-  document.getElementById("slopeHudSpeed").textContent = `${SLOPE_STAGE.speedKmh.toFixed(1)} km/h (${speedMs.toFixed(1)} m/s)`;
-  document.getElementById("slopeHudAngle").textContent = `${angleDeg.toFixed(2)}° (Grade ${gradePct.toFixed(1)}%)`;
-  document.getElementById("slopeHudGx").textContent = `-${Math.sin(alpha).toFixed(2)} g (${Math.round(F_gx)} N 阻力)`;
+  const elSpeed = document.getElementById("slopeHudSpeed");
+  if(elSpeed) elSpeed.textContent = `${speedKmh.toFixed(1)} km/h (${speedMs.toFixed(1)} m/s)`;
+  
+  const elAngle = document.getElementById("slopeHudAngle");
+  if(elAngle) elAngle.textContent = `${angleDeg.toFixed(2)}° (Grade ${gradePct.toFixed(1)}%)`;
+  
+  const elGx = document.getElementById("slopeHudGx");
+  if(elGx) elGx.textContent = `-${Math.sin(alpha).toFixed(2)} g (${Math.round(F_gx)} N 阻力)`;
   
   const FzF = (tel.Fz.FL || 0) + (tel.Fz.FR || 0);
   const FzR = (tel.Fz.RL || 0) + (tel.Fz.RR || 0);
   const FzTotal = Math.max(1, FzF + FzR);
   const frontPct = (FzF / FzTotal) * 100;
   const rearPct = (FzR / FzTotal) * 100;
-  document.getElementById("slopeHudLoadSplit").textContent = `${frontPct.toFixed(1)}% / ${rearPct.toFixed(1)}%`;
+  
+  const elSplit = document.getElementById("slopeHudLoadSplit");
+  if(elSplit) elSplit.textContent = `${frontPct.toFixed(1)}% / ${rearPct.toFixed(1)}%`;
   
   const tr = tel.tr || { FL:0, FR:0, RL:0, RR:0 };
   const squatR = (((tr.RL || 0) + (tr.RR || 0)) / 2) * 1000;
   const squatF = (((tr.FL || 0) + (tr.FR || 0)) / 2) * 1000;
   
-  document.getElementById("slopeHudSquat").textContent = `${squatR > 0 ? '+' : ''}${squatR.toFixed(1)} mm`;
-  document.getElementById("slopeHudLift").textContent = `${squatF > 0 ? '+' : ''}${squatF.toFixed(1)} mm`;
+  const elSquat = document.getElementById("slopeHudSquat");
+  if(elSquat) elSquat.textContent = `${squatR > 0 ? '+' : ''}${squatR.toFixed(1)} mm`;
+  
+  const elLift = document.getElementById("slopeHudLift");
+  if(elLift) elLift.textContent = `${squatF > 0 ? '+' : ''}${squatF.toFixed(1)} mm`;
 }
 
 function initSlopeStageEvents(){
@@ -5618,7 +5719,32 @@ function initSlopeStageEvents(){
       SLOPE_STAGE.camOrbit = { az: 0, elv: 0, distFactor: 1.0 };
     });
   }
+
+  // Keyboard driving controls
+  window.addEventListener("keydown", (e) => {
+    if(!SLOPE_STAGE.active) return;
+    const k = e.key.toLowerCase();
+    if(k === "w" || k === "arrowup") SLOPE_STAGE.keys.w = true;
+    if(k === "s" || k === "arrowdown") SLOPE_STAGE.keys.s = true;
+    if(k === "a" || k === "arrowleft") SLOPE_STAGE.keys.a = true;
+    if(k === "d" || k === "arrowright") SLOPE_STAGE.keys.d = true;
+    if(k === " ") { SLOPE_STAGE.keys.space = true; e.preventDefault(); }
+  });
+
+  window.addEventListener("keyup", (e) => {
+    if(!SLOPE_STAGE.active) return;
+    const k = e.key.toLowerCase();
+    if(k === "w" || k === "arrowup") SLOPE_STAGE.keys.w = false;
+    if(k === "s" || k === "arrowdown") SLOPE_STAGE.keys.s = false;
+    if(k === "a" || k === "arrowleft") SLOPE_STAGE.keys.a = false;
+    if(k === "d" || k === "arrowright") SLOPE_STAGE.keys.d = false;
+    if(k === " ") SLOPE_STAGE.keys.space = false;
+  });
 }
+window.openSlopeStage = openSlopeStage;
+window.closeSlopeStage = closeSlopeStage;
+window.SLOPE_STAGE = SLOPE_STAGE;
+window.slopeStageLoop = slopeStageLoop;
 
 
 // Init Pure Suspension button
