@@ -615,7 +615,8 @@ canvas.plot{display:block;width:100%;height:84px;background:var(--well);border:1
     <div class="susp-eval-header">
       <div class="susp-eval-title-group">
         <h2 class="susp-eval-title">📊 悬架系统综合性能工程评价与诊断报告</h2>
-        <span class="susp-eval-subtitle" id="evalVehSubtitle">FIA GT3 · 综合评分: <b id="evalOverallScore">88.5</b> / 100</span>
+        <span class="susp-eval-subtitle" id="evalVehSubtitle">FIA GT3</span>
+        <span class="susp-eval-subtitle">综合评分: <b id="evalOverallScore">88.5</b> / 100</span>
       </div>
       <button class="susp-eval-close-btn" id="evalCloseBtn">✖ 关闭报告</button>
     </div>
@@ -819,6 +820,14 @@ const PRESETS={
 };
 
 
+/* ================================ 整车平台档案（综合评价 / 爬坡舞台共用） ================================ */
+const VEHICLE_PRESETS={
+  FSC: {name:"FSC 方程式赛车 (Formula SAE)",     wb:1620, hcg:320, mTotal:600,  note:"单座中置钢管桁架 · 前推杆+后拉杆 · 高刚度弹簧"},
+  GT3: {name:"FIA GT3 房车赛车 (GT3 Touring)",   wb:2650, hcg:450, mTotal:1400, note:"FIA 笼式防滚架 · 前后推杆架构 · 下压力 3600N"},
+  Baja:{name:"SAE Baja 巴哈越野 (Baja Off-Road)",wb:1750, hcg:520, mTotal:500,  note:"高挑防滚笼 · 牛栏前杠 · ±120mm 行程 · 全地形大齿胎"}
+};
+
+
 const HP_META=[
   ["LCA_F","下摆臂前铰点","LWR ARM FRT PIVOT","chassis",1,0],
   ["LCA_R","下摆臂后铰点","LWR ARM RR PIVOT","chassis",1,0],
@@ -839,7 +848,7 @@ const HP_META=[
 
 /* 全局活动仿真状态 (包含完整底盘与增量分析参数) */
 const S={
-  axis: "front", front: null, rear: null,
+  axis: "front", front: null, rear: null, vehicleType: "FSC",
   mode:"kin", // 'kin' | 'rig' | 'quasi'
   play:true, travel:0, roll:0, rack:0, swAngle:0, driveTorque:250, brakePedal:35,
   exc:"sine", excA:50, excF:0.25, steerExc:"off", stA:40, stF:0.12,
@@ -1504,6 +1513,7 @@ function travelL(half, deg){return clamp(S.travel-rollOffset(half,deg),S.trMin,S
 function simulate(dt){
   if(TRK.active){trackStep(dt);return;}
   if(STAGE.open){requestAnimationFrame(loop);return;}   // 舞台打开时挂起主渲染（省帧率）
+  if(SLOPE_STAGE.active){requestAnimationFrame(loop);return;} // 爬坡舞台打开时挂起主仿真，避免双写 SIM
   const MF=SIM.FR, NF=SIM.FL, MR=SIM.RR, NR=SIM.RL;
   if(S.mode==="kin"){
     const z0F=MF.n[MF.idx.WC].p0[2], z0R=MR.n[MR.idx.WC].p0[2];
@@ -4399,7 +4409,7 @@ function openSuspensionEvaluation(){
   const data = calculateEvaluationData();
   if(!data) return;
 
-  document.getElementById("evalVehSubtitle").textContent = `${(VEHICLE_PRESETS[S.vehicleType]||{}).name || 'FIA GT3'} · 综合评分: ${data.overall} / 100`;
+  document.getElementById("evalVehSubtitle").textContent = (VEHICLE_PRESETS[S.vehicleType]||{}).name || "FIA GT3";
   document.getElementById("evalOverallScore").textContent = data.overall;
   
   const badge = document.getElementById("evalGradeBadge");
@@ -4762,7 +4772,9 @@ const SLOPE_STAGE = {
   camMode: "behind",
   camOrbit: { az: 0, elv: 0, distFactor: 1.0 },
   lastTime: 0,
-  drag: null
+  drag: null,
+  scene: null,
+  rebuild: 0
 };
 
 const SLOPE_CAMS_CONFIG = {
@@ -5016,7 +5028,9 @@ function renderSlopeScene(alpha, st){
     }
   }
 
-  const sc = buildScenePRO();
+  if(SLOPE_STAGE.rebuild <= 0){ SLOPE_STAGE.scene = buildScenePRO(); SLOPE_STAGE.rebuild = 6; }
+  SLOPE_STAGE.rebuild--;
+  const sc = SLOPE_STAGE.scene || [];
   for(let i = 0; i < sc.length; i++){
     const prim = sc[i];
     if(prim.type === "poly"){
