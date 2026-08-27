@@ -330,6 +330,243 @@ canvas.plot{display:block;width:100%;height:84px;background:var(--well);border:1
 #ssPreview{display:block;margin:6px 0;border:1px solid #252E3D;background:#0e1218}
 .ss-st{font:9px var(--font-mono);color:#9AA4B5;margin-top:10px}
 
+
+/* ================================ 综合评价报告 & 直线爬坡 样式 ================================ */
+.header-action-btn {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  transition: all 0.2s ease;
+}
+.slope-btn {
+  background: rgba(46, 204, 113, 0.15);
+  border: 1px solid rgba(46, 204, 113, 0.4);
+  color: #2ecc71;
+}
+.slope-btn:hover { background: rgba(46, 204, 113, 0.3); }
+
+.eval-btn {
+  background: rgba(78, 161, 211, 0.15);
+  border: 1px solid rgba(78, 161, 211, 0.4);
+  color: #4ea1d3;
+}
+.eval-btn:hover { background: rgba(78, 161, 211, 0.3); }
+
+.susp-eval-modal-backdrop, .slope-stage-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 9, 14, 0.88);
+  backdrop-filter: blur(12px);
+  z-index: 9999;
+  display: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.susp-eval-modal-backdrop.show, .slope-stage-modal-backdrop.show {
+  display: flex;
+  opacity: 1;
+}
+
+.susp-eval-modal-container {
+  width: 92vw;
+  max-width: 1380px;
+  height: 88vh;
+  margin: auto;
+  background: #0d1117;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.susp-eval-header {
+  padding: 16px 24px;
+  background: #161b22;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.susp-eval-title { font-size: 17px; font-weight: 700; color: #fff; margin: 0; }
+.susp-eval-subtitle { font-size: 12px; color: #8b949e; margin-top: 4px; display: block; }
+.susp-eval-close-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #c9d1d9;
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.susp-eval-body {
+  flex: 1;
+  display: flex;
+  gap: 16px;
+  padding: 16px 20px;
+  overflow-y: auto;
+}
+.susp-eval-col-left { width: 380px; display: flex; flex-direction: column; gap: 14px; }
+.susp-eval-col-right { flex: 1; display: flex; flex-direction: column; }
+
+.eval-card {
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 14px;
+}
+.eval-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.eval-card-header h3 { font-size: 13px; font-weight: 700; color: #e6edf3; margin: 0; }
+
+.eval-grade-badge {
+  background: #238636;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.radar-container { display: flex; justify-content: center; align-items: center; margin: 6px 0; }
+.eval-score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px; }
+.eval-score-item {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 6px 8px;
+  border-radius: 6px;
+  display: flex;
+  justify-content: space-between;
+}
+.eval-score-item b { color: #58a6ff; }
+
+.eval-advice-list { font-size: 11.5px; color: #c9d1d9; display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
+.eval-advice-item {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 8px 10px;
+  border-radius: 6px;
+  border-left: 3px solid #f1e05a;
+}
+.eval-advice-item.danger { border-left-color: #f85149; }
+.eval-advice-item.good { border-left-color: #2ea043; }
+
+.eval-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.metric-card {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.metric-card-top { display: flex; justify-content: space-between; align-items: center; }
+.metric-name { font-size: 12px; font-weight: 700; color: #e6edf3; }
+.metric-status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.metric-status-dot.green { background: #2ea043; box-shadow: 0 0 6px #2ea043; }
+.metric-status-dot.yellow { background: #d29922; box-shadow: 0 0 6px #d29922; }
+.metric-status-dot.red { background: #f85149; box-shadow: 0 0 6px #f85149; }
+
+.metric-val-row { display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px; }
+.metric-val { font-size: 15px; font-weight: 800; font-family: ui-monospace, monospace; color: #58a6ff; }
+.metric-target { font-size: 10.5px; color: #8b949e; }
+.metric-desc { font-size: 10.5px; color: #8b949e; line-height: 1.35; margin-top: 2px; }
+
+/* 爬坡舞台全屏 */
+.slope-stage-modal-backdrop {
+  flex-direction: column;
+}
+.slope-stage-topbar {
+  height: 46px;
+  background: #161b22;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+  z-index: 10;
+}
+.slope-top-left { display: flex; align-items: center; gap: 16px; }
+.slope-stage-logo { font-size: 13px; font-weight: 800; color: #2ecc71; letter-spacing: 0.5px; }
+
+.slope-cam-group { display: flex; background: rgba(0, 0, 0, 0.3); border-radius: 6px; padding: 2px; }
+.slope-cam-btn {
+  background: transparent;
+  border: none;
+  color: #8b949e;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.slope-cam-btn.on { background: #238636; color: #fff; }
+
+.slope-top-right { display: flex; align-items: center; gap: 16px; font-size: 11px; }
+.slope-control-item { display: flex; align-items: center; gap: 8px; color: #8b949e; }
+.slope-control-item input[type=range] { width: 90px; }
+.slope-control-item b { color: #58a6ff; width: 45px; }
+
+.slope-action-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #c9d1d9;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.slope-exit-btn { background: rgba(248, 81, 73, 0.2); border-color: rgba(248, 81, 73, 0.4); color: #f85149; }
+
+.slope-stage-main { flex: 1; position: relative; width: 100%; height: calc(100% - 46px); overflow: hidden; }
+#slopeCanvas { width: 100%; height: 100%; display: block; }
+
+.slope-hud-overlay {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  pointer-events: none;
+}
+.slope-hud-card {
+  background: rgba(13, 17, 23, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  min-width: 250px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.slope-hud-row { display: flex; justify-content: space-between; gap: 14px; color: #8b949e; }
+.slope-hud-row b { color: #e6edf3; font-family: ui-monospace, monospace; }
+.slope-hud-row b.hl { color: #58a6ff; }
+.slope-hud-row b.warn { color: #d29922; }
+
+.slope-hint-box {
+  position: absolute;
+  bottom: 14px;
+  right: 24px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}
+
 </style>
 </head>
 <body>
@@ -338,6 +575,11 @@ canvas.plot{display:block;width:100%;height:84px;background:var(--well);border:1
     <div class="brand"><b>LABSUS</b></div>
     <div class="tt"><span>全车底盘 高性能悬架 · 运动学 / 动力学 / 准静态操稳分析台</span><span>Full Chassis Inboard Suspension K&C, Rig Dynamics & Quasi-Static Handling</span></div>
     <div class="sp"></div>
+    <div style="display:flex;align-items:center;gap:6px;margin-right:8px;">
+      <button id="slopeStageBtn" class="header-action-btn slope-btn" title="进入全物理15自由度直线爬坡动力学舞台">🏁 直线爬坡测试</button>
+      <button id="evalModalBtn" class="header-action-btn eval-btn" title="查看全维度悬架工程评价与AI调校建议">📊 综合评价报告</button>
+      <button id="pureSuspTg" class="header-action-btn" title="切换纯悬架透视 (隐藏车架与外围附件)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:var(--text);">纯悬架透视</button>
+    </div>
     <div id="themeTg" class="theme-tg" title="切换浅色 / 深色模式"><i></i></div>
     <div class="cell"><i>正在调校</i><b class="a" id="tbArch">前悬架 PUSHROD</b></div>
     <div class="cell"><i>Baseline 快照</i><b id="tbBase">未锁定 (无比对)</b></div>
@@ -363,6 +605,135 @@ canvas.plot{display:block;width:100%;height:84px;background:var(--well);border:1
     <div class="sp"></div>
     <div class="c"><u>坐标拾取</u><b id="sbCur">-</b></div>
     <div class="c hl"><u>提示</u><b id="sbHint">正交视图左键拖拽硬点 · 随时快照基准线(Save Baseline)进行多曲线比对</b></div>
+  </div>
+</div>
+
+
+<!-- ================================ 综合悬架工程评价与诊断模态窗口 ================================ -->
+<div id="suspEvalModal" class="susp-eval-modal-backdrop">
+  <div class="susp-eval-modal-container">
+    <div class="susp-eval-header">
+      <div class="susp-eval-title-group">
+        <h2 class="susp-eval-title">📊 悬架系统综合性能工程评价与诊断报告</h2>
+        <span class="susp-eval-subtitle" id="evalVehSubtitle">FIA GT3 · 综合评分: <b id="evalOverallScore">88.5</b> / 100</span>
+      </div>
+      <button class="susp-eval-close-btn" id="evalCloseBtn">✖ 关闭报告</button>
+    </div>
+    
+    <div class="susp-eval-body">
+      <!-- 左侧：六维雷达图与评分 -->
+      <div class="susp-eval-col-left">
+        <div class="eval-card radar-card">
+          <div class="eval-card-header">
+            <h3>🕸️ 六维工程性能雷达图</h3>
+            <span class="eval-grade-badge" id="evalGradeBadge">GRADE A</span>
+          </div>
+          <div class="radar-container">
+            <canvas id="evalRadarCanvas" width="340" height="340"></canvas>
+          </div>
+          <div class="eval-score-grid" id="evalDimensionScores">
+            <!-- JS 动态注入六个维度的得分 -->
+          </div>
+        </div>
+
+        <!-- 调校诊断与工程建议 -->
+        <div class="eval-card advisor-card">
+          <div class="eval-card-header">
+            <h3>🛠️ 悬架调校建议与专家诊断</h3>
+          </div>
+          <div class="eval-advice-list" id="evalAdviceList">
+            <!-- 动态生成 -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧：详细指标交通灯诊断矩阵 -->
+      <div class="susp-eval-col-right">
+        <div class="eval-card metrics-detail-card">
+          <div class="eval-card-header">
+            <h3>🎯 核心设计指标交通灯矩阵 (Traffic Lights)</h3>
+            <span class="metric-filter-hint">绿色: 理想 · 黄色: 警告 · 红色: 异常</span>
+          </div>
+          <div class="eval-metrics-grid" id="evalMetricsGrid">
+            <!-- 动态注入 24 项指标卡片 -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================ 直线爬坡测试 3D 动力学舞台模态窗口 ================================ -->
+<div id="slopeStageModal" class="slope-stage-modal-backdrop">
+  <div class="slope-stage-topbar">
+    <div class="slope-top-left">
+      <span class="slope-stage-logo">🏁 赛车直线爬坡动力学舞台 · SLOPE CLIMB STAGE</span>
+      <!-- 多机位切换按钮组 -->
+      <div class="slope-cam-group">
+        <button class="slope-cam-btn on" data-cam="behind">🏎️ 尾部跟随</button>
+        <button class="slope-cam-btn" data-cam="front">🎯 车头特写</button>
+        <button class="slope-cam-btn" data-cam="side">📐 侧向轮廓</button>
+        <button class="slope-cam-btn" data-cam="threeq">🏆 45° 鸟瞰</button>
+        <button class="slope-cam-btn" data-cam="cockpit">💺 第一人称</button>
+      </div>
+    </div>
+    
+    <div class="slope-top-right">
+      <div class="slope-control-item">
+        <label>坡度 GRADE</label>
+        <input type="range" id="slopeGradeSlider" min="0" max="40" value="15" step="1">
+        <b id="slopeGradeVal">15%</b>
+      </div>
+      <div class="slope-control-item">
+        <label>车速 SPEED</label>
+        <input type="range" id="slopeSpeedSlider" min="10" max="160" value="70" step="5">
+        <b id="slopeSpeedVal">70 km/h</b>
+      </div>
+      <button class="slope-action-btn" id="slopePlayBtn">⏸ 暂停</button>
+      <button class="slope-action-btn slope-exit-btn" id="slopeExitBtn">✖ 退出舞台</button>
+    </div>
+  </div>
+
+  <div class="slope-stage-main">
+    <canvas id="slopeCanvas"></canvas>
+
+    <!-- 实时遥测 HUD -->
+    <div class="slope-hud-overlay">
+      <div class="slope-hud-card">
+        <div class="slope-hud-row">
+          <span>🏎️ 车型平台</span>
+          <b id="slopeVehName">FIA GT3</b>
+        </div>
+        <div class="slope-hud-row">
+          <span>🏁 爬坡车速 / 动能</span>
+          <b class="hl" id="slopeHudSpeed">70.0 km/h (19.4 m/s)</b>
+        </div>
+        <div class="slope-hud-row">
+          <span>📐 坡度角 / 仰角</span>
+          <b id="slopeHudAngle">8.53° (Grade 15.0%)</b>
+        </div>
+        <div class="slope-hud-row">
+          <span>⚖️ 纵向重力载荷分量</span>
+          <b class="warn" id="slopeHudGx">-0.15 g (1620 N)</b>
+        </div>
+        <div class="slope-hud-row">
+          <span>🔄 动态轴荷分布 (前 / 后)</span>
+          <b id="slopeHudLoadSplit">38.5% / 61.5%</b>
+        </div>
+        <div class="slope-hud-row">
+          <span>📉 后悬架下蹲压缩 (Squat)</span>
+          <b class="hl" id="slopeHudSquat">+18.5 mm</b>
+        </div>
+        <div class="slope-hud-row">
+          <span>📈 前悬架拉伸伸展 (Lift)</span>
+          <b id="slopeHudLift">-12.2 mm</b>
+        </div>
+      </div>
+    </div>
+
+    <div class="slope-hint-box">
+      🖱️ 提示：按住鼠标左键拖拽可自由 360° 环绕旋转机位 · 滚轮缩放视距 · 双击重置当前机位
+    </div>
   </div>
 </div>
 
@@ -1748,7 +2119,19 @@ function addAxleAssemblyPRO(sc, M, m, sx, yOff, axis){
   const ax=nrm([m.ax[0]*sx, m.ax[1], m.ax[2]]);
   const kg=T(m.kg);
   const tR=state.tire.R, tW=state.tire.W, rimR=state.tire.rim, dR=state.tire.disc;
-  const eU=nrm(sub([0,0,1],mul(ax,dot([0,0,1],ax)))), eV=cross(ax,eU);
+    const _eU0=nrm(sub([0,0,1],mul(ax,dot([0,0,1],ax)))), _eV0=cross(ax,_eU0);
+  let _spin = 0;
+  if(window._tireSpinAngles) {
+    if(M === SIM.FL) _spin = window._tireSpinAngles.FL;
+    else if(M === SIM.FR) _spin = window._tireSpinAngles.FR;
+    else if(M === SIM.RL) _spin = window._tireSpinAngles.RL;
+    else if(M === SIM.RR) _spin = window._tireSpinAngles.RR;
+  } else {
+    _spin = window._tireSpinAngle || 0;
+  }
+  const _cosS = Math.cos(_spin*sx), _sinS = Math.sin(_spin*sx);
+  const eU = add(mul(_eU0, _cosS), mul(_eV0, _sinS));
+  const eV = add(mul(_eU0, -_sinS), mul(_eV0, _cosS));
 
   if(S.show.face){
     PL(sc,[LAF,LBJ,LAR,LAF],SYSTEM_COLORS.rigArm,1,null,SYSTEM_COLORS.arm);
@@ -3893,6 +4276,916 @@ function applyTheme(t){
   const tg=document.getElementById("themeTg");
   if(tg)tg.onclick=()=>applyTheme(document.documentElement.getAttribute("data-theme")==="light"?"dark":"light");
 })();
+
+
+/* =====================================================================
+   LABSUS 综合性能评价与AI调校诊断引擎 (Evaluation Engine)
+   ===================================================================== */
+const EVAL_BENCHMARKS = {
+  camberGainF:     { name: "前外倾增益 (Camber Gain)", target: "0.04 ~ 0.08 °/mm", unit: "°/mm", eval: v => (v >= 0.04 && v <= 0.08 ? 'good' : (v >= 0.02 && v <= 0.11 ? 'warn' : 'bad')), desc: "过弯侧倾时补偿接地面积，过小易推头，过大影响制动" },
+  camberGainR:     { name: "后外倾增益 (Camber Gain)", target: "0.03 ~ 0.07 °/mm", unit: "°/mm", eval: v => (v >= 0.03 && v <= 0.07 ? 'good' : (v >= 0.015 && v <= 0.09 ? 'warn' : 'bad')), desc: "后轴侧倾附着力支撑，保障高速稳定性" },
+  bumpSteerF:      { name: "前跳动转向 (Bump Steer)", target: "< 0.02 °/mm", unit: "°/mm", eval: v => (Math.abs(v) <= 0.02 ? 'good' : (Math.abs(v) <= 0.05 ? 'warn' : 'bad')), desc: "路面颠簸时方向稳定性，过大会引起车头晃动" },
+  bumpSteerR:      { name: "后跳动转向 (Bump Steer)", target: "0.00 ~ +0.03 °/mm", unit: "°/mm", eval: v => (v >= 0.0 && v <= 0.03 ? 'good' : (v >= -0.01 && v <= 0.05 ? 'warn' : 'bad')), desc: "跳动后束角变化，轻微压下前束增加高速稳定性" },
+  rcHeightF:       { name: "前侧倾中心高度 (Roll Center)", target: "30 ~ 75 mm", unit: "mm", eval: v => (v >= 30 && v <= 75 ? 'good' : (v >= 10 && v <= 100 ? 'warn' : 'bad')), desc: "前轴侧向力几何传递高度，过高易千斤顶效应" },
+  rcHeightR:       { name: "后侧倾中心高度 (Roll Center)", target: "45 ~ 95 mm", unit: "mm", eval: v => (v >= 45 && v <= 95 ? 'good' : (v >= 20 && v <= 120 ? 'warn' : 'bad')), desc: "后轴侧倾中心应高于前轴，形成自然前倾侧倾轴线" },
+  antiDiveF:       { name: "前抗点头率 (Anti-Dive)", target: "20% ~ 40%", unit: "%", eval: v => (v >= 20 && v <= 40 ? 'good' : (v >= 10 && v <= 55 ? 'warn' : 'bad')), desc: "制动时前悬架抗压缩几何能力，抑制俯仰" },
+  antiSquatR:      { name: "后抗下蹲率 (Anti-Squat)", target: "30% ~ 60%", unit: "%", eval: v => (v >= 30 && v <= 60 ? 'good' : (v >= 15 && v <= 80 ? 'warn' : 'bad')), desc: "加速时后悬架抗压缩几何能力，防止重心塌陷" },
+  scrubRadiusF:    { name: "前磨地半径 (Scrub Radius)", target: "5 ~ 25 mm", unit: "mm", eval: v => (v >= 5 && v <= 25 ? 'good' : (v >= -5 && v <= 40 ? 'warn' : 'bad')), desc: "方向盘路感反馈与制动跑偏容限" },
+  casterTrailF:    { name: "前主销拖距 (Caster Trail)", target: "15 ~ 35 mm", unit: "mm", eval: v => (v >= 15 && v <= 35 ? 'good' : (v >= 5 && v <= 45 ? 'warn' : 'bad')), desc: "轮胎回正力矩杠杆，过大导致打方向沉重" },
+  motionRatioF:    { name: "前安装比 (Motion Ratio)", target: "0.65 ~ 0.85", unit: "", eval: v => (v >= 0.65 && v <= 0.85 ? 'good' : (v >= 0.5 && v <= 0.95 ? 'warn' : 'bad')), desc: "弹簧避震器杠杆效率，推荐接近线性" },
+  motionRatioR:    { name: "后安装比 (Motion Ratio)", target: "0.70 ~ 0.90", unit: "", eval: v => (v >= 0.70 && v <= 0.90 ? 'good' : (v >= 0.55 && v <= 1.0 ? 'warn' : 'bad')), desc: "后轴弹簧避震器杠杆效率" },
+  wheelRateF:      { name: "前轮端刚度 (Wheel Rate)", target: "30 ~ 70 N/mm", unit: "N/mm", eval: v => (v >= 30 && v <= 70 ? 'good' : (v >= 20 && v <= 90 ? 'warn' : 'bad')), desc: "前悬架对路面垂直支撑刚度" },
+  wheelRateR:      { name: "后轮端刚度 (Wheel Rate)", target: "35 ~ 75 N/mm", unit: "N/mm", eval: v => (v >= 35 && v <= 75 ? 'good' : (v >= 25 && v <= 95 ? 'warn' : 'bad')), desc: "后悬架对路面垂直支撑刚度" },
+  rideFreqF:       { name: "前偏频 (Ride Frequency)", target: "1.8 ~ 3.2 Hz", unit: "Hz", eval: v => (v >= 1.8 && v <= 3.2 ? 'good' : (v >= 1.4 && v <= 4.0 ? 'warn' : 'bad')), desc: "赛车前轴垂向固有振动频率" },
+  rideFreqR:       { name: "后偏频 (Ride Frequency)", target: "2.0 ~ 3.5 Hz", unit: "Hz", eval: v => (v >= 2.0 && v <= 3.5 ? 'good' : (v >= 1.5 && v <= 4.2 ? 'warn' : 'bad')), desc: "后偏频通常比前偏频高 10%~15% 消除平顺颠簸" },
+  dampingRatioF:   { name: "前阻尼比 (Damping Ratio)", target: "0.55 ~ 0.75", unit: "", eval: v => (v >= 0.55 && v <= 0.75 ? 'good' : (v >= 0.4 && v <= 0.85 ? 'warn' : 'bad')), desc: "前轴振动衰减能力，防止多余弹跳" },
+  dampingRatioR:   { name: "后阻尼比 (Damping Ratio)", target: "0.60 ~ 0.80", unit: "", eval: v => (v >= 0.60 && v <= 0.80 ? 'good' : (v >= 0.45 && v <= 0.90 ? 'warn' : 'bad')), desc: "后轴振动衰减能力" },
+  rollStiffnessPct:{ name: "前侧倾刚度占比 (F/T Roll)", target: "48% ~ 58%", unit: "%", eval: v => (v >= 48 && v <= 58 ? 'good' : (v >= 40 && v <= 65 ? 'warn' : 'bad')), desc: "决定稳态过弯平衡：>55% 趋向不足转向，<48% 趋向过度" },
+  ackermannPct:    { name: "阿克曼转向百分比 (Ackermann)", target: "30% ~ 80%", unit: "%", eval: v => (v >= 30 && v <= 80 ? 'good' : (v >= 10 && v <= 100 ? 'warn' : 'bad')), desc: "高速赛车通常采用 40%~60% 减少外侧胎拖拽" }
+};
+
+function calculateEvaluationData(){
+  const swF = SIM.swF, swR = SIM.swR;
+  const mF = SIM.mFR, mR = SIM.mRR;
+  if(!swF || !swR || !mF || !mR) return null;
+
+  const sampleSweep = (sw, tr0) => {
+    if(!sw.rows || sw.rows.length === 0) return null;
+    let closest = sw.rows[0], minDiff = 1e9;
+    for(const r of sw.rows){
+      const diff = Math.abs(r.tr - tr0);
+      if(diff < minDiff){ minDiff = diff; closest = r; }
+    }
+    return closest;
+  };
+
+  const nomF = sampleSweep(swF, 0) || swF.rows[Math.floor(swF.rows.length/2)];
+  const nomR = sampleSweep(swR, 0) || swR.rows[Math.floor(swR.rows.length/2)];
+  
+  const trArrF = swF.rows.map(r => r.tr);
+  const trArrR = swR.rows.map(r => r.tr);
+  const dTrF = Math.max(1, trArrF[trArrF.length-1] - trArrF[0]);
+  const dTrR = Math.max(1, trArrR[trArrR.length-1] - trArrR[0]);
+
+  const camGainF = Math.abs((swF.rows[swF.rows.length-1].cam - swF.rows[0].cam) / dTrF);
+  const camGainR = Math.abs((swR.rows[swR.rows.length-1].cam - swR.rows[0].cam) / dTrR);
+  const bumpSteerF = Math.abs((swF.rows[swF.rows.length-1].toe - swF.rows[0].toe) / dTrF);
+  const bumpSteerR = (swR.rows[swR.rows.length-1].toe - swR.rows[0].toe) / dTrR;
+
+  const mrF = Math.abs(nomF.mr || 0.75);
+  const mrR = Math.abs(nomR.mr || 0.78);
+  const kwF = (S.front.kS || 60) * (mrF * mrF);
+  const kwR = (S.rear.kS || 65) * (mrR * mrR);
+  const cwF = (S.front.cR || 3.5) * (mrF * mrF);
+  const cwR = (S.rear.cR || 4.0) * (mrR * mrR);
+
+  const mSprungF = (S.mSprung || 400) * 0.45 / 2;
+  const mSprungR = (S.mSprung || 400) * 0.55 / 2;
+  const freqF = (1 / (2 * Math.PI)) * Math.sqrt((kwF * 1000) / mSprungF);
+  const freqR = (1 / (2 * Math.PI)) * Math.sqrt((kwR * 1000) / mSprungR);
+  const ccF = 2 * Math.sqrt((kwF * 1000) * mSprungF);
+  const ccR = 2 * Math.sqrt((kwR * 1000) * mSprungR);
+  const dampRatioF = (cwF * 1000) / (ccF || 1);
+  const dampRatioR = (cwR * 1000) / (ccR || 1);
+
+  const tf = Math.abs(S.front.hp.WC[0] * 2);
+  const tr = Math.abs(S.rear.hp.WC[0] * 2);
+  const kRollF = 0.5 * (kwF * 1000) * (tf * tf / 1e6) + (S.front.arb.d > 0 ? 1200 : 0);
+  const kRollR = 0.5 * (kwR * 1000) * (tr * tr / 1e6) + (S.rear.arb.d > 0 ? 900 : 0);
+  const rollSplitF = (kRollF / (kRollF + kRollR || 1)) * 100;
+
+  const metrics = {
+    camberGainF: { val: camGainF, formatted: camGainF.toFixed(3) },
+    camberGainR: { val: camGainR, formatted: camGainR.toFixed(3) },
+    bumpSteerF:  { val: bumpSteerF, formatted: bumpSteerF.toFixed(3) },
+    bumpSteerR:  { val: bumpSteerR, formatted: bumpSteerR.toFixed(3) },
+    rcHeightF:   { val: nomF.rcH || 45, formatted: (nomF.rcH || 45).toFixed(1) },
+    rcHeightR:   { val: nomR.rcH || 65, formatted: (nomR.rcH || 65).toFixed(1) },
+    antiDiveF:   { val: nomF.anti || 28, formatted: (nomF.anti || 28).toFixed(1) },
+    antiSquatR:  { val: nomR.anti || 42, formatted: (nomR.anti || 42).toFixed(1) },
+    scrubRadiusF:{ val: mF.scrub || 15, formatted: (mF.scrub || 15).toFixed(1) },
+    casterTrailF:{ val: mF.trail || 22, formatted: (mF.trail || 22).toFixed(1) },
+    motionRatioF:{ val: mrF, formatted: mrF.toFixed(3) },
+    motionRatioR:{ val: mrR, formatted: mrR.toFixed(3) },
+    wheelRateF:  { val: kwF, formatted: kwF.toFixed(1) },
+    wheelRateR:  { val: kwR, formatted: kwR.toFixed(1) },
+    rideFreqF:   { val: freqF, formatted: freqF.toFixed(2) },
+    rideFreqR:   { val: freqR, formatted: freqR.toFixed(2) },
+    dampingRatioF:{ val: dampRatioF, formatted: dampRatioF.toFixed(2) },
+    dampingRatioR:{ val: dampRatioR, formatted: dampRatioR.toFixed(2) },
+    rollStiffnessPct: { val: rollSplitF, formatted: rollSplitF.toFixed(1) },
+    ackermannPct:{ val: S.ackermann || 52, formatted: (S.ackermann || 52).toFixed(0) }
+  };
+
+  const dimScores = {
+    "外倾抓地 (Camber)": Math.min(100, Math.max(40, 100 - Math.abs(camGainF - 0.06)*800)),
+    "跳动转向 (BumpSteer)": Math.min(100, Math.max(30, 100 - bumpSteerF*2000)),
+    "侧倾中心 (RollCenter)": Math.min(100, Math.max(40, 100 - Math.abs(nomF.rcH - 50)*1.2)),
+    "抗点头俯仰 (AntiDive)": Math.min(100, Math.max(40, 100 - Math.abs(nomF.anti - 30)*1.5)),
+    "平顺阻尼 (Damping)": Math.min(100, Math.max(40, 100 - Math.abs(dampRatioF - 0.65)*120)),
+    "转向手感 (Steering)": Math.min(100, Math.max(40, 100 - Math.abs(mF.scrub - 15)*2.5))
+  };
+
+  let totalScore = 0, count = 0;
+  for(const k in dimScores){ totalScore += dimScores[k]; count++; }
+  const overall = Math.round(totalScore / count);
+
+  return { metrics, dimScores, overall };
+}
+
+function openSuspensionEvaluation(){
+  const modal = document.getElementById("suspEvalModal");
+  if(!modal) return;
+  const data = calculateEvaluationData();
+  if(!data) return;
+
+  document.getElementById("evalVehSubtitle").textContent = `${(VEHICLE_PRESETS[S.vehicleType]||{}).name || 'FIA GT3'} · 综合评分: ${data.overall} / 100`;
+  document.getElementById("evalOverallScore").textContent = data.overall;
+  
+  const badge = document.getElementById("evalGradeBadge");
+  if(data.overall >= 90){ badge.textContent = "GRADE S+ 极致竞赛"; badge.style.background = "#238636"; }
+  else if(data.overall >= 80){ badge.textContent = "GRADE A 优秀调校"; badge.style.background = "#1f6feb"; }
+  else if(data.overall >= 70){ badge.textContent = "GRADE B 良好平衡"; badge.style.background = "#d29922"; }
+  else { badge.textContent = "GRADE C 存在缺陷"; badge.style.background = "#da3633"; }
+
+  const scoreGrid = document.getElementById("evalDimensionScores");
+  scoreGrid.innerHTML = "";
+  for(const k in data.dimScores){
+    const d = document.createElement("div");
+    d.className = "eval-score-item";
+    d.innerHTML = `<span>${k}</span><b>${Math.round(data.dimScores[k])} 分</b>`;
+    scoreGrid.appendChild(d);
+  }
+
+  const adviceList = document.getElementById("evalAdviceList");
+  adviceList.innerHTML = "";
+  const advices = [];
+  if(data.metrics.camberGainF.val < 0.035) advices.push({ type: 'danger', text: "【前外倾增益偏低】当前仅 " + data.metrics.camberGainF.formatted + " °/mm，过弯车身侧倾时前轮接地变差，易造成剧烈推头！建议拉长下控制臂或抬高上控制臂外球销。" });
+  if(data.metrics.bumpSteerF.val > 0.03) advices.push({ type: 'danger', text: "【前跳动转向过大】当前为 " + data.metrics.bumpSteerF.formatted + " °/mm，赛车冲过路肩时方向盘将剧烈抢把！建议调整转向机高低 (RACK_Z) 使转向拉杆与下摆臂虚拟瞬心重合。" });
+  if(data.metrics.rcHeightF.val < 20) advices.push({ type: 'warn', text: "【前侧倾中心过低】侧倾力臂过大导致过弯侧倾严重，建议适当调整内外球销几何高度。" });
+  if(data.metrics.rollStiffnessPct.val < 48) advices.push({ type: 'warn', text: "【前侧倾刚度占比偏低】当前后轴过硬，高速弯出弯时后轮附着力容易被突破，车辆趋向过度转向。" });
+  if(advices.length === 0) advices.push({ type: 'good', text: "【完美几何架构】当前悬架各项指标均处于职业赛车最佳黄金视窗内，外倾补偿与跳动转向极其收敛！" });
+
+  advices.forEach(adv => {
+    const el = document.createElement("div");
+    el.className = `eval-advice-item ${adv.type}`;
+    el.textContent = adv.text;
+    adviceList.appendChild(el);
+  });
+
+  const grid = document.getElementById("evalMetricsGrid");
+  grid.innerHTML = "";
+  for(const k in data.metrics){
+    const def = EVAL_BENCHMARKS[k];
+    if(!def) continue;
+    const m = data.metrics[k];
+    const status = def.eval(m.val);
+    const card = document.createElement("div");
+    card.className = "metric-card";
+    card.innerHTML = `
+      <div class="metric-card-top">
+        <span class="metric-name">${def.name}</span>
+        <span class="metric-status-dot ${status === 'good' ? 'green' : (status === 'warn' ? 'yellow' : 'red')}"></span>
+      </div>
+      <div class="metric-val-row">
+        <span class="metric-val">${m.formatted} <small style="font-size:10px;font-weight:normal;">${def.unit}</small></span>
+        <span class="metric-target">目标: ${def.target}</span>
+      </div>
+      <div class="metric-desc">${def.desc}</div>
+    `;
+    grid.appendChild(card);
+  }
+
+  drawRadarChart(data.dimScores);
+  modal.classList.add("show");
+}
+
+function drawRadarChart(scores){
+  const cv = document.getElementById("evalRadarCanvas");
+  if(!cv) return;
+  const ctx = cv.getContext("2d");
+  const w = cv.width, h = cv.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const cx = w / 2, cy = h / 2, R = w * 0.38;
+  const keys = Object.keys(scores);
+  const total = keys.length;
+  const angleStep = (Math.PI * 2) / total;
+
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+  ctx.lineWidth = 1;
+  for(let layer = 1; layer <= 4; layer++){
+    ctx.beginPath();
+    const r = (R / 4) * layer;
+    for(let i = 0; i < total; i++){
+      const ang = i * angleStep - Math.PI / 2;
+      const x = cx + r * Math.cos(ang), y = cy + r * Math.sin(ang);
+      if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  for(let i = 0; i < total; i++){
+    const ang = i * angleStep - Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + R * Math.cos(ang), cy + R * Math.sin(ang));
+    ctx.stroke();
+
+    const labelX = cx + (R + 22) * Math.cos(ang);
+    const labelY = cy + (R + 22) * Math.sin(ang);
+    ctx.fillStyle = "#8b949e";
+    ctx.font = "10.5px ui-monospace, sans-serif";
+    ctx.textAlign = Math.abs(Math.cos(ang)) < 0.2 ? "center" : (Math.cos(ang) > 0 ? "left" : "right");
+    ctx.textBaseline = "middle";
+    ctx.fillText(keys[i].split(" ")[0], labelX, labelY);
+  }
+
+  ctx.beginPath();
+  for(let i = 0; i < total; i++){
+    const ang = i * angleStep - Math.PI / 2;
+    const scorePct = Math.min(100, Math.max(10, scores[keys[i]])) / 100;
+    const r = R * scorePct;
+    const x = cx + r * Math.cos(ang), y = cy + r * Math.sin(ang);
+    if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = "rgba(88, 166, 255, 0.25)";
+  ctx.fill();
+  ctx.strokeStyle = "#58a6ff";
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+
+  for(let i = 0; i < total; i++){
+    const ang = i * angleStep - Math.PI / 2;
+    const scorePct = Math.min(100, Math.max(10, scores[keys[i]])) / 100;
+    const r = R * scorePct;
+    const x = cx + r * Math.cos(ang), y = cy + r * Math.sin(ang);
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = "#58a6ff";
+    ctx.fill();
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+}
+
+/* =====================================================================
+   LABSUS 15-DOF HARDCORE MULTI-BODY VEHICLE DYNAMICS ENGINE
+   ===================================================================== */
+class VehicleDynamics15DOF {
+  constructor(S_config, SIM_data, initSpeedMs = 0) {
+    this.S = S_config;
+    this.SIM = SIM_data;
+    
+    this.m = Math.max(100, S_config.mTotal || 1000);
+    this.wb = (S_config.wb || 2600) / 1000;
+    this.a = this.wb * 0.45;
+    this.b = this.wb - this.a;
+    this.h_cg = (S_config.hcg || 350) / 1000;
+    
+    this.tF = Math.abs((S_config.front.hp.WC[0] || 800) * 2) / 1000;
+    this.tR = Math.abs((S_config.rear.hp.WC[0] || 800) * 2) / 1000;
+
+    this.tireF = S_config.front.tire;
+    this.tireR = S_config.rear.tire;
+    this.ReF = (this.tireF.R || 330) / 1000;
+    this.ReR = (this.tireR.R || 330) / 1000;
+    
+    this.Ixx = this.m * 0.25; 
+    this.Iyy = this.m * 1.15;
+    this.Izz = this.m * 1.35;
+    this.Iw = 1.2;
+    
+    this.Fz0_F = (this.m * 9.81 * (this.b / this.wb)) / 2.0;
+    this.Fz0_R = (this.m * 9.81 * (this.a / this.wb)) / 2.0;
+    
+    const mrF = Math.abs(S_config.front.mr || 0.75);
+    const mrR = Math.abs(S_config.rear.mr || 0.78);
+    this.Kw_F = (S_config.front.kS * 1000 || 60000) * (mrF * mrF);
+    this.Kw_R = (S_config.rear.kS * 1000 || 65000) * (mrR * mrR);
+    this.Cw_F = (S_config.front.cR * 1000 || 3500) * (mrF * mrF);
+    this.Cw_R = (S_config.rear.cR * 1000 || 4000) * (mrR * mrR);
+    
+    this.state = {
+      X: 0, Y: 0, Z: 0, 
+      phi: 0, theta: 0, psi: 0,
+      u: initSpeedMs, v: 0, w: 0,
+      p: 0, q: 0, r: 0,
+      omega: { 
+        FL: initSpeedMs / this.ReF, 
+        FR: initSpeedMs / this.ReF, 
+        RL: initSpeedMs / this.ReR, 
+        RR: initSpeedMs / this.ReR 
+      }
+    };
+    
+    this.telemetry = { 
+      Fz: { FL: this.Fz0_F, FR: this.Fz0_F, RL: this.Fz0_R, RR: this.Fz0_R }, 
+      Fx: { FL: 0, FR: 0, RL: 0, RR: 0 }, 
+      Fy: { FL: 0, FR: 0, RL: 0, RR: 0 }, 
+      tr: { FL: 0, FR: 0, RL: 0, RR: 0 },
+      alpha: { FL: 0, FR: 0, RL: 0, RR: 0 }, 
+      kappa: { FL: 0, FR: 0, RL: 0, RR: 0 },
+      ax: 0, ay: 0
+    };
+  }
+
+  magicFormula(Fz, alpha, kappa, mu_peak = 1.3) {
+    if (Fz <= 10.0) return { Fx: 0, Fy: 0 };
+    const Cx = 1.65, Bx = 10.0, Ex = -0.1;
+    const Cy = 1.4, By = 12.0, Ey = -0.2;
+    const C_kappa = 150000.0, C_alpha = 100000.0;
+    
+    const s_x = (C_kappa * kappa) / (mu_peak * Fz);
+    const s_y = (C_alpha * Math.tan(alpha)) / (mu_peak * Fz);
+    const s = Math.max(1e-6, Math.hypot(s_x, s_y));
+    
+    const mu_x = mu_peak * Math.sin(Cx * Math.atan(Bx * s - Ex * (Bx * s - Math.atan(Bx * s))));
+    const mu_y = mu_peak * Math.sin(Cy * Math.atan(By * s - Ey * (By * s - Math.atan(By * s))));
+    
+    const Fx = (s_x / s) * (mu_x * Fz);
+    const Fy = (s_y / s) * (mu_y * Fz);
+    return { Fx, Fy };
+  }
+
+  step(ctrl, env, dt_sec) {
+    const MAX_DT = 0.001; // 1000Hz Sub-stepping
+    let t_remain = Math.min(0.05, dt_sec);
+    const alpha_slope = env.grade || 0;
+    const cosA = Math.cos(alpha_slope);
+    const sinA = Math.sin(alpha_slope);
+    
+    while(t_remain > 0) {
+      const dt = Math.min(MAX_DT, t_remain);
+      const st = this.state;
+      
+      const z_FL = st.Z - this.a * st.theta + (this.tF / 2.0) * st.phi;
+      const z_FR = st.Z - this.a * st.theta - (this.tF / 2.0) * st.phi;
+      const z_RL = st.Z + this.b * st.theta + (this.tR / 2.0) * st.phi;
+      const z_RR = st.Z + this.b * st.theta - (this.tR / 2.0) * st.phi;
+      
+      const bump = env.bumpNoise || 0;
+      const tr_FL = -(z_FL - bump);
+      const tr_FR = -(z_FR - bump);
+      const tr_RL = -(z_RL - bump);
+      const tr_RR = -(z_RR - bump);
+      
+      const dz_FL = st.w - this.a * st.q + (this.tF / 2.0) * st.p;
+      const dz_FR = st.w - this.a * st.q - (this.tF / 2.0) * st.p;
+      const dz_RL = st.w + this.b * st.q + (this.tR / 2.0) * st.p;
+      const dz_RR = st.w + this.b * st.q - (this.tR / 2.0) * st.p;
+      
+      const dtr_FL = -dz_FL;
+      const dtr_FR = -dz_FR;
+      const dtr_RL = -dz_RL;
+      const dtr_RR = -dz_RR;
+      
+      const Fz0_F_slope = this.Fz0_F * cosA;
+      const Fz0_R_slope = this.Fz0_R * cosA;
+      
+      const Fz_FL = Math.max(10.0, Fz0_F_slope + this.Kw_F * tr_FL + this.Cw_F * dtr_FL);
+      const Fz_FR = Math.max(10.0, Fz0_F_slope + this.Kw_F * tr_FR + this.Cw_F * dtr_FR);
+      const Fz_RL = Math.max(10.0, Fz0_R_slope + this.Kw_R * tr_RL + this.Cw_R * dtr_RL);
+      const Fz_RR = Math.max(10.0, Fz0_R_slope + this.Kw_R * tr_RR + this.Cw_R * dtr_RR);
+      
+      const K_arb_F = (this.S.front.arb && this.S.front.arb.d > 0) ? 25000.0 : 0.0;
+      const K_arb_R = (this.S.rear.arb && this.S.rear.arb.d > 0) ? 15000.0 : 0.0;
+      const F_arb_F = K_arb_F * (tr_FL - tr_FR);
+      const F_arb_R = K_arb_R * (tr_RL - tr_RR);
+      
+      const F_susp = {
+        FL: Fz_FL + F_arb_F,
+        FR: Fz_FR - F_arb_F,
+        RL: Fz_RL + F_arb_R,
+        RR: Fz_RR - F_arb_R
+      };
+      
+      let SumFx = 0.0, SumFy = 0.0, SumFz = 0.0;
+      let SumMx = 0.0, SumMy = 0.0, SumMz = 0.0;
+      
+      const v2 = st.u * st.u;
+      const F_drag = 0.5 * 1.225 * 0.35 * 2.0 * v2 * (st.u >= 0 ? 1.0 : -1.0);
+      const F_down = 0.5 * 1.225 * 1.2 * 2.0 * v2;
+      
+      SumFx -= (this.m * 9.81 * sinA + F_drag);
+      SumFz -= (this.m * 9.81 * cosA + F_down);
+      
+      const wheels = [
+        { id: 'FL', x: this.a,  y: this.tF/2.0,  Re: this.ReF, axle: 'front', Fz: Fz_FL, tr: tr_FL },
+        { id: 'FR', x: this.a,  y: -this.tF/2.0, Re: this.ReF, axle: 'front', Fz: Fz_FR, tr: tr_FR },
+        { id: 'RL', x: -this.b, y: this.tR/2.0,  Re: this.ReR, axle: 'rear',  Fz: Fz_RL, tr: tr_RL },
+        { id: 'RR', x: -this.b, y: -this.tR/2.0, Re: this.ReR, axle: 'rear',  Fz: Fz_RR, tr: tr_RR }
+      ];
+      
+      for(const w of wheels) {
+        SumFz += F_susp[w.id];
+        SumMx += F_susp[w.id] * w.y;
+        SumMy += -F_susp[w.id] * w.x;
+        
+        const v_cp_x = st.u - st.r * w.y;
+        const v_cp_y = st.v + st.r * w.x;
+        
+        const steer = (w.axle === 'front' ? (ctrl.steer * Math.PI / 180.0) : 0.0);
+        const v_tire_x = v_cp_x * Math.cos(steer) + v_cp_y * Math.sin(steer);
+        const v_tire_y = -v_cp_x * Math.sin(steer) + v_cp_y * Math.cos(steer);
+        
+        const alpha = Math.atan2(v_tire_y, Math.max(0.5, Math.abs(v_tire_x)));
+        const v_rot = st.omega[w.id] * w.Re;
+        const kappa = (v_rot - v_tire_x) / Math.max(0.5, Math.abs(v_tire_x));
+        
+        const { Fx: Fx_t, Fy: Fy_t } = this.magicFormula(w.Fz, alpha, kappa);
+        
+        const Fx_b = Fx_t * Math.cos(steer) - Fy_t * Math.sin(steer);
+        const Fy_b = Fx_t * Math.sin(steer) + Fy_t * Math.cos(steer);
+        
+        SumFx += Fx_b;
+        SumFy += Fy_b;
+        SumMx += Fy_b * (-this.h_cg);
+        SumMy += -Fx_b * (-this.h_cg);
+        SumMz += Fx_b * w.y - Fy_b * w.x;
+        
+        const T_drive = (w.axle === 'rear' ? (ctrl.throttle * 400.0) : 0.0);
+        const T_brake = (ctrl.brake * 1200.0) * (w.axle === 'front' ? 0.6 : 0.4);
+        const sgn_w = st.omega[w.id] >= 0 ? 1.0 : -1.0;
+        const T_net = T_drive - T_brake * sgn_w - Fx_t * w.Re;
+        const d_omega = T_net / this.Iw;
+        st.omega[w.id] += d_omega * dt;
+        
+        this.telemetry.Fz[w.id] = w.Fz;
+        this.telemetry.Fx[w.id] = Fx_t;
+        this.telemetry.Fy[w.id] = Fy_t;
+        this.telemetry.tr[w.id] = w.tr;
+        this.telemetry.kappa[w.id] = kappa;
+        this.telemetry.alpha[w.id] = alpha;
+      }
+      
+      const d_u = SumFx / this.m + st.v * st.r - st.w * st.q;
+      const d_v = SumFy / this.m + st.w * st.p - st.u * st.r;
+      const d_w = SumFz / this.m + st.u * st.q - st.v * st.p;
+      
+      const d_p = (SumMx + (this.Iyy - this.Izz) * st.q * st.r) / this.Ixx;
+      const d_q = (SumMy + (this.Izz - this.Ixx) * st.p * st.r) / this.Iyy;
+      const d_r = (SumMz + (this.Ixx - this.Iyy) * st.p * st.q) / this.Izz;
+      
+      st.u += d_u * dt;
+      st.v += d_v * dt;
+      st.w += d_w * dt;
+      st.p += d_p * dt;
+      st.q += d_q * dt;
+      st.r += d_r * dt;
+      
+      st.X += st.u * dt;
+      st.Y += st.v * dt;
+      st.Z += st.w * dt;
+      st.phi += st.p * dt;
+      st.theta += st.q * dt;
+      st.psi += st.r * dt;
+      
+      this.telemetry.ax = d_u / 9.81;
+      this.telemetry.ay = d_v / 9.81;
+      
+      t_remain -= dt;
+    }
+  }
+}
+
+/* ================================ 17. 直线爬坡测试与多机位 3D 舞台 ================================ */
+const SLOPE_STAGE = {
+  active: false,
+  playing: true,
+  grade: 0.15,
+  speedKmh: 70.0,
+  distTraveled: 0,
+  camMode: "behind",
+  camOrbit: { az: 0, elv: 0, distFactor: 1.0 },
+  lastTime: 0,
+  drag: null
+};
+
+const SLOPE_CAMS_CONFIG = {
+  behind:  { dx: 0,     dy: -4800, dz: 1600, lookDy: 1200, lookDz: 300 },
+  front:   { dx: 0,     dy: 4200,  dz: 1200, lookDy: -600, lookDz: 200 },
+  side:    { dx: 5500,  dy: 0,     dz: 1100, lookDy: 0,    lookDz: 200 },
+  threeq:  { dx: 4500,  dy: -5200, dz: 2800, lookDy: 600,  lookDz: 200 },
+  cockpit: { dx: 0,     dy: -350,  dz: 750,  lookDy: 2500, lookDz: 400 }
+};
+
+function openSlopeStage(){
+  const modal = document.getElementById("slopeStageModal");
+  if(!modal) return;
+  SLOPE_STAGE.active = true;
+  SLOPE_STAGE.playing = true;
+  SLOPE_STAGE.lastTime = performance.now();
+  SLOPE_STAGE.camOrbit = { az: 0, elv: 0, distFactor: 1.0 };
+  
+  document.getElementById("slopeVehName").textContent = (VEHICLE_PRESETS[S.vehicleType]||{}).name || "FIA GT3";
+  modal.classList.add("show");
+
+  const cv = document.getElementById("slopeCanvas");
+  if(cv) {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = cv.clientWidth * dpr;
+    cv.height = cv.clientHeight * dpr;
+  }
+  
+  const initSpeedMs = (SLOPE_STAGE.speedKmh * 1000) / 3600;
+  window.physicsEngine = new VehicleDynamics15DOF(S, SIM, initSpeedMs);
+  
+  requestAnimationFrame(slopeStageLoop);
+}
+
+function closeSlopeStage(){
+  const modal = document.getElementById("slopeStageModal");
+  if(modal) modal.classList.remove("show");
+  SLOPE_STAGE.active = false;
+}
+
+function slopeStageLoop(now){
+  if(!SLOPE_STAGE.active) return;
+  const dt = Math.min(0.1, (now - (SLOPE_STAGE.lastTime || now)) / 1000);
+  SLOPE_STAGE.lastTime = now;
+
+  const env = { 
+    grade: Math.atan(SLOPE_STAGE.grade), 
+    bumpNoise: SLOPE_STAGE.playing ? (Math.sin(SLOPE_STAGE.distTraveled * 0.008) * 0.015 + Math.cos(SLOPE_STAGE.distTraveled * 0.02) * 0.008) : 0 
+  };
+  
+  const targetSpeed = (SLOPE_STAGE.speedKmh * 1000) / 3600;
+  const speedError = targetSpeed - (window.physicsEngine.state.u);
+  const ctrl = {
+    steer: 0,
+    throttle: Math.max(0, Math.min(1.0, speedError * 0.5)),
+    brake: speedError < -1.0 ? Math.max(0, Math.min(1.0, -speedError * 0.5)) : 0
+  };
+
+  if(SLOPE_STAGE.playing) {
+    window.physicsEngine.step(ctrl, env, dt);
+    SLOPE_STAGE.distTraveled += window.physicsEngine.state.u * dt * 1000;
+  }
+
+  try {
+    const st = window.physicsEngine.state;
+    const tel = window.physicsEngine.telemetry;
+    
+    const tr = tel.tr || { FL:0, FR:0, RL:0, RR:0 };
+    const z0F = (SIM.FR && SIM.FR.n && SIM.FR.idx) ? SIM.FR.n[SIM.FR.idx.WC].p0[2] : 250;
+    const z0R = (SIM.RR && SIM.RR.n && SIM.RR.idx) ? SIM.RR.n[SIM.RR.idx.WC].p0[2] : 250;
+    
+    if(SIM.FR) driveTo(SIM.FR, z0F + (tr.FR || 0) * 1000, ctrl.steer, 'front');
+    if(SIM.RR) driveTo(SIM.RR, z0R + (tr.RR || 0) * 1000, 0, 'rear');
+    if(S.show.mirror){
+      if(SIM.FL) driveTo(SIM.FL, z0F + (tr.FL || 0) * 1000, -ctrl.steer, 'front');
+      if(SIM.RL) driveTo(SIM.RL, z0R + (tr.RL || 0) * 1000, 0, 'rear');
+    }
+    
+    window._tireSpinAngles = {
+      FL: st.omega.FL * (now/1000), 
+      FR: st.omega.FR * (now/1000),
+      RL: st.omega.RL * (now/1000), 
+      RR: st.omega.RR * (now/1000)
+    };
+    
+    const alpha = env.grade;
+    renderSlopeScene(alpha, st);
+
+    const F_gx = window.physicsEngine.m * 9.81 * Math.sin(alpha);
+    updateSlopeHUD(st.u, alpha, F_gx, tel);
+  } catch(err) {
+    console.error("Physics Loop Error:", err);
+  }
+
+  requestAnimationFrame(slopeStageLoop);
+}
+
+function renderSlopeScene(alpha, st){
+  const cv = document.getElementById("slopeCanvas");
+  if(!cv) return;
+  const ctx = cv.getContext("2d");
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  if(cv.width !== cv.clientWidth * dpr || cv.height !== cv.clientHeight * dpr){
+    cv.width = cv.clientWidth * dpr;
+    cv.height = cv.clientHeight * dpr;
+  }
+  const w = cv.width / dpr, h = cv.height / dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  ctx.fillStyle = "#0a0e14";
+  ctx.fillRect(0, 0, w, h);
+
+  const cosA = Math.cos(alpha), sinA = Math.sin(alpha);
+  const u_road = [0, cosA, sinA];
+  const n_road = [0, -sinA, cosA];
+  const t_road = [1, 0, 0];
+
+  const T = [st.X * 1000, st.Y * 1000, st.Z * 1000];
+  
+  const cP = Math.cos(st.phi), sP = Math.sin(st.phi);
+  const cT = Math.cos(st.theta), sT = Math.sin(st.theta);
+  const cS = Math.cos(st.psi), sS = Math.sin(st.psi);
+  
+  const R11 = cT*cS, R12 = sP*sT*cS - cP*sS, R13 = cP*sT*cS + sP*sS;
+  const R21 = cT*sS, R22 = sP*sT*sS + cP*cS, R23 = cP*sT*sS - sP*cS;
+  const R31 = -sT,   R32 = sP*cT,            R33 = cP*cT;
+  
+  const bodyTransform = (p) => {
+    return [
+      p[0]*R11 + p[1]*R12 + p[2]*R13,
+      p[0]*R21 + p[1]*R22 + p[2]*R23,
+      p[0]*R31 + p[1]*R32 + p[2]*R33
+    ];
+  };
+
+  const camCfg = SLOPE_CAMS_CONFIG[SLOPE_STAGE.camMode] || SLOPE_CAMS_CONFIG.behind;
+  const distFactor = SLOPE_STAGE.camOrbit.distFactor;
+  let cam_dx = camCfg.dx * distFactor, cam_dy = camCfg.dy * distFactor, cam_dz = camCfg.dz * distFactor;
+
+  if(SLOPE_STAGE.camOrbit.az !== 0 || SLOPE_STAGE.camOrbit.elv !== 0) {
+    const rH = Math.hypot(cam_dx, cam_dy);
+    const angH = Math.atan2(cam_dx, cam_dy) + SLOPE_STAGE.camOrbit.az;
+    cam_dx = Math.sin(angH) * rH;
+    cam_dy = Math.cos(angH) * rH;
+    cam_dz = cam_dz + Math.tan(SLOPE_STAGE.camOrbit.elv) * rH;
+  }
+
+  const E = [
+    T[0] + cam_dx*t_road[0] + cam_dy*u_road[0] + cam_dz*n_road[0],
+    T[1] + cam_dx*t_road[1] + cam_dy*u_road[1] + cam_dz*n_road[1],
+    T[2] + cam_dx*t_road[2] + cam_dy*u_road[2] + cam_dz*n_road[2]
+  ];
+
+  const lookTarget = [
+    T[0] + camCfg.lookDy*u_road[0] + camCfg.lookDz*n_road[0],
+    T[1] + camCfg.lookDy*u_road[1] + camCfg.lookDz*n_road[1],
+    T[2] + camCfg.lookDy*u_road[2] + camCfg.lookDz*n_road[2]
+  ];
+
+  const fw_un = [lookTarget[0]-E[0], lookTarget[1]-E[1], lookTarget[2]-E[2]];
+  const l_fw = Math.hypot(fw_un[0], fw_un[1], fw_un[2]) || 1;
+  const fw = [fw_un[0]/l_fw, fw_un[1]/l_fw, fw_un[2]/l_fw];
+
+  const rt_un = [
+    fw[1]*n_road[2] - fw[2]*n_road[1],
+    fw[2]*n_road[0] - fw[0]*n_road[2],
+    fw[0]*n_road[1] - fw[1]*n_road[0]
+  ];
+  const l_rt = Math.hypot(rt_un[0], rt_un[1], rt_un[2]) || 1;
+  const rt = [rt_un[0]/l_rt, rt_un[1]/l_rt, rt_un[2]/l_rt];
+
+  const up = [
+    rt[1]*fw[2] - rt[2]*fw[1],
+    rt[2]*fw[0] - rt[0]*fw[2],
+    rt[0]*fw[1] - rt[1]*fw[0]
+  ];
+
+  const fovDist = Math.min(w, h) * 1.6;
+
+  const project = (P_local, isBody = true) => {
+    const P_rot = isBody ? bodyTransform(P_local) : P_local;
+    const P_world = [
+      T[0] + P_rot[0]*t_road[0] + P_rot[1]*u_road[0] + P_rot[2]*n_road[0],
+      T[1] + P_rot[0]*t_road[1] + P_rot[1]*u_road[1] + P_rot[2]*n_road[1],
+      T[2] + P_rot[0]*t_road[2] + P_rot[1]*u_road[2] + P_rot[2]*n_road[2]
+    ];
+    const q = [P_world[0]-E[0], P_world[1]-E[1], P_world[2]-E[2]];
+    const z = q[0]*fw[0] + q[1]*fw[1] + q[2]*fw[2];
+    if(z < 150) return null;
+    const f = fovDist / z;
+    return [
+      w/2 + (q[0]*rt[0] + q[1]*rt[1] + q[2]*rt[2]) * f,
+      h/2 - (q[0]*up[0] + q[1]*up[1] + q[2]*up[2]) * f
+    ];
+  };
+
+  const roadHalfW = 4500;
+  const roadNearY = -12000, roadFarY = 80000;
+  const roadGridStep = 3000;
+  const animOffset = (SLOPE_STAGE.distTraveled % roadGridStep);
+
+  const pL_near = project([-roadHalfW, roadNearY, 0], false), pR_near = project([roadHalfW, roadNearY, 0], false);
+  const pR_far  = project([roadHalfW, roadFarY, 0], false),  pL_far  = project([-roadHalfW, roadFarY, 0], false);
+
+  if(pL_near && pR_near && pR_far && pL_far){
+    ctx.beginPath();
+    ctx.moveTo(pL_near[0], pL_near[1]);
+    ctx.lineTo(pR_near[0], pR_near[1]);
+    ctx.lineTo(pR_far[0], pR_far[1]);
+    ctx.lineTo(pL_far[0], pL_far[1]);
+    ctx.closePath();
+    const roadGrad = ctx.createLinearGradient(w/2, h, w/2, 0);
+    roadGrad.addColorStop(0, "#161b24");
+    roadGrad.addColorStop(1, "#0d1117");
+    ctx.fillStyle = roadGrad;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(78,161,211,0.2)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  for(let y = roadNearY; y <= roadFarY; y += roadGridStep){
+    const curY = y - animOffset;
+    const nextY = curY + roadGridStep;
+    const isRed = (Math.floor((curY + SLOPE_STAGE.distTraveled) / roadGridStep) % 2 === 0);
+    const kerbCol = isRed ? "#e74c3c" : "#ecf0f1";
+
+    const kL1 = project([-roadHalfW, curY, 20], false),       kL2 = project([-roadHalfW-600, curY, 30], false);
+    const kL3 = project([-roadHalfW-600, nextY, 30], false),  kL4 = project([-roadHalfW, nextY, 20], false);
+    if(kL1 && kL2 && kL3 && kL4){
+      ctx.beginPath();
+      ctx.moveTo(kL1[0], kL1[1]); ctx.lineTo(kL2[0], kL2[1]); ctx.lineTo(kL3[0], kL3[1]); ctx.lineTo(kL4[0], kL4[1]);
+      ctx.closePath();
+      ctx.fillStyle = kerbCol; ctx.fill();
+    }
+
+    const kR1 = project([roadHalfW, curY, 20], false),       kR2 = project([roadHalfW+600, curY, 30], false);
+    const kR3 = project([roadHalfW+600, nextY, 30], false),  kR4 = project([roadHalfW, nextY, 20], false);
+    if(kR1 && kR2 && kR3 && kR4){
+      ctx.beginPath();
+      ctx.moveTo(kR1[0], kR1[1]); ctx.lineTo(kR2[0], kR2[1]); ctx.lineTo(kR3[0], kR3[1]); ctx.lineTo(kR4[0], kR4[1]);
+      ctx.closePath();
+      ctx.fillStyle = kerbCol; ctx.fill();
+    }
+
+    const d1 = project([0, curY + 600, 2], false);
+    const d2 = project([0, curY + 2200, 2], false);
+    if(d1 && d2){
+      ctx.beginPath(); ctx.moveTo(d1[0], d1[1]); ctx.lineTo(d2[0], d2[1]);
+      ctx.strokeStyle = "rgba(255,255,255,0.45)"; ctx.lineWidth = 2.5; ctx.stroke();
+    }
+  }
+
+  const sc = buildScenePRO();
+  for(let i = 0; i < sc.length; i++){
+    const prim = sc[i];
+    if(prim.type === "poly"){
+      if(prim.pts && prim.pts.length >= 2){
+        ctx.beginPath();
+        let valid = true;
+        for(let j = 0; j < prim.pts.length; j++){
+          const pt2d = project(prim.pts[j]);
+          if(!pt2d){ valid = false; break; }
+          if(j === 0) ctx.moveTo(pt2d[0], pt2d[1]);
+          else ctx.lineTo(pt2d[0], pt2d[1]);
+        }
+        if(valid){
+          if(prim.fill) { ctx.fillStyle = prim.fill; ctx.fill(); }
+          ctx.strokeStyle = prim.col || "#58a6ff";
+          ctx.lineWidth = prim.w || 1.2;
+          ctx.stroke();
+        }
+      }
+    } else if(prim.type === "line"){
+      const p1 = project(prim.a), p2 = project(prim.b);
+      if(p1 && p2){
+        ctx.beginPath();
+        ctx.moveTo(p1[0], p1[1]);
+        ctx.lineTo(p2[0], p2[1]);
+        ctx.strokeStyle = prim.col || "#fff";
+        ctx.lineWidth = prim.w || 1.2;
+        if(prim.dash) ctx.setLineDash(prim.dash); else ctx.setLineDash([]);
+        ctx.stroke();
+      }
+    } else if(prim.type === "node"){
+      const p = project(prim.p);
+      if(p){
+        ctx.beginPath();
+        ctx.arc(p[0], p[1], prim.r || 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = prim.fill || "#fff";
+        ctx.fill();
+        ctx.strokeStyle = prim.col || "#000";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.setLineDash([]);
+}
+
+function updateSlopeHUD(speedMs, alpha, F_gx, tel){
+  const gradePct = SLOPE_STAGE.grade * 100;
+  const angleDeg = alpha * (180 / Math.PI);
+  
+  document.getElementById("slopeHudSpeed").textContent = `${SLOPE_STAGE.speedKmh.toFixed(1)} km/h (${speedMs.toFixed(1)} m/s)`;
+  document.getElementById("slopeHudAngle").textContent = `${angleDeg.toFixed(2)}° (Grade ${gradePct.toFixed(1)}%)`;
+  document.getElementById("slopeHudGx").textContent = `-${Math.sin(alpha).toFixed(2)} g (${Math.round(F_gx)} N 阻力)`;
+  
+  const FzF = (tel.Fz.FL || 0) + (tel.Fz.FR || 0);
+  const FzR = (tel.Fz.RL || 0) + (tel.Fz.RR || 0);
+  const FzTotal = Math.max(1, FzF + FzR);
+  const frontPct = (FzF / FzTotal) * 100;
+  const rearPct = (FzR / FzTotal) * 100;
+  document.getElementById("slopeHudLoadSplit").textContent = `${frontPct.toFixed(1)}% / ${rearPct.toFixed(1)}%`;
+  
+  const tr = tel.tr || { FL:0, FR:0, RL:0, RR:0 };
+  const squatR = (((tr.RL || 0) + (tr.RR || 0)) / 2) * 1000;
+  const squatF = (((tr.FL || 0) + (tr.FR || 0)) / 2) * 1000;
+  
+  document.getElementById("slopeHudSquat").textContent = `${squatR > 0 ? '+' : ''}${squatR.toFixed(1)} mm`;
+  document.getElementById("slopeHudLift").textContent = `${squatF > 0 ? '+' : ''}${squatF.toFixed(1)} mm`;
+}
+
+function initSlopeStageEvents(){
+  const btn = document.getElementById("slopeStageBtn");
+  if(btn) btn.onclick = openSlopeStage;
+
+  const exitBtn = document.getElementById("slopeExitBtn");
+  if(exitBtn) exitBtn.onclick = closeSlopeStage;
+
+  const playBtn = document.getElementById("slopePlayBtn");
+  if(playBtn) {
+    playBtn.onclick = () => {
+      SLOPE_STAGE.playing = !SLOPE_STAGE.playing;
+      playBtn.textContent = SLOPE_STAGE.playing ? "⏸ 暂停" : "▶ 继续";
+    };
+  }
+
+  const gradeSlider = document.getElementById("slopeGradeSlider");
+  if(gradeSlider) {
+    gradeSlider.oninput = (e) => {
+      const v = parseFloat(e.target.value);
+      SLOPE_STAGE.grade = v / 100;
+      document.getElementById("slopeGradeVal").textContent = v + "%";
+    };
+  }
+
+  const speedSlider = document.getElementById("slopeSpeedSlider");
+  if(speedSlider) {
+    speedSlider.oninput = (e) => {
+      const v = parseFloat(e.target.value);
+      SLOPE_STAGE.speedKmh = v;
+      document.getElementById("slopeSpeedVal").textContent = v + " km/h";
+    };
+  }
+
+  const camBtns = document.querySelectorAll(".slope-cam-btn");
+  camBtns.forEach(b => {
+    b.onclick = () => {
+      camBtns.forEach(q => q.classList.remove("on"));
+      b.classList.add("on");
+      SLOPE_STAGE.camMode = b.dataset.cam;
+      SLOPE_STAGE.camOrbit = { az: 0, elv: 0, distFactor: 1.0 };
+    };
+  });
+
+  const cv = document.getElementById("slopeCanvas");
+  if(cv) {
+    cv.addEventListener("mousedown", (e) => {
+      SLOPE_STAGE.drag = { x0: e.clientX, y0: e.clientY, az0: SLOPE_STAGE.camOrbit.az, elv0: SLOPE_STAGE.camOrbit.elv };
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if(!SLOPE_STAGE.drag || !SLOPE_STAGE.active) return;
+      const dx = e.clientX - SLOPE_STAGE.drag.x0;
+      const dy = e.clientY - SLOPE_STAGE.drag.y0;
+      SLOPE_STAGE.camOrbit.az = SLOPE_STAGE.drag.az0 - dx * 0.008;
+      SLOPE_STAGE.camOrbit.elv = Math.max(-0.6, Math.min(0.6, SLOPE_STAGE.drag.elv0 - dy * 0.006));
+    });
+
+    window.addEventListener("mouseup", () => {
+      SLOPE_STAGE.drag = null;
+    });
+
+    cv.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 1.08 : 0.92;
+      SLOPE_STAGE.camOrbit.distFactor = Math.max(0.4, Math.min(2.5, SLOPE_STAGE.camOrbit.distFactor * delta));
+    }, { passive: false });
+
+    cv.addEventListener("dblclick", () => {
+      SLOPE_STAGE.camOrbit = { az: 0, elv: 0, distFactor: 1.0 };
+    });
+  }
+}
+
+
+// Init Pure Suspension button
+(function initPureSuspButton(){
+  const btn = document.getElementById("pureSuspTg");
+  if(!btn) return;
+  btn.onclick = () => {
+    const isPure = S.show.wheel && !S.show.chassis && !S.show.powertrain && !S.show.steer_col && !S.show.master_cyl;
+    if(isPure) {
+      S.show.chassis = true; S.show.powertrain = true; S.show.steer_col = true; S.show.master_cyl = true;
+      btn.style.borderColor = "rgba(255,255,255,0.12)";
+      btn.style.color = "var(--text)";
+    } else {
+      S.show.chassis = false; S.show.powertrain = false; S.show.steer_col = false; S.show.master_cyl = false;
+      btn.style.borderColor = "var(--hl)";
+      btn.style.color = "var(--hl)";
+    }
+    rebuild();
+    UI.sync.forEach(f => f());
+  };
+})();
+
+const evalBtn = document.getElementById("evalModalBtn");
+if(evalBtn) evalBtn.onclick = openSuspensionEvaluation;
+const evalCloseBtn = document.getElementById("evalCloseBtn");
+if(evalCloseBtn) evalCloseBtn.onclick = () => document.getElementById("suspEvalModal").classList.remove("show");
+
+initSlopeStageEvents();
 
 hpLoad();
 buildLeft();

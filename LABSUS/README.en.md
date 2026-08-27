@@ -9,6 +9,9 @@ Open-source FSAE race-chassis analysis workbench: kinematics & compliance, ride 
 - K&C sweeps with a two-level bushing solver (6-DOF bushing force balance + mechanism re-solve)
 - 4-Post rig explicit dynamics; quasi-static handling (roll-coupled TLLTD)
 - Standalone 80-percent track stage: planar 3-DOF vehicle, 4-wheel Magic Formula tires (friction circle, slip relaxation, camber thrust, load sensitivity), powertrain envelope, aero, pure-pursuit + PI driver; 5 follow cams and live per-wheel friction circles with 12 telemetry readouts
+- One-click suspension evaluation report: 12 engineering metrics graded against benchmarks (camber gain, bump steer, MR, wheel rates, ride frequencies, damping ratios, roll-stiffness split) with radar chart, grade badge and tuning advice
+- Straight-line climb rig: 15-DOF full-vehicle transient stage (Pacejka combined-slip tires, 1000 Hz sub-stepping, grade/bump/aero/ARB) with a projected-3D canvas view, orbiting camera and live HUD (speed, grade %, Fz split, squat)
+- Spinning wheels + "pure suspension" view: rolling wheel visuals and a one-click toggle that hides chassis/powertrain/steering column/master cylinder
 - Hardpoint persistence (auto localStorage), baseline diff curves, dual light/dark themes
 
 ## Zero-dependency demo
