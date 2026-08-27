@@ -4102,6 +4102,11 @@ function updateSweeps(){
 
 let _last=0,_fps=0,_fc=0,_ft=0;
 function loop(ts){
+  if(typeof SLOPE_STAGE !== 'undefined' && SLOPE_STAGE.active){
+    _last = ts;
+    requestAnimationFrame(loop);
+    return;
+  }
   const dt=Math.min(0.045,_last?(ts-_last)/1000:0.016);_last=ts;
   if(S.play){
     S.t+=dt;
@@ -5249,10 +5254,14 @@ window.VehicleDynamics15DOF = VehicleDynamics15DOF;
 /* =====================================================================
    SLOPE STAGE: 60-FPS HIGH-PERFORMANCE AUTONOMOUS 15-DOF CLIMBING STAGE
    ===================================================================== */
+
+/* =====================================================================
+   SLOPE STAGE: 60-FPS ZERO-ALLOCATION AUTONOMOUS 15-DOF CLIMBING STAGE
+   ===================================================================== */
 const SLOPE_STAGE = {
   active: false,
   playing: true,
-  autoPilot: true,       // 自动驾驶巡航
+  autoPilot: true,
   grade: 0.15,
   speedKmh: 70.0,
   distTraveled: 0,
@@ -5306,16 +5315,17 @@ function closeSlopeStage(){
   const modal = document.getElementById("slopeStageModal");
   if(modal) modal.classList.remove("show");
   SLOPE_STAGE.active = false;
+  rebuild();
 }
 
 function slopeStageLoop(now){
   if(!SLOPE_STAGE.active) return;
-  const dt = Math.min(0.04, (now - (SLOPE_STAGE.lastTime || now)) / 1000);
+  const dt = Math.min(0.033, (now - (SLOPE_STAGE.lastTime || now)) / 1000);
   SLOPE_STAGE.lastTime = now;
 
   const env = { 
     grade: Math.atan(SLOPE_STAGE.grade), 
-    bumpNoise: SLOPE_STAGE.playing ? (Math.sin(SLOPE_STAGE.distTraveled * 0.008) * 0.008 + Math.cos(SLOPE_STAGE.distTraveled * 0.02) * 0.004) : 0 
+    bumpNoise: SLOPE_STAGE.playing ? (Math.sin(SLOPE_STAGE.distTraveled * 0.008) * 0.006 + Math.cos(SLOPE_STAGE.distTraveled * 0.02) * 0.003) : 0 
   };
   
   // 1. 全自动巡航与居中保持 (Autonomous Drive)
@@ -5327,7 +5337,6 @@ function slopeStageLoop(now){
   const curSpeed = window.physicsEngine ? window.physicsEngine.state.u : targetSpeedMs;
   const speedError = targetSpeedMs - curSpeed;
 
-  // 检查是否有用户键盘手动接管
   const isUserManual = (SLOPE_STAGE.keys.w || SLOPE_STAGE.keys.s || SLOPE_STAGE.keys.a || SLOPE_STAGE.keys.d || SLOPE_STAGE.keys.space);
   
   if(isUserManual) {
@@ -5339,14 +5348,13 @@ function slopeStageLoop(now){
   } else {
     // 自动驾驶闭环 PID
     SLOPE_STAGE.autoPilot = true;
-    ctrl_throttle = Math.max(0, Math.min(1.0, 0.4 + speedError * 0.15));
+    ctrl_throttle = Math.max(0, Math.min(1.0, 0.45 + speedError * 0.20));
     ctrl_brake = speedError < -2.0 ? Math.max(0, Math.min(1.0, -speedError * 0.25)) : 0;
     
-    // 车道居中保持
     if(window.physicsEngine) {
       const devX = window.physicsEngine.state.X;
       const devPsi = window.physicsEngine.state.psi;
-      ctrl_steer = Math.max(-6, Math.min(6, -devX * 0.8 - devPsi * 15));
+      ctrl_steer = Math.max(-6, Math.min(6, -devX * 0.6 - devPsi * 12));
     }
   }
 
@@ -5361,9 +5369,9 @@ function slopeStageLoop(now){
     const st = window.physicsEngine.state;
     const tel = window.physicsEngine.telemetry;
     
-    // 2. 悬架多体杆系运动学更新 (降低重算频率，提升至 60 FPS)
+    // 2. 悬架多体杆系运动学更新 (每 3 帧更新一次几何骨架，极度轻量)
     SLOPE_STAGE.rebuildCadence++;
-    if(SLOPE_STAGE.rebuildCadence % 2 === 0 || !SLOPE_STAGE.cachedScene) {
+    if(SLOPE_STAGE.rebuildCadence % 3 === 0 || !SLOPE_STAGE.cachedScene) {
       const tr = tel.tr || { FL:0, FR:0, RL:0, RR:0 };
       const z0F = (SIM.FR && SIM.FR.n && SIM.FR.idx) ? SIM.FR.n[SIM.FR.idx.WC].p0[2] : 250;
       const z0R = (SIM.RR && SIM.RR.n && SIM.RR.idx) ? SIM.RR.n[SIM.RR.idx.WC].p0[2] : 250;
@@ -5422,23 +5430,7 @@ function renderSlopeScene(alpha, st){
   const n_road = [0, -sinA, cosA];   // Road normal vector (Up)
   const t_road = [1, 0, 0];          // Road lateral vector (Right)
 
-  // Body Rotation Matrix (Pitch theta, Roll phi, Yaw psi relative to road)
-  const cP = Math.cos(st.phi || 0), sP = Math.sin(st.phi || 0);
-  const cT = Math.cos(st.theta || 0), sT = Math.sin(st.theta || 0);
-  const cS = Math.cos(st.psi || 0), sS = Math.sin(st.psi || 0);
-  
-  const R11 = cS*cP, R12 = cS*sP*sT - sS*cT, R13 = cS*sP*cT + sS*sT;
-  const R21 = sS*cP, R22 = sS*sP*sT + cS*cT, R23 = sS*sP*cT - cS*sT;
-  const R31 = -sP,   R32 = cP*sT,            R33 = cP*cT;
-  
-  const bodyTransform = (p) => {
-    return [
-      p[0]*R11 + p[1]*R12 + p[2]*R13,
-      p[0]*R21 + p[1]*R22 + p[2]*R23,
-      p[0]*R31 + p[1]*R32 + p[2]*R33
-    ];
-  };
-
+  // Combined 3D Projection Matrix (Zero GC Allocation)
   const camCfg = SLOPE_CAMS_CONFIG[SLOPE_STAGE.camMode] || SLOPE_CAMS_CONFIG.behind;
   const distFactor = SLOPE_STAGE.camOrbit.distFactor;
   let cam_dx = camCfg.dx * distFactor, cam_dy = camCfg.dy * distFactor, cam_dz = camCfg.dz * distFactor;
@@ -5483,31 +5475,32 @@ function renderSlopeScene(alpha, st){
   ];
 
   const fovDist = Math.min(w, h) * (camCfg.fov || 1.6);
+  const halfW = w / 2, halfH = h / 2;
 
-  // Projection pipeline
-  const project = (P_local, isBody = true) => {
-    let P_world;
-    if(isBody) {
-      const P_rot = bodyTransform(P_local);
-      P_world = [
-        P_rot[0]*t_road[0] + P_rot[1]*u_road[0] + P_rot[2]*n_road[0],
-        P_rot[0]*t_road[1] + P_rot[1]*u_road[1] + P_rot[2]*n_road[1],
-        P_rot[0]*t_road[2] + P_rot[1]*u_road[2] + P_rot[2]*n_road[2]
-      ];
-    } else {
-      P_world = [
-        P_local[0]*t_road[0] + P_local[1]*u_road[0] + P_local[2]*n_road[0],
-        P_local[0]*t_road[1] + P_local[1]*u_road[1] + P_local[2]*n_road[1],
-        P_local[0]*t_road[2] + P_local[1]*u_road[2] + P_local[2]*n_road[2]
-      ];
-    }
-    const q = [P_world[0]-E[0], P_world[1]-E[1], P_world[2]-E[2]];
-    const z = q[0]*fw[0] + q[1]*fw[1] + q[2]*fw[2];
-    if(z < 60) return null;
-    const f = fovDist / z;
+  // View Matrix Elements
+  const m11 = rt[0]*t_road[0] + rt[1]*t_road[1] + rt[2]*t_road[2];
+  const m12 = rt[0]*u_road[0] + rt[1]*u_road[1] + rt[2]*u_road[2];
+  const m13 = rt[0]*n_road[0] + rt[1]*n_road[1] + rt[2]*n_road[2];
+  const v0x = -(rt[0]*E[0] + rt[1]*E[1] + rt[2]*E[2]);
+
+  const m21 = up[0]*t_road[0] + up[1]*t_road[1] + up[2]*t_road[2];
+  const m22 = up[0]*u_road[0] + up[1]*u_road[1] + up[2]*u_road[2];
+  const m23 = up[0]*n_road[0] + up[1]*n_road[1] + up[2]*n_road[2];
+  const v0y = -(up[0]*E[0] + up[1]*E[1] + up[2]*E[2]);
+
+  const m31 = fw[0]*t_road[0] + fw[1]*t_road[1] + fw[2]*t_road[2];
+  const m32 = fw[0]*u_road[0] + fw[1]*u_road[1] + fw[2]*u_road[2];
+  const m33 = fw[0]*n_road[0] + fw[1]*n_road[1] + fw[2]*n_road[2];
+  const v0z = -(fw[0]*E[0] + fw[1]*E[1] + fw[2]*E[2]);
+
+  // Direct fast projection function (Zero Object Allocation)
+  const projFast = (x, y, z) => {
+    const zc = m31*x + m32*y + m33*z + v0z;
+    if(zc < 50) return null;
+    const f = fovDist / zc;
     return [
-      w/2 + (q[0]*rt[0] + q[1]*rt[1] + q[2]*rt[2]) * f,
-      h/2 - (q[0]*up[0] + q[1]*up[1] + q[2]*up[2]) * f
+      halfW + (m11*x + m12*y + m13*z + v0x) * f,
+      halfH - (m21*x + m22*y + m23*z + v0y) * f
     ];
   };
 
@@ -5517,8 +5510,8 @@ function renderSlopeScene(alpha, st){
   const roadGridStep = 3000;
   const animOffset = (SLOPE_STAGE.distTraveled % roadGridStep);
 
-  const pL_near = project([-roadHalfW, roadNearY, 0], false), pR_near = project([roadHalfW, roadNearY, 0], false);
-  const pR_far  = project([roadHalfW, roadFarY, 0], false),  pL_far  = project([-roadHalfW, roadFarY, 0], false);
+  const pL_near = projFast(-roadHalfW, roadNearY, 0), pR_near = projFast(roadHalfW, roadNearY, 0);
+  const pR_far  = projFast(roadHalfW, roadFarY, 0),  pL_far  = projFast(-roadHalfW, roadFarY, 0);
 
   if(pL_near && pR_near && pR_far && pL_far){
     ctx.beginPath();
@@ -5527,7 +5520,7 @@ function renderSlopeScene(alpha, st){
     ctx.lineTo(pR_far[0], pR_far[1]);
     ctx.lineTo(pL_far[0], pL_far[1]);
     ctx.closePath();
-    const roadGrad = ctx.createLinearGradient(w/2, h, w/2, 0);
+    const roadGrad = ctx.createLinearGradient(halfW, h, halfW, 0);
     roadGrad.addColorStop(0, "#1c222d");
     roadGrad.addColorStop(0.6, "#141922");
     roadGrad.addColorStop(1, "#0d1117");
@@ -5545,8 +5538,8 @@ function renderSlopeScene(alpha, st){
     const isRed = (Math.floor((curY + SLOPE_STAGE.distTraveled) / roadGridStep) % 2 === 0);
     const kerbCol = isRed ? "#e74c3c" : "#ecf0f1";
 
-    const kL1 = project([-roadHalfW, curY, 15], false),       kL2 = project([-roadHalfW-650, curY, 25], false);
-    const kL3 = project([-roadHalfW-650, nextY, 25], false),  kL4 = project([-roadHalfW, nextY, 15], false);
+    const kL1 = projFast(-roadHalfW, curY, 15),       kL2 = projFast(-roadHalfW-650, curY, 25);
+    const kL3 = projFast(-roadHalfW-650, nextY, 25),  kL4 = projFast(-roadHalfW, nextY, 15);
     if(kL1 && kL2 && kL3 && kL4){
       ctx.beginPath();
       ctx.moveTo(kL1[0], kL1[1]); ctx.lineTo(kL2[0], kL2[1]); ctx.lineTo(kL3[0], kL3[1]); ctx.lineTo(kL4[0], kL4[1]);
@@ -5554,8 +5547,8 @@ function renderSlopeScene(alpha, st){
       ctx.fillStyle = kerbCol; ctx.fill();
     }
 
-    const kR1 = project([roadHalfW, curY, 15], false),       kR2 = project([roadHalfW+650, curY, 25], false);
-    const kR3 = project([roadHalfW+650, nextY, 25], false),  kR4 = project([roadHalfW, nextY, 15], false);
+    const kR1 = projFast(roadHalfW, curY, 15),       kR2 = projFast(roadHalfW+650, curY, 25);
+    const kR3 = projFast(roadHalfW+650, nextY, 25),  kR4 = projFast(roadHalfW, nextY, 15);
     if(kR1 && kR2 && kR3 && kR4){
       ctx.beginPath();
       ctx.moveTo(kR1[0], kR1[1]); ctx.lineTo(kR2[0], kR2[1]); ctx.lineTo(kR3[0], kR3[1]); ctx.lineTo(kR4[0], kR4[1]);
@@ -5564,8 +5557,8 @@ function renderSlopeScene(alpha, st){
     }
 
     // White Center Dash Line
-    const d1 = project([0, curY + 600, 2], false);
-    const d2 = project([0, curY + 2200, 2], false);
+    const d1 = projFast(0, curY + 600, 2);
+    const d2 = projFast(0, curY + 2200, 2);
     if(d1 && d2){
       ctx.beginPath(); ctx.moveTo(d1[0], d1[1]); ctx.lineTo(d2[0], d2[1]);
       ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = 3; ctx.stroke();
@@ -5575,10 +5568,10 @@ function renderSlopeScene(alpha, st){
   // 2. Soft Contact Ground Shadow under the 4 wheels and chassis
   const shadowW = Math.max(1200, (S.front.tire.R || 300) * 3);
   const shadowL = (S.wb || 2600) + 800;
-  const s1 = project([-shadowW/2, -shadowL/2, 2], false);
-  const s2 = project([shadowW/2, -shadowL/2, 2], false);
-  const s3 = project([shadowW/2, shadowL/2, 2], false);
-  const s4 = project([-shadowW/2, shadowL/2, 2], false);
+  const s1 = projFast(-shadowW/2, -shadowL/2, 2);
+  const s2 = projFast(shadowW/2, -shadowL/2, 2);
+  const s3 = projFast(shadowW/2, shadowL/2, 2);
+  const s4 = projFast(-shadowW/2, shadowL/2, 2);
   if(s1 && s2 && s3 && s4){
     ctx.beginPath();
     ctx.moveTo(s1[0], s1[1]); ctx.lineTo(s2[0], s2[1]); ctx.lineTo(s3[0], s3[1]); ctx.lineTo(s4[0], s4[1]);
@@ -5587,7 +5580,7 @@ function renderSlopeScene(alpha, st){
     ctx.fill();
   }
 
-  // 3. Render 3D Full Chassis Multibody Scene (Using Cached High-Performance Scene)
+  // 3. Render 3D Full Chassis Multibody Scene (Ultra-fast cached draw)
   const sc = SLOPE_STAGE.cachedScene || buildScenePRO();
   for(let i = 0; i < sc.length; i++){
     const prim = sc[i];
@@ -5596,7 +5589,8 @@ function renderSlopeScene(alpha, st){
         ctx.beginPath();
         let valid = true;
         for(let j = 0; j < prim.pts.length; j++){
-          const pt2d = project(prim.pts[j], true);
+          const p = prim.pts[j];
+          const pt2d = projFast(p[0], p[1], p[2]);
           if(!pt2d){ valid = false; break; }
           if(j === 0) ctx.moveTo(pt2d[0], pt2d[1]);
           else ctx.lineTo(pt2d[0], pt2d[1]);
@@ -5609,7 +5603,8 @@ function renderSlopeScene(alpha, st){
         }
       }
     } else if(prim.type === "line"){
-      const p1 = project(prim.a, true), p2 = project(prim.b, true);
+      const p1 = projFast(prim.a[0], prim.a[1], prim.a[2]);
+      const p2 = projFast(prim.b[0], prim.b[1], prim.b[2]);
       if(p1 && p2){
         ctx.beginPath();
         ctx.moveTo(p1[0], p1[1]);
@@ -5620,7 +5615,7 @@ function renderSlopeScene(alpha, st){
         ctx.stroke();
       }
     } else if(prim.type === "node"){
-      const p = project(prim.p, true);
+      const p = projFast(prim.p[0], prim.p[1], prim.p[2]);
       if(p){
         ctx.beginPath();
         ctx.arc(p[0], p[1], prim.r || 3.5, 0, Math.PI * 2);
@@ -5741,7 +5736,7 @@ function initSlopeStageEvents(){
     });
   }
 
-  // Keyboard driving controls (Auto-pilot resumes when user releases keys)
+  // Keyboard driving controls
   window.addEventListener("keydown", (e) => {
     if(!SLOPE_STAGE.active) return;
     const k = e.key.toLowerCase();
