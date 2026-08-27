@@ -5245,9 +5245,14 @@ class VehicleDynamics15DOF {
 window.VehicleDynamics15DOF = VehicleDynamics15DOF;
 
 
+
+/* =====================================================================
+   SLOPE STAGE: 60-FPS HIGH-PERFORMANCE AUTONOMOUS 15-DOF CLIMBING STAGE
+   ===================================================================== */
 const SLOPE_STAGE = {
   active: false,
   playing: true,
+  autoPilot: true,       // 自动驾驶巡航
   grade: 0.15,
   speedKmh: 70.0,
   distTraveled: 0,
@@ -5255,17 +5260,17 @@ const SLOPE_STAGE = {
   camOrbit: { az: 0, elv: 0, distFactor: 1.0 },
   lastTime: 0,
   drag: null,
-  scene: null,
-  rebuild: 0,
+  cachedScene: null,
+  rebuildCadence: 0,
   keys: { w: false, s: false, a: false, d: false, space: false }
 };
 
 const SLOPE_CAMS_CONFIG = {
-  behind:  { dx: 0,     dy: -4800, dz: 1650, lookDy: 1200, lookDz: 320, fov: 1.6 },
-  front:   { dx: 0,     dy: 3800,  dz: 1100, lookDy: -600, lookDz: 280, fov: 1.6 },
-  side:    { dx: 5200,  dy: 0,     dz: 1100, lookDy: 0,    lookDz: 280, fov: 1.6 },
-  threeq:  { dx: 4200,  dy: -4600, dz: 2400, lookDy: 600,  lookDz: 280, fov: 1.5 },
-  cockpit: { dx: 0,     dy: -320,  dz: 680,  lookDy: 2600, lookDz: 380, fov: 1.4 }
+  behind:  { dx: 0,    dy: -3800, dz: 950,  lookDy: 600,  lookDz: 300, fov: 1.6 },
+  front:   { dx: 0,    dy: 3200,  dz: 700,  lookDy: -400, lookDz: 250, fov: 1.6 },
+  side:    { dx: 3800, dy: 0,     dz: 650,  lookDy: 0,    lookDz: 300, fov: 1.6 },
+  threeq:  { dx: 3000, dy: -3400, dz: 1400, lookDy: 400,  lookDz: 300, fov: 1.5 },
+  cockpit: { dx: 0,    dy: -150,  dz: 620,  lookDy: 2500, lookDz: 350, fov: 1.3 }
 };
 
 function openSlopeStage(){
@@ -5273,11 +5278,15 @@ function openSlopeStage(){
   if(!modal) return;
   SLOPE_STAGE.active = true;
   SLOPE_STAGE.playing = true;
+  SLOPE_STAGE.autoPilot = true;
   SLOPE_STAGE.lastTime = performance.now();
   SLOPE_STAGE.camOrbit = { az: 0, elv: 0, distFactor: 1.0 };
+  SLOPE_STAGE.cachedScene = null;
+  SLOPE_STAGE.rebuildCadence = 0;
   
   const vehName = (VEHICLE_PRESETS[S.vehicleType]||{}).name || "FIA GT3";
-  document.getElementById("slopeVehName").textContent = vehName;
+  const elName = document.getElementById("slopeVehName");
+  if(elName) elName.textContent = vehName;
   modal.classList.add("show");
 
   const cv = document.getElementById("slopeCanvas");
@@ -5301,32 +5310,44 @@ function closeSlopeStage(){
 
 function slopeStageLoop(now){
   if(!SLOPE_STAGE.active) return;
-  const dt = Math.min(0.05, (now - (SLOPE_STAGE.lastTime || now)) / 1000);
+  const dt = Math.min(0.04, (now - (SLOPE_STAGE.lastTime || now)) / 1000);
   SLOPE_STAGE.lastTime = now;
 
   const env = { 
     grade: Math.atan(SLOPE_STAGE.grade), 
-    bumpNoise: SLOPE_STAGE.playing ? (Math.sin(SLOPE_STAGE.distTraveled * 0.008) * 0.012 + Math.cos(SLOPE_STAGE.distTraveled * 0.022) * 0.006) : 0 
+    bumpNoise: SLOPE_STAGE.playing ? (Math.sin(SLOPE_STAGE.distTraveled * 0.008) * 0.008 + Math.cos(SLOPE_STAGE.distTraveled * 0.02) * 0.004) : 0 
   };
   
-  // Interactive Keyboard / Slider Controls
+  // 1. 全自动巡航与居中保持 (Autonomous Drive)
   let ctrl_steer = 0;
   let ctrl_throttle = 0;
   let ctrl_brake = 0;
 
-  if(SLOPE_STAGE.keys.a) ctrl_steer -= 12;
-  if(SLOPE_STAGE.keys.d) ctrl_steer += 12;
+  const targetSpeedMs = (SLOPE_STAGE.speedKmh * 1000) / 3600;
+  const curSpeed = window.physicsEngine ? window.physicsEngine.state.u : targetSpeedMs;
+  const speedError = targetSpeedMs - curSpeed;
+
+  // 检查是否有用户键盘手动接管
+  const isUserManual = (SLOPE_STAGE.keys.w || SLOPE_STAGE.keys.s || SLOPE_STAGE.keys.a || SLOPE_STAGE.keys.d || SLOPE_STAGE.keys.space);
   
-  if(SLOPE_STAGE.keys.w) {
-    ctrl_throttle = 1.0;
-  } else if(SLOPE_STAGE.keys.s || SLOPE_STAGE.keys.space) {
-    ctrl_brake = 1.0;
+  if(isUserManual) {
+    SLOPE_STAGE.autoPilot = false;
+    if(SLOPE_STAGE.keys.a) ctrl_steer -= 8;
+    if(SLOPE_STAGE.keys.d) ctrl_steer += 8;
+    if(SLOPE_STAGE.keys.w) ctrl_throttle = 1.0;
+    if(SLOPE_STAGE.keys.s || SLOPE_STAGE.keys.space) ctrl_brake = 1.0;
   } else {
-    // Automated Cruise Speed Controller
-    const targetSpeed = (SLOPE_STAGE.speedKmh * 1000) / 3600;
-    const speedError = targetSpeed - (window.physicsEngine.state.u);
-    ctrl_throttle = Math.max(0, Math.min(1.0, speedError * 0.5));
-    ctrl_brake = speedError < -1.0 ? Math.max(0, Math.min(1.0, -speedError * 0.5)) : 0;
+    // 自动驾驶闭环 PID
+    SLOPE_STAGE.autoPilot = true;
+    ctrl_throttle = Math.max(0, Math.min(1.0, 0.4 + speedError * 0.15));
+    ctrl_brake = speedError < -2.0 ? Math.max(0, Math.min(1.0, -speedError * 0.25)) : 0;
+    
+    // 车道居中保持
+    if(window.physicsEngine) {
+      const devX = window.physicsEngine.state.X;
+      const devPsi = window.physicsEngine.state.psi;
+      ctrl_steer = Math.max(-6, Math.min(6, -devX * 0.8 - devPsi * 15));
+    }
   }
 
   const ctrl = { steer: ctrl_steer, throttle: ctrl_throttle, brake: ctrl_brake };
@@ -5340,16 +5361,20 @@ function slopeStageLoop(now){
     const st = window.physicsEngine.state;
     const tel = window.physicsEngine.telemetry;
     
-    // Drive 3D multi-body suspension kinematics to the true physical travel
-    const tr = tel.tr || { FL:0, FR:0, RL:0, RR:0 };
-    const z0F = (SIM.FR && SIM.FR.n && SIM.FR.idx) ? SIM.FR.n[SIM.FR.idx.WC].p0[2] : 250;
-    const z0R = (SIM.RR && SIM.RR.n && SIM.RR.idx) ? SIM.RR.n[SIM.RR.idx.WC].p0[2] : 250;
-    
-    if(SIM.FR) driveTo(SIM.FR, z0F + (tr.FR || 0) * 1000, ctrl.steer, 'front');
-    if(SIM.RR) driveTo(SIM.RR, z0R + (tr.RR || 0) * 1000, 0, 'rear');
-    if(S.show.mirror){
-      if(SIM.FL) driveTo(SIM.FL, z0F + (tr.FL || 0) * 1000, -ctrl.steer, 'front');
-      if(SIM.RL) driveTo(SIM.RL, z0R + (tr.RL || 0) * 1000, 0, 'rear');
+    // 2. 悬架多体杆系运动学更新 (降低重算频率，提升至 60 FPS)
+    SLOPE_STAGE.rebuildCadence++;
+    if(SLOPE_STAGE.rebuildCadence % 2 === 0 || !SLOPE_STAGE.cachedScene) {
+      const tr = tel.tr || { FL:0, FR:0, RL:0, RR:0 };
+      const z0F = (SIM.FR && SIM.FR.n && SIM.FR.idx) ? SIM.FR.n[SIM.FR.idx.WC].p0[2] : 250;
+      const z0R = (SIM.RR && SIM.RR.n && SIM.RR.idx) ? SIM.RR.n[SIM.RR.idx.WC].p0[2] : 250;
+      
+      if(SIM.FR) driveTo(SIM.FR, z0F + (tr.FR || 0) * 1000, ctrl.steer, 'front');
+      if(SIM.RR) driveTo(SIM.RR, z0R + (tr.RR || 0) * 1000, 0, 'rear');
+      if(S.show.mirror){
+        if(SIM.FL) driveTo(SIM.FL, z0F + (tr.FL || 0) * 1000, -ctrl.steer, 'front');
+        if(SIM.RL) driveTo(SIM.RL, z0R + (tr.RL || 0) * 1000, 0, 'rear');
+      }
+      SLOPE_STAGE.cachedScene = buildScenePRO();
     }
     
     window._tireSpinAngles = {
@@ -5383,11 +5408,11 @@ function renderSlopeScene(alpha, st){
   const w = cv.width / dpr, h = cv.height / dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  // Background Sky / Horizon
+  // Background Sky / Atmosphere
   const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
-  skyGrad.addColorStop(0, "#080c12");
-  skyGrad.addColorStop(0.5, "#121824");
-  skyGrad.addColorStop(1, "#05080c");
+  skyGrad.addColorStop(0, "#080c14");
+  skyGrad.addColorStop(0.55, "#101622");
+  skyGrad.addColorStop(1, "#05070a");
   ctx.fillStyle = skyGrad;
   ctx.fillRect(0, 0, w, h);
 
@@ -5397,15 +5422,11 @@ function renderSlopeScene(alpha, st){
   const n_road = [0, -sinA, cosA];   // Road normal vector (Up)
   const t_road = [1, 0, 0];          // Road lateral vector (Right)
 
-  // Keep car centered at [0, 0, Z_bounce]
-  const carZ_offset = (st.Z || 0) * 1000;
+  // Body Rotation Matrix (Pitch theta, Roll phi, Yaw psi relative to road)
+  const cP = Math.cos(st.phi || 0), sP = Math.sin(st.phi || 0);
+  const cT = Math.cos(st.theta || 0), sT = Math.sin(st.theta || 0);
+  const cS = Math.cos(st.psi || 0), sS = Math.sin(st.psi || 0);
   
-  // Body Rotation Matrix (Pitch theta around X, Roll phi around Y, Yaw psi around Z)
-  const cP = Math.cos(st.phi), sP = Math.sin(st.phi);
-  const cT = Math.cos(st.theta), sT = Math.sin(st.theta);
-  const cS = Math.cos(st.psi), sS = Math.sin(st.psi);
-  
-  // R = Rz(psi) * Ry(phi) * Rx(theta)
   const R11 = cS*cP, R12 = cS*sP*sT - sS*cT, R13 = cS*sP*cT + sS*sT;
   const R21 = sS*cP, R22 = sS*sP*sT + cS*cT, R23 = sS*sP*cT - cS*sT;
   const R31 = -sP,   R32 = cP*sT,            R33 = cP*cT;
@@ -5432,15 +5453,15 @@ function renderSlopeScene(alpha, st){
 
   // Camera Eye and LookTarget relative to road plane
   const E = [
-    cam_dx*t_road[0] + cam_dy*u_road[0] + (cam_dz + carZ_offset)*n_road[0],
-    cam_dx*t_road[1] + cam_dy*u_road[1] + (cam_dz + carZ_offset)*n_road[1],
-    cam_dx*t_road[2] + cam_dy*u_road[2] + (cam_dz + carZ_offset)*n_road[2]
+    cam_dx*t_road[0] + cam_dy*u_road[0] + cam_dz*n_road[0],
+    cam_dx*t_road[1] + cam_dy*u_road[1] + cam_dz*n_road[1],
+    cam_dx*t_road[2] + cam_dy*u_road[2] + cam_dz*n_road[2]
   ];
 
   const lookTarget = [
-    camCfg.lookDy*u_road[0] + (camCfg.lookDz + carZ_offset)*n_road[0],
-    camCfg.lookDy*u_road[1] + (camCfg.lookDz + carZ_offset)*n_road[1],
-    camCfg.lookDy*u_road[2] + (camCfg.lookDz + carZ_offset)*n_road[2]
+    camCfg.lookDy*u_road[0] + camCfg.lookDz*n_road[0],
+    camCfg.lookDy*u_road[1] + camCfg.lookDz*n_road[1],
+    camCfg.lookDy*u_road[2] + camCfg.lookDz*n_road[2]
   ];
 
   const fw_un = [lookTarget[0]-E[0], lookTarget[1]-E[1], lookTarget[2]-E[2]];
@@ -5469,9 +5490,9 @@ function renderSlopeScene(alpha, st){
     if(isBody) {
       const P_rot = bodyTransform(P_local);
       P_world = [
-        P_rot[0]*t_road[0] + P_rot[1]*u_road[0] + (P_rot[2] + carZ_offset)*n_road[0],
-        P_rot[0]*t_road[1] + P_rot[1]*u_road[1] + (P_rot[2] + carZ_offset)*n_road[1],
-        P_rot[0]*t_road[2] + P_rot[1]*u_road[2] + (P_rot[2] + carZ_offset)*n_road[2]
+        P_rot[0]*t_road[0] + P_rot[1]*u_road[0] + P_rot[2]*n_road[0],
+        P_rot[0]*t_road[1] + P_rot[1]*u_road[1] + P_rot[2]*n_road[1],
+        P_rot[0]*t_road[2] + P_rot[1]*u_road[2] + P_rot[2]*n_road[2]
       ];
     } else {
       P_world = [
@@ -5482,7 +5503,7 @@ function renderSlopeScene(alpha, st){
     }
     const q = [P_world[0]-E[0], P_world[1]-E[1], P_world[2]-E[2]];
     const z = q[0]*fw[0] + q[1]*fw[1] + q[2]*fw[2];
-    if(z < 100) return null;
+    if(z < 60) return null;
     const f = fovDist / z;
     return [
       w/2 + (q[0]*rt[0] + q[1]*rt[1] + q[2]*rt[2]) * f,
@@ -5566,8 +5587,8 @@ function renderSlopeScene(alpha, st){
     ctx.fill();
   }
 
-  // 3. Render 3D Full Chassis Multibody Scene
-  const sc = buildScenePRO();
+  // 3. Render 3D Full Chassis Multibody Scene (Using Cached High-Performance Scene)
+  const sc = SLOPE_STAGE.cachedScene || buildScenePRO();
   for(let i = 0; i < sc.length; i++){
     const prim = sc[i];
     if(prim.type === "poly"){
@@ -5720,7 +5741,7 @@ function initSlopeStageEvents(){
     });
   }
 
-  // Keyboard driving controls
+  // Keyboard driving controls (Auto-pilot resumes when user releases keys)
   window.addEventListener("keydown", (e) => {
     if(!SLOPE_STAGE.active) return;
     const k = e.key.toLowerCase();
