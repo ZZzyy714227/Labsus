@@ -581,6 +581,13 @@ canvas.plot{display:block;width:100%;height:84px;background:var(--well);border:1
       <button id="pureSuspTg" class="header-action-btn" title="切换纯悬架透视 (隐藏车架与外围附件)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:var(--text);">纯悬架透视</button>
     </div>
     <div id="themeTg" class="theme-tg" title="切换浅色 / 深色模式"><i></i></div>
+    <div class="cell"><i>车型平台</i>
+      <select id="topVehSelect" style="background:transparent;border:none;color:var(--pri);font:600 11px var(--font-ui);cursor:pointer;outline:none;" onchange="loadVehiclePreset(this.value)">
+        <option value="formula" style="background:#161B22;color:#fff;">🏎️ Formula SAE (方程式)</option>
+        <option value="gt3" style="background:#161B22;color:#fff;">🏁 FIA GT3 (房车赛车)</option>
+        <option value="baja" style="background:#161B22;color:#fff;">🏜️ SAE Baja (越野赛车)</option>
+      </select>
+    </div>
     <div class="cell"><i>正在调校</i><b class="a" id="tbArch">前悬架 PUSHROD</b></div>
     <div class="cell"><i>Baseline 快照</i><b id="tbBase">未锁定 (无比对)</b></div>
     <div class="cell"><i>求解内核</i><b class="c" id="tbSolver">闭式几何 + 静力平衡</b></div>
@@ -793,38 +800,129 @@ const fmt=(v,d)=>(v===null||v===undefined||!isFinite(v))?"--":v.toFixed(d===unde
 const sfmt=(v,d)=>{const s=fmt(v,d);return(isFinite(v)&&v>0)?"+"+s:s;};
 function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
 
-/* ================================ 1. 结构与状态初始化 ================================ */
-const PRESETS={
-  "后悬架 (拉杆 Pullrod 架构)":{
-    arch:"pullrod", hp:{
-      LCA_F:[250.0, 140.0, 115.0], LCA_R:[250.0, -130.0, 125.0], LBJ:  [630.0, 10.0, 135.0],
-      UCA_F:[340.0, 110.0, 320.0], UCA_R:[340.0, -110.0, 330.0], UBJ:  [580.0, -15.0, 390.0],
-      WC:   [700.0, 0.0, 290.0],  TRO:  [590.0, -120.0, 170.0], RACK: [210.0, -130.0, 160.0],
-      STRUT_OUT:[570.0, -15.0, 380.0], RCK_AX_A: [340.0, 25.0, 290.0], RCK_AX_B: [340.0, 75.0, 292.0],
-      STRUT_IN: [370.0, 45.0, 255.0], RCK_DMP:  [305.0, 60.0, 270.0], DMP_BODY: [25.0, 62.0, 310.0]
-    }, strutOutAttach:"uca", tire:{R:310,W:285,rim:228.6,disc:175,label:"285/35R18 REAR"},
-    cam0:-1.5,toe0:0.10,mS:340,kS:130,kT:250,cB:9,cR:14,wb:1620,hcg:320,
-    arb:{d:18, dy:35, dz:95, t:0.55, G:79000}
+
+/* ================================ 1. 三款预设车型底盘总成与硬点定义 ================================ */
+const VEHICLE_PRESETS = {
+  formula: {
+    name: "🏎️ FSC 方程式 (Formula SAE)",
+    wb: 1620, hcg: 290, hs: 310, mTotal: 240, mSprung: 195,
+    limF: [-60, 65], limR: [-60, 65],
+    qs: { gx: 0.0, gy: 1.6, speed: 110, aeroF: 1200, aeroBias: 0.48 },
+    front: {
+      arch: "pushrod",
+      hp: {
+        LCA_F: [260.0, 140.0, 130.0], LCA_R: [260.0, -120.0, 140.0], LBJ: [640.0, 10.0, 150.0],
+        UCA_F: [350.0, 110.0, 340.0], UCA_R: [350.0, -100.0, 350.0], UBJ: [590.0, -15.0, 410.0],
+        WC: [710.0, 0.0, 280.0], TRO: [600.0, -120.0, 185.0], RACK: [220.0, -135.0, 180.0],
+        STRUT_OUT: [595.0, 10.0, 185.0], RCK_AX_A: [300.0, 15.0, 330.0], RCK_AX_B: [300.0, 70.0, 328.0],
+        STRUT_IN: [315.0, 45.0, 400.0], RCK_DMP: [230.0, 48.0, 345.0], DMP_BODY: [30.0, 48.0, 170.0]
+      },
+      strutOutAttach: "lca",
+      tire: { R: 280, W: 205, rim: 228.6, disc: 170, label: "205/45R13 FORMULA" },
+      cam0: -2.5, toe0: -0.10, mS: 55, mU: 18, kS: 110, kT: 220, cB: 8, cR: 12, tieTrim: 0,
+      damperMode: "table",
+      vfTable: [[-1.0,-1600],[-0.5,-950],[-0.2,-450],[-0.05,-120],[0.0,0],[0.05,150],[0.2,550],[0.5,1200],[1.0,2100]],
+      bushings: { LCA_F:[2500,2500,2500], LCA_R:[2500,2500,2500], UCA_F:[3500,3500,3500], UCA_R:[3500,3500,3500] },
+      arb: { d: 18, dy: 40, dz: 100, t: 0.62, G: 79000 }
+    },
+    rear: {
+      arch: "pullrod",
+      hp: {
+        LCA_F: [250.0, 140.0, 115.0], LCA_R: [250.0, -130.0, 125.0], LBJ: [630.0, 10.0, 135.0],
+        UCA_F: [340.0, 110.0, 320.0], UCA_R: [340.0, -110.0, 330.0], UBJ: [580.0, -15.0, 390.0],
+        WC: [700.0, 0.0, 290.0], TRO: [590.0, -120.0, 170.0], RACK: [210.0, -130.0, 160.0],
+        STRUT_OUT: [570.0, -15.0, 380.0], RCK_AX_A: [340.0, 25.0, 290.0], RCK_AX_B: [340.0, 75.0, 292.0],
+        STRUT_IN: [370.0, 45.0, 255.0], RCK_DMP: [305.0, 60.0, 270.0], DMP_BODY: [25.0, 62.0, 310.0]
+      },
+      strutOutAttach: "uca",
+      tire: { R: 290, W: 245, rim: 228.6, disc: 175, label: "245/40R13 REAR" },
+      cam0: -1.8, toe0: 0.08, mS: 65, mU: 20, kS: 130, kT: 250, cB: 9, cR: 14, tieTrim: 0,
+      damperMode: "table",
+      vfTable: [[-1.0,-1800],[-0.5,-1100],[-0.2,-520],[-0.05,-150],[0.0,0],[0.05,180],[0.2,650],[0.5,1400],[1.0,2400]],
+      bushings: { LCA_F:[2500,2500,2500], LCA_R:[2500,2500,2500], UCA_F:[3500,3500,3500], UCA_R:[3500,3500,3500] },
+      arb: { d: 16, dy: 35, dz: 95, t: 0.55, G: 79000 }
+    }
   },
-  "前悬架 (推杆 Pushrod 架构)":{
-    arch:"pushrod", hp:{
-      LCA_F:[260.0, 140.0, 130.0], LCA_R:[260.0, -120.0, 140.0], LBJ:  [640.0, 10.0, 150.0],
-      UCA_F:[350.0, 110.0, 340.0], UCA_R:[350.0, -100.0, 350.0], UBJ:  [590.0, -15.0, 410.0],
-      WC:   [710.0, 0.0, 280.0],  TRO:  [600.0, -120.0, 185.0], RACK: [220.0, -135.0, 180.0],
-      STRUT_OUT:[595.0, 10.0, 185.0], RCK_AX_A: [300.0, 15.0, 330.0], RCK_AX_B: [300.0, 70.0, 328.0],
-      STRUT_IN: [315.0, 45.0, 400.0], RCK_DMP:  [230.0, 48.0, 345.0], DMP_BODY: [30.0, 48.0, 170.0]
-    }, strutOutAttach:"lca", tire:{R:305,W:235,rim:228.6,disc:170,label:"235/40R18 FRONT"},
-    cam0:-1.2,toe0:0.05,mS:300,kS:110,kT:220,cB:8,cR:12,wb:1620,hcg:320,
-    arb:{d:20, dy:40, dz:100, t:0.62, G:79000}
+  gt3: {
+    name: "🏁 FIA GT3 房车 (GT3 Touring)",
+    wb: 2650, hcg: 360, hs: 380, mTotal: 1280, mSprung: 1140,
+    limF: [-55, 60], limR: [-55, 60],
+    qs: { gx: 0.0, gy: 1.8, speed: 220, aeroF: 3600, aeroBias: 0.45 },
+    front: {
+      arch: "pushrod",
+      hp: {
+        LCA_F: [310.0, 180.0, 140.0], LCA_R: [310.0, -160.0, 152.0], LBJ: [780.0, 12.0, 160.0],
+        UCA_F: [420.0, 140.0, 420.0], UCA_R: [420.0, -130.0, 430.0], UBJ: [720.0, -16.0, 490.0],
+        WC: [840.0, 0.0, 330.0], TRO: [730.0, -160.0, 205.0], RACK: [260.0, -180.0, 195.0],
+        STRUT_OUT: [720.0, 15.0, 210.0], RCK_AX_A: [360.0, 20.0, 400.0], RCK_AX_B: [360.0, 85.0, 398.0],
+        STRUT_IN: [380.0, 50.0, 480.0], RCK_DMP: [280.0, 55.0, 430.0], DMP_BODY: [50.0, 55.0, 220.0]
+      },
+      strutOutAttach: "lca",
+      tire: { R: 330, W: 305, rim: 228.6, disc: 190, label: "305/660R18 GT3 SLICK" },
+      cam0: -3.5, toe0: -0.15, mS: 320, mU: 45, kS: 160, kT: 320, cB: 12, cR: 18, tieTrim: 0,
+      damperMode: "table",
+      vfTable: [[-1.2,-3200],[-0.5,-2100],[-0.2,-1100],[-0.05,-350],[0.0,0],[0.05,450],[0.2,1600],[0.5,2900],[1.2,4200]],
+      bushings: { LCA_F:[8000,8000,8000], LCA_R:[8000,8000,8000], UCA_F:[10000,10000,10000], UCA_R:[10000,10000,10000] },
+      arb: { d: 28, dy: 45, dz: 110, t: 0.65, G: 79000 }
+    },
+    rear: {
+      arch: "pushrod",
+      hp: {
+        LCA_F: [320.0, 170.0, 145.0], LCA_R: [320.0, -170.0, 155.0], LBJ: [800.0, 10.0, 165.0],
+        UCA_F: [430.0, 130.0, 430.0], UCA_R: [430.0, -140.0, 440.0], UBJ: [735.0, -15.0, 500.0],
+        WC: [850.0, 0.0, 340.0], TRO: [740.0, -150.0, 210.0], RACK: [270.0, -170.0, 200.0],
+        STRUT_OUT: [730.0, 12.0, 215.0], RCK_AX_A: [370.0, 20.0, 410.0], RCK_AX_B: [370.0, 85.0, 408.0],
+        STRUT_IN: [390.0, 50.0, 490.0], RCK_DMP: [290.0, 55.0, 440.0], DMP_BODY: [55.0, 55.0, 230.0]
+      },
+      strutOutAttach: "lca",
+      tire: { R: 340, W: 315, rim: 228.6, disc: 185, label: "315/710R18 GT3 REAR" },
+      cam0: -2.8, toe0: 0.12, mS: 360, mU: 48, kS: 180, kT: 340, cB: 14, cR: 20, tieTrim: 0,
+      damperMode: "table",
+      vfTable: [[-1.2,-3600],[-0.5,-2400],[-0.2,-1300],[-0.05,-400],[0.0,0],[0.05,500],[0.2,1800],[0.5,3200],[1.2,4600]],
+      bushings: { LCA_F:[8000,8000,8000], LCA_R:[8000,8000,8000], UCA_F:[10000,10000,10000], UCA_R:[10000,10000,10000] },
+      arb: { d: 26, dy: 40, dz: 105, t: 0.60, G: 79000 }
+    }
+  },
+  baja: {
+    name: "🏜️ SAE Baja 越野 (Baja Off-Road)",
+    wb: 1750, hcg: 480, hs: 510, mTotal: 340, mSprung: 260,
+    limF: [-85, 90], limR: [-85, 90],
+    qs: { gx: 0.0, gy: 0.95, speed: 65, aeroF: 150, aeroBias: 0.50 },
+    front: {
+      arch: "pushrod",
+      hp: {
+        LCA_F: [220.0, 160.0, 220.0], LCA_R: [220.0, -150.0, 235.0], LBJ: [680.0, 10.0, 260.0],
+        UCA_F: [320.0, 130.0, 520.0], UCA_R: [320.0, -120.0, 530.0], UBJ: [620.0, -18.0, 580.0],
+        WC: [760.0, 0.0, 396.0], TRO: [640.0, -150.0, 310.0], RACK: [230.0, -170.0, 290.0],
+        STRUT_OUT: [630.0, 10.0, 300.0], RCK_AX_A: [280.0, 20.0, 500.0], RCK_AX_B: [280.0, 80.0, 498.0],
+        STRUT_IN: [300.0, 50.0, 600.0], RCK_DMP: [200.0, 55.0, 530.0], DMP_BODY: [30.0, 55.0, 270.0]
+      },
+      strutOutAttach: "lca",
+      tire: { R: 396, W: 265, rim: 216, disc: 170, label: "265/65R17 BAJA ALL-TERRAIN" },
+      cam0: -0.5, toe0: 0.15, mS: 75, mU: 26, kS: 55, kT: 170, cB: 7, cR: 12, tieTrim: 0,
+      damperMode: "table",
+      vfTable: [[-1.2,-1400],[-0.5,-900],[-0.2,-450],[-0.05,-120],[0.0,0],[0.05,180],[0.2,650],[0.5,1300],[1.2,2200]],
+      bushings: { LCA_F:[1200,1200,1200], LCA_R:[1200,1200,1200], UCA_F:[1500,1500,1500], UCA_R:[1500,1500,1500] },
+      arb: { d: 16, dy: 45, dz: 120, t: 0.50, G: 79000 }
+    },
+    rear: {
+      arch: "pullrod",
+      hp: {
+        LCA_F: [220.0, 150.0, 210.0], LCA_R: [220.0, -150.0, 225.0], LBJ: [670.0, 10.0, 250.0],
+        UCA_F: [310.0, 120.0, 500.0], UCA_R: [310.0, -130.0, 510.0], UBJ: [610.0, -15.0, 570.0],
+        WC: [750.0, 0.0, 396.0], TRO: [630.0, -140.0, 290.0], RACK: [220.0, -150.0, 280.0],
+        STRUT_OUT: [600.0, -15.0, 550.0], RCK_AX_A: [310.0, 25.0, 460.0], RCK_AX_B: [310.0, 75.0, 462.0],
+        STRUT_IN: [340.0, 45.0, 390.0], RCK_DMP: [270.0, 60.0, 420.0], DMP_BODY: [25.0, 62.0, 480.0]
+      },
+      strutOutAttach: "uca",
+      tire: { R: 396, W: 265, rim: 216, disc: 170, label: "265/65R17 BAJA REAR" },
+      cam0: -0.3, toe0: 0.10, mS: 85, mU: 28, kS: 65, kT: 170, cB: 8, cR: 14, tieTrim: 0,
+      damperMode: "table",
+      vfTable: [[-1.2,-1600],[-0.5,-1050],[-0.2,-520],[-0.05,-140],[0.0,0],[0.05,200],[0.2,750],[0.5,1500],[1.2,2600]],
+      bushings: { LCA_F:[1200,1200,1200], LCA_R:[1200,1200,1200], UCA_F:[1500,1500,1500], UCA_R:[1500,1500,1500] },
+      arb: { d: 14, dy: 40, dz: 110, t: 0.48, G: 79000 }
+    }
   }
-};
-
-
-/* ================================ 整车平台档案（综合评价 / 爬坡舞台共用） ================================ */
-const VEHICLE_PRESETS={
-  FSC: {name:"FSC 方程式赛车 (Formula SAE)",     wb:1620, hcg:320, mTotal:600,  note:"单座中置钢管桁架 · 前推杆+后拉杆 · 高刚度弹簧"},
-  GT3: {name:"FIA GT3 房车赛车 (GT3 Touring)",   wb:2650, hcg:450, mTotal:1400, note:"FIA 笼式防滚架 · 前后推杆架构 · 下压力 3600N"},
-  Baja:{name:"SAE Baja 巴哈越野 (Baja Off-Road)",wb:1750, hcg:520, mTotal:500,  note:"高挑防滚笼 · 牛栏前杠 · ±120mm 行程 · 全地形大齿胎"}
 };
 
 
@@ -848,22 +946,22 @@ const HP_META=[
 
 /* 全局活动仿真状态 (包含完整底盘与增量分析参数) */
 const S={
-  axis: "front", front: null, rear: null, vehicleType: "FSC",
+  axis: "front", front: null, rear: null, vehicleType: "formula",
   mode:"kin", // 'kin' | 'rig' | 'quasi'
   play:true, travel:0, roll:0, rack:0, swAngle:0, driveTorque:250, brakePedal:35,
   exc:"sine", excA:50, excF:0.25, steerExc:"off", stA:40, stF:0.12,
   bsU:70, bsD:75, kBS:1000,
-  road:"none", rA:15, rF:2.0, wb:2750, hcg:350, hs:370, brkF:0.60,
-  mTotal:1420, mSprung:1260,
-  trMin:-80, trMax:80,
+  road:"none", rA:15, rF:2.0, wb:1620, hcg:290, hs:310, brkF:0.60,
+  mTotal:240, mSprung:195,
+  trMin:-60, trMax:65,
   
   // 准静态工况增量参数
   qs:{
     gx: 0.0,
-    gy: 1.0,
-    speed: 120,
-    aeroF: 1500,
-    aeroBias: 0.45
+    gy: 1.6,
+    speed: 110,
+    aeroF: 1200,
+    aeroBias: 0.48
   },
   
   // Baseline 快照比对
@@ -876,26 +974,75 @@ const S={
   t:0, simT:0, dyn:{on:false,z:0,v:0,load:0,fs:0,fd:0,pen:0,acc:0}
 };
 
+const PRESETS = {
+  "前悬架 (推杆 Pushrod 架构)": VEHICLE_PRESETS.formula.front,
+  "后悬架 (拉杆 Pullrod 架构)": VEHICLE_PRESETS.formula.rear
+};
+
+function loadVehiclePreset(type) {
+  const p = VEHICLE_PRESETS[type];
+  if(!p) return;
+  S.vehicleType = type;
+  S.wb = p.wb;
+  S.hcg = p.hcg;
+  S.hs = p.hs || (p.hcg + 20);
+  S.mTotal = p.mTotal;
+  S.mSprung = p.mSprung || (p.mTotal * 0.85);
+  S.travel = 0; S.rack = 0; S.roll = 0; S.simT = 0;
+  if(p.limF) {
+    S.trMin = p.limF[0];
+    S.trMax = p.limF[1];
+  }
+  if(p.qs) {
+    S.qs.gx = p.qs.gx || 0;
+    S.qs.gy = p.qs.gy || 1.0;
+    S.qs.speed = p.qs.speed || 120;
+    S.qs.aeroF = p.qs.aeroF || 1000;
+    S.qs.aeroBias = p.qs.aeroBias || 0.5;
+  }
+  
+  S.front = JSON.parse(JSON.stringify(p.front));
+  S.rear = JSON.parse(JSON.stringify(p.rear));
+  
+  if(typeof rebuild === 'function') rebuild();
+  
+  // Sync Left & Right UI panels if available
+  const sel = document.getElementById("topVehSelect");
+  if(sel) sel.value = type;
+  
+  const vehBtns = document.querySelectorAll(".veh-btn-tab");
+  vehBtns.forEach(b => {
+    if(b.dataset.veh === type) b.classList.add("on");
+    else b.classList.remove("on");
+  });
+  
+  const tbArch = document.getElementById("tbArch");
+  if(tbArch) tbArch.textContent = (S.axis==='front'?'前悬架 ':'后悬架 ') + S[S.axis].arch.toUpperCase();
+  
+  const vehDesc = document.getElementById("vehPresetDesc");
+  if(vehDesc) vehDesc.textContent = "当前载入: " + p.name;
+  
+  if(typeof UI !== 'undefined' && UI.sync) {
+    UI.sync.forEach(f => { try{ f(); }catch(e){} });
+  }
+  if(typeof VW !== 'undefined') {
+    VW.forEach(v => { sizeView(v); fitView(v); });
+  }
+}
+
 function initData(){
-  const PF = PRESETS["前悬架 (推杆 Pushrod 架构)"];
-  const PR = PRESETS["后悬架 (拉杆 Pullrod 架构)"];
-  S.front = {
-    arch: PF.arch, tire: JSON.parse(JSON.stringify(PF.tire)),
-    cam0: PF.cam0, toe0: PF.toe0, mS: PF.mS, mU: 38, kS: PF.kS, kT: PF.kT, cB: PF.cB, cR: PF.cR, strutOutAttach: PF.strutOutAttach, hp: {}, tieTrim: 0,
-    arb: JSON.parse(JSON.stringify(PF.arb))
-  };
-  for(const id in PF.hp) S.front.hp[id] = [...PF.hp[id]];
-  
-  S.rear = {
-    arch: PR.arch, tire: JSON.parse(JSON.stringify(PR.tire)),
-    cam0: PR.cam0, toe0: PR.toe0, mS: PR.mS, mU: 42, kS: PR.kS, kT: PR.kT, cB: PR.cB, cR: PR.cR, strutOutAttach: PR.strutOutAttach, hp: {}, tieTrim: 0,
-    arb: JSON.parse(JSON.stringify(PR.arb))
-  };
-  for(const id in PR.hp) S.rear.hp[id] = [...PR.hp[id]];
-  
-  S.wb = PF.wb; S.hcg = PF.hcg;
+  const p = VEHICLE_PRESETS["formula"];
+  S.vehicleType = "formula";
+  S.wb = p.wb; S.hcg = p.hcg; S.hs = p.hs || (p.hcg + 20);
+  S.mTotal = p.mTotal; S.mSprung = p.mSprung || (p.mTotal * 0.85);
+  S.front = JSON.parse(JSON.stringify(p.front));
+  S.rear = JSON.parse(JSON.stringify(p.rear));
 }
 initData();
+window.S = S;
+window.loadVehiclePreset = loadVehiclePreset;
+window.VEHICLE_PRESETS = VEHICLE_PRESETS;
+
 
 /* ================================ 2. 机构构建与多体投影求解 ================================ */
 function buildMech(axis){
@@ -1745,19 +1892,25 @@ function buildScenePRO(){
   const sc=[];
   const yF = S.wb/2, yR = -S.wb/2;
 
-  // 1. 定形乘员舱/前后定形防撞区 + 悬架动联过渡舱
-  buildDecoupledImpactSpaceframe(sc, yF, yR);
+  // 根据当前车型切换对应的车架与空间架构
+  if(S.vehicleType === "gt3") {
+    buildGT3Spaceframe(sc, yF, yR);
+  } else if(S.vehicleType === "baja") {
+    buildBajaSpaceframe(sc, yF, yR);
+  } else {
+    buildDecoupledImpactSpaceframe(sc, yF, yR);
+  }
 
-  // 2. 传动系：EDU 电驱动总成与差速器
+  // 传动系：EDU 电驱动总成与差速器
   if(S.show.powertrain) buildPowertrainEDU(sc, yF, yR);
 
-  // 3. 转向系：中置单座方程式转向总成
+  // 转向系：中置单座方程式转向总成
   if(S.show.steer_col) buildFormulaCentralSteering(sc, yF);
 
-  // 4. 制动系：中置双回路主缸与踏板
+  // 制动系：中置双回路主缸与踏板
   if(S.show.master_cyl) buildBrakeHydraulicSystem(sc, yF, yR);
 
-  // 5. 悬架与车轮端各系统实例装配
+  // 悬架与车轮端各系统实例装配
   addAxleAssemblyPRO(sc, SIM.FR, SIM.mFR, 1, yF, 'front');
   addAxleAssemblyPRO(sc, SIM.RR, SIM.mRR, 1, yR, 'rear');
   if(S.show.mirror){
@@ -1765,6 +1918,239 @@ function buildScenePRO(){
     addAxleAssemblyPRO(sc, SIM.RL, SIM.mRL, -1, yR, 'rear');
   }
   return sc;
+}
+
+/* ================================ B. FIA GT3 房车赛车 (Coupe Proportions) ================================ */
+function buildGT3Spaceframe(sc, yF, yR){
+  const T = (a, b, r, col) => cylinder(sc, a, b, r||16, col||"#5a728c", 1.3, 12);
+  const D = (a, b, r, col) => cylinder(sc, a, b, r||12, col||"#3d5168", 1.1, 10);
+  const WING = (a, b, r, col) => cylinder(sc, a, b, r||14, col||"#e67e22", 1.4, 12);
+
+  const Z_floor = 120, Z_belt = 600, Z_roof = 980;
+  const Z_nose = 380, Z_tail = 620;
+  const W_floor = 780, W_belt = 800, W_roof = 520, W_nose = 650, W_tail = 750;
+  
+  const Y_nose = yF + 650;
+  const Y_dash = yF - 400;
+  const Y_roof_front = Y_dash - 650;
+  const Y_roof_rear = yR + 750;
+  const Y_rearHoop = yR + 150;
+  const Y_tail = yR - 650;
+
+  const F_FL = [-W_floor, Y_dash, Z_floor], F_FR = [W_floor, Y_dash, Z_floor];
+  const F_RL = [-W_floor, Y_rearHoop, Z_floor], F_RR = [W_floor, Y_rearHoop, Z_floor];
+  const B_FL = [-W_belt, Y_dash, Z_belt], B_FR = [W_belt, Y_dash, Z_belt];
+  const B_RL = [-W_belt, Y_rearHoop, Z_belt], B_RR = [W_belt, Y_rearHoop, Z_belt];
+  const R_FL = [-W_roof, Y_roof_front, Z_roof], R_FR = [W_roof, Y_roof_front, Z_roof];
+  const R_RL = [-W_roof, Y_roof_rear, Z_roof], R_RR = [W_roof, Y_roof_rear, Z_roof];
+  const N_TL = [-W_nose, Y_nose, Z_nose], N_TR = [W_nose, Y_nose, Z_nose];
+  const N_BL = [-W_nose, Y_nose, Z_floor+30], N_BR = [W_nose, Y_nose, Z_floor+30];
+  const T_TL = [-W_tail, Y_tail, Z_tail], T_TR = [W_tail, Y_tail, Z_tail];
+  const T_BL = [-W_tail, Y_tail, Z_floor+50], T_BR = [W_tail, Y_tail, Z_floor+50];
+
+  if(S.show.frame_main){
+    const tbCol = "#1a2530";
+    T(F_FL, F_FR, 20, tbCol); T(F_RL, F_RR, 20, tbCol);
+    T(F_FL, F_RL, 25, tbCol); T(F_FR, F_RR, 25, tbCol);
+    T(B_FL, B_FR, 20, tbCol); T(B_RL, B_RR, 20, tbCol);
+    T(B_FL, B_RL, 25, tbCol); T(B_FR, B_RR, 25, tbCol);
+    T(R_FL, R_FR, 18, tbCol); T(R_RL, R_RR, 18, tbCol);
+    T(R_FL, R_RL, 18, tbCol); T(R_FR, R_RR, 18, tbCol);
+    T(B_FL, R_FL, 22, tbCol); T(B_FR, R_FR, 22, tbCol); 
+    T(B_RL, R_RL, 24, tbCol); T(B_RR, R_RR, 24, tbCol); 
+    T(F_FL, B_FL, 22, tbCol); T(F_FR, B_FR, 22, tbCol);
+    T(F_RL, B_RL, 22, tbCol); T(F_RR, B_RR, 22, tbCol);
+    
+    const cageCol = "#d2543f"; 
+    const C_FL = [-W_roof-20, Y_roof_front+20, Z_roof-30], C_FR = [W_roof+20, Y_roof_front+20, Z_roof-30];
+    const C_RL = [-W_roof-20, Y_roof_rear-20, Z_roof-30], C_RR = [W_roof+20, Y_roof_rear-20, Z_roof-30];
+    const C_B_RL = [-W_belt+40, Y_rearHoop-40, Z_belt-40], C_B_RR = [W_belt-40, Y_rearHoop-40, Z_belt-40];
+    T(C_FL, C_FR, 16, cageCol); T(C_RL, C_RR, 16, cageCol); T(C_FL, C_RL, 16, cageCol); T(C_FR, C_RR, 16, cageCol); 
+    D(C_FL, C_RR, 12, cageCol); D(C_FR, C_RL, 12, cageCol); 
+    T(C_RL, C_B_RL, 18, cageCol); T(C_RR, C_B_RR, 18, cageCol); 
+    D(C_RL, C_B_RR, 15, cageCol); D(C_RR, C_B_RL, 15, cageCol); 
+    T(C_B_RL, C_B_RR, 18, cageCol); 
+  }
+
+  if(S.show.frame_side){
+    const bodyCol = "rgba(40, 48, 56, 0.95)"; 
+    const hoodCol = "rgba(45, 55, 65, 0.90)"; 
+    PL(sc, [F_FL, B_FL, B_RL, F_RL, F_FL], bodyCol, 1, null, bodyCol);
+    PL(sc, [F_FR, B_FR, B_RR, F_RR, F_FR], bodyCol, 1, null, bodyCol);
+    PL(sc, [B_FL, B_FR, N_TR, N_TL, B_FL], hoodCol, 1, null, hoodCol);
+    PL(sc, [F_FL, B_FL, N_TL, N_BL, F_FL], bodyCol, 1, null, bodyCol);
+    PL(sc, [F_FR, B_FR, N_TR, N_BR, F_FR], bodyCol, 1, null, bodyCol);
+    PL(sc, [B_RL, B_RR, T_TR, T_TL, B_RL], hoodCol, 1, null, hoodCol);
+    PL(sc, [F_RL, B_RL, T_TL, T_BL, F_RL], bodyCol, 1, null, bodyCol);
+    PL(sc, [F_RR, B_RR, T_TR, T_BR, F_RR], bodyCol, 1, null, bodyCol);
+    PL(sc, [R_FL, R_FR, R_RR, R_RL, R_FL], hoodCol, 1, null, hoodCol);
+    
+    const glass = "rgba(120, 160, 200, 0.25)";
+    PL(sc, [B_FL, B_FR, R_FR, R_FL, B_FL], "rgba(100,150,200,0.5)", 1.5, null, glass);
+    PL(sc, [B_FL, R_FL, R_RL, B_RL, B_FL], "rgba(100,150,200,0.5)", 1.5, null, glass);
+    PL(sc, [B_FR, R_FR, R_RR, B_RR, B_FR], "rgba(100,150,200,0.5)", 1.5, null, glass);
+    PL(sc, [B_RL, B_RR, R_RR, R_RL, B_RL], "rgba(100,150,200,0.5)", 1.5, null, glass);
+  }
+
+  const hF = S.front.hp;
+  if(S.show.frame_front){
+    const sfC = "#7a8a9e";
+    T(N_TL, N_TR, 16, sfC); T(N_BL, N_BR, 18, sfC); 
+    T(N_TL, N_BL, 16, sfC); T(N_TR, N_BR, 16, sfC);
+    const R_DMP_F = [hF.DMP_BODY[0], hF.DMP_BODY[1] + yF, hF.DMP_BODY[2]];
+    const L_DMP_F = [-hF.DMP_BODY[0], hF.DMP_BODY[1] + yF, hF.DMP_BODY[2]];
+    T(R_DMP_F, B_FR, 18, "#d2543f"); T(L_DMP_F, B_FL, 18, "#d2543f");
+    T(R_DMP_F, L_DMP_F, 20, "#d2543f"); 
+    const R_UCA_F = [hF.UCA_F[0], hF.UCA_F[1] + yF, hF.UCA_F[2]], L_UCA_F = [-hF.UCA_F[0], hF.UCA_F[1] + yF, hF.UCA_F[2]];
+    const R_LCA_F = [hF.LCA_F[0], hF.LCA_F[1] + yF, hF.LCA_F[2]], L_LCA_F = [-hF.LCA_F[0], hF.LCA_F[1] + yF, hF.LCA_F[2]];
+    const R_UCA_R = [hF.UCA_R[0], hF.UCA_R[1] + yF, hF.UCA_R[2]], L_UCA_R = [-hF.UCA_R[0], hF.UCA_R[1] + yF, hF.UCA_R[2]];
+    const R_LCA_R = [hF.LCA_R[0], hF.LCA_R[1] + yF, hF.LCA_R[2]], L_LCA_R = [-hF.LCA_R[0], hF.LCA_R[1] + yF, hF.LCA_R[2]];
+    T(R_UCA_F, N_TR, 14, sfC); T(L_UCA_F, N_TL, 14, sfC);
+    T(R_LCA_F, N_BR, 16, sfC); T(L_LCA_F, N_BL, 16, sfC);
+    T(R_UCA_R, B_FR, 14, sfC); T(L_UCA_R, B_FL, 14, sfC);
+    T(R_LCA_R, F_FR, 16, sfC); T(L_LCA_R, F_FL, 16, sfC);
+  }
+
+  const hR = S.rear.hp;
+  if(S.show.frame_rear){
+    const sfC = "#7a8a9e";
+    T(T_TL, T_TR, 16, sfC); T(T_BL, T_BR, 18, sfC); 
+    T(T_TL, T_BL, 16, sfC); T(T_TR, T_BR, 16, sfC);
+    const R_DMP_R = [hR.DMP_BODY[0], hR.DMP_BODY[1] + yR, hR.DMP_BODY[2]];
+    const L_DMP_R = [-hR.DMP_BODY[0], hR.DMP_BODY[1] + yR, hR.DMP_BODY[2]];
+    T(R_DMP_R, B_RR, 18, sfC); T(L_DMP_R, B_RL, 18, sfC);
+    T(R_DMP_R, L_DMP_R, 20, "#d2543f"); 
+    const R_UCA_F = [hR.UCA_F[0], hR.UCA_F[1] + yR, hR.UCA_F[2]], L_UCA_F = [-hR.UCA_F[0], hR.UCA_F[1] + yR, hR.UCA_F[2]];
+    const R_LCA_F = [hR.LCA_F[0], hR.LCA_F[1] + yR, hR.LCA_F[2]], L_LCA_F = [-hR.LCA_F[0], hR.LCA_F[1] + yR, hR.LCA_F[2]];
+    const R_UCA_R = [hR.UCA_R[0], hR.UCA_R[1] + yR, hR.UCA_R[2]], L_UCA_R = [-hR.UCA_R[0], hR.UCA_R[1] + yR, hR.UCA_R[2]];
+    const R_LCA_R = [hR.LCA_R[0], hR.LCA_R[1] + yR, hR.LCA_R[2]], L_LCA_R = [-hR.LCA_R[0], hR.LCA_R[1] + yR, hR.LCA_R[2]];
+    T(R_UCA_F, B_RR, 14, sfC); T(L_UCA_F, B_RL, 14, sfC);
+    T(R_LCA_F, F_RR, 16, sfC); T(L_LCA_F, F_RL, 16, sfC);
+    T(R_UCA_R, T_TR, 14, sfC); T(L_UCA_R, T_TL, 14, sfC);
+    T(R_LCA_R, T_BR, 16, sfC); T(L_LCA_R, T_BL, 16, sfC);
+
+    const Pylon_Y = Y_tail + 100, Pylon_Z = Z_roof + 80, Pylon_W = 280;
+    const Pylon_L_Base = [-Pylon_W, Pylon_Y, Z_tail], Pylon_R_Base = [Pylon_W, Pylon_Y, Z_tail];
+    const Pylon_L_Top = [-Pylon_W, Pylon_Y-100, Pylon_Z], Pylon_R_Top = [Pylon_W, Pylon_Y-100, Pylon_Z];
+    WING(Pylon_L_Base, Pylon_L_Top, 16); WING(Pylon_R_Base, Pylon_R_Top, 16);
+    D(Pylon_L_Base, Pylon_R_Top, 10); D(Pylon_R_Base, Pylon_L_Top, 10);
+
+    const Wing_Span = 850, Wing_Y = Pylon_Y - 120;
+    const W_L_Lead = [-Wing_Span, Wing_Y+80, Pylon_Z+10], W_R_Lead = [Wing_Span, Wing_Y+80, Pylon_Z+10];
+    const W_L_Trail = [-Wing_Span, Wing_Y-120, Pylon_Z+40], W_R_Trail = [Wing_Span, Wing_Y-120, Pylon_Z+40];
+    WING(W_L_Lead, W_R_Lead, 20); WING(W_L_Trail, W_R_Trail, 12);
+    T(W_L_Lead, W_L_Trail, 14); T(W_R_Lead, W_R_Trail, 14);
+
+    const EP_L_Bot = [-Wing_Span, Wing_Y-30, Pylon_Z-70], EP_R_Bot = [Wing_Span, Wing_Y-30, Pylon_Z-70];
+    const EP_L_Top = [-Wing_Span, Wing_Y-30, Pylon_Z+80], EP_R_Top = [Wing_Span, Wing_Y-30, Pylon_Z+80];
+    WING(EP_L_Bot, EP_L_Top, 10); WING(EP_R_Bot, EP_R_Top, 10);
+  }
+}
+
+/* ================================ C. SAE Baja 巴哈越野赛车管架 ================================ */
+function buildBajaSpaceframe(sc, yF, yR){
+  const hF = S.front.hp, hR = S.rear.hp;
+  const T = (a, b, r, col) => cylinder(sc, a, b, r||16, col||"#d23535", 1.3, 12); 
+  const D = (a, b, r, col) => cylinder(sc, a, b, r||14, col||"#a82a2a", 1.1, 10);
+
+  const Y_front_bulk = yF + 350;
+  const Y_front_hoop = yF - 300;
+  const Y_main_hoop = yR + 700;
+  const Y_rear_bulk = yR - 400;
+
+  const Z_bottom = 180;
+  const Z_sim = 550;
+  const Z_front_hoop = 900;
+  const Z_main_hoop = 1450;
+  const Z_nose = 450;
+  const Z_rear = 750;
+
+  const W_bottom = 200; 
+  const W_shoulder = 280;
+  const W_roof = 200;
+  const W_nose = 160;
+
+  const FBM_TL = [-W_nose, Y_front_bulk, Z_nose], FBM_TR = [W_nose, Y_front_bulk, Z_nose];
+  const FBM_BL = [-W_nose, Y_front_bulk, Z_bottom], FBM_BR = [W_nose, Y_front_bulk, Z_bottom];
+  const FHO_TL = [-W_roof, Y_front_hoop, Z_front_hoop], FHO_TR = [W_roof, Y_front_hoop, Z_front_hoop];
+  const FHO_ML = [-W_shoulder, Y_front_hoop, Z_sim], FHO_MR = [W_shoulder, Y_front_hoop, Z_sim];
+  const FHO_BL = [-W_bottom, Y_front_hoop, Z_bottom], FHO_BR = [W_bottom, Y_front_hoop, Z_bottom];
+  const RHO_TL = [-W_roof, Y_main_hoop, Z_main_hoop], RHO_TR = [W_roof, Y_main_hoop, Z_main_hoop];
+  const RHO_ML = [-W_shoulder, Y_main_hoop, Z_sim], RHO_MR = [W_shoulder, Y_main_hoop, Z_sim];
+  const RHO_BL = [-W_bottom, Y_main_hoop, Z_bottom], RHO_BR = [W_bottom, Y_main_hoop, Z_bottom];
+  const RR_TL = [-W_shoulder, Y_rear_bulk, Z_rear], RR_TR = [W_shoulder, Y_rear_bulk, Z_rear];
+  const RR_BL = [-W_bottom, Y_rear_bulk, Z_bottom], RR_BR = [W_bottom, Y_rear_bulk, Z_bottom];
+
+  if(S.show.frame_main){
+    T(RHO_BL, RHO_ML); T(RHO_BR, RHO_MR); T(RHO_ML, RHO_TL); T(RHO_MR, RHO_TR); T(RHO_TL, RHO_TR);
+    D(RHO_TL, RHO_MR); D(RHO_TR, RHO_ML);
+    T(RHO_ML, RHO_MR);
+    T(FHO_BL, FHO_ML); T(FHO_BR, FHO_MR); T(FHO_ML, FHO_TL); T(FHO_MR, FHO_TR); T(FHO_TL, FHO_TR);
+    T(FHO_ML, FHO_MR);
+    T(FHO_TL, RHO_TL); T(FHO_TR, RHO_TR);
+    D(FHO_TL, RHO_TR); D(FHO_TR, RHO_TL);
+  }
+
+  if(S.show.frame_side){
+    T(FBM_BL, FHO_BL); T(FBM_BR, FHO_BR);
+    T(FBM_TL, FHO_ML); T(FBM_TR, FHO_MR);
+    T(FHO_BL, RHO_BL); T(FHO_BR, RHO_BR);
+    T(FHO_ML, RHO_ML); T(FHO_MR, RHO_MR);
+    D(FHO_ML, RHO_BL); D(FHO_BL, RHO_ML);
+    D(FHO_MR, RHO_BR); D(FHO_BR, RHO_MR);
+  }
+
+  if(S.show.frame_rear){
+    T(RHO_BL, RR_BL); T(RHO_BR, RR_BR);
+    T(RHO_ML, RR_TL); T(RHO_MR, RR_TR);
+    T(RHO_TL, RR_TL); T(RHO_TR, RR_TR);
+    T(RR_TL, RR_TR); T(RR_BL, RR_BR); 
+    T(RR_TL, RR_BL); T(RR_TR, RR_BR);
+    D(RR_TL, RR_BR); D(RR_TR, RR_BL);
+  }
+
+  if(S.show.frame_side){
+    const panelCol = "rgba(220, 225, 230, 0.95)";
+    const noseCol = "rgba(30, 35, 40, 0.95)";
+    PL(sc, [FBM_TL, FBM_TR, FHO_MR, FHO_ML, FBM_TL], noseCol, 1, null, noseCol);
+    PL(sc, [FHO_BL, FHO_ML, RHO_ML, RHO_BL, FHO_BL], panelCol, 1, null, panelCol);
+    PL(sc, [FHO_BR, FHO_MR, RHO_MR, RHO_BR, FHO_BR], panelCol, 1, null, panelCol);
+    PL(sc, [FHO_BL, FHO_BR, RHO_BR, RHO_BL, FHO_BL], "rgba(25,25,25,0.95)", 1, null, "rgba(25,25,25,0.95)");
+  }
+
+  if(S.show.frame_front){
+    const sfC = "#4a5a6a";
+    T(FBM_TL, FBM_TR); T(FBM_BL, FBM_BR); T(FBM_TL, FBM_BL); T(FBM_TR, FBM_BR);
+    D(FBM_TL, FBM_BR); D(FBM_TR, FBM_BL);
+    const R_UCA_F = [hF.UCA_F[0], hF.UCA_F[1] + yF, hF.UCA_F[2]], L_UCA_F = [-hF.UCA_F[0], hF.UCA_F[1] + yF, hF.UCA_F[2]];
+    const R_LCA_F = [hF.LCA_F[0], hF.LCA_F[1] + yF, hF.LCA_F[2]], L_LCA_F = [-hF.LCA_F[0], hF.LCA_F[1] + yF, hF.LCA_F[2]];
+    const R_UCA_R = [hF.UCA_R[0], hF.UCA_R[1] + yF, hF.UCA_R[2]], L_UCA_R = [-hF.UCA_R[0], hF.UCA_R[1] + yF, hF.UCA_R[2]];
+    const R_LCA_R = [hF.LCA_R[0], hF.LCA_R[1] + yF, hF.LCA_R[2]], L_LCA_R = [-hF.LCA_R[0], hF.LCA_R[1] + yF, hF.LCA_R[2]];
+    T(R_UCA_F, FBM_TR, 14, sfC); T(L_UCA_F, FBM_TL, 14, sfC);
+    T(R_LCA_F, FBM_BR, 16, sfC); T(L_LCA_F, FBM_BL, 16, sfC);
+    T(R_UCA_R, FHO_MR, 14, sfC); T(L_UCA_R, FHO_ML, 14, sfC);
+    T(R_LCA_R, FHO_BR, 16, sfC); T(L_LCA_R, FHO_BL, 16, sfC);
+    const R_DMP_F = [hF.DMP_BODY[0], hF.DMP_BODY[1] + yF, hF.DMP_BODY[2]];
+    const L_DMP_F = [-hF.DMP_BODY[0], hF.DMP_BODY[1] + yF, hF.DMP_BODY[2]];
+    T(R_DMP_F, FHO_TR, 16, sfC); T(L_DMP_F, FHO_TL, 16, sfC);
+    T(R_DMP_F, L_DMP_F, 18, sfC);
+  }
+
+  if(S.show.frame_rear){
+    const sfC = "#4a5a6a";
+    const R_UCA_F = [hR.UCA_F[0], hR.UCA_F[1] + yR, hR.UCA_F[2]], L_UCA_F = [-hR.UCA_F[0], hR.UCA_F[1] + yR, hR.UCA_F[2]];
+    const R_LCA_F = [hR.LCA_F[0], hR.LCA_F[1] + yR, hR.LCA_F[2]], L_LCA_F = [-hR.LCA_F[0], hR.LCA_F[1] + yR, hR.LCA_F[2]];
+    const R_UCA_R = [hR.UCA_R[0], hR.UCA_R[1] + yR, hR.UCA_R[2]], L_UCA_R = [-hR.UCA_R[0], hR.UCA_R[1] + yR, hR.UCA_R[2]];
+    const R_LCA_R = [hR.LCA_R[0], hR.LCA_R[1] + yR, hR.LCA_R[2]], L_LCA_R = [-hR.LCA_R[0], hR.LCA_R[1] + yR, hR.LCA_R[2]];
+    T(R_UCA_F, RHO_MR, 14, sfC); T(L_UCA_F, RHO_ML, 14, sfC);
+    T(R_LCA_F, RHO_BR, 16, sfC); T(L_LCA_F, RHO_BL, 16, sfC);
+    T(R_UCA_R, RR_TR, 14, sfC); T(L_UCA_R, RR_TL, 14, sfC);
+    T(R_LCA_R, RR_BR, 16, sfC); T(L_LCA_R, RR_BL, 16, sfC);
+    const R_DMP_R = [hR.DMP_BODY[0], hR.DMP_BODY[1] + yR, hR.DMP_BODY[2]];
+    const L_DMP_R = [-hR.DMP_BODY[0], hR.DMP_BODY[1] + yR, hR.DMP_BODY[2]];
+    T(R_DMP_R, RHO_TR, 16, sfC); T(L_DMP_R, RHO_TL, 16, sfC);
+    T(R_DMP_R, L_DMP_R, 18, sfC);
+  }
 }
 
 /* 核心车架建模：前后防撞吸能区与乘员舱完全定形，仅悬架舱过渡管件随硬点自适应 */
@@ -2891,9 +3277,41 @@ function ro(b,zh,en,unit,id,cls){
 function setRO(id,txt,warn){const e=UI.ro[id];if(!e)return;e.textContent=txt;
   e.parentElement.classList.toggle("warn",!!warn);}
 
+
+function buildVehiclePresetSection(host){
+  const b = sec(host, "🏎️ 车型平台预设", "VEHICLE PRESET");
+  const row = E("div");
+  row.style.cssText = "display:flex;gap:4px;padding:4px 8px;";
+  
+  [
+    ["formula", "🏎️ 方程式 (FSC)"],
+    ["gt3", "🏁 房车 (GT3)"],
+    ["baja", "🏜️ 越野 (Baja)"]
+  ].forEach(([k, label]) => {
+    const btn = E("button", "eng-btn veh-btn-tab");
+    btn.dataset.veh = k;
+    btn.textContent = label;
+    btn.style.cssText = "flex:1;min-width:0;font-size:10px;padding:4px 2px;";
+    if(S.vehicleType === k) btn.classList.add("on");
+    btn.onclick = () => {
+      loadVehiclePreset(k);
+    };
+    row.appendChild(btn);
+  });
+  b.appendChild(row);
+  
+  const desc = E("div");
+  desc.id = "vehPresetDesc";
+  desc.style.cssText = "font:9.5px var(--font-mono);color:var(--ink-2);padding:2px 8px 6px;line-height:1.3;";
+  const curName = (VEHICLE_PRESETS[S.vehicleType]||{}).name || "";
+  desc.textContent = "当前载入: " + curName;
+  b.appendChild(desc);
+}
+
 function buildLeft(){
   const host=document.getElementById("lp");
   host.innerHTML="";
+  buildVehiclePresetSection(host);
   buildEnginePanel(host);
   buildChassisPanel(host);
   buildTrackPanel(host);
@@ -4428,6 +4846,9 @@ function calculateEvaluationData(){
 
   return { metrics, dimScores, overall };
 }
+window.calculateEvaluationData = calculateEvaluationData;
+window.openSuspensionEvaluation = openSuspensionEvaluation;
+window.openSlopeStage = openSlopeStage;
 
 function openSuspensionEvaluation(){
   const modal = document.getElementById("suspEvalModal");
@@ -5205,18 +5626,22 @@ function initSlopeStageEvents(){
   const btn = document.getElementById("pureSuspTg");
   if(!btn) return;
   btn.onclick = () => {
-    const isPure = S.show.wheel && !S.show.chassis && !S.show.powertrain && !S.show.steer_col && !S.show.master_cyl;
-    if(isPure) {
-      S.show.chassis = true; S.show.powertrain = true; S.show.steer_col = true; S.show.master_cyl = true;
+    const isCurrentlyPure = !S.show.frame_main && !S.show.frame_front && !S.show.frame_side && !S.show.frame_rear && !S.show.powertrain;
+    if(isCurrentlyPure) {
+      S.show.frame_main = 1; S.show.frame_front = 1; S.show.frame_side = 1; S.show.frame_rear = 1;
+      S.show.powertrain = 1; S.show.steer_col = 1; S.show.master_cyl = 1; S.show.chassis = 1;
+      btn.style.background = "rgba(255,255,255,0.06)";
       btn.style.borderColor = "rgba(255,255,255,0.12)";
-      btn.style.color = "var(--text)";
+      btn.style.color = "var(--ink-1)";
     } else {
-      S.show.chassis = false; S.show.powertrain = false; S.show.steer_col = false; S.show.master_cyl = false;
-      btn.style.borderColor = "var(--hl)";
-      btn.style.color = "var(--hl)";
+      S.show.frame_main = 0; S.show.frame_front = 0; S.show.frame_side = 0; S.show.frame_rear = 0;
+      S.show.powertrain = 0; S.show.steer_col = 0; S.show.master_cyl = 0; S.show.chassis = 0;
+      btn.style.background = "rgba(241, 196, 15, 0.2)";
+      btn.style.borderColor = "#f1c40f";
+      btn.style.color = "#f1c40f";
     }
     rebuild();
-    UI.sync.forEach(f => f());
+    if(typeof UI !== 'undefined' && UI.sync) UI.sync.forEach(f => { try{ f(); }catch(e){} });
   };
 })();
 
