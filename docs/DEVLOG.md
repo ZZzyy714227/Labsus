@@ -586,3 +586,20 @@
 - **纯悬架透视**：头栏 toggle 一键隐藏车架/动力总成/转向柱/主缸，仅保留四轮与悬架线框观察。
 - **入口**：头栏新增三个按钮（`slopeStageBtn` / `evalModalBtn` / `pureSuspTg`）。
 - **验证**：内嵌脚本 `node --check` 语法通过（206KB 无语法错误）；完整浏览器端到端回归留待下一轮补验。
+
+## 2026-08-27 — LABSUS Pro 前端对接修复：综合评价 / 直线爬坡 / 纯悬架透视 打通 + 文档勘误
+
+- **复现（无头 Chrome + CDP 自动点击三按钮）**：点击「📊 综合评价报告」与「🏁 直线爬坡测试」均抛 `ReferenceError: VEHICLE_PRESETS is not defined`，弹窗从未打开；「纯悬架透视」实测可用。
+- **根因 1**：单文件内 `VEHICLE_PRESETS`（整车平台档案）只有引用、从未定义；`S.vehicleType` 未初始化 → 两个入口在 modal 显示之前即抛异常。
+- **根因 2**：评价报告头部 `evalOverallScore` 的 <b> 嵌在 `evalVehSubtitle` span 内，JS 用 textContent 整体覆写 subtitle 时销毁子节点，下一行再取 `evalOverallScore` 即 null → TypeError。
+- **修复**（LABSUS/web/dwb-pro-fullchassis.html）：
+  1. 新增 `VEHICLE_PRESETS`（FSC / GT3 / Baja 三档案：wb/hcg/mTotal/note），`S.vehicleType` 默认 "FSC"；
+  2. 评价报告头部拆分为独立「车型子标题 + 综合评分」两元素，两行写入互不干扰；
+  3. `simulate()` 增加 `SLOPE_STAGE.active` 挂起护栏（与 `STAGE.open` 同款，避免主仿真与爬坡循环双写 SIM）；
+  4. `renderSlopeScene()` 场景几何改 6 帧重建缓存（`buildScenePRO` 每帧重建是历史帧率杀手，对齐赛道舞台方案）。
+- **验证（自动点击断言，0 异常 / 0 console error）**：
+  - 综合评价：弹窗打开；6 维雷达卡 6 张、指标交通灯矩阵 20 项、调校建议 1 条；综合 74/100 → GRADE B；
+  - 直线爬坡：弹窗打开；`VehicleDynamics15DOF` 实例化；从 0 加速循迹 1.5s 里程累计 9m+，车速逼近目标 70 km/h（19.1 m/s），HUD 坡度角/载荷分配/行程更新，四轮自旋联动；
+  - 纯悬架透视：chassis/powertrain/steer_col/master_cyl 往返翻转并触发 rebuild；
+  - 引擎回归：LABSUS/engine pytest 75 passed（21.7s），后端本轮未改动。
+- **文档勘误（重要）**：2026-08-25 日志所载「三大车系 3D 车架全覆盖」「液态玻璃三标签页」「V-F 阻尼曲线画布」「衬套柔度 4 档预设」「车型切换 539ms→40ms」经逐一核对，在当前 `dwb-pro-fullchassis.html` / `dwb-pro-allinone.html` 代码中均不存在（无对应标识符/UI/预设），仅为文档描述；本轮仅新增 `VEHICLE_PRESETS` 三档案作为最小平台定义。车系切换 UI、衬套柔度输入、V-F 阻尼画布均未实现，留待后续迭代。
