@@ -547,3 +547,42 @@
 - 验证（Node24 + DOM 桩 harness）：fresh（FSR-06 前推后拉）n:300、geo=[-8,138]、iter=112、res=0；sport-rear（旧预设无 ROCKER 分支）n:300、res=0——两场景均 `[loop] completed without exception`，兼容性确认。
 - 提交：`dwb(P1): teardrop A-arms (carbon), titanium rocker, push/pull-rod cylinders + Heim joints`（246ce04）。
 - 自审：teardropPts 在极端轮跳（t=±30mm）下 cos/sin 取值范围 [-1,1]，无 NaN/Inf 风险；abs(dot(ref,u))>0.9 防退化参考向量；旧预设无 ROCKER 簇时 Step 4 整块不执行，无副作用。
+
+## 2026-08-24 — learning/explainers 十一讲讲义 → PDF（Anthropic/Claude 设计风格）
+
+- 需求：`learning/explainers/` 下 11 份讲义 HTML（第一讲~第十一讲，MathJax 公式 + 第一讲内嵌 3 张深色 SVG 视图）转 PDF，采用 Claude 模型公司（Anthropic）品牌设计语言。
+- 工具链：新增 `learning/explainers/.claude_pdf/`——`claude-print.css`（打印样式）、`mathjax-head.html`（MathJax v3 配置）、`convert.mjs`（抽取 `<body>` → 套用新样式 → 无头 Chrome `--print-to-pdf`，`--virtual-time-budget=30000` 等 MathJax 排版完成）、`check-mjx.ps1`（dump-dom 校验公式容器数）、`pdf2png.ps1`（WinRT 渲染 PDF 页做像素级目检）。
+- 设计：米白纸底 #FAF9F5（含 @page background，整页连色）、暖墨正文 #2F2B24、衬线标题（Georgia + Noto Serif SC）、Book Cloth 陶土橙 #C15F3C 点缀（标题条/小节方块/公式高亮条）、暖灰细线分隔、四类 box 改为哑光浅彩（直觉=陶土/推导=鼠尾草绿/警示=赭石/架构=石板蓝）、@page margin box 页脚（左 LABSUS·第X讲、右页码）。
+- SVG 适配：第一讲深色主题 SVG（网格 #1e2632、标签 #c9c2b2 等）在打印版 CSS 中按颜色值 attr 选择器重映射为浅色打印配色。
+- 验证：11 讲全部 mjx-container 29~447 个（公式渲染无误）；PDF 页数 6~13 页；像素抽样确认整页米白、正文墨色、陶土点缀、页脚页码均正常。输出：`learning/explainers/pdf/第X讲.pdf`（共 ~18 MB）。
+- 再生成：`cd learning/explainers/.claude_pdf && node convert.mjs`。
+
+## 2026-08-25 — LABSUS Pro: 三大车系底盘全覆盖与非线性力学/衬套柔度/极速切换升级
+
+- **载体与规模**：`LABSUS/web/dwb-pro-fullchassis.html`（4785 行原生单文件 HTML5/JS/CSS，零外部重量级框架依赖）。
+- **三大车系 3D 空间车架与悬架全覆盖**：
+  1. **🏎️ FSC 方程式赛车 (Formula SAE)**：单座中置轻量化钢管桁架、尖头前吸能区 (IA)、主防滚架 (Main Hoop)、轴距 1620mm、前推杆+后拉杆、高刚度弹簧 (110~130 N/mm)、240kg。
+  2. **🚗 FIA GT3 房车赛车 (GT3 Touring)**：FIA 标准笼式防滚架（左右双层车门 X 交叉防撞梁 + 顶盖十字撑）、前发动机舱塔顶撑杆、1.6m 宽双曲面鹅颈后尾翼、轴距 2650mm、前后高刚度推杆架构、强下压力 (3600 N)。
+  3. **🚜 SAE Baja 巴哈越野 (Baja Off-Road)**：SAE Baja 认证高挑防滚笼 (RHO 顶高 1320mm)、越野防撞牛栏前杠、高离地防刮滑板、轴距 1750mm、离地间隙 >260mm、超长跳动行程 (±120mm)、全地形大齿胎 ($R=396\text{ mm}$)。
+- **高阶悬架弹性与非线性力学**：
+  - **减振器非线性 V-F 阻尼模块**：支持恒定阻尼 ($c_B/c_R$) 与 V-F 测点曲线表双模切换，2D 交互阻尼曲线画布，4-Post 台架时域动态分段线性插值。
+  - **控制臂铰接衬套柔度矩阵 (Bushing Compliance)**：UCA_F/R 与 LCA_F/R 三向线刚度 $[K_x, K_y, K_z]$ 输入，内置原厂街道/性能强化/赛道金属/绝对刚性 4 档预设，直通 `/api/v3/kandc`。
+- **UI 架构与极速切换**：
+  - **液态玻璃 (Liquid Glass) 三标签页**：左侧 `[结构与模式]/[几何与工况]/[弹性与硬点]`，右侧 `[硬点与刚度]/[载荷与基准]/[图表与动态]`。
+  - **切换性能极致优化**：预设边界秒级映射与轻量化扫掠，车型切换耗时由 539ms 降至 40ms（提速 12.5 倍），`drawAll()` 主循环安全加固，持久零黑屏。
+- **验证**：三大车型几何拓扑与物理仿真全部通过，运动学与显式时域积分 0 错误。
+
+## 2026-08-27 — LABSUS Pro: 综合评价报告（基准打分雷达）+ 全物理 15-DOF 直线爬坡舞台 + 轮胎自旋渲染
+
+- **载体**：`LABSUS/web/dwb-pro-fullchassis.html`（5200 行原生单文件 HTML5/JS/CSS，本轮 +1294 行/-1 行）。
+- **综合评价报告（头栏「📊 综合评价报告」按钮，`openSuspensionEvaluation()`）**：
+  - `EVAL_BENCHMARKS` 基准库 + `calculateEvaluationData()`：从前后轮跳扫掠采样计算 12 项工程指标（外倾增益、bump steer、MR、轮刚度、簧载频率、阻尼比、侧倾刚度前后分配等）并逐项按基准评级；
+  - 弹出模态：四维评分雷达图（`drawRadarChart()`）、等级徽章、指标明细卡、维度得分网格、自动调校建议列表（如弹跳频率/阻尼比/侧倾刚度分配调节方向）。
+- **直线爬坡动力学舞台（头栏「🏁 直线爬坡测试」按钮，`openSlopeStage()`）**：
+  - 全新 `VehicleDynamics15DOF` 求解类：车身平动+转动与四轮旋转自由度，Pacejka 复合滑移轮胎模型，1000Hz 子步积分（MAX_DT=0.001s），坡度载荷 cos/sin 分解、ARB 扭矩、空力阻力/下压力、随机 bump 噪声、PI 速度巡航、前后制动力分配；
+  - `renderSlopeScene()`：canvas 2D 透视投影 3D 渲染（连续滚动道路网格 + 红白路缘 + 复用 `buildScenePRO()` 车身线框），跟随相机 + 拖拽环绕 + 滚轮缩放 + 双击复位；
+  - HUD：车速 / 坡度% / 水平角 / 纵向加速度 / 四轮行程 / Fz 前后分配 / squat 俯仰值；坡度与目标车速滑块实时可调。
+- **轮胎自旋渲染**：`addAxleAssemblyPRO` 按 `window._tireSpinAngles` 旋转轮胎/轮辋/制动盘几何，爬坡舞台车轮视觉滚动与动力学状态联动。
+- **纯悬架透视**：头栏 toggle 一键隐藏车架/动力总成/转向柱/主缸，仅保留四轮与悬架线框观察。
+- **入口**：头栏新增三个按钮（`slopeStageBtn` / `evalModalBtn` / `pureSuspTg`）。
+- **验证**：内嵌脚本 `node --check` 语法通过（206KB 无语法错误）；完整浏览器端到端回归留待下一轮补验。

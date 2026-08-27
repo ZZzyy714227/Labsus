@@ -46,3 +46,13 @@ nul
 
 # Agent tool runtime
 .workbuddy/
+
+# Scratch / dev detritus
+scratch_*
+
+# Gemini artifact copy (moved out of LABSUS/)
+/Gemini.html
+
+# Generated lecture PDFs + conversion tooling (too heavy for git)
+learning/explainers/.claude_pdf/
+learning/explainers/pdf/
