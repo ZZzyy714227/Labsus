@@ -603,3 +603,13 @@
   - 纯悬架透视：chassis/powertrain/steer_col/master_cyl 往返翻转并触发 rebuild；
   - 引擎回归：LABSUS/engine pytest 75 passed（21.7s），后端本轮未改动。
 - **文档勘误（重要）**：2026-08-25 日志所载「三大车系 3D 车架全覆盖」「液态玻璃三标签页」「V-F 阻尼曲线画布」「衬套柔度 4 档预设」「车型切换 539ms→40ms」经逐一核对，在当前 `dwb-pro-fullchassis.html` / `dwb-pro-allinone.html` 代码中均不存在（无对应标识符/UI/预设），仅为文档描述；本轮仅新增 `VEHICLE_PRESETS` 三档案作为最小平台定义。车系切换 UI、衬套柔度输入、V-F 阻尼画布均未实现，留待后续迭代。
+
+## 2026-08-27 — LABSUS Pro: 新增「实体着色」按零件分色渲染开关
+
+- 需求：让所有构建按实体（零件）上色，便于一眼区分各几何件的归属。
+- 实现（LABSUS/web/dwb-pro-fullchassis.html，纯前端，不动引擎）：
+  - 新增 ENTITY_COLORS 实体调色板 + EC(key, fallback) 统一取色助手：开关关闭时返回原系统色，打开时返回实体色；
+  - S.show 新增 entityColor 开关，左侧「实体着色·按零件分色」面板勾选切换，主循环逐帧重建场景即时生效；
+  - 覆盖：车架（主环/前/后/侧环/斜撑/节点）、动力（EDU/差速器）、转向（齿条/防尘套/管柱/万向节/毂/轮缘/握把）、制动（踏瓣平衡杆/总泵/管路）、四角悬架与车轮端（LCA/UCA/转向节/摇臂/弹簧/减振/防倾杆/转向拉杆/主销、半轴/CV、盘/卡钳/软管、轮胎/胎纹/轮辋）；左右对称件同色、前后同色系；
+  - 爬坡舞台与赛道回放共用 buildScenePRO，开关同步生效。
+- 验证（headless Chrome CDP 断言）：开关翻转 S.show.entityColor；场景去重颜色 31→36 种；LCA=#e0704f / UCA=#5b8fd6 / 转向节=#3ec3a0 / 摇臂=#e3a03f / 弹簧=#e68a35 / 防倾杆=#7cae8f / 卡钳=#d24d3e / EDU=#2e4d6e / 轮辋=#8d99a6 等关键实体色全部命中；0 异常 / 0 console error；脚本 node --check 语法通过。
