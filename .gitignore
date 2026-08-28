@@ -20,9 +20,9 @@ logs/
 *.log
 
 # Frontend build artifacts
-web/node_modules/
-web/dist/
-web/package-lock.json
+**/node_modules/
+**/dist/
+**/package-lock.json
 
 # Backups
 *.bak
@@ -51,7 +51,7 @@ nul
 scratch_*
 
 # Gemini artifact copy (moved out of LABSUS/)
-/Gemini.html
+archive/legacy-root/Gemini.html
 
 # Generated lecture PDFs + conversion tooling (too heavy for git)
 learning/explainers/.claude_pdf/
