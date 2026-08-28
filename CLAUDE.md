@@ -56,7 +56,7 @@ New_suspension/                          # git 仓库根
 │   └── superpowers/  research/  bench/
 ├── CLAUDE.md                            # 项目约定（本文件）
 ├── Gemini.html                          # 历史草稿（gitignore）
-└── src/  dwb-mod/  web/  scratch_*      # 历史旧版/双轨遗留，勿改
+└── archive/legacy-root/                 # 旧版根项目归档（2026-08-28，勿改）
 ```
 
 ## 运行方式

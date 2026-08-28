@@ -1233,11 +1233,6 @@ const S={
   t:0, simT:0, dyn:{on:false,z:0,v:0,load:0,fs:0,fd:0,pen:0,acc:0}
 };
 
-const PRESETS = {
-  "前悬架 (推杆 Pushrod 架构)": VEHICLE_PRESETS.formula.front,
-  "后悬架 (拉杆 Pullrod 架构)": VEHICLE_PRESETS.formula.rear
-};
-
 function loadVehiclePreset(type) {
   const p = VEHICLE_PRESETS[type];
   if(!p) return;
@@ -3562,7 +3557,7 @@ async function engineConnect(){
     ENG.ok=true;ENG.url=url;
     setKcStatus("已连接引擎 "+url+"\nK&C 工况: "+h.kandc.join(" / "),C.pathC);engineSyncTb();
   }catch(err){
-    ENG.ok=false;setKcStatus("连接失败："+err.message+"\n→ 当前由内置 JS 求解器即时运算",C.nodeFix);engineSyncTb();
+    ENG.ok=false;setKcStatus("连接失败："+err.message+"\n→ 本地 JS 仅运动学/几何扫掠；K&C/整车/赛道需引擎 ("+ENG.url+")",C.nodeFix);engineSyncTb();
   }
 }
 function engineDisconnect(){ENG.ok=false;setKcStatus("已断开引擎 → 内置 JS 求解器",C.txt3);engineSyncTb();}
@@ -3654,7 +3649,7 @@ function buildEnginePanel(host){
   const kcRun=E("button","eng-run");kcRun.id="kcRun";kcRun.textContent="运行 K&C 分析 RUN";
   kcRun.onclick=engineRun;b.appendChild(kcRun);
   const kcStatus=E("div","eng-status");kcStatus.id="kcStatus";
-  kcStatus.textContent="未连接 → 由内置 JS 求解器即时运算";
+  kcStatus.textContent="未连接 → 本地 JS 仅运动学/几何扫掠；K&C 曲线需引擎（"+ENG.url+"）";
   b.appendChild(kcStatus);
 }
 function buildEngineResults(host){
@@ -4710,7 +4705,7 @@ function drawStageTelemetry(row){
 }
 
 function buildTrackPanel(host){
-  const b = sec(host, "虚拟试车场 🏎️", "VIRTUAL PROVING GROUND", false, "blu");
+  const b = sec(host, "动态驾驶测试 🏎️", "DYNAMIC TESTS", false, "blu");
   
   const d = E("div");
   d.style.display = "flex"; 

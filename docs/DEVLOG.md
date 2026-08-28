@@ -679,3 +679,13 @@
 
 - 删除 `drawSubframe`/`addShared`/`addInstance` 三个 legacy 渲染函数（207 行，互相调用但主渲染 buildScene→buildScenePRO 永不触达），`buildScene` 保留为直通入口并更新注释。
 - 验证：node --check 通过；headless Chrome 冒烟 buildScene() 返回 1983 primitives、0 异常 0 console error；engine pytest 79 passed 不受影响。
+
+## 2026-08-28 — 现有功能收束整理（UI 与赛道开发暂停后的清理轮）
+
+- **历史遗留归档**：根目录旧版双轨项目（src/tests/scripts/web/dwb-mod/data + Makefile/pyproject/requirements/run.py/start_modeler.bat）整体 `git mv` 至 `archive/legacy-root/`（附 README 说明）；Gemini.html/scratch_test_node.js 一并归档；`.gitignore` 忽略规则通用化（`**/node_modules/`、`**/dist/`、`**/package-lock.json`），归档内 node_modules 已删除不入库；旧版 `tests/test_convention.py` 等随归档保留可查（此前的"convention 测试缺失"系双轨化导致，非真缺失）。
+- **删除 temp_syn.js**（6521 行零引用临时文件，已验证无任何引用）。
+- **死对象清理**：fullchassis `PRESETS`（两项指向 VEHICLE_PRESETS.formula 的零引用对象）删除。
+- **赛道入口归类（仅文案，物理不动）**：fullchassis 面板统一命名「动态驾驶测试 / DYNAMIC TESTS」，allinone 面板「TRACK SIM STAGE · S3-2」（与注释命名一致，消除 S3-1/S3-2 矛盾）。
+- **失实文案修正**（×4，fullchassis/allinone 各 2 处）："内置 JS 求解器即时运算" → "本地 JS 仅运动学/几何扫掠；K&C 曲线需引擎（127.0.0.1:8001）"；引擎 v3service 注释同步（摇臂 RK_PIVOT 三维轴）。
+- **CLAUDE.md 结构树更新**：根目录标注 archive/legacy-root 归档。
+- **验证**：双 HTML headless 冒烟 0 异常 0 console error（面板标题/K&C 文案/入口均确认）；engine pytest 79 passed。

@@ -2675,7 +2675,7 @@ async function engineConnect(){
     ENG.ok=true;ENG.url=url;
     setKcStatus("已连接引擎 "+url+"\nK&C 工况: "+h.kandc.join(" / "),C.pathC);engineSyncTb();
   }catch(err){
-    ENG.ok=false;setKcStatus("连接失败："+err.message+"\n→ 当前由内置 JS 求解器即时运算",C.nodeFix);engineSyncTb();
+    ENG.ok=false;setKcStatus("连接失败："+err.message+"\n→ 本地 JS 仅运动学/几何扫掠；K&C/整车/赛道需引擎 ("+ENG.url+")",C.nodeFix);engineSyncTb();
   }
 }
 function engineDisconnect(){ENG.ok=false;setKcStatus("已断开引擎 → 内置 JS 求解器",C.txt3);engineSyncTb();}
@@ -2760,7 +2760,7 @@ function buildEnginePanel(host){
   const kcRun=E("button","eng-run");kcRun.id="kcRun";kcRun.textContent="运行 K&C 分析 RUN";
   kcRun.onclick=engineRun;b.appendChild(kcRun);
   const kcStatus=E("div","eng-status");kcStatus.id="kcStatus";
-  kcStatus.textContent="未连接 → 由内置 JS 求解器即时运算";
+  kcStatus.textContent="未连接 → 本地 JS 仅运动学/几何扫掠；K&C 曲线需引擎（"+ENG.url+"）";
   b.appendChild(kcStatus);
 }
 function buildEngineResults(host){
@@ -4156,7 +4156,7 @@ function drawStageTelemetry(row){
 }
 
 function buildTrackPanel(host){
-  const b=sec(host,"赛道瞬态仿真 (引擎)","TRACK SIM STAGE - S3-1",false,"purp");
+  const b=sec(host,"赛道瞬态仿真 (引擎)","TRACK SIM STAGE · S3-2",false,"purp");
   const row=E("div","ctl");
   row.appendChild(E("label",null,'赛道预设 <u>PRESET</u>'));
   const sel=E("select");sel.id="trkPreset";sel.style.flex="1";
