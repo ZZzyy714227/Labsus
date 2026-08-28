@@ -153,14 +153,16 @@ class VehiclePlanar:
             # ★ 外倾推力项（线性增益，与 MF 峰值解耦采用 μ 归一）
             fy_w = -float(self.tires[w].fy(math.degrees(a_lat), fz))
             fy_w += -self.Cg * cam_deg * fz              # ★ 外倾推力（cam_deg 为弧度，γ>0 产生反向 Fy）
-            # 纵向：动力包络（★ 恒扭矩-恒功率）或制动（参数化分配）
+            # 纵向：动力包络（★ 恒扭矩-恒功率，前后分配 drive_split_f）或制动（参数化分配）
             fx_w = 0.0
-            if w in ("RR", "RL") and throttle > 0:
+            if throttle > 0:
                 t_eff = self.pt.get("T_max", 250.0) / 0.30          # 减速比≈0.3 轮半径（N·m→N）
                 p_eff = (self.pt.get("P_kw", 80.0) * 1000.0) / max(0.8, vx)
-                fx_w = min(0.75 * mu_fz, min(t_eff, p_eff)) * throttle * 0.5
-                if self.pt.get("drive_split_f", 0.0) > 0 and w in ("FR", "FL"):
-                    fx_w *= 0.0     # 前驱分支简化（后驱默认）
+                f_avail = min(t_eff, p_eff) * throttle
+                split = float(self.pt.get("drive_split_f", 0.0))
+                share = (1.0 - split) if w in ("RR", "RL") else split
+                if share > 0.0:
+                    fx_w = min(0.75 * mu_fz, f_avail * share) * 0.5
             if brake > 0:
                 sp_f = float(self.pt.get("brake_split_f", 0.60))
                 share = (sp_f / 2.0) if w in ("FR", "FL") else ((1.0 - sp_f) / 2.0)

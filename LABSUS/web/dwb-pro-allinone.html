@@ -3757,10 +3757,13 @@ const TPHYS = (function(){
     let fy=-this.fy(aLat,fz);
     fy+=-this.Cg*camRad*fz;
     let fx=0;
-    if((w==="RR"||w==="RL")&&thr>0){
+    if(thr>0){
       const tEff=(this.pt.T_max||250)/0.30;
       const pEff=((this.pt.P_kw||80)*1000)/Math.max(0.8,vx);
-      fx=Math.min(0.75*muFz,Math.min(tEff,pEff))*thr*0.5;
+      const fAvail=Math.min(tEff,pEff)*thr;
+      const split=this.pt.drive_split_f||0;
+      const share=(w==="RR"||w==="RL")?(1-split):split;
+      if(share>0) fx=Math.min(0.75*muFz,fAvail*share)*0.5;
     }
     if(brk>0){
       const spf=("brake_split_f" in this.pt)?this.pt.brake_split_f:0.6;

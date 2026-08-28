@@ -188,3 +188,28 @@ def test_slip_relaxation_lags_kinematic():
             break
     assert found, "no slip rows found"
     assert max(max(float(p[f"mu_{w}"]) for w in ("FR", "FL", "RR", "RL")) for p in rows) <= 1.001
+
+
+
+def test_transient_drive_split_front_wheels():
+    """drive_split_f=1 纯前驱：前轮输出驱动力、后轮不输出（审计 P1-2）。"""
+    track = [{"x": 0, "y": 0, "target_speed": 15.0},
+             {"x": 80, "y": 0, "target_speed": 15.0}]
+    pt4 = {"T_max": 250.0, "P_kw": 80.0, "brake_split_f": 0.6, "drive_split_f": 1.0}
+    r = client.post("/api/v3/chassis/simulate_track",
+                    json=_body(track, sim_time=8.0, start_speed=5.0, powertrain=pt4))
+    assert r.status_code == 200
+    b = r.json()
+    assert b["status"] == "VALID"
+    acc = [p for p in b["trace"] if p["throttle"] > 0.5 and p["vx"] < 10.0]
+    assert len(acc) > 5
+    assert max(p["fx_FR"] for p in acc) > 50.0          # 前轮有驱动力
+    assert max(abs(p["fx_RR"]) for p in acc) < 1.0      # 后轮无驱动力
+    # 对照：纯后驱同工况下后轮输出、前轮无
+    pt0 = {"T_max": 250.0, "P_kw": 80.0, "brake_split_f": 0.6, "drive_split_f": 0.0}
+    base = client.post("/api/v3/chassis/simulate_track",
+                       json=_body(track, sim_time=8.0, start_speed=5.0,
+                                  powertrain=pt0)).json()
+    accb = [p for p in base["trace"] if p["throttle"] > 0.5 and p["vx"] < 10.0]
+    assert max(p["fx_RR"] for p in accb) > 50.0
+    assert max(abs(p["fx_FR"]) for p in accb) < 1.0
