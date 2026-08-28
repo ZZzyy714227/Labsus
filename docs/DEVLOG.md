@@ -647,3 +647,12 @@
   - v3service.make_bushings：DWB_TO_ENGINE.get + 防御性 ValueError（绕过 pydantic 直调也清晰报错）；
   - 新增 test_bushing_rck_ax_b_422_clear_message：422 且响应含 RCK_AX_B、不含 KeyError。
 - **验证**：test_v3_api.py 16 passed（原 15 + 新 1）。
+
+## 2026-08-27 — 引擎+TPHYS：瞬态前驱分配接线（审计 C3 / P1-2）
+
+- **问题**：transient.py 前驱分支 fx_w*=0 占位，drive_split_f>0 无实际效果（四驱/前驱仿真前轮不干活）；JS TPHYS 同样只驱动后轮。
+- **修复**：
+  - python VehiclePlanar.wheel_force：驱动力包络 f_avail=min(T/R, P/v)·throttle 按 drive_split_f 分配 —— 后轮 share=(1-split)、前轮 share=split（split>0 才输出），每轮 min(0.75·μ·Fz) 限制；split=0（默认）路径数学与原实现完全一致；
+  - JS TPHYS force() 同步同款分配逻辑；
+  - 新增 test_transient_drive_split_front_wheels：纯前驱（split=1）加速段 fx_FR>50N 且 fx_RR≈0，对照纯后驱 fx_RR>50N 且 fx_FR≈0。
+- **验证**：engine 全量 79 passed（原 77 + 新 2：前驱回归 + 前述 RCK_AX_B）；TPHYS↔Python 对拍（split=0 默认）仍通过。
