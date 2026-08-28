@@ -86,7 +86,7 @@
     Python 引擎（参考实现 · 权威数值：机构 TRF 收敛 · K&C 两层 · quasi · transient）
 
 - 引擎与前端对同一物理保持两套实现：engine/src/solver/transient.py 与前端 TPHYS（JS 直译，数值逐位对标）；其余模块由前端 JS 平行实现并持续黄金对拍
-- 前端为单文件演进（约 5200 行），所有 UI 与交互均在 dwb-pro-fullchassis.html
+- 前端为单文件演进（约 7500 行），所有 UI 与交互均在 dwb-pro-fullchassis.html
 
 ## 目录
 

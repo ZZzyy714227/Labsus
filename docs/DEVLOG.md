@@ -656,3 +656,14 @@
   - JS TPHYS force() 同步同款分配逻辑；
   - 新增 test_transient_drive_split_front_wheels：纯前驱（split=1）加速段 fx_FR>50N 且 fx_RR≈0，对照纯后驱 fx_RR>50N 且 fx_FR≈0。
 - **验证**：engine 全量 79 passed（原 77 + 新 2：前驱回归 + 前述 RCK_AX_B）；TPHYS↔Python 对拍（split=0 默认）仍通过。
+
+## 2026-08-27 — 补录：db0753c→f585a63 四提交与未提交 skidpad 舞台 + 审计行数勘误
+
+- **补录四笔后续提交**（此前无对应日志条目）：
+  1. db0753c feat(web)：3 车辆预设 + 15-DOF 爬坡舞台 + 评价雷达报告 + 纯悬架透视——新增 VEHICLE_PRESETS（formula/gt3/baja 三档案）、topVehSelect 车系切换、buildGT3Spaceframe/buildBajaSpaceframe 三套车架。**勘误再勘误**：2026-08-27 首条勘误称"车系切换 UI 未实现"，现代码已实现，该勘误过时；
+  2. bf58e39 feat(web)：15-DOF 车辆动力学引擎强化（Pacejka 滑移、俯仰恢复几何、WASD 交互驾驶、5 相机 3D 爬坡舞台）；
+  3. e4111d9 perf(web)：60fps 巡航爬坡、标定 3D 相机、几何缓存；
+  4. f585a63 perf(web)：零 GC 投影矩阵 + 后台循环挂起（60fps）。
+- **未提交工作区**（并行会话产出）：dwb-pro-fullchassis.html +1925/-181，新增定圆绕环（SKIDPAD_STAGE）等；并入后需补记。
+- **行数勘误**：README 记"约 5200 行"已过时——实测 git HEAD f585a63 为 5807 行、工作区 7551 行（含未提交增量），README 已同步为"约 7500 行"。另历史条目 08-25"4785 行"与 08-27"+1294→5200"算术矛盾（4785+1294=6079），保留历史原文，以此补录为准。
+- **仍为「文档有代码无」**：液态玻璃三标签页、V-F 阻尼画布、衬套柔度四档预设、539ms→40ms 切换（未实现，勿重复宣传）。

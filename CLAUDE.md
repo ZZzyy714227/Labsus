@@ -9,7 +9,7 @@ Formula Student（大学生方程式）悬架几何分析与可视化工具。�
 - **悬架拓扑**：前轴双侧双叉臂 + 推杆，每个 A 臂两个独立鱼眼轴承（球铰）
 - **坐标系**：X 向前、Y 向右、Z 向上，原点 = 前轴中心地面
 - **3D 风格**：纯线框（小球 = 硬点，彩色线段 = 连杆，半透明面片 = 立柱）
-- **技术路线**：先 Web+Three.js 原型验证，再 PySide6 桌面版，对比后选一条走到底
+- **技术路线**：原生单文件 Web（HTML5 + Canvas 2D，无外部框架）；PySide6 桌面版路线已弃（从未实现）
 
 ## 开发哲学
 
@@ -37,49 +37,39 @@ Formula Student（大学生方程式）悬架几何分析与可视化工具。�
 ## 项目结构
 
 ```
-New_suspension/
-├── run.py                # 入口点（添加 src/ 到 path，启动 uvicorn）
-│
-├── src/                  # Python 后端
-│   ├── main.py           # FastAPI 应用 + API 路由
-│   ├── config.py         # 设计参数、车架节点、车身覆盖面、空力配置
-│   ├── geometry.py       # 纯数学工具（vec3, dist, 投影, 旋转）
-│   ├── hardpoints.py     # 硬点派生 + 覆盖读写 + 镜像工具
-│   ├── tire.py           # 轮胎模型 + 接地点计算
-│   ├── persistence.py    # 源文件 I/O（永久保存写入函数）
-│   └── api_models.py     # Pydantic 请求模型
-│
-├── web/                  # 前端
-│   └── index.html        # Three.js + Chart.js 单页应用
-│
-├── data/                 # 运行时数据（已 gitignore）
-│   ├── hardpoint_overrides.json
-│   └── defaults_pipe.json
-│
-├── logs/                 # 运行时日志（已 gitignore）
-│   └── server.log
-│
-├── docs/                 # 项目文档
-│   ├── DEVLOG.md
-│   ├── PLAN.md
-│   ├── AERO_SIDE_DEVICES.md
-│   ├── superpowers/
-│   └── FSAE赛车CAD模型构造观察报告.docx
-│
-├── ref/                  # 参考资料
-│   ├── chassis_rules.txt
-│   ├── OptimumKinematics - Help File.pdf
-│   └── 2025中国大学生方程式大赛规则_最终版.pdf
-│
-├── CLAUDE.md             # 项目约定（本文件）
-├── requirements.txt
-└── .gitignore
+New_suspension/                          # git 仓库根
+├── LABSUS/                              # 项目主体（当前开发主线）
+│   ├── web/
+│   │   ├── dwb-pro-fullchassis.html     # 完整版前端（约 7500 行，主力入口）
+│   │   ├── dwb-pro-allinone.html        # 综合版（内置 TPHYS 赛道物理，零依赖）
+│   │   ├── tphys_parity.cjs             # TPHYS↔Python 对拍 runner
+│   │   └── serve_nocache.py             # 开发静态服务 (:8921)
+│   ├── engine/                          # FastAPI 引擎 (:8001)
+│   │   ├── server.py
+│   │   ├── src/api  src/solver  src/components  src/tire_mf.py  src/metrics  src/core
+│   │   └── tests/                       # pytest（当前 79 项）
+│   ├── README.md / README.en.md / LICENSE
+│   └── scratch_head_end.txt             # 历史草稿（gitignore）
+├── docs/
+│   ├── DEVLOG.md                        # 开发日志（含研究/修复/勘误）
+│   ├── learning/explainers/             # 讲义（.claude_pdf/ 与 pdf/ 产物已 gitignore）
+│   └── superpowers/  research/  bench/
+├── CLAUDE.md                            # 项目约定（本文件）
+├── Gemini.html                          # 历史草稿（gitignore）
+└── src/  dwb-mod/  web/  scratch_*      # 历史旧版/双轨遗留，勿改
 ```
 
 ## 运行方式
 
-```bash
-pip install -r requirements.txt
-python run.py
-# 浏览器打开 http://localhost:8000
-```
+方式 A（完整引擎，体验全部 K&C）：
+
+    cd LABSUS/engine
+    pip install fastapi uvicorn pydantic numpy scipy
+    python server.py          # http://127.0.0.1:8001
+
+打开 LABSUS/web/dwb-pro-fullchassis.html（或 allinone）→ 左上角「连接引擎」。
+
+方式 B（零依赖综合版）：直接双击 LABSUS/web/dwb-pro-allinone.html —— 赛道仿真用内置
+JS 物理（TPHYS），无需后端；K&C/整车高级分析仍建议连接引擎。
+
+约定：每完成一轮修改，简单同步 docs/DEVLOG.md。
