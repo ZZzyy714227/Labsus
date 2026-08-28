@@ -330,7 +330,6 @@ canvas.plot{display:block;width:100%;height:84px;background:var(--well);border:1
 #ssPreview{display:block;margin:6px 0;border:1px solid #252E3D;background:#0e1218}
 .ss-st{font:9px var(--font-mono);color:#9AA4B5;margin-top:10px}
 
-
 /* ================================ 综合评价报告 & 直线爬坡 样式 ================================ */
 .header-action-btn {
   height: 24px;
@@ -752,7 +751,6 @@ canvas.plot{display:block;width:100%;height:84px;background:var(--well);border:1
   </div>
 </div>
 
-
 <!-- ================================ 综合悬架工程评价与诊断模态窗口 ================================ -->
 <div id="suspEvalModal" class="susp-eval-modal-backdrop">
   <div class="susp-eval-modal-container">
@@ -1063,7 +1061,6 @@ const fmt=(v,d)=>(v===null||v===undefined||!isFinite(v))?"--":v.toFixed(d===unde
 const sfmt=(v,d)=>{const s=fmt(v,d);return(isFinite(v)&&v>0)?"+"+s:s;};
 function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
 
-
 /* ================================ 1. 三款预设车型底盘总成与硬点定义 ================================ */
 const VEHICLE_PRESETS = {
   formula: {
@@ -1188,7 +1185,6 @@ const VEHICLE_PRESETS = {
   }
 };
 
-
 const HP_META=[
   ["LCA_F","下摆臂前铰点","LWR ARM FRT PIVOT","chassis",1,0],
   ["LCA_R","下摆臂后铰点","LWR ARM RR PIVOT","chassis",1,0],
@@ -1305,7 +1301,6 @@ initData();
 window.S = S;
 window.loadVehiclePreset = loadVehiclePreset;
 window.VEHICLE_PRESETS = VEHICLE_PRESETS;
-
 
 /* ================================ 2. 机构构建与多体投影求解 ================================ */
 function buildMech(axis){
@@ -2920,220 +2915,9 @@ function addAxleAssemblyPRO(sc, M, m, sx, yOff, axis){
   if(S.show.node) M.n.forEach(n=>ND(sc,T(n.p),n.fix,n.id,n.zh,sx,axis));
 }
 
-
-
 function buildScene(){
-  /* 2026-08-23 PRO merged: full-chassis 4-system models (from gemini);
-     legacy addShared/drawSubframe/addInstance kept as dead code for later cleanup. */
+  /* PRO 渲染入口：完整底盘模型（2026-08-27 已清除 legacy addShared/drawSubframe/addInstance 死代码） */
   return buildScenePRO();
-}
-
-function drawSubframe(sc, h, yOff, bx, mir, state){
-  const y1 = Math.max(abs(h.LCA_F[1]), abs(h.UCA_F[1]))+60;
-  const y0 = -y1;
-  const z0 = Math.min(h.LCA_F[2], h.LCA_R[2])-55;
-  const z1 = Math.max(h.UCA_F[2], h.UCA_R[2])+45;
-  const x0 = mir ? -bx : 0, x1 = bx;
-  const box = [
-    [x0, y0+yOff, z0], [x1, y0+yOff, z0], [x1, y1+yOff, z0], [x0, y1+yOff, z0],
-    [x0, y0+yOff, z1], [x1, y0+yOff, z1], [x1, y1+yOff, z1], [x0, y1+yOff, z1]
-  ];
-  const E = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
-  E.forEach(e=>L3(sc, box[e[0]], box[e[1]], C.chas, 1));
-
-  const sgn = [1].concat(mir?[-1]:[]);
-  sgn.forEach(s=>{
-    // Rocker 枢轴与支架
-    const a = [h.RCK_AX_A[0]*s, h.RCK_AX_A[1]+yOff, h.RCK_AX_A[2]];
-    const b = [h.RCK_AX_B[0]*s, h.RCK_AX_B[1]+yOff, h.RCK_AX_B[2]];
-    cylinder(sc, a, b, 16, C.chas, 1, 12);
-    L3(sc, a, [s*bx, a[1], a[2]], C.chas2, 1);
-    L3(sc, b, [s*bx, b[1], b[2]], C.chas2, 1);
-    const db = [h.DMP_BODY[0]*s, h.DMP_BODY[1]+yOff, h.DMP_BODY[2]];
-    cylinder(sc, sub(db,[0,0,10]), add(db,[0,0,10]), 14, C.chas, 1, 10);
-    L3(sc, db, [0, db[1], db[2]], C.chas2, 1);
-
-    // LCA & UCA 车架侧铰轴转轴设计 (Bushing / Pivot Axis)
-    const renderBushing = (idF, idR, rBush) => {
-      const pF = [h[idF][0]*s, h[idF][1]+yOff, h[idF][2]];
-      const pR = [h[idR][0]*s, h[idR][1]+yOff, h[idR][2]];
-      const axPivot = nrm(sub(pR, pF));
-      cylinder(sc, sub(pF, mul(axPivot, 18)), add(pF, mul(axPivot, 18)), rBush, C.rig, 1.1, 12);
-      L3(sc, pF, [s*bx, pF[1], pF[2]], C.chas2, 1);
-      cylinder(sc, sub(pR, mul(axPivot, 18)), add(pR, mul(axPivot, 18)), rBush, C.rig, 1.1, 12);
-      L3(sc, pR, [s*bx, pR[1], pR[2]], C.chas2, 1);
-      L3(sc, pF, pR, C.chas2, 1, [3,3]);
-    };
-    renderBushing("LCA_F", "LCA_R", 16);
-    renderBushing("UCA_F", "UCA_R", 13);
-  });
-  
-  // ARB 机架硬点
-  if(S.show.arb && state.arb.d>0.5){
-    const P0 = lerp3(h.LCA_F, h.LBJ, state.arb.t);
-    const ay = h.LCA_F[1] + state.arb.dy + yOff;
-    const az = h.LCA_F[2] + state.arb.dz;
-    L3(sc, [mir?-P0[0]:0, ay, az], [P0[0], ay, az], C.arb, 3.2);
-    sgn.forEach(s=>{
-      const bp = [s*(P0[0]-10), ay, az];
-      cylinder(sc, [bp[0]-s*16, ay, az], [bp[0]+s*16, ay, az], 14, C.chas, 1, 10);
-      L3(sc, bp, [s*bx, ay, z0+20], C.chas2, 1);
-    });
-  }
-}
-
-function addShared(sc){
-  const hF = S.front.hp, hR = S.rear.hp, mir = S.show.mirror;
-  const yF = S.wb/2, yR = -S.wb/2;
-
-  if(S.show.chassis){
-    const bxF = Math.min(hF.LCA_F[0], hF.UCA_F[0])-30;
-    const bxR = Math.min(hR.LCA_F[0], hR.UCA_F[0])-30;
-    const z0 = Math.min(hF.LCA_F[2], hR.LCA_F[2])-55;
-    const z1 = Math.max(hF.UCA_F[2], hR.UCA_F[2])+45;
-    
-    L3(sc, [bxF, yF-200, z0], [bxR, yR+200, z0], C.chas, 1.2);
-    L3(sc, [bxF, yF-200, z1], [bxR, yR+200, z1], C.chas, 1.2);
-    if(mir){
-      L3(sc, [-bxF, yF-200, z0], [-bxR, yR+200, z0], C.chas, 1.2);
-      L3(sc, [-bxF, yF-200, z1], [-bxR, yR+200, z1], C.chas, 1.2);
-    }
-    drawSubframe(sc, hF, yF, bxF, mir, S.front);
-    drawSubframe(sc, hR, yR, bxR, mir, S.rear);
-  }
-
-  if(S.show.steer){
-    const R = hF.RACK;
-    const a = [mir?-(abs(R[0])-14):16, R[1]+yF, R[2]], b = [abs(R[0])-14, R[1]+yF, R[2]];
-    cylinder(sc, a, b, 20, C.rack, 1.1, 16);
-    const sgn = [1].concat(mir?[-1]:[]);
-    sgn.forEach(s=>{
-      const P = [SIM.FR.n[SIM.FR.idx.RACK].p[0]*s, R[1]+yF, R[2]];
-      L3(sc, [s*(abs(R[0])-16), R[1]+yF, R[2]], P, C.tie, 2.2);
-    });
-  }
-}
-
-function addInstance(sc,M,m,sw,sx,yOff,axis){
-  const state = S[axis];
-  const T=p=>[p[0]*sx, p[1]+yOff, p[2]];
-  const N=id=>T(M.n[M.idx[id]].p);
-  const LBJ=N("LBJ"),UBJ=N("UBJ"),WC=N("WC"),TRO=N("TRO");
-  const LAF=N("LCA_F"),LAR=N("LCA_R"),UAF=N("UCA_F"),UAR=N("UCA_R"),RCK=N("RACK");
-  const ST_O=N("STRUT_OUT"), ST_I=N("STRUT_IN");
-  const RK_A=N("RCK_AX_A"), RK_B=N("RCK_AX_B"), RK_D=N("RCK_DMP"), DMP_B=N("DMP_BODY");
-
-  const ax=nrm([m.ax[0]*sx,m.ax[1],m.ax[2]]);
-  const cp=T(m.cp),kg=T(m.kg);
-  const tR=state.tire.R,tW=state.tire.W,rimR=state.tire.rim,dR=state.tire.disc;
-  const eU=nrm(sub([0,0,1],mul(ax,dot([0,0,1],ax)))),eV=cross(ax,eU);
-
-  if(S.show.face){
-    PL(sc,[LAF,LBJ,LAR,LAF],C.rigArm,1,null,C.arm);
-    PL(sc,[UAF,UBJ,UAR,UAF],C.rigArm,1,null,C.arm);
-    PL(sc,[LBJ,UBJ,WC,LBJ],C.knu,1,null,C.knuF);
-    PL(sc,[LBJ,UBJ,TRO,LBJ],C.knu,1,null,C.knuF);
-  }
-
-  if(S.show.rocker){
-    const rckPivotCenter=lerp3(RK_A,RK_B,0.5);
-    PL(sc,[rckPivotCenter,ST_I,RK_D,rckPivotCenter],C.rocker,1.5,null,C.rockerF);
-    cylinder(sc,RK_A,RK_B,11,C.rocker,1.2,12);
-    cylinder(sc,ST_I,rckPivotCenter,7,C.rocker,1,8);
-    cylinder(sc,RK_D,rckPivotCenter,7,C.rocker,1,8);
-    PL(sc,circPts(ST_I,[1,0,0],7,10),C.rocker,1);
-    PL(sc,circPts(RK_D,[1,0,0],7,10),C.rocker,1);
-  }
-
-  cylinder(sc,ST_O,ST_I,8,C.strut,1.5,12); L3(sc,ST_O,ST_I,C.strut,2);
-
-  if(S.show.elastic){
-    const u=nrm(sub(DMP_B,RK_D)),L=dst(RK_D,DMP_B);
-    const bodyA=add(RK_D,mul(u,L*0.06)),bodyB=add(RK_D,mul(u,L*0.54));
-    cylinder(sc,bodyA,bodyB,22,C.rig,1,12);
-    L3(sc,bodyB,DMP_B,C.rig,2);
-    PL(sc,springPts(add(RK_D,mul(u,L*0.08)),add(DMP_B,mul(u,-L*0.05)),40,7.5,160),C.ela,1.8);
-    PL(sc,circPts(add(RK_D,mul(u,L*0.08)),u,46,18),C.ela,1.2);
-    PL(sc,circPts(add(DMP_B,mul(u,-L*0.05)),u,46,18),C.ela,1.2);
-  }
-  
-  if(S.show.arb && state.arb.d > 0.5){
-    const g = arbGeom(m.lbj, state);
-    const A0 = T([g.xa, g.ay, g.az]), E = T(g.E), Pd = T(g.P);
-    L3(sc, A0, E, C.arb, 3.0);
-    cylinder(sc, E, Pd, 7, C.arb, 1, 8);
-    PL(sc, circPts(Pd, [1,0,0], 9, 10), C.arb, 1);
-    PL(sc, circPts(E, [1,0,0], 9, 10), C.arb, 1);
-  }
-
-  if(S.show.wheel){
-    const ci=add(WC,mul(ax,-tW/2)),co=add(WC,mul(ax,tW/2));
-    const ro=add(WC,mul(ax,tW/2-15));
-    PL(sc,circPts(ci,ax,tR,40,eU,eV),C.tire,1.3);
-    PL(sc,circPts(co,ax,tR,40,eU,eV),C.tire,1.3);
-    for(let k=0;k<20;k++){const an=2*PI*k/20;
-      const o=add(mul(eU,tR*cos(an)),mul(eV,tR*sin(an)));
-      L3(sc,add(ci,o),add(co,o),C.tread,1);}
-    PL(sc,circPts(ro,ax,rimR,32,eU,eV),C.rim,1.1);
-    PL(sc,circPts(ro,ax,rimR*0.88,32,eU,eV),C.rim,1);
-    for(let k=0;k<6;k++){const an=2*PI*k/6;
-      const o=add(mul(eU,rimR*0.9*cos(an)),mul(eV,rimR*0.9*sin(an)));
-      L3(sc,add(ro,mul(ax,-5)),add(ro,o),C.rim,1.5);}
-  }
-
-  if(S.show.disc){
-    const d1=add(WC,mul(ax,-14)),d2=add(WC,mul(ax,4));
-    PL(sc,circPts(d1,ax,dR,28,eU,eV),C.disc,1);
-    PL(sc,circPts(d2,ax,dR,28,eU,eV),C.disc,1);
-    cylinder(sc,add(WC,mul(ax,-22)),add(WC,mul(ax,22)),38,C.rim,1,12);
-    const ang = axis==='front' ? -2.0 : 2.0; 
-    const ca = add(mul(eU,cos(ang)), mul(eV,sin(ang)));
-    const cb = cross(ax, ca);
-    const cc = add(WC, mul(ca, dR*0.92));
-    const bp=[];
-    for(let i=-1;i<=1;i+=2)for(let j=-1;j<=1;j+=2)for(let k2=-1;k2<=1;k2+=2)
-      bp.push(add(add(cc,mul(ca,i*32)),add(mul(cb,j*45),mul(ax,k2*25))));
-    const be=[[0,1],[0,2],[1,3],[2,3],[4,5],[4,6],[5,7],[6,7],[0,4],[1,5],[2,6],[3,7]];
-    be.forEach(e=>L3(sc,bp[e[0]],bp[e[1]],C.cal,1));
-  }
-
-  if(S.show.steer && axis==='front'){
-    cylinder(sc,RCK,TRO,8,C.tie,1.2,10);
-    L3(sc,RCK,TRO,C.tie,1.6);
-  }
-
-  if(S.show.kp){
-    const d=nrm(sub(LBJ,UBJ));
-    const a=add(UBJ,mul(d,-80)),b=add(UBJ,mul(d,dst(UBJ,LBJ)+dst(LBJ,kg)+15));
-    L3(sc,a,b,C.kp,1.5,[6,3]);
-    PL(sc,circPts(kg,[0,0,1],16,18),C.kpg,1.3);
-  }
-  
-  if(S.show.kpsw && sw){
-    const R = sw.rows, st = Math.max(1, Math.round(R.length/17));
-    for(let k=0; k<R.length; k+=st){
-      const A = [R[k].ubj[0]*sx, R[k].ubj[1]+yOff, R[k].ubj[2]];
-      const B = [R[k].kg[0]*sx, R[k].kg[1]+yOff, R[k].kg[2]];
-      L3(sc, A, B, C.kpsw, 1);
-    }
-  }
-  
-  if(S.show.path && sw){
-    const R = sw.rows;
-    const Pt = (key) => R.map(r => [r[key][0]*sx, r[key][1]+yOff, r[key][2]]);
-    PL(sc, Pt("wc"), C.path, 1.3, [5,3]);
-    PL(sc, Pt("cp"), C.pathC, 1.3);
-    PL(sc, Pt("lbj"), C.path, 1);
-    PL(sc, Pt("ubj"), C.path, 1);
-    if(axis==='front') PL(sc, Pt("tro"), C.tie, 1, [4,3]);
-    PL(sc, Pt("kg"), C.pathK, 1.6);
-  }
-
-  M.L.forEach(l=>{
-    const a=T(M.n[l.a].p),b=T(M.n[l.b].p);
-    if(l.type==="R"&&S.show.rigid) L3(sc,a,b,l.grp==="strut"?C.strut:(l.grp==="steer"?C.tie:C.rig),1.1);
-  });
-  if(S.show.node) M.n.forEach(n=>ND(sc,T(n.p),n.fix,n.id,n.zh,sx,axis));
 }
 
 /* ================================ 9. 四视口正交/透视投影引擎 ================================ */
@@ -3545,7 +3329,6 @@ function ro(b,zh,en,unit,id,cls){
 }
 function setRO(id,txt,warn){const e=UI.ro[id];if(!e)return;e.textContent=txt;
   e.parentElement.classList.toggle("warn",!!warn);}
-
 
 function buildVehiclePresetSection(host){
   const b = sec(host, "🏎️ 车型平台预设", "VEHICLE PRESET");
@@ -4404,7 +4187,6 @@ function loop(ts){
 if(location.search.indexOf("stagedemo")>=0){setTimeout(function(){_stageOpenSetup();setTimeout(function(){trackStageRun();},300);},800);}else if(location.search.indexOf("stage")>=0){setTimeout(function(){_stageOpenSetup();},800);}
 }
 
-
 /* ================================ 14b. 赛道瞬态仿真（S3-2 前端闭环） ================================ */
 /* 数据链：本面板调校状态 → trackPayload()（复用整车 vehicle + 前端扫掠 K&C 查表）
    → POST /api/v3/chassis/simulate_track → trace 时序 → 回放（俯视轨迹 + 3D 侧倾联动
@@ -5000,7 +4782,6 @@ function applyTheme(t){
   if(tg)tg.onclick=()=>applyTheme(document.documentElement.getAttribute("data-theme")==="light"?"dark":"light");
 })();
 
-
 /* =====================================================================
    LABSUS 综合性能评价与AI调校诊断引擎 (Evaluation Engine)
    ===================================================================== */
@@ -5345,7 +5126,6 @@ class StraightPath extends TrackPath {
     };
   }
 }
-
 
 // -------------------- CIRCUIT TRACK SPLINE & PROFILING --------------------
 class CircuitPath extends TrackPath {
@@ -5781,8 +5561,6 @@ class VehicleDynamics15DOF {
   }
 }
 window.VehicleDynamics15DOF = VehicleDynamics15DOF;
-
-
 
 /* =====================================================================
    SLOPE STAGE: 60-FPS HIGH-PERFORMANCE AUTONOMOUS 15-DOF CLIMBING STAGE
@@ -6345,8 +6123,6 @@ window.openSlopeStage = openSlopeStage;
 window.closeSlopeStage = closeSlopeStage;
 window.SLOPE_STAGE = SLOPE_STAGE;
 window.slopeStageLoop = slopeStageLoop;
-
-
 
 /* =====================================================================
    SKIDPAD STAGE: 60-FPS 15-DOF CONSTANT RADIUS CORNERING DYNAMICS
@@ -7078,7 +6854,6 @@ if(evalCloseBtn) evalCloseBtn.onclick = () => document.getElementById("suspEvalM
 
 initSlopeStageEvents();
 initSkidpadStageEvents();
-
 
 hpLoad();
 buildLeft();
