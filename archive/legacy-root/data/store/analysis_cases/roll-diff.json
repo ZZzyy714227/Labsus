@@ -1,0 +1,30 @@
+{
+  "case_id": "roll-diff",
+  "versions": [
+    {
+      "version": 1,
+      "name": "四轮左右差动轮跳",
+      "description": "",
+      "travel": {
+        "fl": 20.0,
+        "fr": -20.0,
+        "rl": 20.0,
+        "rr": -20.0
+      },
+      "rack_displacement": 0.0,
+      "loads": {
+        "ax_g": 0.0,
+        "ay_g": 0.0,
+        "az_g": 0.0,
+        "brake_split_front": 0.5,
+        "drive_split_rear": 1.0
+      },
+      "options": {
+        "arb_enabled": true,
+        "compute_wheel_forces": true,
+        "friction_check": true
+      }
+    }
+  ],
+  "latest": 1
+}
