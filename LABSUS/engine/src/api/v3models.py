@@ -18,6 +18,10 @@ DWB_KEYS = frozenset({
     "RCK_DMP", "DMP_BODY",
 })
 
+# 衬套可挂节点：引擎摇臂模型为单枢轴（RCK_AX_A->RK_PIVOT），RCK_AX_B
+# 未建模（OpenItem：精确轴方向），挂它的衬套无法解析 -> 明确拒绝。
+BUSHING_NODES = frozenset(DWB_KEYS - {"RCK_AX_B"})
+
 
 class BushingSpec(BaseModel):
     """衬套定义（S2）：挂在某个前端命名节点上的 6DOF 线性衬套。"""
@@ -29,8 +33,10 @@ class BushingSpec(BaseModel):
 
     @model_validator(mode="after")
     def _check(self):
-        if self.node not in DWB_KEYS:
-            raise ValueError(f"unknown bushing node {self.node!r} (DWB keys: {sorted(DWB_KEYS)})")
+        if self.node not in BUSHING_NODES:
+            raise ValueError(f"unsupported bushing node {self.node!r} "
+                             f"(engine rocker is single-pivot RCK_AX_A->RK_PIVOT; "
+                             f"supported: {sorted(BUSHING_NODES)})")
         if len(self.kT) != 3 or len(self.kR) != 3 or len(self.preload) != 6:
             raise ValueError("kT/kR must be length 3, preload length 6")
         return self

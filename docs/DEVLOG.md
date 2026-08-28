@@ -638,3 +638,12 @@
   - 定圆：py 178.9m / v_end 12.01 / v_max 12.1 / 0.586g ↔ js 178.9 / 12.01 / 12.1 / 0.586（max_slip 1.24 vs 1.26）；
   - 直线：py 54.0m / v_end 14.53 ↔ js 54.0 / 14.53（完全一致）。
   - 全量引擎套件 77 passed（原 75 + 新 2）。
+
+## 2026-08-27 — 引擎：RCK_AX_B 衬套节点明确拒绝（审计 C2 / P1-1）
+
+- **问题**：DWB_KEYS 含 RCK_AX_B，但引擎摇臂模型为单枢轴（RCK_AX_A→RK_PIVOT，精确轴方向 OpenItem 未做），DWB_TO_ENGINE 无映射 → 衬套挂 RCK_AX_B 时 make_bushings 抛裸 KeyError（422 但信息不明）。
+- **修复**：
+  - v3models：新增 BUSHING_NODES = DWB_KEYS − {RCK_AX_B}，BushingSpec 校验改用之并给出明确消息（"engine rocker is single-pivot RCK_AX_A->RK_PIVOT"）；
+  - v3service.make_bushings：DWB_TO_ENGINE.get + 防御性 ValueError（绕过 pydantic 直调也清晰报错）；
+  - 新增 test_bushing_rck_ax_b_422_clear_message：422 且响应含 RCK_AX_B、不含 KeyError。
+- **验证**：test_v3_api.py 16 passed（原 15 + 新 1）。

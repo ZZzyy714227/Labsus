@@ -185,6 +185,15 @@ def test_invalid_bushing_node_422():
     assert r.status_code == 422
 
 
+def test_bushing_rck_ax_b_422_clear_message():
+    """RCK_AX_B 未建模（摇臂单枢轴）：422 且错误信息明确，而非裸 KeyError。"""
+    r = client.post("/api/v3/kandc/bump", json={
+        "bushings": [{"name": "bRck", "node": "RCK_AX_B"}]})
+    assert r.status_code == 422
+    assert "RCK_AX_B" in r.text
+    assert "KeyError" not in r.text
+
+
 def test_invalid_compliance_axis_422():
     r = client.post("/api/v3/kandc/compliance",
                     json={"sweep": {"min": 0, "max": 1, "n": 3},
