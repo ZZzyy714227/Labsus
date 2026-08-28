@@ -627,3 +627,14 @@
   - 引擎在线 + 内置：176.3m / 0.609g（与离线一致）；
   - 引擎在线 + 引擎路径：178.4m / v_max 12.03 / 0.554g / 1525ms 完赛，0 异常。
   - 内置与引擎路径差约 1.2%（符合"模型回声"定位，非位级一致）。
+
+## 2026-08-27 — TPHYS↔Python 两实现对拍 harness（审计 D1 / P0-3）
+
+- **问题**：README 声称"JS 直译、数值逐位对标"，但仓库无任何两实现比对 harness；引擎 tests 残留孤儿 crosscheck.pyc 说明曾有对拍测试被删。
+- **实现**：
+  - `LABSUS/web/tphys_parity.cjs`：从 dwb-pro-allinone.html 用 vm 抽取 TPHYS 闭包直调 `TPHYS.run`（无需浏览器），输入同 payload+ctx，输出 summary；
+  - `LABSUS/engine/tests/test_tphys_parity.py`：FSAE 1620/480kg 基线 + 定圆 R=30 / 直线 60m 两案例；ctx 由引擎侧 `axle_rc_sweep` 产出（两实现同源 rc/kw）；断言 status/finished 与 path±5% / v_max±5% / v_end±6% / max_ay±0.06g；node 缺失自动 skip。
+- **实测**（同一 ctx）：
+  - 定圆：py 178.9m / v_end 12.01 / v_max 12.1 / 0.586g ↔ js 178.9 / 12.01 / 12.1 / 0.586（max_slip 1.24 vs 1.26）；
+  - 直线：py 54.0m / v_end 14.53 ↔ js 54.0 / 14.53（完全一致）。
+  - 全量引擎套件 77 passed（原 75 + 新 2）。
