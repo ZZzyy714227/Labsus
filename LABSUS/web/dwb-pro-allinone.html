@@ -3320,7 +3320,7 @@ function trackPayload(){
     start_speed:parseFloat(document.getElementById("trkV0").value)||6.0, _closed:closed};
 }
 async function trackRun(){
-  if(!ENG.ok){setTrkStatus("未连接引擎 → 先连接（赛道仿真走 /api/v3/chassis/simulate_track）",C.ela);return;}
+  if(!ENG.ok){setTrkStatus("未连接引擎 → 先连接，或点「进入赛道仿真大厅 [独立]」走内置 JS 物理 (TPHYS)",C.ela);return;}
   const btn=document.getElementById("trkRun");if(btn)btn.textContent="仿真中…";
   setTrkStatus("赛道瞬态仿真中…（平面 3-DOF + 四轮 MF + 准静态载荷）",C.txt2);
   try{
@@ -3611,10 +3611,13 @@ function drawStageSetupPreview(){
 }
 /* ================================================================
    TPHYS: built-in track physics engine (JS port of transient.py,
-   2026-08-24) - zero-dependency; powers the standalone all-in-one.
-   Equals the upgraded S3-1 model: planar 3-DOF body, MF tires with
-   composite-slip + relaxation length + camber thrust + LS, powertrain
-   envelope, aero downforce/drag, roll/pitch lag, pure-pursuit + PI.
+   2026-08-24) - zero-dependency; runs when the /api/v3 engine is offline
+   or "使用引擎" is unchecked. Model echo of the upgraded S3-1: planar
+   3-DOF body, MF tires with composite-slip + relaxation length + camber
+   thrust + LS, powertrain envelope, aero downforce/drag, roll/pitch lag,
+   pure-pursuit + PI. NOTE: rc/kw LUTs come from SIM.swF/swR sweeps (same
+   geometry source the engine path sends as kw_curve); a bit-level parity
+   harness vs transient.py is still TODO (audit: D1).
    ================================================================ */
 const TPHYS = (function(){
   const G=9.81, R2D=180/Math.PI, D2R=Math.PI/180;
@@ -3910,24 +3913,37 @@ const TPHYS = (function(){
         max_slip_deg:+maxSlip.toFixed(2)},warnings:warnings,
       builtin:true};
   }
-  // context builder: rc/kw LUTs from caller-supplied sweeps (SIM.swF/swR)
+  // context builder: rc/kw LUTs derived from the SAME front-end sweeps
+  // (SIM.swF/swR rows: rcH in mm, kw in N/mm) that chassisPayload sends to
+  // the engine as kw_curve — one geometry source for builtin and engine paths.
   function makeSimContext(body){
     const v=body.vehicle;
-    const rc={travel:[-90,-60,-30,-15,0,15,30,60,90],rcF:[65,60,57,55.5,55,54,52,48,42],
-              rcR:[75,70,66,64,63,62,60,55,48],zrc0_f:55,zrc0_r:63,karb_f:0,karb_r:0};
-    const kw={travel:[-90,-60,-30,-15,0,15,30,60,90],
-              kwF:Array(9).fill(v.front.spring_rate*(v.front.motion_ratio||0.75)**2),
-              kwR:Array(9).fill(v.rear.spring_rate*(v.rear.motion_ratio||0.78)**2)};
-    return {rc:rc,kw:kw};
+    const col=(sw,key,f0)=>(sw&&sw.rows&&sw.rows.length>=2)
+      ?{travel:sw.rows.map(q=>q.tr),vals:sw.rows.map(q=>{const x=q[key];return (x===null||x===undefined||!isFinite(x))?f0:x;})}
+      :{travel:[-90,-60,-30,-15,0,15,30,60,90],vals:[f0,f0,f0,f0,f0,f0,f0,f0,f0]};
+    const rF=col(SIM.swF,"rcH",55), rR=col(SIM.swR,"rcH",63);
+    const kwF=col(SIM.swF,"kw",(v.front.spring_rate||60)*(v.front.motion_ratio||0.75)**2);
+    const kwR=col(SIM.swR,"kw",(v.rear.spring_rate||65)*(v.rear.motion_ratio||0.78)**2);
+    return {
+      rc:{travel:rF.travel,rcF:rF.vals,rcR:rR.vals,
+          zrc0_f:(SIM.mFR&&SIM.mFR.rcH)||55,zrc0_r:(SIM.mRR&&SIM.mRR.rcH)||63,karb_f:0,karb_r:0},
+      kw:{travel:kwF.travel,kwF:kwF.vals,kwR:kwR.vals}
+    };
   }
   return {run:run, makeSimContext:makeSimContext};
 })();
 
 function trackStageRun(){
   _stageBuild();
-  if(!ENG.ok){document.getElementById("ssStatus").textContent="未连接引擎 -> 请先连接";return;}
   const st=document.getElementById("ssStatus");
-  st.textContent="仿真中...(MF 松弛/复合滑移 + 动力/气动包络)";
+  const wantEng=document.getElementById("ssUseEng")&&document.getElementById("ssUseEng").checked;
+  if(!ENG.ok){
+    if(wantEng){st.textContent="引擎未连接 → 请先连接，或取消「使用引擎」改走内置 JS 物理 (TPHYS)";return;}
+    st.textContent="引擎未连接 → 内置 JS 物理 (TPHYS) 仿真中…";
+  }else{
+    st.textContent=wantEng?"仿真中...(引擎 /api/v3/chassis/simulate_track)"
+      :"仿真中...(内置 JS 物理 TPHYS：MF 松弛/复合滑移 + 动力/气动包络)";
+  }
   const base=chassisPayload();
   const lut=sw=>({travel:sw.rows.map(r=>r.tr),toe:sw.rows.map(r=>r.toe),cam:sw.rows.map(r=>r.cam)});
   const key=document.getElementById("ssPreset").value;
