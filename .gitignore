@@ -56,3 +56,7 @@ scratch_*
 # Generated lecture PDFs + conversion tooling (too heavy for git)
 learning/explainers/.claude_pdf/
 learning/explainers/pdf/
+
+# One-off artifacts (untracked, guard against accidental add)
+LABSUS/web/temp_syn.js
+LABSUS/web/test_dom.js
