@@ -674,3 +674,8 @@
 - **衬套预设**：enginePayload 的 bushings 由硬编码 bLCA_F 500N/mm 改为读取 VEHICLE_PRESETS[vehicleType][S.axis].bushings（四节点 LCA_F/LCA_R/UCA_F/UCA_R 各轴三向刚度），无预设时回退原 bLCA_F；presetBushings() 按当前轴取值。
 - **验证**：headless Chrome 直构 15DOF step 多帧 finite 且 0 异常；baja 前后轴 presetBushings() 各返回 4 节点；engine pytest 全量通过。
 - **说明**：UI 交互画布（V-F 曲线编辑 / 衬套四档预设按钮）仍为「文档有代码无」，本轮只让数据真正生效，宣传口径维持 P1-3 补录。
+
+## 2026-08-27 — 清除 legacy 渲染死代码（审计 P2-1 收尾）
+
+- 删除 `drawSubframe`/`addShared`/`addInstance` 三个 legacy 渲染函数（207 行，互相调用但主渲染 buildScene→buildScenePRO 永不触达），`buildScene` 保留为直通入口并更新注释。
+- 验证：node --check 通过；headless Chrome 冒烟 buildScene() 返回 1983 primitives、0 异常 0 console error；engine pytest 79 passed 不受影响。
