@@ -613,3 +613,17 @@
   - 覆盖：车架（主环/前/后/侧环/斜撑/节点）、动力（EDU/差速器）、转向（齿条/防尘套/管柱/万向节/毂/轮缘/握把）、制动（踏瓣平衡杆/总泵/管路）、四角悬架与车轮端（LCA/UCA/转向节/摇臂/弹簧/减振/防倾杆/转向拉杆/主销、半轴/CV、盘/卡钳/软管、轮胎/胎纹/轮辋）；左右对称件同色、前后同色系；
   - 爬坡舞台与赛道回放共用 buildScenePRO，开关同步生效。
 - 验证（headless Chrome CDP 断言）：开关翻转 S.show.entityColor；场景去重颜色 31→36 种；LCA=#e0704f / UCA=#5b8fd6 / 转向节=#3ec3a0 / 摇臂=#e3a03f / 弹簧=#e68a35 / 防倾杆=#7cae8f / 卡钳=#d24d3e / EDU=#2e4d6e / 轮辋=#8d99a6 等关键实体色全部命中；0 异常 / 0 console error；脚本 node --check 语法通过。
+
+## 2026-08-27 — allinone TPHYS 对接修复（审计 P0-1）
+
+- **问题**：trackStageRun 在 ENG.ok 为假时直接 return，内置 JS 物理（TPHYS）在引擎离线时不可达——与"零依赖独立运行"卖点相反；且 makeSimContext 用硬编码 rc/kw 常量，与引擎路径的扫掠 LUT 不同源。
+- **修复**（LABSUS/web/dwb-pro-allinone.html）：
+  1. 守卫重排：引擎离线+未勾选「使用引擎」→ 走内置 TPHYS 并提示；勾选但离线 → 明确提示先连接或取消勾选；在线+勾选 → 引擎路径；在线+未勾选 → 内置 TPHYS；
+  2. makeSimContext 弃硬编码常量，从 SIM.swF/swR 扫掠行取值（rcH=mm、kw=N/mm），与 chassisPayload.kw_curve 同一几何数据源；
+  3. TPHYS 头注释如实化：模型回声而非位级一致，对拍 harness 标注 TODO（审计 D1）；
+  4. 侧栏 trackRun 离线提示改为指向「进入赛道仿真大厅 [独立]」。
+- **验证**（headless Chrome CDP，真实引擎 :8001）：
+  - 引擎离线 + 内置：176.3m 完赛 / v_max 12.05m/s / 0.608g，trace 1748 点，0 异常 0 报错；
+  - 引擎在线 + 内置：176.3m / 0.609g（与离线一致）；
+  - 引擎在线 + 引擎路径：178.4m / v_max 12.03 / 0.554g / 1525ms 完赛，0 异常。
+  - 内置与引擎路径差约 1.2%（符合"模型回声"定位，非位级一致）。
