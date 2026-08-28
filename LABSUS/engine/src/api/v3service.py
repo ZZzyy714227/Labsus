@@ -72,7 +72,11 @@ def make_bushings(specs: list[BushingSpec],
     """BushingSpec 列表 → 引擎 Bushing6DOF 集合（member_nodes = 引擎锚点）。"""
     out: dict[str, Bushing6DOF] = {}
     for s in specs:
-        eng = DWB_TO_ENGINE[s.node]
+        eng = DWB_TO_ENGINE.get(s.node)
+        if eng is None:
+            raise ValueError(
+                f"unsupported bushing node {s.node!r}: engine rocker is "
+                f"single-pivot (RCK_AX_A only); supported: {sorted(DWB_TO_ENGINE)}")
         anchor = np.asarray(points[s.node], dtype=float)
         b = Bushing6DOF(
             name=s.name, anchor=anchor.copy(),
