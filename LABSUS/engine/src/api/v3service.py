@@ -63,7 +63,7 @@ def to_engine_points(points: dict[str, list[float]]) -> dict[str, np.ndarray]:
     out: dict[str, np.ndarray] = {}
     for dwb, eng in DWB_TO_ENGINE.items():
         out[eng] = np.asarray(points[dwb], dtype=float)
-    # 摇臂轴用 RCK_AX_A 单点（S1 引擎 solve_rocker 固定绕 X 轴，OpenItem：精确轴方向）
+    # 摇臂轴用 RCK_AX_A 单点（solve_rocker 绕 RK_PIVOT 真实三维轴；RCK_AX_B 未建模——见 BUSHING_NODES）
     return out
 
 
