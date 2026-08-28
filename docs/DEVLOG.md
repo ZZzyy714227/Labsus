@@ -667,3 +667,10 @@
 - **未提交工作区**（并行会话产出）：dwb-pro-fullchassis.html +1925/-181，新增定圆绕环（SKIDPAD_STAGE）等；并入后需补记。
 - **行数勘误**：README 记"约 5200 行"已过时——实测 git HEAD f585a63 为 5807 行、工作区 7551 行（含未提交增量），README 已同步为"约 7500 行"。另历史条目 08-25"4785 行"与 08-27"+1294→5200"算术矛盾（4785+1294=6079），保留历史原文，以此补录为准。
 - **仍为「文档有代码无」**：液态玻璃三标签页、V-F 阻尼画布、衬套柔度四档预设、539ms→40ms 切换（未实现，勿重复宣传）。
+
+## 2026-08-27 — 前端数据接线：V-F 阻尼表进入 15-DOF 舞台 + 衬套预设进引擎 payload（审计 P2-2）
+
+- **V-F 阻尼**：VehicleDynamics15DOF 四轮回弹力中的阻尼项由线性 cB/cR 改为按 `damperMode==="table"` 用 vfTable（速度 m/s → 阻尼力 N）分段线性插值（新增 vfDamper helper），缺表时回退线性；4-Post stepDyn 保持线性（其内部单位体系另计）。
+- **衬套预设**：enginePayload 的 bushings 由硬编码 bLCA_F 500N/mm 改为读取 VEHICLE_PRESETS[vehicleType][S.axis].bushings（四节点 LCA_F/LCA_R/UCA_F/UCA_R 各轴三向刚度），无预设时回退原 bLCA_F；presetBushings() 按当前轴取值。
+- **验证**：headless Chrome 直构 15DOF step 多帧 finite 且 0 异常；baja 前后轴 presetBushings() 各返回 4 节点；engine pytest 全量通过。
+- **说明**：UI 交互画布（V-F 曲线编辑 / 衬套四档预设按钮）仍为「文档有代码无」，本轮只让数据真正生效，宣传口径维持 P1-3 补录。

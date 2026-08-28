@@ -484,6 +484,143 @@ canvas.plot{display:block;width:100%;height:84px;background:var(--well);border:1
 .metric-target { font-size: 10.5px; color: #8b949e; }
 .metric-desc { font-size: 10.5px; color: #8b949e; line-height: 1.35; margin-top: 2px; }
 
+/* 定圆绕环按钮样式 */
+.header-action-btn.skidpad-btn {
+  background: linear-gradient(135deg, rgba(230, 126, 34, 0.25), rgba(241, 196, 15, 0.2));
+  border: 1px solid rgba(243, 156, 18, 0.5);
+  color: #f39c12;
+}
+.header-action-btn.skidpad-btn:hover {
+  background: linear-gradient(135deg, rgba(230, 126, 34, 0.4), rgba(241, 196, 15, 0.35));
+  border-color: #f39c12;
+  box-shadow: 0 0 12px rgba(243, 156, 18, 0.3);
+}
+
+/* 定圆绕环舞台全屏模态窗口 */
+.circuit-stage-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: #05070a;
+  z-index: 99999;
+  display: none;
+  flex-direction: column;
+}
+.circuit-stage-modal-backdrop.show {
+  display: flex;
+}
+.skidpad-stage-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: #05070a;
+  z-index: 99999;
+  display: none;
+  flex-direction: column;
+}
+.skidpad-stage-modal-backdrop.show {
+  display: flex;
+}
+.skidpad-stage-topbar {
+  height: 46px;
+  background: #161b22;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+  z-index: 10;
+}
+.skidpad-top-left { display: flex; align-items: center; gap: 16px; }
+.skidpad-stage-logo { font-size: 13px; font-weight: 800; color: #f39c12; letter-spacing: 0.5px; }
+
+.skidpad-cam-group { display: flex; background: rgba(0, 0, 0, 0.3); border-radius: 6px; padding: 2px; }
+.skidpad-cam-btn {
+  background: transparent;
+  border: none;
+  color: #8b949e;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.skidpad-cam-btn.on { background: #d35400; color: #fff; }
+
+.skidpad-top-right { display: flex; align-items: center; gap: 14px; font-size: 11px; }
+.skidpad-control-item { display: flex; align-items: center; gap: 8px; color: #8b949e; }
+.skidpad-control-item input[type=range] { width: 85px; }
+.skidpad-control-item b { color: #f39c12; width: 50px; font-family: ui-monospace, monospace; }
+
+.skidpad-select {
+  background: #0d1117;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #e6edf3;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  outline: none;
+  cursor: pointer;
+}
+.skidpad-dir-btn {
+  background: rgba(243, 156, 18, 0.15);
+  border: 1px solid rgba(243, 156, 18, 0.4);
+  color: #f39c12;
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.skidpad-action-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #c9d1d9;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.skidpad-exit-btn { background: rgba(248, 81, 73, 0.2); border-color: rgba(248, 81, 73, 0.4); color: #f85149; }
+
+.skidpad-stage-main { flex: 1; position: relative; width: 100%; height: calc(100% - 46px); overflow: hidden; }
+#skidpadCanvas { width: 100%; height: 100%; display: block; }
+
+.skidpad-hud-overlay {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  pointer-events: none;
+}
+.skidpad-hud-card {
+  background: rgba(13, 17, 23, 0.88);
+  border: 1px solid rgba(243, 156, 18, 0.25);
+  backdrop-filter: blur(10px);
+  border-radius: 10px;
+  padding: 12px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  min-width: 270px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+}
+.skidpad-hud-row { display: flex; justify-content: space-between; gap: 14px; color: #8b949e; }
+.skidpad-hud-row b { color: #e6edf3; font-family: ui-monospace, monospace; }
+.skidpad-hud-row b.hl { color: #f39c12; }
+.skidpad-hud-row b.warn { color: #e74c3c; }
+.skidpad-hud-row b.good { color: #2ecc71; }
+
+.skidpad-hint-box {
+  position: absolute;
+  bottom: 14px;
+  right: 24px;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+}
+
 /* 爬坡舞台全屏 */
 .slope-stage-modal-backdrop {
   flex-direction: column;
@@ -576,7 +713,7 @@ canvas.plot{display:block;width:100%;height:84px;background:var(--well);border:1
     <div class="tt"><span>全车底盘 高性能悬架 · 运动学 / 动力学 / 准静态操稳分析台</span><span>Full Chassis Inboard Suspension K&C, Rig Dynamics & Quasi-Static Handling</span></div>
     <div class="sp"></div>
     <div style="display:flex;align-items:center;gap:6px;margin-right:8px;">
-      <button id="slopeStageBtn" class="header-action-btn slope-btn" title="进入全物理15自由度直线爬坡动力学舞台">🏁 直线爬坡测试</button>
+      <!-- Dynamic Test Stages moved to Left Panel -->
       <button id="evalModalBtn" class="header-action-btn eval-btn" title="查看全维度悬架工程评价与AI调校建议">📊 综合评价报告</button>
       <button id="pureSuspTg" class="header-action-btn" title="切换纯悬架透视 (隐藏车架与外围附件)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:var(--text);">纯悬架透视</button>
     </div>
@@ -667,6 +804,132 @@ canvas.plot{display:block;width:100%;height:84px;background:var(--well);border:1
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================ 综合赛道测试 3D 动力学舞台模态窗口 ================================ -->
+<div id="circuitStageModal" class="circuit-stage-modal-backdrop">
+  <div class="skidpad-stage-topbar">
+        <div class="skidpad-top-left">
+      <span class="skidpad-stage-logo" style="color:#58a6ff;">🏁 综合赛道自动驾驶 (上海国际赛车场) · AUTONOMOUS GRAND PRIX</span>
+      <div class="skidpad-cam-group" style="margin-left: 20px;">
+        <button class="skidpad-cam-btn on" data-stage="circuit" data-cam="behind">🏎️ 追尾跟拍</button>
+        <button class="skidpad-cam-btn" data-stage="circuit" data-cam="cockpit">💺 驾驶舱 (Cockpit)</button>
+        <button class="skidpad-cam-btn" data-stage="circuit" data-cam="blimp">🚁 高空俯视</button>
+        <button class="skidpad-cam-btn" data-stage="circuit" data-cam="tv">📺 电视转播</button>
+      </div>
+    </div>
+    <div class="skidpad-top-right">
+      <button class="skidpad-action-btn" id="circuitPlayBtn">⏸ 暂停</button>
+      <button class="skidpad-action-btn skidpad-exit-btn" id="circuitExitBtn" onclick="closeCircuitStage()">✖ 退出舞台</button>
+    </div>
+  </div>
+  <div class="skidpad-stage-main" style="position:relative; flex:1; width:100%; height:100%; overflow:hidden;">
+    <canvas id="circuitCanvas" style="width:100%; height:100%; display:block; outline:none; background:#1e242a;" tabindex="0"></canvas>
+    <div id="circuitHUD" style="position:absolute; bottom:20px; left:20px; width:340px; background:rgba(10,14,23,0.85); border:1px solid #30363d; border-radius:6px; padding:15px; color:#c9d1d9; font-family:'ui-monospace',monospace; font-size:12px; pointer-events:none; backdrop-filter:blur(4px);">
+      <div style="color:#58a6ff; font-weight:bold; margin-bottom:10px; font-size:13px; text-transform:uppercase;">
+        🏎️ 实时遥测数据 (TELEMETRY)
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>车速 (Speed)</span><b id="c_hud_v" style="color:#7ee787;">0.0 km/h</b></div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>规划限速 (Target V)</span><b id="c_hud_vtar">0.0 km/h</b></div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>侧向加速度 (ay)</span><b id="c_hud_ay">0.00 g</b></div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>油门 (Throttle)</span><b id="c_hud_thr" style="color:#ff7b72;">0 %</b></div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>制动 (Brake)</span><b id="c_hud_brk" style="color:#f2cc60;">0 %</b></div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>横向偏离 (Err)</span><b id="c_hud_err">0.00 m</b></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================ 定圆绕环测试 3D 动力学舞台模态窗口 ================================ -->
+<div id="skidpadStageModal" class="skidpad-stage-modal-backdrop">
+  <div class="skidpad-stage-topbar">
+    <div class="skidpad-top-left">
+      <span class="skidpad-stage-logo">⭕ 赛车定圆绕环动力学舞台 · CONSTANT RADIUS SKIDPAD STAGE</span>
+      <!-- 多机位切换按钮组 -->
+      <div class="skidpad-cam-group">
+        <button class="skidpad-cam-btn on" data-cam="behind">🏎️ 尾部跟随</button>
+        <button class="skidpad-cam-btn" data-cam="blimp">🚁 高空俯瞰</button>
+        <button class="skidpad-cam-btn" data-cam="outer">📐 外侧悬架</button>
+        <button class="skidpad-cam-btn" data-cam="center">🎯 圆心站台</button>
+        <button class="skidpad-cam-btn" data-cam="cockpit">💺 第一人称</button>
+      </div>
+    </div>
+    
+    <div class="skidpad-top-right">
+      <div class="skidpad-control-item">
+        <label>半径 RADIUS</label>
+        <input type="range" id="skidpadRadiusSlider" min="10" max="45" value="15.25" step="0.25">
+        <b id="skidpadRadiusVal">15.25 m</b>
+      </div>
+      <div class="skidpad-control-item">
+        <label>车速 SPEED</label>
+        <input type="range" id="skidpadSpeedSlider" min="15" max="110" value="45" step="1">
+        <b id="skidpadSpeedVal">45 km/h</b>
+      </div>
+      <div class="skidpad-control-item">
+        <label>模式</label>
+        <select id="skidpadModeSelect" class="skidpad-select">
+          <option value="steady">🎯 定速巡航</option>
+          <option value="sweep">📈 极限抓地扫描</option>
+        </select>
+      </div>
+      <div class="skidpad-control-item">
+        <label>回转方向</label>
+        <button class="skidpad-dir-btn" id="skidpadDirBtn">🔄 逆时针 (CCW)</button>
+      </div>
+      <button class="skidpad-action-btn" id="skidpadPlayBtn">⏸ 暂停</button>
+      <button class="skidpad-action-btn skidpad-exit-btn" id="skidpadExitBtn">✖ 退出舞台</button>
+    </div>
+  </div>
+
+  <div class="skidpad-stage-main">
+    <canvas id="skidpadCanvas"></canvas>
+
+    <!-- 实时遥测 HUD -->
+    <div class="skidpad-hud-overlay">
+      <div class="skidpad-hud-card">
+        <div class="skidpad-hud-row">
+          <span>🏎️ 车型平台</span>
+          <b id="skidpadVehName">Formula SAE</b>
+        </div>
+        <div class="skidpad-hud-row">
+          <span>⏱️ 单圈计时 / 圈数</span>
+          <b class="hl" id="skidpadHudLap">-- s (Lap 0)</b>
+        </div>
+        <div class="skidpad-hud-row">
+          <span>🏁 过弯车速 / 角速度</span>
+          <b class="hl" id="skidpadHudSpeed">45.0 km/h (0.82 rad/s)</b>
+        </div>
+        <div class="skidpad-hud-row">
+          <span>🔄 侧向向心加速度 (ay)</span>
+          <b class="warn" id="skidpadHudAy">1.04 g (抓地利用 78.5%)</b>
+        </div>
+        <div class="skidpad-hud-row">
+          <span>⚖️ 左右轮荷转移 (内 / 外)</span>
+          <b id="skidpadHudLoadSplit">28.4% / 71.6%</b>
+        </div>
+        <div class="skidpad-hud-row">
+          <span>📐 车身动态侧倾角 (Roll)</span>
+          <b id="skidpadHudRoll">+1.65°</b>
+        </div>
+        <div class="skidpad-hud-row">
+          <span>🧭 操稳转向特性判定</span>
+          <b id="skidpadHudSteerBehavior" class="good">中性偏微不足 (Neutral)</b>
+        </div>
+        <div class="skidpad-hud-row">
+          <span>🎛️ 外侧悬架压缩 (Jounce)</span>
+          <b id="skidpadHudOuterSquat">+12.8 mm</b>
+        </div>
+        <div class="skidpad-hud-row">
+          <span>🎛️ 内侧悬架拉伸 (Rebound)</span>
+          <b id="skidpadHudInnerLift">-9.6 mm</b>
+        </div>
+      </div>
+    </div>
+
+    <div class="skidpad-hint-box">
+      🎮 交互控制: 鼠标左键拖拽 360° 环视机位 · 滚轮缩放视距 · 支持 W/S/A/D/空格 随时手动切入接管
     </div>
   </div>
 </div>
@@ -1660,7 +1923,7 @@ function travelL(half, deg){return clamp(S.travel-rollOffset(half,deg),S.trMin,S
 function simulate(dt){
   if(TRK.active){trackStep(dt);return;}
   if(STAGE.open){requestAnimationFrame(loop);return;}   // 舞台打开时挂起主渲染（省帧率）
-  if(SLOPE_STAGE.active){requestAnimationFrame(loop);return;} // 爬坡舞台打开时挂起主仿真，避免双写 SIM
+  if((typeof SLOPE_STAGE !== 'undefined' && SLOPE_STAGE.active) || (typeof SKIDPAD_STAGE !== 'undefined' && SKIDPAD_STAGE.active)){requestAnimationFrame(loop);return;} // 爬坡舞台打开时挂起主仿真，避免双写 SIM
   const MF=SIM.FR, NF=SIM.FL, MR=SIM.RR, NR=SIM.RL;
   if(S.mode==="kin"){
     const z0F=MF.n[MF.idx.WC].p0[2], z0R=MR.n[MR.idx.WC].p0[2];
@@ -1911,11 +2174,16 @@ function buildScenePRO(){
   if(S.show.master_cyl) buildBrakeHydraulicSystem(sc, yF, yR);
 
   // 悬架与车轮端各系统实例装配
-  addAxleAssemblyPRO(sc, SIM.FR, SIM.mFR, 1, yF, 'front');
-  addAxleAssemblyPRO(sc, SIM.RR, SIM.mRR, 1, yR, 'rear');
+  const mF = SIM.FR ? metrics(SIM.FR, 'front') : null;
+  const mR = SIM.RR ? metrics(SIM.RR, 'rear') : null;
+  const mFL = SIM.FL ? metrics(SIM.FL, 'front') : null;
+  const mRL = SIM.RL ? metrics(SIM.RL, 'rear') : null;
+
+  addAxleAssemblyPRO(sc, SIM.FR, mF, 1, yF, 'front');
+  addAxleAssemblyPRO(sc, SIM.RR, mR, 1, yR, 'rear');
   if(S.show.mirror){
-    addAxleAssemblyPRO(sc, SIM.FL, SIM.mFL, -1, yF, 'front');
-    addAxleAssemblyPRO(sc, SIM.RL, SIM.mRL, -1, yR, 'rear');
+    addAxleAssemblyPRO(sc, SIM.FL, mFL, -1, yF, 'front');
+    addAxleAssemblyPRO(sc, SIM.RL, mRL, -1, yR, 'rear');
   }
   return sc;
 }
@@ -2528,6 +2796,7 @@ function buildBrakeHydraulicSystem(sc, yF, yR){
 
 /* 5. 车轮端与悬架总成装配 */
 function addAxleAssemblyPRO(sc, M, m, sx, yOff, axis){
+  if(!M || !M.n || !m) return;
   const state = S[axis];
   const T=p=>[p[0]*sx, p[1]+yOff, p[2]];
   const N=id=>T(M.n[M.idx[id]].p);
@@ -3514,6 +3783,13 @@ async function engineConnect(){
   }
 }
 function engineDisconnect(){ENG.ok=false;setKcStatus("已断开引擎 → 内置 JS 求解器",C.txt3);engineSyncTb();}
+/* 衬套刚度预设 → 引擎 payload（VEHICLE_PRESETS[vehicleType].bushings；缺省回退 bLCA_F 500N/mm） */
+function presetBushings(){
+  const p=(VEHICLE_PRESETS[S.vehicleType]||{})[S.axis]||{};
+  const bp=p.bushings;
+  if(!bp||!Object.keys(bp).length)return[{name:"bLCA_F",node:"LCA_F",kT:[500,500,500],kR:[8e4,8e4,8e4],preload:[0,0,0,0,0,0]}];
+  return Object.keys(bp).map(n=>({name:"b_"+n,node:n,kT:bp[n].slice(0,3),kR:[8e4,8e4,8e4],preload:[0,0,0,0,0,0]}));
+}
 function enginePayload(){
   const st=S[S.axis];
   return {
@@ -3522,7 +3798,7 @@ function enginePayload(){
     sweep:{min:ENG.sweep.min,max:ENG.sweep.max,n:ENG.sweep.n},
     case:{fx:0,fy:0,fz:ENG.fz,mx:0,my:0,mz:0},
     track_width:2*st.hp.WC[0],
-    bushings:ENG.useBush?[{name:"bLCA_F",node:"LCA_F",kT:[500,500,500],kR:[8e4,8e4,8e4],preload:[0,0,0,0,0,0]}]:[]
+    bushings:ENG.useBush?presetBushings():[]
   };
 }
 async function engineRun(){
@@ -4102,7 +4378,7 @@ function updateSweeps(){
 
 let _last=0,_fps=0,_fc=0,_ft=0;
 function loop(ts){
-  if(typeof SLOPE_STAGE !== 'undefined' && SLOPE_STAGE.active){
+  if((typeof SLOPE_STAGE !== 'undefined' && SLOPE_STAGE.active) || (typeof SKIDPAD_STAGE !== 'undefined' && SKIDPAD_STAGE.active)){
     _last = ts;
     requestAnimationFrame(loop);
     return;
@@ -4652,55 +4928,43 @@ function drawStageTelemetry(row){
 }
 
 function buildTrackPanel(host){
-  const b=sec(host,"赛道瞬态仿真 (引擎)","TRACK SIM STAGE - S3-1",false,"purp");
-  const row=E("div","ctl");
-  row.appendChild(E("label",null,'赛道预设 <u>PRESET</u>'));
-  const sel=E("select");sel.id="trkPreset";sel.style.flex="1";
-  Object.keys(TRACK_PRESETS).forEach(k=>{
-    const o=E("option",null,TRACK_PRESETS[k].zh);o.value=k;sel.appendChild(o);});
-  const oc=E("option",null,"自定义路点…");oc.value="custom";sel.appendChild(oc);
-  sel.onchange=()=>{TRK.preset=sel.value;};
-  row.appendChild(sel);b.appendChild(row);
-  const fr=E("input");fr.type="file";fr.accept=".json,.csv";fr.style.display="none";
-  fr.onchange=()=>{const f=fr.files[0];if(!f)return;const rd=new FileReader();
-    rd.onload=()=>{try{
-      let pts=[];
-      if(/\.json$/i.test(f.name)){pts=JSON.parse(rd.result);}
-      else{pts=rd.result.trim().split(/\r?\n/).slice(1).map(ln=>{
-        const c=ln.split(/[;,\t]/).map(parseFloat);return {x:c[0],y:c[1],target_speed:c[2]||12};});}
-      if(!Array.isArray(pts)||pts.length<2)throw new Error("至少 2 个路点");
-      TRK.custom=pts;TRK.preset="custom";sel.value="custom";
-      setTrkStatus("自定义赛道已载入 "+pts.length+" 点",C.ok);
-    }catch(e){setTrkStatus("导入失败："+e.message,C.nodeFix);}};
-    rd.readAsText(f);};
-  b.appendChild(fr);
-  rowBtns(b,[["导入 JSON/CSV 路点",()=>fr.click(),()=>TRK.preset==="custom"]]);
-  rowSlider(b,"预瞄增益","LOOKAHEAD GAIN","",0.4,1.5,0.05,()=>0.9,v=>{},2);
-  const ls=b.querySelectorAll("input[type=range]");ls[0].id="trkLook";
-  const rowV=E("div","ctl");
-  rowV.appendChild(E("label",null,'初速 <u>START V</u> [m/s]'));
-  const vi=E("input");vi.type="number";vi.id="trkV0";vi.value="6";vi.step="0.5";vi.min="2";vi.max="20";
-  rowV.appendChild(vi);b.appendChild(rowV);
-  const run=E("button","eng-run");run.id="trkRun";run.textContent="进入赛道仿真大厅 [独立]";
-  run.onclick=_stageOpenSetup;b.appendChild(run);
-  const pb=E("button","eng-run");pb.id="trkPlay";pb.textContent="▶ 播放";pb.onclick=()=>{if(TRK.res){TRK.playing=!TRK.playing;syncTrackUI();}};
-  const ex=E("button","eng-run");ex.textContent="退出回放";ex.onclick=trackExit;
-  const csvb=E("button","eng-run");csvb.textContent="导出 CSV";csvb.onclick=trackCSV;
-  const pr=E("div");pr.style.cssText="display:flex;gap:6px;margin:6px 0";
-  pr.appendChild(pb);pr.appendChild(ex);pr.appendChild(csvb);b.appendChild(pr);
-  const sc=E("input");sc.id="trkScrub";sc.type="range";sc.min=0;sc.max=100;sc.value=0;sc.step=1;
-  sc.style.width="100%";
-  sc.oninput=()=>{if(!TRK.res)return;TRK.playing=false;applyTrackFrame(parseInt(sc.value||0));syncTrackUI();};
-  b.appendChild(sc);
-  const spd=E("div","ctl");
-  spd.appendChild(E("label",null,'回放速率 <u>RATE</u>'));
-  const ss=E("select");ss.style.flex="1";
-  [["0.5×",0.5],["1.0×",1.0],["2.0×",2.0]].forEach(o=>{const q=E("option",null,o[0]);q.value=o[1];ss.appendChild(q);});
-  ss.onchange=()=>{TRK.speed=parseFloat(ss.value);};
-  spd.appendChild(ss);b.appendChild(spd);
-  const st=E("div","eng-status");st.id="trkStatus";
-  st.textContent="选预设 → 连接引擎 → RUN：俯视图回放轨迹、3D 侧倾联动、右侧遥测 HUD";
-  b.appendChild(st);
+  const b = sec(host, "虚拟试车场 🏎️", "VIRTUAL PROVING GROUND", false, "blu");
+  
+  const d = E("div");
+  d.style.display = "flex"; 
+  d.style.flexDirection = "column"; 
+  d.style.gap = "8px";
+  d.style.padding = "8px 10px 12px 10px";
+  
+  const b1 = E("button"); 
+  b1.innerHTML = "🛣️ 直线爬坡动力学测试 (SLOPE)"; 
+  b1.onclick = () => { openSlopeStage(); };
+  b1.style.padding = "10px"; b1.style.background = "rgba(46,160,67,0.15)"; b1.style.border = "1px solid #2ea043"; 
+  b1.style.color = "#fff"; b1.style.borderRadius = "6px"; b1.style.cursor = "pointer"; b1.style.fontWeight = "bold"; b1.style.letterSpacing = "1px";
+  
+  const b2 = E("button"); 
+  b2.innerHTML = "⭕ 定圆绕环稳态测试 (SKIDPAD)"; 
+  b2.onclick = () => { openSkidpadStage(); };
+  b2.style.padding = "10px"; b2.style.background = "rgba(210,153,34,0.15)"; b2.style.border = "1px solid #d29922"; 
+  b2.style.color = "#fff"; b2.style.borderRadius = "6px"; b2.style.cursor = "pointer"; b2.style.fontWeight = "bold"; b2.style.letterSpacing = "1px";
+  
+  const b3 = E("button"); 
+  b3.innerHTML = "🏁 综合赛道自动驾驶 (CIRCUIT)"; 
+  b3.onclick = () => { openCircuitStage(); };
+  b3.style.padding = "10px"; b3.style.background = "rgba(88,166,255,0.15)"; b3.style.border = "1px solid #58a6ff"; 
+  b3.style.color = "#fff"; b3.style.borderRadius = "6px"; b3.style.cursor = "pointer"; b3.style.fontWeight = "bold"; b3.style.letterSpacing = "1px";
+  
+  b1.onmouseover = () => b1.style.background = "rgba(46,160,67,0.3)";
+  b1.onmouseout = () => b1.style.background = "rgba(46,160,67,0.15)";
+  b2.onmouseover = () => b2.style.background = "rgba(210,153,34,0.3)";
+  b2.onmouseout = () => b2.style.background = "rgba(210,153,34,0.15)";
+  b3.onmouseover = () => b3.style.background = "rgba(88,166,255,0.3)";
+  b3.onmouseout = () => b3.style.background = "rgba(88,166,255,0.15)";
+  
+  d.appendChild(b1);
+  d.appendChild(b2);
+  d.appendChild(b3);
+  b.appendChild(d);
 }
 function buildTrackTelemetry(host){
   const b2=sec(host,"赛道动态遥测","TRACK TELEMETRY · HUD",false,"purp");
@@ -4740,6 +5004,17 @@ function applyTheme(t){
 /* =====================================================================
    LABSUS 综合性能评价与AI调校诊断引擎 (Evaluation Engine)
    ===================================================================== */
+/* V-F 阻尼曲线插值（速度 m/s → 阻尼力 N）：damperMode==="table" 时替换线性 cB/cR */
+function vfDamper(table, v, fallback){
+  if(!table||table.length<2)return fallback;
+  if(v<=table[0][0])return table[0][1];
+  if(v>=table[table.length-1][0])return table[table.length-1][1];
+  let i=1;while(i<table.length&&table[i][0]<v)i++;
+  const a=table[i-1],b=table[i];
+  const t=(v-a[0])/((b[0]-a[0])||1e-9);
+  return a[1]+(b[1]-a[1])*t;
+}
+
 const EVAL_BENCHMARKS = {
   camberGainF:     { name: "前外倾增益 (Camber Gain)", target: "0.04 ~ 0.08 °/mm", unit: "°/mm", eval: v => (v >= 0.04 && v <= 0.08 ? 'good' : (v >= 0.02 && v <= 0.11 ? 'warn' : 'bad')), desc: "过弯侧倾时补偿接地面积，过小易推头，过大影响制动" },
   camberGainR:     { name: "后外倾增益 (Camber Gain)", target: "0.03 ~ 0.07 °/mm", unit: "°/mm", eval: v => (v >= 0.03 && v <= 0.07 ? 'good' : (v >= 0.015 && v <= 0.09 ? 'warn' : 'bad')), desc: "后轴侧倾附着力支撑，保障高速稳定性" },
@@ -5005,6 +5280,259 @@ function drawRadarChart(scores){
    LABSUS HARDCORE 15-DOF MULTI-BODY VEHICLE DYNAMICS ENGINE
    Coordinate Frame: +Y Forward, +X Right, +Z Up (Pitch around X, Roll around Y, Yaw around Z)
    ===================================================================== */
+
+/* =====================================================================
+   UNIVERSAL AUTONOMOUS PILOT (ADAS / AD)
+   ===================================================================== */
+class TrackPath {
+  getLookahead(x, y, v) { return null; }
+}
+
+class CirclePath extends TrackPath {
+  constructor(radius, dir, speedMs) {
+    super();
+    this.R = radius;
+    this.dir = dir; // -1: CCW, 1: CW
+    this.targetSpeed = speedMs;
+  }
+  
+  getLookahead(x, y, v) {
+    const r_cur = Math.hypot(x, y);
+    const theta = (r_cur < 1e-3) ? 0 : Math.atan2(y, x);
+    
+    const psi_tangent = (this.dir === -1) ? theta : (theta + Math.PI);
+    
+    const tx = -Math.sin(psi_tangent);
+    const ty = Math.cos(psi_tangent);
+    const nx_norm = ty;
+    const ny_norm = -tx;
+    
+    const nx = this.R * Math.cos(theta);
+    const ny = this.R * Math.sin(theta);
+    
+    const e_y = (x - nx) * nx_norm + (y - ny) * ny_norm;
+    
+    return {
+      targetHeading: psi_tangent,
+      targetCurvature: (this.dir === -1) ? (-1.0 / this.R) : (1.0 / this.R), 
+      targetSpeed: this.targetSpeed,
+      crossTrackError: e_y
+    };
+  }
+}
+
+class StraightPath extends TrackPath {
+  constructor(speedMs) {
+    super();
+    this.targetSpeed = speedMs;
+  }
+  
+  getLookahead(x, y, v) {
+    const psi_tangent = 0; // Straight up North (+Y)
+    
+    const tx = -Math.sin(psi_tangent); // 0
+    const ty = Math.cos(psi_tangent);  // 1
+    const nx_norm = ty;  // 1
+    const ny_norm = -tx; // 0
+    
+    const e_y = (x - 0) * nx_norm + (y - y) * ny_norm; // = x
+    
+    return {
+      targetHeading: psi_tangent,
+      targetCurvature: 0,
+      targetSpeed: this.targetSpeed,
+      crossTrackError: e_y
+    };
+  }
+}
+
+
+// -------------------- CIRCUIT TRACK SPLINE & PROFILING --------------------
+class CircuitPath extends TrackPath {
+  constructor(waypoints, mu = 1.3) {
+    super();
+    this.mu = mu;
+    this.pts = [];
+    
+    // 1. Closed-Loop Catmull-Rom Spline
+    const N = waypoints.length;
+    for(let i = 0; i < N; i++){
+      const p0 = waypoints[(i - 1 + N) % N];
+      const p1 = waypoints[i];
+      const p2 = waypoints[(i + 1) % N];
+      const p3 = waypoints[(i + 2) % N];
+      
+      const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      const steps = Math.max(4, Math.ceil(dist / 2.0)); // 2 meters step
+      for(let s = 0; s < steps; s++){
+        const t = s / steps, t2 = t*t, t3 = t2*t;
+        const x = 0.5 * ((2*p1.x) + (-p0.x + p2.x)*t + (2*p0.x - 5*p1.x + 4*p2.x - p3.x)*t2 + (-p0.x + 3*p1.x - 3*p2.x + p3.x)*t3);
+        const y = 0.5 * ((2*p1.y) + (-p0.y + p2.y)*t + (2*p0.y - 5*p1.y + 4*p2.y - p3.y)*t2 + (-p0.y + 3*p1.y - 3*p2.y + p3.y)*t3);
+        this.pts.push({ x, y });
+      }
+    }
+    
+    const P = this.pts.length;
+    // 2. Heading & Normal (+Y North, +X East, CCW from +Y)
+    for(let i = 0; i < P; i++){
+      const prev = this.pts[(i - 1 + P) % P];
+      const curr = this.pts[i];
+      const next = this.pts[(i + 1) % P];
+      
+      const dx = next.x - prev.x;
+      const dy = next.y - prev.y;
+      curr.heading = Math.atan2(-dx, dy);
+      curr.nx = Math.cos(curr.heading);
+      curr.ny = Math.sin(curr.heading);
+    }
+    
+    // 3. Curvature & Max Grip Speed
+    for(let i = 0; i < P; i++){
+      const prev = this.pts[(i - 1 + P) % P];
+      const curr = this.pts[i];
+      const next = this.pts[(i + 1) % P];
+      
+      const ds = Math.hypot(next.x - prev.x, next.y - prev.y);
+      let dpsi = next.heading - prev.heading;
+      while(dpsi > Math.PI) dpsi -= 2 * Math.PI;
+      while(dpsi < -Math.PI) dpsi += 2 * Math.PI;
+      
+      curr.curvature = dpsi / (ds + 1e-6);
+      curr.v_max = Math.min(48.0, Math.sqrt((this.mu * 9.81) / (Math.abs(curr.curvature) + 1e-6)));
+    }
+    
+    // 4. Backward & Forward Speed Passes (Race Engineering Trail-Braking Profile)
+    const a_brake = 6.5; // 0.65g safe decel
+    const a_accel = 3.5; // 0.35g safe accel
+    
+    for(let pass = 0; pass < 3; pass++) {
+      for(let i = P - 1; i >= 0; i--){
+        const nextIdx = (i + 1) % P;
+        const ds = Math.hypot(this.pts[nextIdx].x - this.pts[i].x, this.pts[nextIdx].y - this.pts[i].y);
+        this.pts[i].v_max = Math.min(this.pts[i].v_max, Math.sqrt(this.pts[nextIdx].v_max**2 + 2 * a_brake * ds));
+      }
+    }
+
+    for(let pass = 0; pass < 3; pass++) {
+      for(let i = 0; i < P; i++){
+        const prevIdx = (i - 1 + P) % P;
+        const ds = Math.hypot(this.pts[i].x - this.pts[prevIdx].x, this.pts[i].y - this.pts[prevIdx].y);
+        this.pts[i].v_max = Math.min(this.pts[i].v_max, Math.sqrt(this.pts[prevIdx].v_max**2 + 2 * a_accel * ds));
+      }
+    }
+    
+    this.totalPoints = P;
+  }
+  
+  getLookahead(x, y, v) {
+    let minDist = Infinity;
+    let closestIdx = 0;
+    
+    for(let i = 0; i < this.totalPoints; i++){
+      const pt = this.pts[i];
+      const d = (pt.x - x)**2 + (pt.y - y)**2;
+      if(d < minDist){ minDist = d; closestIdx = i; }
+    }
+    
+    const pt = this.pts[closestIdx];
+    const crossTrackError = (x - pt.x) * pt.nx + (y - pt.y) * pt.ny;
+    
+    return {
+      targetHeading: pt.heading,
+      targetCurvature: pt.curvature,
+      targetSpeed: pt.v_max,
+      crossTrackError: crossTrackError
+    };
+  }
+}
+
+function buildShanghaiCircuit() {
+  const wp = [
+    {x: 0, y: 0},       // 0: Start / Finish Line
+    {x: 0, y: 140},     // 1: End of Main Straight
+    {x: 25, y: 185},    // 2: T1 Entry (Right)
+    {x: 65, y: 200},    // 3: T1 Apex
+    {x: 100, y: 175},   // 4: T2 Exit
+    {x: 105, y: 130},   // 5: T3 Entry (Left)
+    {x: 75, y: 105},    // 6: T3 Apex
+    {x: 35, y: 120},    // 7: T4 Exit
+    {x: 20, y: 170},    // 8: S-Bend Transition
+    {x: 50, y: 240},    // 9: T5 Fast Left
+    {x: 110, y: 280},   // 10: T6 Fast Sweeper
+    {x: 180, y: 280},   // 11: T7 Right Hand Entry
+    {x: 240, y: 230},   // 12: T8 Exit onto Long Straight
+    {x: 240, y: 100},   // 13: Mid Long Straight
+    {x: 240, y: -50},   // 14: End of Long Straight
+    {x: 230, y: -120},  // 15: T14 Hairpin Heavy Braking Zone
+    {x: 190, y: -150},  // 16: T14 Hairpin Apex
+    {x: 140, y: -120},  // 17: T14 Hairpin Exit
+    {x: 120, y: -40},   // 18: T15 Fast Kink
+    {x: 60, y: -20}     // 19: T16 Final Corner onto Main Straight
+  ];
+  return new CircuitPath(wp, 1.0); // lowered for safer cornering
+}
+
+class UniversalAutoPilot {
+  constructor(S_config) {
+    this.wb = (S_config.wb || 2600) / 1000.0; 
+    this.a = this.wb * 0.48; // Dist from CG to Front Axle
+    
+    this.k_stanley = 2.5;
+    this.k_soft = 2.0;    
+    
+    this.pid_speed = { p: 0.8, i: 0.15, d: 0.05, integral: 0, last_err: 0 };
+    this.active = false;
+    this.path = null;
+  }
+  
+  setPath(newPath) {
+    this.path = newPath;
+    this.pid_speed.integral = 0;
+    this.pid_speed.last_err = 0;
+  }
+
+  drive(state, dt) {
+    if (!this.path || !this.active) return { steer: 0, throttle: 0, brake: 0 };
+    
+    // Front Axle coordinates (World Frame)
+    const fx = state.X - this.a * Math.sin(state.psi);
+    const fy = state.Y + this.a * Math.cos(state.psi);
+    
+    const target = this.path.getLookahead(fx, fy, state.u);
+    
+    let e_heading = target.targetHeading - state.psi;
+    while(e_heading > Math.PI) e_heading -= 2 * Math.PI;
+    while(e_heading < -Math.PI) e_heading += 2 * Math.PI;
+    
+    let safe_ey = target.crossTrackError;
+    if (safe_ey > 4.8) safe_ey = 4.8;
+    if (safe_ey < -4.8) safe_ey = -4.8;
+    const steer_fb = -e_heading - Math.atan2(this.k_stanley * safe_ey, this.k_soft + Math.max(0.01, state.u));
+    const steer_ff = -Math.atan2(this.wb * target.targetCurvature, 1.0);
+    
+    let ctrl_steer = (steer_fb + steer_ff) * (180.0 / Math.PI);
+    ctrl_steer = Math.max(-28, Math.min(28, ctrl_steer));
+    
+    let e_v = target.targetSpeed - state.u;
+    this.pid_speed.integral += e_v * dt;
+    this.pid_speed.integral = Math.max(-10, Math.min(10, this.pid_speed.integral));
+    
+    const d_err = (e_v - this.pid_speed.last_err) / (dt + 1e-6);
+    this.pid_speed.last_err = e_v;
+    
+    const accel_cmd = this.pid_speed.p * e_v + this.pid_speed.i * this.pid_speed.integral + this.pid_speed.d * d_err;
+    
+    let ctrl_throttle = 0, ctrl_brake = 0;
+    if (accel_cmd > 0) {
+      ctrl_throttle = Math.min(1.0, accel_cmd * 0.25); 
+    } else {
+      ctrl_brake = Math.min(1.0, -accel_cmd * 0.5); 
+    }
+    
+    return { steer: ctrl_steer, throttle: ctrl_throttle, brake: ctrl_brake };
+  }
+}
+
 class VehicleDynamics15DOF {
   constructor(S_config, SIM_data, initSpeedMs = 0) {
     this.S = S_config;
@@ -5084,7 +5612,7 @@ class VehicleDynamics15DOF {
     const mu_y = mu_peak * Math.sin(Cy * Math.atan(By * s - Ey * (By * s - Math.atan(By * s))));
     
     const Fx = (s_x / s) * (mu_x * Fz);
-    const Fy = (s_y / s) * (mu_y * Fz);
+    const Fy = -(s_y / s) * (mu_y * Fz); // Lateral cornering force opposes lateral slip velocity
     return { Fx, Fy };
   }
 
@@ -5099,13 +5627,13 @@ class VehicleDynamics15DOF {
       const dt = Math.min(MAX_SUB_DT, t_remain);
       const st = this.state;
       
-      // 1. Suspension Corner Displacements (Pitch theta > 0: nose up / rear squat)
+      // 1. Suspension Corner Displacements (Pitch theta > 0: nose up; Roll phi > 0: right down, left up)
       // FL: x = -tF/2, y = +a;  FR: x = +tF/2, y = +a;
       // RL: x = -tR/2, y = -b;  RR: x = +tR/2, y = -b;
-      const z_FL = st.Z + this.a * st.theta - (this.tF / 2.0) * st.phi;
-      const z_FR = st.Z + this.a * st.theta + (this.tF / 2.0) * st.phi;
-      const z_RL = st.Z - this.b * st.theta - (this.tR / 2.0) * st.phi;
-      const z_RR = st.Z - this.b * st.theta + (this.tR / 2.0) * st.phi;
+      const z_FL = st.Z + this.a * st.theta + (this.tF / 2.0) * st.phi;
+      const z_FR = st.Z + this.a * st.theta - (this.tF / 2.0) * st.phi;
+      const z_RL = st.Z - this.b * st.theta + (this.tR / 2.0) * st.phi;
+      const z_RR = st.Z - this.b * st.theta - (this.tR / 2.0) * st.phi;
       
       const bump = env.bumpNoise || 0;
       const tr_FL = -(z_FL - bump);
@@ -5114,10 +5642,10 @@ class VehicleDynamics15DOF {
       const tr_RR = -(z_RR - bump);
       
       // Suspension deflection velocities
-      const dz_FL = st.w + this.a * st.q - (this.tF / 2.0) * st.p;
-      const dz_FR = st.w + this.a * st.q + (this.tF / 2.0) * st.p;
-      const dz_RL = st.w - this.b * st.q - (this.tR / 2.0) * st.p;
-      const dz_RR = st.w - this.b * st.q + (this.tR / 2.0) * st.p;
+      const dz_FL = st.w + this.a * st.q + (this.tF / 2.0) * st.p;
+      const dz_FR = st.w + this.a * st.q - (this.tF / 2.0) * st.p;
+      const dz_RL = st.w - this.b * st.q + (this.tR / 2.0) * st.p;
+      const dz_RR = st.w - this.b * st.q - (this.tR / 2.0) * st.p;
       
       const dtr_FL = -dz_FL;
       const dtr_FR = -dz_FR;
@@ -5128,22 +5656,22 @@ class VehicleDynamics15DOF {
       const Fz0_F_slope = this.Fz0_F * cosA;
       const Fz0_R_slope = this.Fz0_R * cosA;
       
-      const Fz_FL = Math.max(5.0, Fz0_F_slope + this.Kw_F * tr_FL + this.Cw_F * dtr_FL);
-      const Fz_FR = Math.max(5.0, Fz0_F_slope + this.Kw_F * tr_FR + this.Cw_F * dtr_FR);
-      const Fz_RL = Math.max(5.0, Fz0_R_slope + this.Kw_R * tr_RL + this.Cw_R * dtr_RL);
-      const Fz_RR = Math.max(5.0, Fz0_R_slope + this.Kw_R * tr_RR + this.Cw_R * dtr_RR);
+      const Fz_FL = Math.max(10.0, Fz0_F_slope + this.Kw_F * tr_FL + ((this.S.front.damperMode==="table"&&this.S.front.vfTable)?vfDamper(this.S.front.vfTable,dtr_FL,this.Cw_F*dtr_FL):this.Cw_F*dtr_FL));
+      const Fz_FR = Math.max(10.0, Fz0_F_slope + this.Kw_F * tr_FR + ((this.S.front.damperMode==="table"&&this.S.front.vfTable)?vfDamper(this.S.front.vfTable,dtr_FR,this.Cw_F*dtr_FR):this.Cw_F*dtr_FR));
+      const Fz_RL = Math.max(10.0, Fz0_R_slope + this.Kw_R * tr_RL + ((this.S.rear.damperMode==="table"&&this.S.rear.vfTable)?vfDamper(this.S.rear.vfTable,dtr_RL,this.Cw_R*dtr_RL):this.Cw_R*dtr_RL));
+      const Fz_RR = Math.max(10.0, Fz0_R_slope + this.Kw_R * tr_RR + ((this.S.rear.damperMode==="table"&&this.S.rear.vfTable)?vfDamper(this.S.rear.vfTable,dtr_RR,this.Cw_R*dtr_RR):this.Cw_R*dtr_RR));
       
-      // Anti-roll bar torque
-      const K_arb_F = (this.S.front && this.S.front.arb && this.S.front.arb.d > 0) ? 28000.0 : 0.0;
-      const K_arb_R = (this.S.rear && this.S.rear.arb && this.S.rear.arb.d > 0) ? 18000.0 : 0.0;
+      // Anti-roll bar torque (Opposes differential wheel displacement)
+      const K_arb_F = (this.S.front && this.S.front.arb && this.S.front.arb.d > 0) ? 32000.0 : 0.0;
+      const K_arb_R = (this.S.rear && this.S.rear.arb && this.S.rear.arb.d > 0) ? 22000.0 : 0.0;
       const F_arb_F = K_arb_F * (tr_FL - tr_FR);
       const F_arb_R = K_arb_R * (tr_RL - tr_RR);
       
       const F_susp = {
-        FL: Fz_FL + F_arb_F,
-        FR: Fz_FR - F_arb_F,
-        RL: Fz_RL + F_arb_R,
-        RR: Fz_RR - F_arb_R
+        FL: Math.max(10.0, Fz_FL + F_arb_F),
+        FR: Math.max(10.0, Fz_FR - F_arb_F),
+        RL: Math.max(10.0, Fz_RL + F_arb_R),
+        RR: Math.max(10.0, Fz_RR - F_arb_R)
       };
       
       let SumFx_tire = 0.0, SumFy_tire = 0.0;
@@ -5157,16 +5685,16 @@ class VehicleDynamics15DOF {
       ];
       
       for(const w of wheels) {
-        // Wheel contact point velocities (+Y forward, +X right)
-        const v_cp_y = st.u - st.r * w.x;
-        const v_cp_x = st.v + st.r * w.y;
+        // Wheel contact point velocities (+X right, +Y forward)
+        const v_cp_x = st.v - st.r * w.y;
+        const v_cp_y = st.u + st.r * w.x;
         
         // Steer angle delta (rad)
         const steer = (w.axle === 'front' ? (ctrl.steer * Math.PI / 180.0) : 0.0);
         
         // Transform velocities into wheel heading frame
-        const v_tire_long = v_cp_y * Math.cos(steer) + v_cp_x * Math.sin(steer);
-        const v_tire_lat  = -v_cp_y * Math.sin(steer) + v_cp_x * Math.cos(steer);
+        const v_tire_long = v_cp_x * Math.sin(steer) + v_cp_y * Math.cos(steer);
+        const v_tire_lat  = v_cp_x * Math.cos(steer) - v_cp_y * Math.sin(steer);
         
         const alpha = Math.atan2(v_tire_lat, Math.max(0.5, Math.abs(v_tire_long)));
         const v_rot = st.omega[w.id] * w.Re;
@@ -5175,13 +5703,14 @@ class VehicleDynamics15DOF {
         // Pacejka tire forces (Fx_t: tractive/braking along tire rolling, Fy_t: cornering grip)
         const { Fx: Fx_t, Fy: Fy_t } = this.magicFormula(w.Fz, alpha, kappa);
         
-        // Transform tire forces back to vehicle body frame (+Y forward, +X right)
-        const Fx_body = -Fy_t * Math.cos(steer) + Fx_t * Math.sin(steer);
-        const Fy_body = Fx_t * Math.cos(steer) + Fy_t * Math.sin(steer);
+        // Transform tire forces back to vehicle body frame (+X right, +Y forward)
+        const Fx_body = Fx_t * Math.sin(steer) + Fy_t * Math.cos(steer);
+        const Fy_body = Fx_t * Math.cos(steer) - Fy_t * Math.sin(steer);
         
         SumFx_tire += Fx_body;
         SumFy_tire += Fy_body;
-        SumMz_tire += Fy_body * w.x - Fx_body * w.y;
+        // Yaw moment around +Z (Up): r x F = w.x * Fy_body - w.y * Fx_body
+        SumMz_tire += w.x * Fy_body - w.y * Fx_body;
         
         // Wheel spin acceleration
         const T_drive = (w.axle === 'rear' ? (ctrl.throttle * 480.0) : (ctrl.throttle * 120.0));
@@ -5216,8 +5745,8 @@ class VehicleDynamics15DOF {
       const SumM_roll  = (F_susp.FL + F_susp.RL) * (this.tF / 2.0) - (F_susp.FR + F_susp.RR) * (this.tF / 2.0) - SumFx * this.h_cg;
       const SumM_yaw   = SumMz_tire;
       
-      const d_u = SumFy / this.m + st.v * st.r - st.w * st.q;
-      const d_v = SumFx / this.m + st.w * st.p - st.u * st.r;
+      const d_u = SumFy / this.m - st.v * st.r - st.w * st.q;
+      const d_v = SumFx / this.m + st.u * st.r + st.w * st.p;
       const d_w = SumFz / this.m;
       
       const d_q = SumM_pitch / this.I_pitch;
@@ -5231,17 +5760,21 @@ class VehicleDynamics15DOF {
       st.p += d_p * dt;
       st.r += d_r * dt;
       
-      // Update orientation and position
-      st.Y += st.u * dt;
-      st.X += st.v * dt;
+      // Update orientation and position in global coordinate system
+      const cPsi = Math.cos(st.psi), sPsi = Math.sin(st.psi);
+      const v_world_X = -st.u * sPsi + st.v * cPsi;
+      const v_world_Y =  st.u * cPsi + st.v * sPsi;
+      
+      st.X += v_world_X * dt;
+      st.Y += v_world_Y * dt;
       st.Z += st.w * dt;
       st.theta += st.q * dt;
       st.phi += st.p * dt;
       st.psi += st.r * dt;
       
-      this.telemetry.ax = d_u / 9.81;
-      this.telemetry.ay = d_v / 9.81;
-      this.telemetry.az = d_w / 9.81;
+      this.telemetry.ax = SumFy / (this.m * 9.81);
+      this.telemetry.ay = -SumFx / (this.m * 9.81);
+      this.telemetry.az = SumFz / (this.m * 9.81);
       
       t_remain -= dt;
     }
@@ -5307,6 +5840,9 @@ function openSlopeStage(){
   
   const initSpeedMs = (SLOPE_STAGE.speedKmh * 1000) / 3600;
   window.physicsEngine = new VehicleDynamics15DOF(S, SIM, initSpeedMs);
+  window.slopePilot = new UniversalAutoPilot(S);
+  window.slopePilot.setPath(new StraightPath(initSpeedMs));
+  window.slopePilot.active = true;
   
   requestAnimationFrame(slopeStageLoop);
 }
@@ -5329,36 +5865,31 @@ function slopeStageLoop(now){
   };
   
   // 1. 全自动巡航与居中保持 (Autonomous Drive)
-  let ctrl_steer = 0;
-  let ctrl_throttle = 0;
-  let ctrl_brake = 0;
-
+  let ctrl = { steer: 0, throttle: 0, brake: 0 };
   const targetSpeedMs = (SLOPE_STAGE.speedKmh * 1000) / 3600;
-  const curSpeed = window.physicsEngine ? window.physicsEngine.state.u : targetSpeedMs;
-  const speedError = targetSpeedMs - curSpeed;
 
   const isUserManual = (SLOPE_STAGE.keys.w || SLOPE_STAGE.keys.s || SLOPE_STAGE.keys.a || SLOPE_STAGE.keys.d || SLOPE_STAGE.keys.space);
   
   if(isUserManual) {
     SLOPE_STAGE.autoPilot = false;
-    if(SLOPE_STAGE.keys.a) ctrl_steer -= 8;
-    if(SLOPE_STAGE.keys.d) ctrl_steer += 8;
-    if(SLOPE_STAGE.keys.w) ctrl_throttle = 1.0;
-    if(SLOPE_STAGE.keys.s || SLOPE_STAGE.keys.space) ctrl_brake = 1.0;
+    if (window.slopePilot) window.slopePilot.active = false;
+    if(SLOPE_STAGE.keys.a) ctrl.steer -= 8;
+    if(SLOPE_STAGE.keys.d) ctrl.steer += 8;
+    if(SLOPE_STAGE.keys.w) ctrl.throttle = 1.0;
+    if(SLOPE_STAGE.keys.s || SLOPE_STAGE.keys.space) ctrl.brake = 1.0;
   } else {
-    // 自动驾驶闭环 PID
+    // Universal Auto Pilot Integration
     SLOPE_STAGE.autoPilot = true;
-    ctrl_throttle = Math.max(0, Math.min(1.0, 0.45 + speedError * 0.20));
-    ctrl_brake = speedError < -2.0 ? Math.max(0, Math.min(1.0, -speedError * 0.25)) : 0;
-    
-    if(window.physicsEngine) {
-      const devX = window.physicsEngine.state.X;
-      const devPsi = window.physicsEngine.state.psi;
-      ctrl_steer = Math.max(-6, Math.min(6, -devX * 0.6 - devPsi * 12));
+    if (window.slopePilot && window.physicsEngine) {
+      window.slopePilot.active = true;
+      if (window.slopePilot.path) {
+        window.slopePilot.path.targetSpeed = targetSpeedMs;
+      } else {
+        window.slopePilot.setPath(new StraightPath(targetSpeedMs));
+      }
+      ctrl = window.slopePilot.drive(window.physicsEngine.state, dt);
     }
   }
-
-  const ctrl = { steer: ctrl_steer, throttle: ctrl_throttle, brake: ctrl_brake };
 
   if(SLOPE_STAGE.playing && window.physicsEngine) {
     window.physicsEngine.step(ctrl, env, dt);
@@ -5376,10 +5907,12 @@ function slopeStageLoop(now){
       const z0F = (SIM.FR && SIM.FR.n && SIM.FR.idx) ? SIM.FR.n[SIM.FR.idx.WC].p0[2] : 250;
       const z0R = (SIM.RR && SIM.RR.n && SIM.RR.idx) ? SIM.RR.n[SIM.RR.idx.WC].p0[2] : 250;
       
-      if(SIM.FR) driveTo(SIM.FR, z0F + (tr.FR || 0) * 1000, ctrl.steer, 'front');
+      // Map steering angle (degrees) to approximate rack displacement (mm) for 3D visual
+      const rackDisplacement = ctrl.steer * -1.8; // Negative because positive steer (right) usually means rack pulls left
+      if(SIM.FR) driveTo(SIM.FR, z0F + (tr.FR || 0) * 1000, rackDisplacement, 'front');
       if(SIM.RR) driveTo(SIM.RR, z0R + (tr.RR || 0) * 1000, 0, 'rear');
       if(S.show.mirror){
-        if(SIM.FL) driveTo(SIM.FL, z0F + (tr.FL || 0) * 1000, -ctrl.steer, 'front');
+        if(SIM.FL) driveTo(SIM.FL, z0F + (tr.FL || 0) * 1000, -rackDisplacement, 'front');
         if(SIM.RL) driveTo(SIM.RL, z0R + (tr.RL || 0) * 1000, 0, 'rear');
       }
       SLOPE_STAGE.cachedScene = buildScenePRO();
@@ -5568,10 +6101,22 @@ function renderSlopeScene(alpha, st){
   // 2. Soft Contact Ground Shadow under the 4 wheels and chassis
   const shadowW = Math.max(1200, (S.front.tire.R || 300) * 3);
   const shadowL = (S.wb || 2600) + 800;
-  const s1 = projFast(-shadowW/2, -shadowL/2, 2);
-  const s2 = projFast(shadowW/2, -shadowL/2, 2);
-  const s3 = projFast(shadowW/2, shadowL/2, 2);
-  const s4 = projFast(-shadowW/2, shadowL/2, 2);
+  
+  const cX_shad = (st && st.X ? st.X : 0) * 1000;
+  const cY_shad = Math.cos(st && st.psi ? st.psi : 0);
+  const sY_shad = Math.sin(st && st.psi ? st.psi : 0);
+
+  const projShad = (lx, ly) => {
+    const rx = cY_shad * lx - sY_shad * ly + cX_shad;
+    const ry = sY_shad * lx + cY_shad * ly; // Y is statically 0 relative to car frame
+    return projFast(rx, ry, 2);
+  };
+
+  const s1 = projShad(-shadowW/2, -shadowL/2);
+  const s2 = projShad(shadowW/2, -shadowL/2);
+  const s3 = projShad(shadowW/2, shadowL/2);
+  const s4 = projShad(-shadowW/2, shadowL/2);
+
   if(s1 && s2 && s3 && s4){
     ctx.beginPath();
     ctx.moveTo(s1[0], s1[1]); ctx.lineTo(s2[0], s2[1]); ctx.lineTo(s3[0], s3[1]); ctx.lineTo(s4[0], s4[1]);
@@ -5581,52 +6126,91 @@ function renderSlopeScene(alpha, st){
   }
 
   // 3. Render 3D Full Chassis Multibody Scene (Ultra-fast cached draw)
-  const sc = SLOPE_STAGE.cachedScene || buildScenePRO();
-  for(let i = 0; i < sc.length; i++){
-    const prim = sc[i];
-    if(prim.type === "poly"){
-      if(prim.pts && prim.pts.length >= 2){
+  let sc;
+  try {
+    sc = SLOPE_STAGE.cachedScene || buildScenePRO();
+  } catch(e) {
+    console.error("buildScenePRO error:", e);
+    sc = [];
+  }
+  
+  // Transform car local coordinates to world coordinates before projection
+  const cx = (st && st.X ? st.X : 0) * 1000;
+  const cy = 0; // The road slides backward relative to the car
+  
+  // Calculate static Z offset so the wheels sit exactly on the road surface
+  const tireR = S.front && S.front.tire && S.front.tire.R ? S.front.tire.R : 330;
+  const wcZ = S.front && S.front.hp && S.front.hp.WC ? S.front.hp.WC[2] : 300;
+  const staticZOffset = tireR - wcZ;
+  
+  const cz = (st && st.Z ? st.Z : 0) * 1000 + staticZOffset;
+
+  const cP = Math.cos(st && st.theta ? st.theta : 0), sP = Math.sin(st && st.theta ? st.theta : 0);
+  const cR = Math.cos(st && st.phi ? st.phi : 0), sR = Math.sin(st && st.phi ? st.phi : 0);
+  const cY = Math.cos(st && st.psi ? st.psi : 0), sY = Math.sin(st && st.psi ? st.psi : 0);
+
+  // Yaw-Pitch-Roll rotation matrix
+  const R11 = cY * cR - sY * sP * sR,  R12 = -sY * cP,  R13 = cY * sR + sY * sP * cR;
+  const R21 = sY * cR + cY * sP * sR,  R22 = cY * cP,   R23 = sY * sR - cY * sP * cR;
+  const R31 = -cP * sR,                R32 = sP,        R33 = cP * cR;
+
+  const projBodyFast = (lx, ly, lz) => {
+    const rx = R11 * lx + R12 * ly + R13 * lz;
+    const ry = R21 * lx + R22 * ly + R23 * lz;
+    const rz = R31 * lx + R32 * ly + R33 * lz;
+    return projFast(rx + cx, ry + cy, rz + cz);
+  };
+
+  try {
+    for(let i = 0; i < sc.length; i++){
+      const o = sc[i];
+      if(!o) continue;
+      if(o.k === "l"){
+        if(!o.a || !o.b) continue;
+        const A = projBodyFast(o.a[0], o.a[1], o.a[2]);
+        const B = projBodyFast(o.b[0], o.b[1], o.b[2]);
+        if(!A || !B) continue;
         ctx.beginPath();
-        let valid = true;
-        for(let j = 0; j < prim.pts.length; j++){
-          const p = prim.pts[j];
-          const pt2d = projFast(p[0], p[1], p[2]);
-          if(!pt2d){ valid = false; break; }
-          if(j === 0) ctx.moveTo(pt2d[0], pt2d[1]);
-          else ctx.lineTo(pt2d[0], pt2d[1]);
-        }
-        if(valid){
-          if(prim.fill) { ctx.fillStyle = prim.fill; ctx.fill(); }
-          ctx.strokeStyle = prim.col || "#58a6ff";
-          ctx.lineWidth = prim.w || 1.2;
-          ctx.stroke();
-        }
-      }
-    } else if(prim.type === "line"){
-      const p1 = projFast(prim.a[0], prim.a[1], prim.a[2]);
-      const p2 = projFast(prim.b[0], prim.b[1], prim.b[2]);
-      if(p1 && p2){
-        ctx.beginPath();
-        ctx.moveTo(p1[0], p1[1]);
-        ctx.lineTo(p2[0], p2[1]);
-        ctx.strokeStyle = prim.col || "#fff";
-        ctx.lineWidth = prim.w || 1.2;
-        if(prim.dash) ctx.setLineDash(prim.dash); else ctx.setLineDash([]);
+        if(o.d && o.d.length) ctx.setLineDash(o.d); else ctx.setLineDash([]);
+        ctx.strokeStyle = o.c || "#58a6ff";
+        ctx.lineWidth = o.w || 1.2;
+        if(o.al !== undefined) ctx.globalAlpha = o.al;
+        ctx.moveTo(A[0], A[1]);
+        ctx.lineTo(B[0], B[1]);
         ctx.stroke();
-      }
-    } else if(prim.type === "node"){
-      const p = projFast(prim.p[0], prim.p[1], prim.p[2]);
-      if(p){
+        ctx.globalAlpha = 1;
+      } else if(o.k === "p"){
+        if(!o.pts || o.pts.length < 2) continue;
         ctx.beginPath();
-        ctx.arc(p[0], p[1], prim.r || 3.5, 0, Math.PI * 2);
-        ctx.fillStyle = prim.fill || "#fff";
+        if(o.d && o.d.length) ctx.setLineDash(o.d); else ctx.setLineDash([]);
+        let started = false;
+        for(let j = 0; j < o.pts.length; j++){
+          const Q = projBodyFast(o.pts[j][0], o.pts[j][1], o.pts[j][2]);
+          if(!Q){ started = false; continue; }
+          if(!started){ ctx.moveTo(Q[0], Q[1]); started = true; }
+          else ctx.lineTo(Q[0], Q[1]);
+        }
+        if(o.f){ ctx.fillStyle = o.f; ctx.fill(); }
+        ctx.strokeStyle = o.c || "#58a6ff";
+        ctx.lineWidth = o.w || 1.2;
+        ctx.stroke();
+      } else if(o.k === "n"){
+        if(!o.p) continue;
+        const A = projBodyFast(o.p[0], o.p[1], o.p[2]);
+        if(!A) continue;
+        ctx.beginPath();
+        ctx.arc(A[0], A[1], 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = o.fix ? "#e0a040" : "#fff";
         ctx.fill();
-        ctx.strokeStyle = prim.col || "#000";
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 0.8;
         ctx.stroke();
       }
     }
+  } catch(e) {
+    console.error("Render Loop Error:", e);
   }
+
   ctx.setLineDash([]);
 }
 
@@ -5763,6 +6347,706 @@ window.SLOPE_STAGE = SLOPE_STAGE;
 window.slopeStageLoop = slopeStageLoop;
 
 
+
+/* =====================================================================
+   SKIDPAD STAGE: 60-FPS 15-DOF CONSTANT RADIUS CORNERING DYNAMICS
+   ===================================================================== */
+const SKIDPAD_STAGE = {
+  active: false,
+  playing: true,
+  autoPilot: true,
+  mode: "steady", // "steady" | "sweep"
+  dir: -1,        // -1: CCW (left turn), +1: CW (right turn)
+  radius: 15.25,  // meters (Standard ISO/FSAE skidpad radius)
+  speedKmh: 45.0, // km/h
+  camMode: "behind",
+  camOrbit: { az: 0, elv: 0, distFactor: 1.0 },
+  lastTime: 0,
+  drag: null,
+  cachedScene: null,
+  rebuildCadence: 0,
+  lapCount: 0,
+  lapStartTime: 0,
+  lastLapTime: 0,
+  lastTheta: 0,
+  peakAy: 0,
+  skidTrails: [], // [{x, y, alpha, t}]
+  keys: { w: false, s: false, a: false, d: false, space: false }
+};
+
+const SKIDPAD_CAMS_CONFIG = {
+  behind:  { dx: 0,     dy: -4500, dz: 1200, lookDy: 800,  lookDz: 350, fov: 1.5 },
+  blimp:   { dx: 0,     dy: -12000, dz: 18000, lookDy: 6000, lookDz: 0,   fov: 1.4 },
+  outer:   { dx: 4500,  dy: -1200, dz: 900,  lookDy: 400,  lookDz: 300, fov: 1.5 },
+  center:  { dx: 0,     dy: 0,     dz: 1500, lookDy: 0,    lookDz: 400, fov: 1.4 },
+  cockpit: { dx: 0,     dy: -150,  dz: 620,  lookDy: 2500, lookDz: 350, fov: 1.3 }
+};
+
+function openSkidpadStage(){
+  const modal = document.getElementById("skidpadStageModal");
+  if(!modal) return;
+  SKIDPAD_STAGE.active = true;
+  SKIDPAD_STAGE.playing = true;
+  SKIDPAD_STAGE.autoPilot = true;
+  SKIDPAD_STAGE.lastTime = performance.now();
+  SKIDPAD_STAGE.camOrbit = { az: 0, elv: 0, distFactor: 1.0 };
+  SKIDPAD_STAGE.cachedScene = null;
+  SKIDPAD_STAGE.rebuildCadence = 0;
+  SKIDPAD_STAGE.lapCount = 0;
+  SKIDPAD_STAGE.lapStartTime = performance.now();
+  SKIDPAD_STAGE.lastLapTime = 0;
+  SKIDPAD_STAGE.peakAy = 0;
+  SKIDPAD_STAGE.skidTrails = [];
+  
+  const vehName = (VEHICLE_PRESETS[S.vehicleType]||{}).name || "Formula SAE";
+  const elName = document.getElementById("skidpadVehName");
+  if(elName) elName.textContent = vehName;
+  modal.classList.add("show");
+
+  const cv = document.getElementById("skidpadCanvas");
+  if(cv) {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = cv.clientWidth * dpr;
+    cv.height = cv.clientHeight * dpr;
+  }
+  
+  // Initial car position at (R, 0) facing North (psi = 0)
+  const initSpeedMs = (SKIDPAD_STAGE.speedKmh * 1000) / 3600;
+  window.skidpadEngine = new VehicleDynamics15DOF(S, SIM, initSpeedMs);
+  window.skidpadPilot = new UniversalAutoPilot(S);
+  window.skidpadPilot.setPath(new CirclePath(SKIDPAD_STAGE.radius, SKIDPAD_STAGE.dir, initSpeedMs));
+  window.skidpadPilot.active = true;
+  
+  const R = SKIDPAD_STAGE.radius;
+  window.skidpadEngine.state.X = R;
+  window.skidpadEngine.state.Y = 0;
+  window.skidpadEngine.state.Z = 0;
+  window.skidpadEngine.state.phi = 0;
+  window.skidpadEngine.state.theta = 0;
+  window.skidpadEngine.state.psi = (SKIDPAD_STAGE.dir === -1) ? 0 : Math.PI; // Heading North for CCW, South for CW
+  window.skidpadEngine.state.u = initSpeedMs;
+  window.skidpadEngine.state.v = 0;
+  window.skidpadEngine.state.r = 0;
+  SKIDPAD_STAGE.lastTheta = 0;
+  
+  requestAnimationFrame(skidpadStageLoop);
+}
+
+function closeSkidpadStage(){
+  const modal = document.getElementById("skidpadStageModal");
+  if(modal) modal.classList.remove("show");
+  SKIDPAD_STAGE.active = false;
+  rebuild();
+}
+
+function skidpadStageLoop(now){
+  if(!SKIDPAD_STAGE.active) return;
+  const dt = Math.min(0.033, (now - (SKIDPAD_STAGE.lastTime || now)) / 1000);
+  SKIDPAD_STAGE.lastTime = now;
+
+  const R_target = SKIDPAD_STAGE.radius;
+  const dir = SKIDPAD_STAGE.dir; // -1: CCW (left), +1: CW (right)
+  const eng = window.skidpadEngine;
+
+  // 1. Universal Auto Pilot integration
+  let ctrl = { steer: 0, throttle: 0, brake: 0 };
+  let targetSpeedMs = (SKIDPAD_STAGE.speedKmh * 1000) / 3600;
+
+  // Limit Grip Sweep Mode: Slowly ramp speed
+  if(SKIDPAD_STAGE.mode === "sweep" && SKIDPAD_STAGE.playing) {
+    SKIDPAD_STAGE.speedKmh += 0.5 * dt;
+    if(SKIDPAD_STAGE.speedKmh > 105) SKIDPAD_STAGE.speedKmh = 105;
+    const speedSlider = document.getElementById("skidpadSpeedSlider");
+    if(speedSlider) speedSlider.value = SKIDPAD_STAGE.speedKmh.toFixed(0);
+    const speedVal = document.getElementById("skidpadSpeedVal");
+    if(speedVal) speedVal.textContent = SKIDPAD_STAGE.speedKmh.toFixed(0) + " km/h";
+    targetSpeedMs = (SKIDPAD_STAGE.speedKmh * 1000) / 3600;
+  }
+
+  const isUserManual = (SKIDPAD_STAGE.keys.w || SKIDPAD_STAGE.keys.s || SKIDPAD_STAGE.keys.a || SKIDPAD_STAGE.keys.d || SKIDPAD_STAGE.keys.space);
+
+  if (isUserManual) {
+    SKIDPAD_STAGE.autoPilot = false;
+    if (window.skidpadPilot) window.skidpadPilot.active = false;
+    if(SKIDPAD_STAGE.keys.a) ctrl.steer -= 14;
+    if(SKIDPAD_STAGE.keys.d) ctrl.steer += 14;
+    if(SKIDPAD_STAGE.keys.w) ctrl.throttle = 1.0;
+    if(SKIDPAD_STAGE.keys.s || SKIDPAD_STAGE.keys.space) ctrl.brake = 1.0;
+  } else {
+    SKIDPAD_STAGE.autoPilot = true;
+    if (window.skidpadPilot && eng) {
+      window.skidpadPilot.active = true;
+      // Update dynamic target parameters
+      if (window.skidpadPilot.path) {
+        window.skidpadPilot.path.R = SKIDPAD_STAGE.radius;
+        window.skidpadPilot.path.dir = SKIDPAD_STAGE.dir;
+        window.skidpadPilot.path.targetSpeed = targetSpeedMs;
+      } else {
+        window.skidpadPilot.setPath(new CirclePath(SKIDPAD_STAGE.radius, SKIDPAD_STAGE.dir, targetSpeedMs));
+      }
+      ctrl = window.skidpadPilot.drive(eng.state, dt);
+    }
+  }
+
+  if(SKIDPAD_STAGE.playing && eng) {
+    eng.step(ctrl, { grade: 0, bumpNoise: 0 }, dt);
+    
+    // Lap Timing detection (crossing positive X-axis in CCW / CW)
+    const st = eng.state;
+    const curTheta = Math.atan2(st.Y, st.X);
+    if(dir === -1) {
+      if(SKIDPAD_STAGE.lastTheta < 0 && curTheta >= 0 && Math.abs(curTheta - SKIDPAD_STAGE.lastTheta) < 2.0) {
+        SKIDPAD_STAGE.lapCount++;
+        SKIDPAD_STAGE.lastLapTime = (now - SKIDPAD_STAGE.lapStartTime) / 1000;
+        SKIDPAD_STAGE.lapStartTime = now;
+      }
+    } else {
+      if(SKIDPAD_STAGE.lastTheta > 0 && curTheta <= 0 && Math.abs(curTheta - SKIDPAD_STAGE.lastTheta) < 2.0) {
+        SKIDPAD_STAGE.lapCount++;
+        SKIDPAD_STAGE.lastLapTime = (now - SKIDPAD_STAGE.lapStartTime) / 1000;
+        SKIDPAD_STAGE.lapStartTime = now;
+      }
+    }
+    SKIDPAD_STAGE.lastTheta = curTheta;
+
+    // Record tire skid marks
+    if(Math.abs(eng.telemetry.ay) > 0.6) {
+      SKIDPAD_STAGE.skidTrails.push({
+        x: st.X * 1000,
+        y: st.Y * 1000,
+        ay: Math.abs(eng.telemetry.ay),
+        t: now
+      });
+      if(SKIDPAD_STAGE.skidTrails.length > 250) SKIDPAD_STAGE.skidTrails.shift();
+    }
+  }
+
+  try {
+    const st = eng.state;
+    const tel = eng.telemetry;
+
+    // Kinematics update
+    SKIDPAD_STAGE.rebuildCadence++;
+    if(SKIDPAD_STAGE.rebuildCadence % 3 === 0 || !SKIDPAD_STAGE.cachedScene) {
+      const tr = tel.tr || { FL:0, FR:0, RL:0, RR:0 };
+      const z0F = (SIM.FR && SIM.FR.n && SIM.FR.idx) ? SIM.FR.n[SIM.FR.idx.WC].p0[2] : 250;
+      const z0R = (SIM.RR && SIM.RR.n && SIM.RR.idx) ? SIM.RR.n[SIM.RR.idx.WC].p0[2] : 250;
+
+      const rackDisplacement = ctrl.steer * -1.8;
+      if(SIM.FR) driveTo(SIM.FR, z0F + (tr.FR || 0) * 1000, rackDisplacement, 'front');
+      if(SIM.RR) driveTo(SIM.RR, z0R + (tr.RR || 0) * 1000, 0, 'rear');
+      if(S.show.mirror){
+        if(SIM.FL) driveTo(SIM.FL, z0F + (tr.FL || 0) * 1000, -rackDisplacement, 'front');
+        if(SIM.RL) driveTo(SIM.RL, z0R + (tr.RL || 0) * 1000, 0, 'rear');
+      }
+      SKIDPAD_STAGE.cachedScene = buildScenePRO();
+    }
+
+    window._tireSpinAngles = {
+      FL: st.omega.FL * (now/1000), 
+      FR: st.omega.FR * (now/1000),
+      RL: st.omega.RL * (now/1000), 
+      RR: st.omega.RR * (now/1000)
+    };
+
+    renderSkidpadScene(st, tel, ctrl);
+    updateSkidpadHUD(st, tel, ctrl, now);
+  } catch(err) {
+    console.error("Skidpad Render Error:", err);
+  }
+
+  requestAnimationFrame(skidpadStageLoop);
+}
+
+function renderSkidpadScene(st, tel, ctrl){
+  const cv = document.getElementById("skidpadCanvas");
+  if(!cv) return;
+  const ctx = cv.getContext("2d");
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  if(cv.width !== cv.clientWidth * dpr || cv.height !== cv.clientHeight * dpr){
+    cv.width = cv.clientWidth * dpr;
+    cv.height = cv.clientHeight * dpr;
+  }
+  const w = cv.width / dpr, h = cv.height / dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // 1. Sky & Atmosphere Background
+  const skyGrad = ctx.createRadialGradient(w/2, h/2, 50, w/2, h/2, Math.max(w, h));
+  skyGrad.addColorStop(0, "#0c131f");
+  skyGrad.addColorStop(0.6, "#080c14");
+  skyGrad.addColorStop(1, "#030508");
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  const R_mm = SKIDPAD_STAGE.radius * 1000;
+  const trackW_mm = 6500;
+  const Rin_mm = Math.max(1000, R_mm - trackW_mm / 2);
+  const Rout_mm = R_mm + trackW_mm / 2;
+
+  // Camera Coordinate Matrix (Zero GC)
+  const camCfg = SKIDPAD_CAMS_CONFIG[SKIDPAD_STAGE.camMode] || SKIDPAD_CAMS_CONFIG.behind;
+  const distFactor = SKIDPAD_STAGE.camOrbit.distFactor;
+  let cam_dx = camCfg.dx * distFactor, cam_dy = camCfg.dy * distFactor, cam_dz = camCfg.dz * distFactor;
+
+  if(SKIDPAD_STAGE.camOrbit.az !== 0 || SKIDPAD_STAGE.camOrbit.elv !== 0) {
+    const rH = Math.hypot(cam_dx, cam_dy);
+    const angH = Math.atan2(cam_dx, cam_dy) + SKIDPAD_STAGE.camOrbit.az;
+    cam_dx = Math.sin(angH) * rH;
+    cam_dy = Math.cos(angH) * rH;
+    cam_dz = cam_dz + Math.tan(SKIDPAD_STAGE.camOrbit.elv) * rH;
+  }
+
+  const carX_mm = st.X * 1000;
+  const carY_mm = st.Y * 1000;
+  const carYaw = st.psi;
+
+  // Transform Camera Eye and LookTarget relative to vehicle or track center
+  let E_x, E_y, E_z;
+  let look_x, look_y, look_z;
+
+  if(SKIDPAD_STAGE.camMode === "center") {
+    E_x = 0; E_y = 0; E_z = cam_dz;
+    look_x = carX_mm; look_y = carY_mm; look_z = 350;
+  } else if(SKIDPAD_STAGE.camMode === "blimp") {
+    E_x = 0; E_y = 0; E_z = cam_dz;
+    look_x = 0; look_y = 0; look_z = 0;
+  } else {
+    // Follows car heading
+    const cY = Math.cos(carYaw), sY = Math.sin(carYaw);
+    E_x = carX_mm + (-sY * cam_dy + cY * cam_dx);
+    E_y = carY_mm + ( cY * cam_dy + sY * cam_dx);
+    E_z = Math.max(150, cam_dz);
+    look_x = carX_mm + (-sY * camCfg.lookDy + cY * 0);
+    look_y = carY_mm + ( cY * camCfg.lookDy + sY * 0);
+    look_z = camCfg.lookDz || 350;
+  }
+
+  const fw_un = [look_x - E_x, look_y - E_y, look_z - E_z];
+  const l_fw = Math.hypot(fw_un[0], fw_un[1], fw_un[2]) || 1;
+  const fw = [fw_un[0]/l_fw, fw_un[1]/l_fw, fw_un[2]/l_fw];
+
+  const n_world = [0, 0, 1];
+  const rt_un = [
+    fw[1]*n_world[2] - fw[2]*n_world[1],
+    fw[2]*n_world[0] - fw[0]*n_world[2],
+    fw[0]*n_world[1] - fw[1]*n_world[0]
+  ];
+  const l_rt = Math.hypot(rt_un[0], rt_un[1], rt_un[2]) || 1;
+  const rt = [rt_un[0]/l_rt, rt_un[1]/l_rt, rt_un[2]/l_rt];
+
+  const up = [
+    rt[1]*fw[2] - rt[2]*fw[1],
+    rt[2]*fw[0] - rt[0]*fw[2],
+    rt[0]*fw[1] - rt[1]*fw[0]
+  ];
+
+  const fovDist = Math.min(w, h) * (camCfg.fov || 1.5);
+  const halfW = w / 2, halfH = h / 2;
+
+  const m11 = rt[0], m12 = rt[1], m13 = rt[2], v0x = -(rt[0]*E_x + rt[1]*E_y + rt[2]*E_z);
+  const m21 = up[0], m22 = up[1], m23 = up[2], v0y = -(up[0]*E_x + up[1]*E_y + up[2]*E_z);
+  const m31 = fw[0], m32 = fw[1], m33 = fw[2], v0z = -(fw[0]*E_x + fw[1]*E_y + fw[2]*E_z);
+
+  const projFast = (x, y, z) => {
+    const zc = m31*x + m32*y + m33*z + v0z;
+    if(zc < 80) return null;
+    const f = fovDist / zc;
+    return [
+      halfW + (m11*x + m12*y + m13*z + v0x) * f,
+      halfH - (m21*x + m22*y + m23*z + v0y) * f
+    ];
+  };
+
+  // 2. Render Circular Skidpad Ground Track
+  const segs = 48;
+  const angleStep = (Math.PI * 2) / segs;
+
+  // Asphalt Ring
+  for(let i = 0; i < segs; i++){
+    const a1 = i * angleStep, a2 = (i + 1) * angleStep;
+    const p1 = projFast(Rin_mm * Math.cos(a1), Rin_mm * Math.sin(a1), 0);
+    const p2 = projFast(Rout_mm * Math.cos(a1), Rout_mm * Math.sin(a1), 0);
+    const p3 = projFast(Rout_mm * Math.cos(a2), Rout_mm * Math.sin(a2), 0);
+    const p4 = projFast(Rin_mm * Math.cos(a2), Rin_mm * Math.sin(a2), 0);
+
+    if(p1 && p2 && p3 && p4){
+      ctx.beginPath();
+      ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.lineTo(p3[0], p3[1]); ctx.lineTo(p4[0], p4[1]);
+      ctx.closePath();
+      ctx.fillStyle = (i % 2 === 0) ? "#161c24" : "#131820";
+      ctx.fill();
+    }
+  }
+
+  // Inner & Outer Checkered Kerbs
+  const kerbW = 600;
+  for(let i = 0; i < segs; i++){
+    const a1 = i * angleStep, a2 = (i + 1) * angleStep;
+    const isRed = (i % 2 === 0);
+    const kerbCol = isRed ? "#e74c3c" : "#ecf0f1";
+
+    // Outer Kerb
+    const ok1 = projFast(Rout_mm * Math.cos(a1), Rout_mm * Math.sin(a1), 15);
+    const ok2 = projFast((Rout_mm + kerbW) * Math.cos(a1), (Rout_mm + kerbW) * Math.sin(a1), 25);
+    const ok3 = projFast((Rout_mm + kerbW) * Math.cos(a2), (Rout_mm + kerbW) * Math.sin(a2), 25);
+    const ok4 = projFast(Rout_mm * Math.cos(a2), Rout_mm * Math.sin(a2), 15);
+    if(ok1 && ok2 && ok3 && ok4){
+      ctx.beginPath();
+      ctx.moveTo(ok1[0], ok1[1]); ctx.lineTo(ok2[0], ok2[1]); ctx.lineTo(ok3[0], ok3[1]); ctx.lineTo(ok4[0], ok4[1]);
+      ctx.closePath();
+      ctx.fillStyle = kerbCol; ctx.fill();
+    }
+
+    // Inner Kerb
+    const ik1 = projFast((Rin_mm - kerbW) * Math.cos(a1), (Rin_mm - kerbW) * Math.sin(a1), 25);
+    const ik2 = projFast(Rin_mm * Math.cos(a1), Rin_mm * Math.sin(a1), 15);
+    const ik3 = projFast(Rin_mm * Math.cos(a2), Rin_mm * Math.sin(a2), 15);
+    const ik4 = projFast((Rin_mm - kerbW) * Math.cos(a2), (Rin_mm - kerbW) * Math.sin(a2), 25);
+    if(ik1 && ik2 && ik3 && ik4){
+      ctx.beginPath();
+      ctx.moveTo(ik1[0], ik1[1]); ctx.lineTo(ik2[0], ik2[1]); ctx.lineTo(ik3[0], ik3[1]); ctx.lineTo(ik4[0], ik4[1]);
+      ctx.closePath();
+      ctx.fillStyle = kerbCol; ctx.fill();
+    }
+
+    // Center Radius White Dash
+    if(i % 2 === 0){
+      const cd1 = projFast(R_mm * Math.cos(a1 + angleStep*0.2), R_mm * Math.sin(a1 + angleStep*0.2), 2);
+      const cd2 = projFast(R_mm * Math.cos(a1 + angleStep*0.8), R_mm * Math.sin(a1 + angleStep*0.8), 2);
+      if(cd1 && cd2){
+        ctx.beginPath(); ctx.moveTo(cd1[0], cd1[1]); ctx.lineTo(cd2[0], cd2[1]);
+        ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = 2.5; ctx.stroke();
+      }
+    }
+  }
+
+  // Pylon Cones (Orange Track Markers)
+  for(let i = 0; i < 16; i++){
+    const ang = i * (Math.PI * 2 / 16);
+    const coneBase = projFast((Rin_mm - 150) * Math.cos(ang), (Rin_mm - 150) * Math.sin(ang), 0);
+    const coneTop = projFast((Rin_mm - 150) * Math.cos(ang), (Rin_mm - 150) * Math.sin(ang), 400);
+    if(coneBase && coneTop){
+      ctx.beginPath();
+      ctx.moveTo(coneBase[0]-6, coneBase[1]);
+      ctx.lineTo(coneTop[0], coneTop[1]);
+      ctx.lineTo(coneBase[0]+6, coneBase[1]);
+      ctx.closePath();
+      ctx.fillStyle = "#ff6b35"; ctx.fill();
+    }
+  }
+
+  // Central Glowing Telemetry Gyro Compass
+  const centerP0 = projFast(0, 0, 0);
+  if(centerP0){
+    const cR1 = projFast(1800, 0, 0);
+    if(cR1){
+      const radPix = Math.hypot(cR1[0] - centerP0[0], cR1[1] - centerP0[1]);
+      ctx.beginPath();
+      ctx.arc(centerP0[0], centerP0[1], radPix, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(243, 156, 18, 0.4)"; ctx.lineWidth = 1.5; ctx.stroke();
+      
+      const cN = projFast(0, 2400, 0), cS = projFast(0, -2400, 0);
+      const cE = projFast(2400, 0, 0), cW = projFast(-2400, 0, 0);
+      if(cN && cS){ ctx.beginPath(); ctx.moveTo(cN[0], cN[1]); ctx.lineTo(cS[0], cS[1]); ctx.strokeStyle="rgba(243,156,18,0.2)"; ctx.stroke(); }
+      if(cE && cW){ ctx.beginPath(); ctx.moveTo(cE[0], cE[1]); ctx.lineTo(cW[0], cW[1]); ctx.strokeStyle="rgba(243,156,18,0.2)"; ctx.stroke(); }
+    }
+  }
+
+  // Dynamic Tire Skid Trails
+  if(SKIDPAD_STAGE.skidTrails.length > 2){
+    ctx.beginPath();
+    let started = false;
+    for(let i = 0; i < SKIDPAD_STAGE.skidTrails.length; i++){
+      const tr = SKIDPAD_STAGE.skidTrails[i];
+      const p = projFast(tr.x, tr.y, 3);
+      if(!p) { started = false; continue; }
+      if(!started) { ctx.moveTo(p[0], p[1]); started = true; }
+      else ctx.lineTo(p[0], p[1]);
+    }
+    ctx.strokeStyle = "rgba(10, 10, 10, 0.45)";
+    ctx.lineWidth = 14;
+    ctx.stroke();
+  }
+
+  // 3. Dynamic Soft Ground Shadow under Car
+  const shadowW = Math.max(1200, (S.front.tire.R || 300) * 3);
+  const shadowL = (S.wb || 2600) + 800;
+  const cY_c = Math.cos(carYaw), sY_c = Math.sin(carYaw);
+
+  const projShad = (lx, ly) => {
+    const rx = -sY_c * ly + cY_c * lx + carX_mm;
+    const ry =  cY_c * ly + sY_c * lx + carY_mm;
+    return projFast(rx, ry, 2);
+  };
+
+  const s1 = projShad(-shadowW/2, -shadowL/2);
+  const s2 = projShad(shadowW/2, -shadowL/2);
+  const s3 = projShad(shadowW/2, shadowL/2);
+  const s4 = projShad(-shadowW/2, shadowL/2);
+  if(s1 && s2 && s3 && s4){
+    ctx.beginPath();
+    ctx.moveTo(s1[0], s1[1]); ctx.lineTo(s2[0], s2[1]); ctx.lineTo(s3[0], s3[1]); ctx.lineTo(s4[0], s4[1]);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+    ctx.fill();
+  }
+
+  // 4. 3D Full Chassis Multibody Scene (Euler Rotation & World Offset)
+  let sc;
+  try {
+    sc = SKIDPAD_STAGE.cachedScene || buildScenePRO();
+  } catch(e) {
+    sc = [];
+  }
+
+  const tireR = S.front && S.front.tire && S.front.tire.R ? S.front.tire.R : 330;
+  const wcZ = S.front && S.front.hp && S.front.hp.WC ? S.front.hp.WC[2] : 300;
+  const staticZOffset = tireR - wcZ;
+  const carZ_mm = (st.Z || 0) * 1000 + staticZOffset;
+
+  const cP = Math.cos(st.theta || 0), sP = Math.sin(st.theta || 0);
+  const cR = Math.cos(st.phi || 0),   sR = Math.sin(st.phi || 0);
+  const cY = Math.cos(st.psi || 0),   sY = Math.sin(st.psi || 0);
+
+  // Rotation matrix: Yaw (Z), Pitch (X), Roll (Y)
+  // Local frame: +Y forward, +X right, +Z up
+  // World frame: +Y North, +X East, +Z up
+  // When psi=0 (North): Local +Y is World +Y, Local +X is World +X
+  const R11 = cY * cR - sY * sP * sR,  R12 = -sY * cP,  R13 = cY * sR + sY * sP * cR;
+  const R21 = sY * cR + cY * sP * sR,  R22 =  cY * cP,  R23 = sY * sR - cY * sP * cR;
+  const R31 = -cP * sR,                R32 =  sP,       R33 = cP * cR;
+
+  const projSkidpadBody = (lx, ly, lz) => {
+    const rx = R11 * lx + R12 * ly + R13 * lz;
+    const ry = R21 * lx + R22 * ly + R23 * lz;
+    const rz = R31 * lx + R32 * ly + R33 * lz;
+    return projFast(rx + carX_mm, ry + carY_mm, rz + carZ_mm);
+  };
+
+  try {
+    for(let i = 0; i < sc.length; i++){
+      const o = sc[i];
+      if(!o) continue;
+      if(o.k === "l"){
+        if(!o.a || !o.b) continue;
+        const A = projSkidpadBody(o.a[0], o.a[1], o.a[2]);
+        const B = projSkidpadBody(o.b[0], o.b[1], o.b[2]);
+        if(!A || !B) continue;
+        ctx.beginPath();
+        if(o.d && o.d.length) ctx.setLineDash(o.d); else ctx.setLineDash([]);
+        ctx.strokeStyle = o.c || "#f39c12";
+        ctx.lineWidth = o.w || 1.2;
+        if(o.al !== undefined) ctx.globalAlpha = o.al;
+        ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]);
+        ctx.stroke(); ctx.globalAlpha = 1;
+      } else if(o.k === "p"){
+        if(!o.pts || o.pts.length < 2) continue;
+        ctx.beginPath();
+        if(o.d && o.d.length) ctx.setLineDash(o.d); else ctx.setLineDash([]);
+        let started = false;
+        for(let j = 0; j < o.pts.length; j++){
+          const Q = projSkidpadBody(o.pts[j][0], o.pts[j][1], o.pts[j][2]);
+          if(!Q){ started = false; continue; }
+          if(!started){ ctx.moveTo(Q[0], Q[1]); started = true; }
+          else ctx.lineTo(Q[0], Q[1]);
+        }
+        if(o.f){ ctx.fillStyle = o.f; ctx.fill(); }
+        ctx.strokeStyle = o.c || "#f39c12";
+        ctx.lineWidth = o.w || 1.2;
+        ctx.stroke();
+      } else if(o.k === "n"){
+        if(!o.p) continue;
+        const A = projSkidpadBody(o.p[0], o.p[1], o.p[2]);
+        if(!A) continue;
+        ctx.beginPath();
+        ctx.arc(A[0], A[1], 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = o.fix ? "#e0a040" : "#fff";
+        ctx.fill();
+        ctx.strokeStyle = "#000"; ctx.lineWidth = 0.8; ctx.stroke();
+      }
+    }
+  } catch(e) {
+    console.error("Skidpad Render Error:", e);
+  }
+
+  ctx.setLineDash([]);
+}
+
+function updateSkidpadHUD(st, tel, ctrl, now){
+  const speedKmh = Math.max(0, st.u * 3.6);
+  const yawRate = Math.abs(st.r || 0);
+  const ay_g = Math.abs(tel.ay || 0);
+
+  const elSpeed = document.getElementById("skidpadHudSpeed");
+  if(elSpeed) elSpeed.textContent = `${speedKmh.toFixed(1)} km/h (${yawRate.toFixed(2)} rad/s)`;
+
+  const curLapElapsed = (now - SKIDPAD_STAGE.lapStartTime) / 1000;
+  const elLap = document.getElementById("skidpadHudLap");
+  if(elLap) {
+    const lastLapStr = SKIDPAD_STAGE.lastLapTime > 0 ? ` (Last: ${SKIDPAD_STAGE.lastLapTime.toFixed(2)}s)` : '';
+    elLap.textContent = `${curLapElapsed.toFixed(2)} s (Lap ${SKIDPAD_STAGE.lapCount})${lastLapStr}`;
+  }
+
+  const muPeak = 1.45;
+  const gripPct = Math.min(100, (ay_g / muPeak) * 100);
+  const elAy = document.getElementById("skidpadHudAy");
+  if(elAy) elAy.textContent = `${ay_g.toFixed(2)} g (抓地利用 ${gripPct.toFixed(1)}%)`;
+
+  const isCCW = (SKIDPAD_STAGE.dir === -1);
+  const innerFz = isCCW ? ((tel.Fz.FL || 0) + (tel.Fz.RL || 0)) : ((tel.Fz.FR || 0) + (tel.Fz.RR || 0));
+  const outerFz = isCCW ? ((tel.Fz.FR || 0) + (tel.Fz.RR || 0)) : ((tel.Fz.FL || 0) + (tel.Fz.RL || 0));
+  const totalFz = Math.max(1, innerFz + outerFz);
+  const innerPct = (innerFz / totalFz) * 100;
+  const outerPct = (outerFz / totalFz) * 100;
+
+  const elSplit = document.getElementById("skidpadHudLoadSplit");
+  if(elSplit) elSplit.textContent = `${innerPct.toFixed(1)}% / ${outerPct.toFixed(1)}%`;
+
+  const rollDeg = (st.phi || 0) * (180 / Math.PI);
+  const elRoll = document.getElementById("skidpadHudRoll");
+  if(elRoll) elRoll.textContent = `${rollDeg > 0 ? '+' : ''}${rollDeg.toFixed(2)}°`;
+
+  const alphaF = Math.abs(tel.alpha.FL + tel.alpha.FR) / 2;
+  const alphaR = Math.abs(tel.alpha.RL + tel.alpha.RR) / 2;
+  const diffAlpha = (alphaF - alphaR) * (180 / Math.PI);
+  const elSteer = document.getElementById("skidpadHudSteerBehavior");
+  if(elSteer) {
+    if(diffAlpha > 0.8) {
+      elSteer.textContent = `转向不足 (Understeer +${diffAlpha.toFixed(1)}°)`;
+      elSteer.className = "warn";
+    } else if(diffAlpha < -0.8) {
+      elSteer.textContent = `过度转向 (Oversteer ${diffAlpha.toFixed(1)}°)`;
+      elSteer.className = "warn";
+    } else {
+      elSteer.textContent = `中性稳态响应 (Neutral Balance)`;
+      elSteer.className = "good";
+    }
+  }
+
+  const tr = tel.tr || { FL:0, FR:0, RL:0, RR:0 };
+  const outerTr = isCCW ? (((tr.FR||0)+(tr.RR||0))/2)*1000 : (((tr.FL||0)+(tr.RL||0))/2)*1000;
+  const innerTr = isCCW ? (((tr.FL||0)+(tr.RL||0))/2)*1000 : (((tr.FR||0)+(tr.RR||0))/2)*1000;
+
+  const elOuter = document.getElementById("skidpadHudOuterSquat");
+  if(elOuter) elOuter.textContent = `${outerTr > 0 ? '+' : ''}${outerTr.toFixed(1)} mm`;
+
+  const elInner = document.getElementById("skidpadHudInnerLift");
+  if(elInner) elInner.textContent = `${innerTr > 0 ? '+' : ''}${innerTr.toFixed(1)} mm`;
+}
+
+function initSkidpadStageEvents(){
+  const btn = document.getElementById("skidpadStageBtn");
+  if(btn) btn.onclick = openSkidpadStage;
+
+  const exitBtn = document.getElementById("skidpadExitBtn");
+  if(exitBtn) exitBtn.onclick = closeSkidpadStage;
+
+  const playBtn = document.getElementById("skidpadPlayBtn");
+  if(playBtn) {
+    playBtn.onclick = () => {
+      SKIDPAD_STAGE.playing = !SKIDPAD_STAGE.playing;
+      playBtn.textContent = SKIDPAD_STAGE.playing ? "⏸ 暂停" : "▶ 继续";
+    };
+  }
+
+  const radiusSlider = document.getElementById("skidpadRadiusSlider");
+  if(radiusSlider) {
+    radiusSlider.oninput = (e) => {
+      const v = parseFloat(e.target.value);
+      SKIDPAD_STAGE.radius = v;
+      document.getElementById("skidpadRadiusVal").textContent = v.toFixed(2) + " m";
+    };
+  }
+
+  const speedSlider = document.getElementById("skidpadSpeedSlider");
+  if(speedSlider) {
+    speedSlider.oninput = (e) => {
+      const v = parseFloat(e.target.value);
+      SKIDPAD_STAGE.speedKmh = v;
+      document.getElementById("skidpadSpeedVal").textContent = v + " km/h";
+    };
+  }
+
+  const modeSelect = document.getElementById("skidpadModeSelect");
+  if(modeSelect) {
+    modeSelect.onchange = (e) => {
+      SKIDPAD_STAGE.mode = e.target.value;
+    };
+  }
+
+  const dirBtn = document.getElementById("skidpadDirBtn");
+  if(dirBtn) {
+    dirBtn.onclick = () => {
+      SKIDPAD_STAGE.dir = (SKIDPAD_STAGE.dir === -1) ? 1 : -1;
+      dirBtn.textContent = SKIDPAD_STAGE.dir === -1 ? "🔄 逆时针 (CCW)" : "🔁 顺时针 (CW)";
+    };
+  }
+
+  const camBtns = document.querySelectorAll(".skidpad-cam-btn");
+  camBtns.forEach(b => {
+    b.onclick = () => {
+      camBtns.forEach(q => q.classList.remove("on"));
+      b.classList.add("on");
+      SKIDPAD_STAGE.camMode = b.dataset.cam;
+      SKIDPAD_STAGE.camOrbit = { az: 0, elv: 0, distFactor: 1.0 };
+    };
+  });
+
+  const cv = document.getElementById("skidpadCanvas");
+  if(cv) {
+    cv.addEventListener("mousedown", (e) => {
+      SKIDPAD_STAGE.drag = { x0: e.clientX, y0: e.clientY, az0: SKIDPAD_STAGE.camOrbit.az, elv0: SKIDPAD_STAGE.camOrbit.elv };
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if(!SKIDPAD_STAGE.drag || !SKIDPAD_STAGE.active) return;
+      const dx = e.clientX - SKIDPAD_STAGE.drag.x0;
+      const dy = e.clientY - SKIDPAD_STAGE.drag.y0;
+      SKIDPAD_STAGE.camOrbit.az = SKIDPAD_STAGE.drag.az0 - dx * 0.008;
+      SKIDPAD_STAGE.camOrbit.elv = Math.max(-0.6, Math.min(0.6, SKIDPAD_STAGE.drag.elv0 - dy * 0.006));
+    });
+
+    window.addEventListener("mouseup", () => {
+      SKIDPAD_STAGE.drag = null;
+    });
+
+    cv.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 1.08 : 0.92;
+      SKIDPAD_STAGE.camOrbit.distFactor = Math.max(0.3, Math.min(3.5, SKIDPAD_STAGE.camOrbit.distFactor * delta));
+    }, { passive: false });
+
+    cv.addEventListener("dblclick", () => {
+      SKIDPAD_STAGE.camOrbit = { az: 0, elv: 0, distFactor: 1.0 };
+    });
+  }
+
+  // Keyboard driving controls for Skidpad
+  window.addEventListener("keydown", (e) => {
+    if(!SKIDPAD_STAGE.active) return;
+    const k = e.key.toLowerCase();
+    if(k === "w" || k === "arrowup") SKIDPAD_STAGE.keys.w = true;
+    if(k === "s" || k === "arrowdown") SKIDPAD_STAGE.keys.s = true;
+    if(k === "a" || k === "arrowleft") SKIDPAD_STAGE.keys.a = true;
+    if(k === "d" || k === "arrowright") SKIDPAD_STAGE.keys.d = true;
+    if(k === " ") { SKIDPAD_STAGE.keys.space = true; e.preventDefault(); }
+  });
+
+  window.addEventListener("keyup", (e) => {
+    if(!SKIDPAD_STAGE.active) return;
+    const k = e.key.toLowerCase();
+    if(k === "w" || k === "arrowup") SKIDPAD_STAGE.keys.w = false;
+    if(k === "s" || k === "arrowdown") SKIDPAD_STAGE.keys.s = false;
+    if(k === "a" || k === "arrowleft") SKIDPAD_STAGE.keys.a = false;
+    if(k === "d" || k === "arrowright") SKIDPAD_STAGE.keys.d = false;
+    if(k === " ") SKIDPAD_STAGE.keys.space = false;
+  });
+}
+
+window.openSkidpadStage = openSkidpadStage;
+window.closeSkidpadStage = closeSkidpadStage;
+window.SKIDPAD_STAGE = SKIDPAD_STAGE;
+
 // Init Pure Suspension button
 (function initPureSuspButton(){
   const btn = document.getElementById("pureSuspTg");
@@ -5793,6 +7077,8 @@ const evalCloseBtn = document.getElementById("evalCloseBtn");
 if(evalCloseBtn) evalCloseBtn.onclick = () => document.getElementById("suspEvalModal").classList.remove("show");
 
 initSlopeStageEvents();
+initSkidpadStageEvents();
+
 
 hpLoad();
 buildLeft();
@@ -5803,6 +7089,482 @@ simulate(0.016);
 simulate(0.016);
 VW.forEach(v=>{sizeView(v);fitView(v);});
 requestAnimationFrame(loop);
+
+/* =====================================================================
+   CIRCUIT STAGE: AUTONOMOUS GRAND PRIX
+   ===================================================================== */
+const CIRCUIT_STAGE = {
+  camMode: "behind",
+  active: false,
+  playing: false,
+  autoPilot: true,
+  path: null,
+  cachedScene: null,
+  rebuildCadence: 0,
+  camOrbit: { az: -0.5, elv: 0.3, distFactor: 1.0 },
+  keys: { w:false, a:false, s:false, d:false, space:false }
+};
+
+function openCircuitStage() {
+  const modal = document.getElementById("circuitStageModal");
+  if(!modal) return;
+  
+  if (window.SLOPE_STAGE && SLOPE_STAGE.active) closeSlopeStage();
+  if (window.SKIDPAD_STAGE && SKIDPAD_STAGE.active) closeSkidpadStage();
+
+  CIRCUIT_STAGE.active = true;
+  CIRCUIT_STAGE.playing = true;
+  CIRCUIT_STAGE.path = buildShanghaiCircuit();
+  CIRCUIT_STAGE.cachedScene = null;
+  CIRCUIT_STAGE.rebuildCadence = 0;
+  
+  const startState = {
+    X: 0, Y: 0, Z: 0.3,
+    phi: 0, theta: 0, psi: 0,
+    u: 0.1, v: 0, w: 0,
+    p: 0, q: 0, r: 0,
+    z: {FL:0,FR:0,RL:0,RR:0},
+    dz: {FL:0,FR:0,RL:0,RR:0},
+    omega: {FL:0,FR:0,RL:0,RR:0}
+  };
+  
+  window.physicsEngine = new VehicleDynamics15DOF(S, SIM, 0.1);
+  Object.assign(window.physicsEngine.state, startState);
+  
+  window.circuitPilot = new UniversalAutoPilot(S);
+  window.circuitPilot.setPath(CIRCUIT_STAGE.path);
+  window.circuitPilot.active = true;
+  
+  modal.classList.add("show");
+  
+  const cv = document.getElementById("circuitCanvas");
+  if(cv) {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = cv.clientWidth * dpr;
+    cv.height = cv.clientHeight * dpr;
+    
+    cv.onkeydown = e => {
+      if(e.key==='w'||e.key==='W') CIRCUIT_STAGE.keys.w = true;
+      if(e.key==='s'||e.key==='S') CIRCUIT_STAGE.keys.s = true;
+      if(e.key==='a'||e.key==='A') CIRCUIT_STAGE.keys.a = true;
+      if(e.key==='d'||e.key==='D') CIRCUIT_STAGE.keys.d = true;
+      if(e.key===' ') CIRCUIT_STAGE.keys.space = true;
+    };
+    cv.onkeyup = e => {
+      if(e.key==='w'||e.key==='W') CIRCUIT_STAGE.keys.w = false;
+      if(e.key==='s'||e.key==='S') CIRCUIT_STAGE.keys.s = false;
+      if(e.key==='a'||e.key==='A') CIRCUIT_STAGE.keys.a = false;
+      if(e.key==='d'||e.key==='D') CIRCUIT_STAGE.keys.d = false;
+      if(e.key===' ') CIRCUIT_STAGE.keys.space = false;
+    };
+    
+    let isDragging = false;
+    cv.onmousedown = () => { isDragging = true; cv.focus(); };
+    window.addEventListener("mouseup", () => { isDragging = false; });
+    window.addEventListener("mousemove", e => {
+      if(isDragging && CIRCUIT_STAGE.active) {
+        CIRCUIT_STAGE.camOrbit.az -= e.movementX * 0.005;
+        CIRCUIT_STAGE.camOrbit.elv += e.movementY * 0.005;
+        CIRCUIT_STAGE.camOrbit.elv = Math.max(0.05, Math.min(1.5, CIRCUIT_STAGE.camOrbit.elv));
+      }
+    });
+    cv.onwheel = e => {
+      e.preventDefault();
+      CIRCUIT_STAGE.camOrbit.distFactor *= (e.deltaY > 0 ? 1.1 : 0.9);
+      CIRCUIT_STAGE.camOrbit.distFactor = Math.max(0.3, Math.min(5.0, CIRCUIT_STAGE.camOrbit.distFactor));
+    };
+  }
+  
+  const playBtn = document.getElementById("circuitPlayBtn");
+  if(playBtn) {
+    playBtn.onclick = () => {
+      CIRCUIT_STAGE.playing = !CIRCUIT_STAGE.playing;
+      playBtn.textContent = CIRCUIT_STAGE.playing ? "⏸ 暂停" : "▶ 继续";
+    };
+  }
+  
+  requestAnimationFrame(circuitStageLoop);
+}
+
+function closeCircuitStage() {
+  const modal = document.getElementById("circuitStageModal");
+  if(modal) modal.classList.remove("show");
+  CIRCUIT_STAGE.active = false;
+  rebuild();
+}
+
+function circuitStageLoop(now) {
+  if (!CIRCUIT_STAGE.active) return;
+
+  const eng = window.physicsEngine;
+  let dt = 1.0 / 60.0;
+  let ctrl = { steer: 0, throttle: 0, brake: 0 };
+  let e_y = 0, v_tar = 0;
+
+  if (eng && CIRCUIT_STAGE.path) {
+    const isUserManual = (CIRCUIT_STAGE.keys.w || CIRCUIT_STAGE.keys.s || CIRCUIT_STAGE.keys.a || CIRCUIT_STAGE.keys.d || CIRCUIT_STAGE.keys.space);
+    if(isUserManual) {
+      if(window.circuitPilot) window.circuitPilot.active = false;
+      if(CIRCUIT_STAGE.keys.a) ctrl.steer -= 8;
+      if(CIRCUIT_STAGE.keys.d) ctrl.steer += 8;
+      if(CIRCUIT_STAGE.keys.w) ctrl.throttle = 1.0;
+      if(CIRCUIT_STAGE.keys.s || CIRCUIT_STAGE.keys.space) ctrl.brake = 1.0;
+    } else {
+      if(window.circuitPilot) {
+        window.circuitPilot.active = true;
+        ctrl = window.circuitPilot.drive(eng.state, dt);
+        const pt = CIRCUIT_STAGE.path.getLookahead(eng.state.X, eng.state.Y, eng.state.u);
+        e_y = pt.crossTrackError;
+        v_tar = pt.targetSpeed;
+        
+        // 🔒 INVISIBLE GUARDRAILS: Hard physical constraint to NEVER leave the track
+        const maxDev = 4.8; // Track is 11m wide (5.5m half-width)
+        if (Math.abs(e_y) > maxDev) {
+            const pen = Math.abs(e_y) - maxDev;
+            const sign = Math.sign(e_y);
+            // Push vehicle position back inside boundary
+            eng.state.X -= sign * pt.nx * pen;
+            eng.state.Y -= sign * pt.ny * pen;
+            // Dampen velocities to prevent bouncing
+            eng.state.v *= 0.7;
+            eng.state.r *= 0.7;
+            e_y = sign * maxDev; // clamp reading for HUD
+        }
+      }
+    }
+  }
+
+  if (CIRCUIT_STAGE.playing && eng) {
+    eng.step(ctrl, { grade: 0, bumpNoise: 0 }, dt);
+  }
+
+  try {
+    const st = eng.state;
+    const tel = eng.telemetry;
+    
+    CIRCUIT_STAGE.rebuildCadence++;
+    if(CIRCUIT_STAGE.rebuildCadence % 3 === 0 || !CIRCUIT_STAGE.cachedScene) {
+      const z0F = (SIM.FR && SIM.FR.n && SIM.FR.idx) ? SIM.FR.n[SIM.FR.idx.WC].p0[2] : 250;
+      const z0R = (SIM.RR && SIM.RR.n && SIM.RR.idx) ? SIM.RR.n[SIM.RR.idx.WC].p0[2] : 250;
+      const rackDisplacement = ctrl.steer * -1.8;
+      const tr = tel.tr || { FL:0, FR:0, RL:0, RR:0 };
+      if(SIM.FR) driveTo(SIM.FR, z0F + (tr.FR || 0) * 1000, rackDisplacement, 'front');
+      if(SIM.RR) driveTo(SIM.RR, z0R + (tr.RR || 0) * 1000, 0, 'rear');
+      if(S.show.mirror){
+        if(SIM.FL) driveTo(SIM.FL, z0F + (tr.FL || 0) * 1000, -rackDisplacement, 'front');
+        if(SIM.RL) driveTo(SIM.RL, z0R + (tr.RL || 0) * 1000, 0, 'rear');
+      }
+      CIRCUIT_STAGE.cachedScene = buildScenePRO();
+    }
+    
+    window._tireSpinAngles = {
+      FL: (window._tireSpinAngles ? window._tireSpinAngles.FL : 0) + (st.omega.FL * dt),
+      FR: (window._tireSpinAngles ? window._tireSpinAngles.FR : 0) + (st.omega.FR * dt),
+      RL: (window._tireSpinAngles ? window._tireSpinAngles.RL : 0) + (st.omega.RL * dt),
+      RR: (window._tireSpinAngles ? window._tireSpinAngles.RR : 0) + (st.omega.RR * dt)
+    };
+    
+    renderCircuitScene(st, tel, ctrl);
+    
+    // HUD Update
+    const elV = document.getElementById("c_hud_v");
+    if(elV) elV.textContent = (Math.max(0, st.u) * 3.6).toFixed(1) + " km/h";
+    const elVT = document.getElementById("c_hud_vtar");
+    if(elVT) elVT.textContent = (v_tar * 3.6).toFixed(1) + " km/h";
+    const elAy = document.getElementById("c_hud_ay");
+    if(elAy) elAy.textContent = Math.abs(tel.ay || 0).toFixed(2) + " g";
+    const elThr = document.getElementById("c_hud_thr");
+    if(elThr) elThr.textContent = (ctrl.throttle * 100).toFixed(0) + " %";
+    const elBrk = document.getElementById("c_hud_brk");
+    if(elBrk) elBrk.textContent = (ctrl.brake * 100).toFixed(0) + " %";
+    const elErr = document.getElementById("c_hud_err");
+    if(elErr) elErr.textContent = Math.abs(e_y).toFixed(2) + " m";
+    
+  } catch (e) {
+    console.error("Circuit Loop Error:", e);
+  }
+
+  requestAnimationFrame(circuitStageLoop);
+}
+
+function renderCircuitScene(st, tel, ctrl) {
+  const cv = document.getElementById("circuitCanvas");
+  if(!cv) return;
+  const ctx = cv.getContext("2d");
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  if(cv.width !== cv.clientWidth * dpr || cv.height !== cv.clientHeight * dpr){
+    cv.width = cv.clientWidth * dpr; cv.height = cv.clientHeight * dpr;
+  }
+  const w = cv.width / dpr, h = cv.height / dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // Deep Sky Gradient
+  const bgGrad = ctx.createRadialGradient(w/2, h/2, 50, w/2, h/2, Math.max(w, h));
+  bgGrad.addColorStop(0, "#0c131f");
+  bgGrad.addColorStop(1, "#03060a");
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, w, h);
+  
+  const carX_mm = st.X * 1000;
+  const carY_mm = st.Y * 1000;
+  const carYaw = st.psi;
+  
+  const CIRCUIT_CAMS = {
+    behind: { dx: 0, dy: -8000, dz: 3500, lookDy: 2000, lookDz: 350 },
+    cockpit: { dx: 0, dy: 100, dz: 1000, lookDy: 10000, lookDz: 1000 },
+    blimp: { dx: 0, dy: -500, dz: 25000, lookDy: 0, lookDz: 0 },
+    tv: { dx: -15000, dy: 10000, dz: 4000, lookDy: 0, lookDz: 500 }
+  };
+  const camCfg = CIRCUIT_CAMS[CIRCUIT_STAGE.camMode] || CIRCUIT_CAMS.behind;
+  const distFactor = CIRCUIT_STAGE.camOrbit.distFactor;
+  let cam_dx = camCfg.dx * distFactor, cam_dy = camCfg.dy * distFactor, cam_dz = camCfg.dz * distFactor;
+  
+  if(CIRCUIT_STAGE.camOrbit.az !== 0 || CIRCUIT_STAGE.camOrbit.elv !== 0) {
+    const rH = Math.hypot(cam_dx, cam_dy);
+    const angH = Math.atan2(cam_dx, cam_dy) + CIRCUIT_STAGE.camOrbit.az;
+    cam_dx = Math.sin(angH) * rH;
+    cam_dy = Math.cos(angH) * rH;
+    cam_dz = cam_dz + Math.tan(CIRCUIT_STAGE.camOrbit.elv) * rH;
+  }
+  
+  const cY = Math.cos(carYaw), sY = Math.sin(carYaw);
+  
+  let E_x, E_y, E_z, look_x, look_y, look_z;
+  
+  if(CIRCUIT_STAGE.camMode === 'tv') {
+     // fixed relative to nearest track point but looking at car
+     E_x = carX_mm + camCfg.dx;
+     E_y = carY_mm + camCfg.dy;
+     E_z = camCfg.dz;
+     look_x = carX_mm; look_y = carY_mm; look_z = camCfg.lookDz;
+  } else if(CIRCUIT_STAGE.camMode === 'blimp') {
+     E_x = carX_mm; E_y = carY_mm; E_z = camCfg.dz;
+     look_x = carX_mm; look_y = carY_mm + 100; look_z = 0; // Look straight down but slightly forward to orient UP
+  } else {
+     E_x = carX_mm + (-sY * cam_dy + cY * cam_dx);
+     E_y = carY_mm + ( cY * cam_dy + sY * cam_dx);
+     E_z = Math.max(250, cam_dz);
+     
+     look_x = carX_mm + (-sY * camCfg.lookDy + cY * 0);
+     look_y = carY_mm + ( cY * camCfg.lookDy + sY * 0);
+     look_z = camCfg.lookDz || 350;
+  }
+  
+  const fw_un = [look_x - E_x, look_y - E_y, look_z - E_z];
+  const l_fw = Math.hypot(fw_un[0], fw_un[1], fw_un[2]) || 1;
+  const fw = [fw_un[0]/l_fw, fw_un[1]/l_fw, fw_un[2]/l_fw];
+  
+  const n_world = [0, 0, 1];
+  let rt_un = [
+    fw[1]*n_world[2] - fw[2]*n_world[1],
+    fw[2]*n_world[0] - fw[0]*n_world[2],
+    fw[0]*n_world[1] - fw[1]*n_world[0]
+  ];
+  if(Math.hypot(rt_un[0], rt_un[1], rt_un[2]) < 1e-4) {
+      // If looking straight down
+      rt_un = [1, 0, 0];
+  }
+  const l_rt = Math.hypot(rt_un[0], rt_un[1], rt_un[2]) || 1;
+  const rt = [rt_un[0]/l_rt, rt_un[1]/l_rt, rt_un[2]/l_rt];
+  
+  const up = [
+    rt[1]*fw[2] - rt[2]*fw[1],
+    rt[2]*fw[0] - rt[0]*fw[2],
+    rt[0]*fw[1] - rt[1]*fw[0]
+  ];
+  
+  let fovScale = 0.95;
+  if(CIRCUIT_STAGE.camMode === 'cockpit') fovScale = 0.6; // wider FOV
+  const fovDist = Math.max(w, h) * fovScale;
+  const halfW = w / 2, halfH = h / 2;
+  
+  const projFast = (wx, wy, wz) => {
+    const dx = wx - E_x, dy = wy - E_y, dz = wz - E_z;
+    const zc = fw[0]*dx + fw[1]*dy + fw[2]*dz;
+    if(zc < 50) return null; // Near clipping plane
+    const xc = rt[0]*dx + rt[1]*dy + rt[2]*dz;
+    const yc = up[0]*dx + up[1]*dy + up[2]*dz;
+    const f = fovDist / zc;
+    return [halfW + xc * f, halfH - yc * f];
+  };
+
+  // 1. Draw 3D Continuous Asphalt Surface & Grand Prix Kerbs
+  const path = CIRCUIT_STAGE.path;
+  if (path) {
+    const hw = 5500; // 5.5m half-width (11m wide racing track)
+    for (let i = 0; i < path.pts.length; i++) {
+      const p1 = path.pts[i];
+      const p2 = path.pts[(i + 1) % path.pts.length];
+      
+      const pl1 = projFast(p1.x * 1000 - p1.nx * hw, p1.y * 1000 - p1.ny * hw, 0);
+      const pr1 = projFast(p1.x * 1000 + p1.nx * hw, p1.y * 1000 + p1.ny * hw, 0);
+      const pr2 = projFast(p2.x * 1000 + p2.nx * hw, p2.y * 1000 + p2.ny * hw, 0);
+      const pl2 = projFast(p2.x * 1000 - p2.nx * hw, p2.y * 1000 - p2.ny * hw, 0);
+      
+      if(pl1 && pr1 && pr2 && pl2) {
+        ctx.beginPath();
+        ctx.moveTo(pl1[0], pl1[1]); ctx.lineTo(pr1[0], pr1[1]);
+        ctx.lineTo(pr2[0], pr2[1]); ctx.lineTo(pl2[0], pl2[1]);
+        ctx.closePath();
+        ctx.fillStyle = "#1b212a";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(78,161,211,0.15)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        
+        // Red/White FIA Kerbs
+        const kerbCol = (i % 8 < 4) ? "#e74c3c" : "#ecf0f1";
+        ctx.beginPath();
+        ctx.moveTo(pl1[0], pl1[1]); ctx.lineTo(pl2[0], pl2[1]);
+        ctx.strokeStyle = kerbCol; ctx.lineWidth = 5; ctx.stroke();
+        
+        // 3D Boundary Walls
+        const wallH = 1200; // 1.2m concrete wall
+        const pl1_top = projFast(p1.x * 1000 - p1.nx * hw, p1.y * 1000 - p1.ny * hw, wallH);
+        const pl2_top = projFast(p2.x * 1000 - p2.nx * hw, p2.y * 1000 - p2.ny * hw, wallH);
+        const pr1_top = projFast(p1.x * 1000 + p1.nx * hw, p1.y * 1000 + p1.ny * hw, wallH);
+        const pr2_top = projFast(p2.x * 1000 + p2.nx * hw, p2.y * 1000 + p2.ny * hw, wallH);
+        
+        ctx.fillStyle = (i % 4 < 2) ? "rgba(40, 90, 150, 0.9)" : "rgba(220, 220, 220, 0.9)";
+        if(pl1_top && pl2_top && pl1 && pl2) {
+          ctx.beginPath();
+          ctx.moveTo(pl1[0], pl1[1]); ctx.lineTo(pl2[0], pl2[1]);
+          ctx.lineTo(pl2_top[0], pl2_top[1]); ctx.lineTo(pl1_top[0], pl1_top[1]);
+          ctx.fill();
+          ctx.strokeStyle = "#111"; ctx.lineWidth = 1; ctx.stroke();
+        }
+        if(pr1_top && pr2_top && pr1 && pr2) {
+          ctx.beginPath();
+          ctx.moveTo(pr1[0], pr1[1]); ctx.lineTo(pr2[0], pr2[1]);
+          ctx.lineTo(pr2_top[0], pr2_top[1]); ctx.lineTo(pr1_top[0], pr1_top[1]);
+          ctx.fill();
+          ctx.strokeStyle = "#111"; ctx.lineWidth = 1; ctx.stroke();
+        }
+        
+        ctx.beginPath();
+        ctx.moveTo(pr1[0], pr1[1]); ctx.lineTo(pr2[0], pr2[1]);
+        ctx.stroke();
+        
+        // Center White Dashed Guide
+        if(i % 4 < 2) {
+          const pc1 = projFast(p1.x * 1000, p1.y * 1000, 2);
+          const pc2 = projFast(p2.x * 1000, p2.y * 1000, 2);
+          if(pc1 && pc2) {
+            ctx.beginPath(); ctx.moveTo(pc1[0], pc1[1]); ctx.lineTo(pc2[0], pc2[1]);
+            ctx.strokeStyle = "rgba(255,255,255,0.45)"; ctx.lineWidth = 2.5; ctx.stroke();
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Soft Contact Ground Shadow under the car
+  const shadowW = Math.max(1200, (S.front.tire.R || 300) * 3);
+  const shadowL = (S.wb || 2600) + 800;
+  const projShad = (lx, ly) => {
+    const rx = cY * lx - sY * ly + carX_mm;
+    const ry = sY * lx + cY * ly + carY_mm;
+    return projFast(rx, ry, 2);
+  };
+  const s1 = projShad(-shadowW/2, -shadowL/2);
+  const s2 = projShad(shadowW/2, -shadowL/2);
+  const s3 = projShad(shadowW/2, shadowL/2);
+  const s4 = projShad(-shadowW/2, shadowL/2);
+  if(s1 && s2 && s3 && s4){
+    ctx.beginPath();
+    ctx.moveTo(s1[0], s1[1]); ctx.lineTo(s2[0], s2[1]); ctx.lineTo(s3[0], s3[1]); ctx.lineTo(s4[0], s4[1]);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fill();
+  }
+
+  // 3. Draw 3D Vehicle Multibody Chassis & Suspension
+  const cx = carX_mm, cy = carY_mm;
+  const staticZOffset = (S.front && S.front.tire && S.front.tire.R ? S.front.tire.R : 330) - 
+                        ((S.front && S.front.hp && S.front.hp.WC) ? S.front.hp.WC[2] : 300);
+  const cz = st.Z * 1000 + staticZOffset;
+
+  const cP = Math.cos(st.theta), sP = Math.sin(st.theta);
+  const cR = Math.cos(st.phi), sR = Math.sin(st.phi);
+
+  const R11 = cY*cR - sY*sP*sR,  R12 = -sY*cP,  R13 = cY*sR + sY*sP*cR;
+  const R21 = sY*cR + cY*sP*sR,  R22 = cY*cP,   R23 = sY*sR - cY*sP*cR;
+  const R31 = -cP*sR,            R32 = sP,      R33 = cP*cR;
+
+  const projBodyFast = (lx, ly, lz) => {
+    return projFast(
+      R11*lx + R12*ly + R13*lz + cx,
+      R21*lx + R22*ly + R23*lz + cy,
+      R31*lx + R32*ly + R33*lz + cz
+    );
+  };
+  
+  if (CIRCUIT_STAGE.cachedScene) {
+    for(let i = 0; i < CIRCUIT_STAGE.cachedScene.length; i++){
+      const o = CIRCUIT_STAGE.cachedScene[i];
+      if(!o || o.k !== "l" || !o.a || !o.b) continue;
+      const A = projBodyFast(o.a[0], o.a[1], o.a[2]);
+      const B = projBodyFast(o.b[0], o.b[1], o.b[2]);
+      if(!A || !B) continue;
+      ctx.beginPath();
+      if(o.d && o.d.length) ctx.setLineDash(o.d); else ctx.setLineDash([]);
+      ctx.strokeStyle = o.c || "#58a6ff";
+      ctx.lineWidth = o.w || 1.2;
+      ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  // 4. Draw Circuit Map (Telemetry Mini-Map)
+  if (path) {
+    const mmSize = 250;
+    const mmPad = 20;
+    const mx = w - mmSize - mmPad, my = h - mmSize - mmPad;
+    
+    // map background
+    ctx.fillStyle = "rgba(10,14,23,0.7)";
+    ctx.strokeStyle = "#30363d";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(mx, my, mmSize, mmSize, 8); ctx.fill(); ctx.stroke();
+    
+    // Track bounds calculation
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for(let pt of path.pts) {
+        if(pt.x < minX) minX = pt.x; if(pt.x > maxX) maxX = pt.x;
+        if(pt.y < minY) minY = pt.y; if(pt.y > maxY) maxY = pt.y;
+    }
+    const tW = maxX - minX, tH = maxY - minY;
+    const scale = (mmSize - 40) / Math.max(tW, tH);
+    const cX = minX + tW/2, cY = minY + tH/2;
+    
+    const trX = (x) => mx + mmSize/2 + (x - cX) * scale;
+    const trY = (y) => my + mmSize/2 - (y - cY) * scale; // Y is flipped in canvas
+    
+    // Draw track path
+    ctx.beginPath();
+    ctx.moveTo(trX(path.pts[0].x), trY(path.pts[0].y));
+    for(let i=1; i<path.pts.length; i++) ctx.lineTo(trX(path.pts[i].x), trY(path.pts[i].y));
+    ctx.closePath();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    
+    // Draw start/finish line
+    ctx.beginPath();
+    ctx.arc(trX(path.pts[0].x), trY(path.pts[0].y), 3, 0, 2*Math.PI);
+    ctx.fillStyle = "#ff7b72"; ctx.fill();
+    
+    // Draw car
+    const carPx = trX(carX_mm / 1000);
+    const carPy = trY(carY_mm / 1000);
+    ctx.beginPath();
+    ctx.arc(carPx, carPy, 6, 0, 2*Math.PI);
+    ctx.fillStyle = "#7ee787"; ctx.fill();
+    ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.stroke();
+  }
+}
+
 </script>
 </body>
 </html>
