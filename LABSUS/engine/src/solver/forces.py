@@ -99,9 +99,13 @@ class CornerLoadsResult:
     Attributes:
         anchor_loads: 键 = 杆 id（车身端），值 = 3-向合力（N）。
         residual: 超静定最小二乘残差（=0 时精确闭合）。
+        moment_residual: 外力矩折算到轮心后的残余范数（N·mm）。
+            球铰模型（二力杆只传力）无法平衡力矩；非零时结果为 APPROXIMATE
+            （F-64：力矩输入不再被静默忽略，残差显式上报）。
     """
     anchor_loads: dict[str, np.ndarray]
     residual: float
+    moment_residual: float = 0.0
 
 
 def _chassis_end(l: LinkForce, hub: np.ndarray) -> np.ndarray:
@@ -130,20 +134,27 @@ def corner_to_anchor_loads(
     注意：本函数会覆写每根 LinkForce 的 ``mag`` 属性。
     调用方若需复用同一 LinkForce 实例跨角点，须自行 copy。
 
+    F-64（2026-08-30）：CaseLoad 的力矩不再被 `_ = cp_rel` 静默丢弃——
+    接地点力矩折算到轮心（刚体等效 m_hub = m_cp + r × F，r = cp_rel），
+    残余经 `moment_residual` 显式上报；球铰模型无法平衡力矩，非零残余
+    意味着结果是 APPROXIMATE（调用方据此降级状态并附说明）。
+
     Args:
-        q: 接地点准静态外载荷（N）。
+        q: 接地点准静态外载荷（N / N·mm）。
         links: 汇交于球头的二力杆列表。
         hub_point: 球头（轮心）坐标。
-        cp_rel: 接地点相对轮心的矢量（由运动学姿态给出，S1 忽略力矩折算）。
+        cp_rel: 接地点相对轮心的矢量（由运动学姿态给出）。
 
     Returns:
-        CornerLoadsResult：锚点合力字典 + 残差。
+        CornerLoadsResult：锚点合力字典 + 力残差 + 力矩残余。
 
     T8 集成约定：anchor_loads 值为杆件施加在车身锚点上的力（即 solve_compliance
     中 f_ext 的 loads[n]），符号无需翻转，直接传入。
     """
     f_cp = np.array([q.fx, q.fy, q.fz], float)
-    _ = cp_rel  # 预留：S2 力矩/力臂折算
+    m_cp = np.array([q.mx, q.my, q.mz], float)
+    r = np.asarray(cp_rel, float)
+    m_hub = m_cp + np.cross(r, f_cp)          # 刚体等效：力矩平移至轮心
     A = np.column_stack([l.unit() for l in links])
     m, resid = solve_linear(A, -f_cp)
     for i, l in enumerate(links):
@@ -154,4 +165,5 @@ def corner_to_anchor_loads(
         key = l.id if l.id else f"{end[0]:.0f},{end[1]:.0f},{end[2]:.0f}"
         # 车身端反力 = -mag * unit（构件端在 hub 的反作用传递到车身）
         out[key] = out.get(key, np.zeros(3)) - l.mag * l.unit()
-    return CornerLoadsResult(anchor_loads=out, residual=float(resid))
+    return CornerLoadsResult(anchor_loads=out, residual=float(resid),
+                             moment_residual=float(np.linalg.norm(m_hub)))

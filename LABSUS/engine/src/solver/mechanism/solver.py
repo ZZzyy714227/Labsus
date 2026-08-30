@@ -46,8 +46,12 @@ def _state(m: Mechanism) -> np.ndarray:
 
 
 def _apply(m: Mechanism, x: np.ndarray) -> None:
+    # F-68（2026-08-30）：视图别名 → 拷贝。旧实现把 x 的切片直接赋给
+    # node.pos（零拷贝视图），`set_drives` 原地写 pos[2] 会反写 x 数组——
+    # 当前调用序无害，但属易踩雷别名，任何"先 apply 再改 pos"的新路径
+    # 都会静默污染初值向量（least_squares 复用 x 的路径尤其危险）。
     for k, i in enumerate(_STATE_IDS):
-        m.nodes[i].pos = x[3 * k:3 * k + 3]
+        m.nodes[i].pos = x[3 * k:3 * k + 3].copy()
 
 
 def _build_residual(m: Mechanism, travel: float, rack: float):
@@ -144,12 +148,15 @@ def solve_rocker(m: Mechanism) -> tuple[bool, float | None, float | None]:
     if bracket is None:
         return False, None, None
     lo, hi = bracket
+    flo = err(lo)  # F-71：缓存 err(lo)，循环内不再每次重复计算
     for _ in range(60):
         mid = 0.5 * (lo + hi)
-        if err(mid) * err(lo) <= 0.0:
+        fm = err(mid)
+        if fm * flo <= 0.0:
             hi = mid
         else:
             lo = mid
+            flo = fm
     theta = 0.5 * (lo + hi)
     m.node("CH5").pos = rotate_around_axis(ch5_0, pivot, axis, theta)
     dmp = rotate_around_axis(dmp_0, pivot, axis, theta)

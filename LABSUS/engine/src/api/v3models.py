@@ -9,7 +9,8 @@ STRUT_OUT / RCK_AX_A / RCK_AX_B / STRUT_IN / RCK_DMP / DMP_BODY），
 """
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, model_validator
+import math
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # ── 前端 DWB 硬点键（同 HP_META） ────────────────────────────────────
 DWB_KEYS = frozenset({
@@ -17,6 +18,20 @@ DWB_KEYS = frozenset({
     "RACK", "STRUT_OUT", "RCK_AX_A", "RCK_AX_B", "STRUT_IN",
     "RCK_DMP", "DMP_BODY",
 })
+
+
+def _check_points_values(points: dict) -> None:
+    """F-45（2026-08-30）：硬点值兜底校验 —— 3 分量 + 全部有限。
+
+    pydantic 默认 allow_inf_nan=True，NaN/Inf 硬点可直达求解器（引擎天然
+    免疫 NaN 但会报 SOLVER_FAILED；前端 F-01/F-02 防线已补）。这里在
+    服务边界统一拒绝非法几何，同时避免超长列表（长度 != 3 直接拒绝）。
+    """
+    for k, v in points.items():
+        if not isinstance(v, (list, tuple)) or len(v) != 3:
+            raise ValueError(f"hardpoint {k!r} must be a length-3 list, got {v!r}")
+        if not all(math.isfinite(float(c)) for c in v):
+            raise ValueError(f"hardpoint {k!r} contains non-finite value: {v!r}")
 
 # 衬套可挂节点：引擎摇臂模型为单枢轴（RCK_AX_A->RK_PIVOT），RCK_AX_B
 # 未建模（OpenItem：精确轴方向），挂它的衬套无法解析 -> 明确拒绝。
@@ -47,6 +62,17 @@ class SweepSpec(BaseModel):
     min: float = -50.0
     max: float = 50.0
     n: int = Field(default=21, ge=3, le=201)
+
+    @model_validator(mode="after")
+    def _check_range(self):
+        # F-45（2026-08-30）：min/max 有限性 + 方向校验（允许 min==max 的单点
+        # 扫掠——test_bump_no_bushing_matches_pose_consistency 即用 7..7；仅
+        # 拒绝 min>max 的反向扫掠）
+        if not (math.isfinite(self.min) and math.isfinite(self.max)):
+            raise ValueError(f"sweep min/max must be finite: {self.min}/{self.max}")
+        if self.min > self.max:
+            raise ValueError(f"sweep requires min <= max, got min={self.min} max={self.max}")
+        return self
 
 
 class DesignSpec(BaseModel):
@@ -86,6 +112,7 @@ class KandcRequest(BaseModel):
             missing = DWB_KEYS - set(self.points)
             if missing:
                 raise ValueError(f"missing hardpoint keys: {sorted(missing)}")
+            _check_points_values(self.points)   # F-45：3 分量 + 有限性
         if self.compliance_axis not in ("fx", "fy", "mz"):
             raise ValueError("compliance_axis must be fx|fy|mz")
         return self
@@ -115,6 +142,18 @@ class PoseRequest(BaseModel):
     rack: float = 0.0
     tire_radius: float = 325.0
     design: DesignSpec = Field(default_factory=DesignSpec)
+
+    @model_validator(mode="after")
+    def _check(self):
+        if self.points is not None:
+            bad = set(self.points) - DWB_KEYS
+            if bad:
+                raise ValueError(f"unknown hardpoint keys: {sorted(bad)}")
+            missing = DWB_KEYS - set(self.points)
+            if missing:
+                raise ValueError(f"missing hardpoint keys: {sorted(missing)}")
+            _check_points_values(self.points)   # F-45：3 分量 + 有限性
+        return self
 
 
 class PoseResponse(BaseModel):
@@ -223,6 +262,7 @@ class ChassisRequest(BaseModel):
             missing = DWB_KEYS - set(ax.points)
             if missing:
                 raise ValueError(f"missing axle hardpoint keys: {sorted(missing)}")
+            _check_points_values(ax.points)   # F-45：3 分量 + 有限性
         return self
 
 
@@ -275,6 +315,15 @@ class TrackPoint(BaseModel):
     y: float
     target_speed: float = 15.0
 
+    @model_validator(mode="after")
+    def _check(self):
+        # F-45：target_speed 必须有限且 >= 0（负速度会使松弛/漂移模型无意义）
+        if not math.isfinite(self.x) or not math.isfinite(self.y):
+            raise ValueError(f"track point must be finite: ({self.x}, {self.y})")
+        if not math.isfinite(self.target_speed) or self.target_speed < 0:
+            raise ValueError(f"target_speed must be finite >= 0, got {self.target_speed}")
+        return self
+
 
 class TireParams(BaseModel):
     """四轮共用的 MF 参数（缺省 = tire_mf 默认）。μ 由 Fy0/FzNom 推导用于摩擦圆。"""
@@ -288,6 +337,18 @@ class TireParams(BaseModel):
     LS: float = 0.10               # 载荷敏感性（重载 μ 递减；0 = 线性基线）
     Cg: float = 0.5                # 外倾推力系数 1/rad（S3-1 升级：Fy += -Cg·γ·Fz）
     Ls: float = 0.35               # 侧偏松弛长度 m（瞬态一阶滞后）
+
+    @model_validator(mode="after")
+    def _check(self):
+        # F-45：FzNom=0 → tire_mf._d 除零；By<=0 → MF 形状退化；Cg/Ls 需有限
+        if not math.isfinite(self.FzNom) or self.FzNom <= 0:
+            raise ValueError(f"FzNom must be finite > 0, got {self.FzNom}")
+        if not math.isfinite(self.By) or self.By <= 0:
+            raise ValueError(f"By must be finite > 0, got {self.By}")
+        for name, val in (("Cg", self.Cg), ("Ls", self.Ls), ("Fy0", self.Fy0)):
+            if not math.isfinite(val):
+                raise ValueError(f"{name} must be finite, got {val}")
+        return self
 
 
 class PowertrainParams(BaseModel):

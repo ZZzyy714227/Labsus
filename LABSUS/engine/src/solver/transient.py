@@ -34,11 +34,16 @@ _WHEELS = ("FR", "FL", "RR", "RL")
 
 
 class TireState:
-    """每轮瞬态状态：松弛侧偏（rad）与纵向滑移缓存。"""
-    __slots__ = ("alpha_lat", "kappa_dyn")
+    """每轮瞬态状态：松弛侧偏（rad）与纵向滑移缓存。
+
+    alpha_st：本步侧偏目标（rad），由 derivs 记录、step() 末尾统一积分用——
+    F-22 修复后 derivs 保持纯函数，RK2 中间评估不得污染滞后状态。
+    """
+    __slots__ = ("alpha_lat", "kappa_dyn", "alpha_st")
     def __init__(self):
         self.alpha_lat = 0.0
         self.kappa_dyn = 0.0
+        self.alpha_st = 0.0
 
 
 def _lut(lut: dict, travel_mm: float, key: str, default: float) -> float:
@@ -86,6 +91,10 @@ class VehiclePlanar:
         }
         self.mr = {"front": vehicle.front.motion_ratio or 0.75,
                    "rear": vehicle.rear.motion_ratio or 0.78}
+        # F-19（2026-08-30）：MR 链与准静态一致——引擎侧 chassis._resolve_mr_fb
+        # 是 显式 > mr_at_zero 推导 > 分轴常量，但 transient 无机构上下文，
+        # 静态回退分轴常量保持 0.75/0.78（与准静态的最终回退相同，不再漂移）；
+        # 显式输入依旧优先，差额登记"故意不同清单"（transient 无摇臂链）。
         swf = axle_rc_sweep(vehicle.front)
         swr = axle_rc_sweep(vehicle.rear)
         rc0 = lambda sw: float(np.interp(0.0, sw["travel"],
@@ -106,10 +115,13 @@ class VehiclePlanar:
 
     def wheel_loads(self, vx: float) -> dict[str, float]:
         q = QuasiInputs(gy=self.prev_ay / G, gx=self.prev_ax / G)
-        # ★ 气动下压力注入（aero_force_n / aero_bias 已有语义）
-        df, dr, _ = self.aero_forces(vx)
-        q.aero_force_n = df + dr
-        q.aero_bias = df / max(1.0, df + dr)
+        # ★ 气动下压力注入（aero_force_n / aero_bias 已有语义）。
+        # 勘误（2026-08-30，F-23 复核）：dfn_f/dfn_r 是前/后轴下压力，阻力不入垂向
+        # 载荷——审查报告误把 dr 读成 drag；实际阻力在 derivs 中单独作用于 Fx，
+        # 本函数物理正确，仅重命名消歧义。
+        dfn_f, dfn_r, _ = self.aero_forces(vx)
+        q.aero_force_n = dfn_f + dfn_r
+        q.aero_bias = dfn_f / max(1.0, dfn_f + dfn_r)
         loads = quasi_loads(self.v, q, self.mr, self.rcH, self.rc_sw)
         self.roll_ss = loads.roll_deg          # 准静态侧倾（滤波在 derivs 中做）
         return dict(loads.fz)
@@ -143,11 +155,13 @@ class VehiclePlanar:
         ts = self._ts[w]
         if speed < 0.8 or fz <= 1.0:
             alpha_st, fy_w, fx_w, mu_use, slip_k = 0.0, 0.0, 0.0, 0.0, 0.0
+            ts.alpha_st = ts.alpha_lat    # 失活轮：松弛目标=当前值（不衰减，状态冻结）
         else:
             alpha_st = math.atan2(vwy, max(abs(vwx), 0.5))
-            # ★ 松弛：一阶滞后（vx 低时趋瞬时）
-            sigma = max(0.3, self.Ls)
-            ts.alpha_lat += dt * (vx / sigma) * (alpha_st - ts.alpha_lat)
+            # ★ 松弛（F-22/F-24 修复，2026-08-30）：derivs 保持纯函数——只记录
+            #   侧偏目标，不推进状态（RK2 中间评估不得污染滞后状态）；推进在
+            #   step() 末尾用解析精确解 1−e^(−dt·vx/σ) 每步积分一次（无条件稳定）。
+            ts.alpha_st = alpha_st
             a_lat = ts.alpha_lat
             mu_fz = self.mu * fz
             # ★ 外倾推力项（线性增益，与 MF 峰值解耦采用 μ 归一）
@@ -156,7 +170,11 @@ class VehiclePlanar:
             # 纵向：动力包络（★ 恒扭矩-恒功率，前后分配 drive_split_f）或制动（参数化分配）
             fx_w = 0.0
             if throttle > 0:
-                t_eff = self.pt.get("T_max", 250.0) / 0.30          # 减速比≈0.3 轮半径（N·m→N）
+                # F-26（2026-08-30）：轮半径不再硬编码 0.30（默认 tire 325mm 却按
+                # 300mm 算力会虚高 ~8%）——取本轴 tire_radius 折算扭矩→力。
+                is_f = w in ("FR", "FL")
+                t_r_mm = (self.v.front.tire_radius if is_f else self.v.rear.tire_radius) or 325.0
+                t_eff = self.pt.get("T_max", 250.0) / (t_r_mm / 1000.0)   # N·m→N（一档直驱近似）
                 p_eff = (self.pt.get("P_kw", 80.0) * 1000.0) / max(0.8, vx)
                 f_avail = min(t_eff, p_eff) * throttle
                 split = float(self.pt.get("drive_split_f", 0.0))
@@ -179,13 +197,11 @@ class VehiclePlanar:
 
     def derivs(self, s: np.ndarray, delta: float, throttle: float,
                brake: float, dt: float) -> tuple[np.ndarray, dict]:
+        """纯函数导数（F-22 修复，2026-08-30）：不再推进 roll_deg/pitch_deg/
+        alpha_lat 等滞后状态——旧实现让 RK2 的 k1/k2 两次评估各推一次滞后，
+        τ_eff 减半且中点状态被污染。滞后推进统一移到 step() 末尾。"""
         vx, vy, r = s[3], s[4], s[5]
         fz = self.wheel_loads(vx)
-        # ★ 侧倾/俯仰一阶滞后（显式增量而非准静态瞬时）
-        tr, tp = 0.18, 0.25
-        self.roll_deg += (self.roll_ss - self.roll_deg) * (dt / tr)
-        pitch_ss = math.degrees(math.atan2(self.prev_ax, G)) * 0.55
-        self.pitch_deg += (pitch_ss - self.pitch_deg) * (dt / tp)
         steer = self.steer_angles(delta)
         Fx = Fy = Mz = 0.0
         diag = {}
@@ -222,6 +238,18 @@ class VehiclePlanar:
         s2[2] += dt * s2[5]
         self.prev_ax = k2[3] - s2[5] * s2[4]
         self.prev_ay = k2[4] + s2[5] * s2[3]
+        # —— 滞后状态推进（F-22 修复：移出 derivs，每个 RK2 步只积分一次）——
+        self.roll_deg += (self.roll_ss - self.roll_deg) * (dt / 0.18)
+        pitch_ss = math.degrees(math.atan2(self.prev_ax, G)) * 0.55
+        self.pitch_deg += (pitch_ss - self.pitch_deg) * (dt / 0.25)
+        # —— 松弛滞后（F-24 修复：解析精确解，无条件稳定；显式欧拉在
+        #    dt·vx/σ > 2 时发散，dt=0.05/vx=40/σ=0.3 时比率高达 6.7）——
+        sigma = max(0.3, self.Ls)
+        vx_now = max(float(s2[3]), 0.0)
+        for w in _WHEELS:
+            tsw = self._ts[w]
+            tsw.alpha_lat += (tsw.alpha_st - tsw.alpha_lat) * (
+                1.0 - math.exp(-dt * vx_now / sigma))
         self._t += dt
         return s2, diag
 
@@ -254,7 +282,8 @@ class DriverPI:
         self.gain = gain
         self.e_int = 0.0
 
-    def __call__(self, track_xy, state, idx, v_target, L) -> tuple[float, float, float, int]:
+    def __call__(self, track_xy, state, idx, v_target, L,
+                 dt: float = 0.05) -> tuple[float, float, float, int]:
         x, y, psi, vx = state[0], state[1], state[2], state[3]
         idx = _closest_idx(track_xy, np.array([x, y]), idx)
         ld = float(np.clip(3.0 + self.gain * vx, 4.0, 18.0))
@@ -266,10 +295,27 @@ class DriverPI:
         alpha_ld = math.atan2(ly, max(lx, 1.0))
         delta = math.atan2(2.0 * L * math.sin(alpha_ld), ld)
         e = v_target - vx
-        self.e_int = max(-2.0, min(2.0, self.e_int + e * 0.05))
+        # F-27（2026-08-30）：积分按真实 dt 缩放（旧实现 e*0.05 隐含 dt=0.05，
+        # 请求 dt 允许 0.0005~0.05 → 积分增益随步长漂移最多 100 倍）
+        self.e_int = max(-2.0, min(2.0, self.e_int + e * dt))
         throttle = float(np.clip(self.kp_v * e + self.ki_v * self.e_int, 0.0, 1.0))
         brake = float(np.clip(-self.kp_v * e - 0.15, 0.0, 1.0)) if e < -0.5 else 0.0
         return delta, throttle, brake, idx
+
+
+def _wash_json(obj):
+    """F-25（2026-08-30）：递归把非有限浮点洗成 None，保证响应 JSON 严格合法。
+
+    FastAPI 默认 json.dumps(allow_nan=True) 会输出 NaN/Infinity 字面量，
+    前端 JSON.parse 直接抛 SyntaxError——发散仿真的错误路径本身不能炸。
+    """
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {k: _wash_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_wash_json(v) for v in obj]
+    return obj
 
 
 def run_track_sim(req: TrackSimRequest) -> dict:
@@ -300,7 +346,7 @@ def run_track_sim(req: TrackSimRequest) -> dict:
     for k in range(n_steps):
         t = k * req.dt
         v_target = float(tgt_speed[min(idx, len(tgt_speed) - 1)])
-        delta, throttle, brake, idx = drv(track_xy, state, idx, v_target, L)
+        delta, throttle, brake, idx = drv(track_xy, state, idx, v_target, L, req.dt)
         if throttle < 0.02 and brake < 0.02 and abs(v_target - state[3]) > 0.5:
             throttle = 0.05
         state, diag = car.step(state, req.dt, delta, throttle, brake)
@@ -334,7 +380,7 @@ def run_track_sim(req: TrackSimRequest) -> dict:
     seg = np.linalg.norm(np.diff(xy, axis=0), axis=1).sum() if len(xy) > 1 else 0.0
     npy = min(len(trace), 1200)
     lats = [max(abs(float(t[f"alphaL_{w}"])) for w in _WHEELS) for t in trace[-npy:]]
-    return {
+    return _wash_json({
         "status": "VALID" if np.isfinite(state).all() else "SOLVER_FAILED",
         "ms": (time.perf_counter() - t0) * 1000.0,
         "steps": len(ts), "finished": finished,
@@ -346,4 +392,4 @@ def run_track_sim(req: TrackSimRequest) -> dict:
                     "max_slip_deg": round(max(lats, default=0.0), 2),
                     "aero_n": round(sum(car.aero_forces(state[3])[:2]), 1)},
         "warnings": warnings,
-    }
+    })

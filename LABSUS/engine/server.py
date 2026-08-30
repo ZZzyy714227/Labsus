@@ -45,6 +45,22 @@ from src.solver.transient import run_track_sim  # noqa: E402
 ENGINE_VERSION = "0.3.0"          # 引擎（S1 内核 + S2 服务层）
 API_VERSION = "v3"
 
+
+def _wash_json(obj):
+    """F-25（2026-08-30）：响应出口统一洗刷非有限浮点 → None。
+
+    FastAPI 默认 allow_nan=True 会把 NaN/Infinity 原样写进响应体，
+    前端 JSON.parse 直接抛 SyntaxError。所有端点返回前过一遍。
+    """
+    import math as _math
+    if isinstance(obj, float):
+        return obj if _math.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {k: _wash_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_wash_json(v) for v in obj]
+    return obj
+
 app = FastAPI(
     title="LABSUS Engine /api/v3",
     description="LABSUS 悬架实验室分析引擎（S1 衬套两层求解器 + S2 工况/API 服务层）",
@@ -82,11 +98,16 @@ def version() -> dict:
 @app.post("/api/v3/solve/pose")
 def solve_pose_api(req: PoseRequest) -> dict:
     try:
-        return v3service.run_pose(req).model_dump()
+        return _wash_json(v3service.run_pose(req).model_dump())
     except ValidationError:
         raise
-    except Exception as exc:  # noqa: BLE001 —— 求解异常如实上报
-        raise HTTPException(status_code=422, detail=f"solver error: {exc}") from exc
+    except Exception as exc:  # noqa: BLE001
+        # F-46（2026-08-30）：detail 脱敏 —— 不再把原始异常串回给客户端
+        # （本地工具可接受，但异常可能含内部路径/参数栈，收紧为通用文案
+        # + 模块名；详细信息进服务器日志）。
+        import traceback as _tb
+        _tb.print_exc()
+        raise HTTPException(status_code=422, detail=f"solver error ({type(exc).__name__})") from exc
 
 
 @app.post("/api/v3/kandc/{case}")
@@ -100,19 +121,24 @@ def kandc(case: str, req: KandcRequest) -> dict:
         "compliance": v3service.run_compliance,
     }[case]
     try:
-        return runner(req).model_dump()
+        return _wash_json(runner(req).model_dump())
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=422, detail=f"K&C solver error: {exc}") from exc
+        import traceback as _tb
+        _tb.print_exc()   # F-46：detail 脱敏（完整异常进日志）
+        raise HTTPException(status_code=422,
+                            detail=f"K&C solver error ({type(exc).__name__})") from exc
 
 
 @app.post("/api/v3/chassis/solve")
 def chassis_solve(req: ChassisRequest) -> dict:
     """整车单点：四角定位角 + 整车姿态 + 准静态载荷转移（TLLTD/侧倾梯度）。"""
     try:
-        return chassis_service.solve_chassis(req).model_dump()
+        return _wash_json(chassis_service.solve_chassis(req).model_dump())
     except Exception as exc:  # noqa: BLE001
+        import traceback as _tb
+        _tb.print_exc()   # F-46：detail 脱敏（完整异常进日志）
         raise HTTPException(status_code=422,
-                            detail=f"chassis solve error: {exc}") from exc
+                            detail=f"chassis solve error ({type(exc).__name__})") from exc
 
 
 @app.post("/api/v3/chassis/kandc/{case}")
@@ -125,20 +151,24 @@ def chassis_kandc(case: str, req: ChassisRequest) -> dict:
         "steer": chassis_service.sweep_steer,
     }[case]
     try:
-        return runner(req).model_dump()
+        return _wash_json(runner(req).model_dump())
     except Exception as exc:  # noqa: BLE001
+        import traceback as _tb
+        _tb.print_exc()   # F-46：detail 脱敏（完整异常进日志）
         raise HTTPException(status_code=422,
-                            detail=f"chassis K&C error: {exc}") from exc
+                            detail=f"chassis K&C error ({type(exc).__name__})") from exc
 
 
 @app.post("/api/v3/chassis/simulate_track")
 def simulate_track(req: TrackSimRequest) -> dict:
     """整车瞬态赛道仿真（S3-1）：平面 3-DOF + 四轮 MF + 准静态载荷 + 纯追踪驾驶员。"""
     try:
-        return run_track_sim(req)
+        return _wash_json(run_track_sim(req))
     except Exception as exc:  # noqa: BLE001
+        import traceback as _tb
+        _tb.print_exc()   # F-46：detail 脱敏（完整异常进日志）
         raise HTTPException(status_code=422,
-                            detail=f"transient sim error: {exc}") from exc
+                            detail=f"transient sim error ({type(exc).__name__})") from exc
 
 
 if __name__ == "__main__":

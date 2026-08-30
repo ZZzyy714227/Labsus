@@ -73,7 +73,7 @@ class Mechanism:
     free_ids: list[str]
     wheel: str           # 轮心节点 id（轮跳驱动锚）
     steer_anchor: Vec    # FL1 齿条线锚点（=FL1.p0）
-    steer_axis: Vec      # 单位向量，齿条平移方向（右轮 +Y）
+    steer_axis: Vec      # 单位向量，齿条平移方向（默认世界 −X 横向，右轮外侧）
     strut_attach: str = "knuckle"  # STRUT_OUT 附着拓扑：knuckle|lca|uca（P2）
 
     def node(self, name: str) -> Node:
@@ -167,7 +167,12 @@ def build_mechanism(
              L0=float(np.linalg.norm(nodes[pushrod_from].p0 - nodes[pushrod_to].p0)), Ld=0.0),
     ]
     steer_anchor = nodes[tie_inner].p0.copy()
-    sa = steer_axis if steer_axis is not None else np.array([0.0, 1.0, 0.0])
+    # 第三讲判决（2026-08-22 修复）默认值对齐：齿条沿世界 −X 横移（右轮外侧），
+    # 与前端 setChassis 同源。旧默认 (0,1,0) 是 Y 向旧约定，灵敏度差 20.8 倍。
+    # A.3 残留清理（2026-08-30）：默认回退已由 (0,1,0) 改为 (−1,0,0)，
+    # 与 v3service._new_mech 的显式传参一致，杜绝"未传 steer_axis 即掉回
+    # 旧约定"的误用路径（legacy 快照目录为历史存档，保持原样）。
+    sa = steer_axis if steer_axis is not None else np.array([-1.0, 0.0, 0.0])
     return Mechanism(nodes=nodes, links=links, axis_clusters=axis_clusters, bodies=bodies,
                      free_ids=free_ids, wheel=wheel, steer_anchor=steer_anchor,
                      steer_axis=_unit(sa), strut_attach=strut_attach)

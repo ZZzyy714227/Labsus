@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import bisect
 import math
+import threading
 import time
 
 import numpy as np
@@ -22,6 +23,7 @@ from src.api.v3models import (
     CornerTravel, DesignSpec, QuasiInputs, VehicleSpec,
 )
 from src.api.v3service import _new_mech, mirror_left, pose_metrics
+from src.metrics.kandc import _slope  # F-13：单一差分内核（全局共用）
 from src.solver.mechanism.solver import solve_pose
 
 R2D = 180.0 / math.pi
@@ -66,19 +68,24 @@ def mr_at_zero(ax: AxleSpec, points: dict, left: bool) -> float:
     abs 会被旧 max(0.05) 地板掩盖。分支/数值与前端 mrRef 常量的差距
     （前 0.47 vs 0.75、后 0.17 vs 0.78）登记 OpenItem-B：摇臂双根分支选择
     （最近根 vs 投影全局解）与 FE 弹簧力平衡分支的差异。
+
+    F-67（2026-08-30）：不再吞异常 —— 任一姿态求解失败即抛出让调用方
+    _resolve_mr 统一兜底（此前 except 静默返回 0.75，后轴也被回退到前轴
+    常量）；同时检查 solve_pose 的 rep.ok，失败解的 damper 长度不再进 MR。
     """
     mech = _new_mech(points, left=left, arch=ax.arch)
-    try:
-        solve_pose(mech, 2.0, 0.0)
-        d1 = mech.node("RK_DAMPER").pos - mech.node("DAMPER_CHASSIS").pos
-        lp = float(np.linalg.norm(d1))
-        mech2 = _new_mech(points, left=left, arch=ax.arch)
-        solve_pose(mech2, -2.0, 0.0)
-        d2 = mech2.node("RK_DAMPER").pos - mech2.node("DAMPER_CHASSIS").pos
-        lm = float(np.linalg.norm(d2))
-        return max(0.02, abs(-(lp - lm) / 4.0))
-    except Exception:
-        return 0.75
+    rep1 = solve_pose(mech, 2.0, 0.0)
+    if not rep1.ok:
+        raise RuntimeError(f"mr_at_zero: +2mm pose 残差 {rep1.residual:.3f}mm > 0.02")
+    d1 = mech.node("RK_DAMPER").pos - mech.node("DAMPER_CHASSIS").pos
+    lp = float(np.linalg.norm(d1))
+    mech2 = _new_mech(points, left=left, arch=ax.arch)
+    rep2 = solve_pose(mech2, -2.0, 0.0)
+    if not rep2.ok:
+        raise RuntimeError(f"mr_at_zero: -2mm pose 残差 {rep2.residual:.3f}mm > 0.02")
+    d2 = mech2.node("RK_DAMPER").pos - mech2.node("DAMPER_CHASSIS").pos
+    lm = float(np.linalg.norm(d2))
+    return max(0.02, abs(-(lp - lm) / 4.0))
 
 
 def arb_geom(points: dict, arb) -> dict:
@@ -123,6 +130,7 @@ def arb_rate(ax: AxleSpec) -> dict:
 
 
 _RC_SWEEP_CACHE: dict[tuple, dict] = {}
+_RC_SWEEP_LOCK = threading.Lock()  # F-70：FastAPI 端点跑线程池，缓存读写加锁
 
 
 def axle_rc_sweep(ax: AxleSpec, lim: float = 90.0, n: int = 21) -> dict:
@@ -131,13 +139,17 @@ def axle_rc_sweep(ax: AxleSpec, lim: float = 90.0, n: int = 21) -> dict:
     rc_h 只依赖双叉臂几何（CH1-4 / LBJ / UBJ / WC），不受 STRUT_OUT 拓扑
     影响，引擎可权威计算（对比：damper 链 MR 在引擎拓扑下失真，kw 迁移
     改由前端 kw_curve 下发）。按轴参数缓存，重复 solve 免重算。
+
+    F-70（2026-08-30）：dict 淘汰/写入此前无锁（CPython 下竞态良性但
+    非零风险）；加锁保证并发的 Hit/Miss 与 LRU 淘汰原子化。
     """
     key = (tuple(sorted((k, tuple(map(float, v))) for k, v in ax.points.items())),
            float(ax.tire_radius), float(ax.camber_deg), float(ax.toe_deg),
            ax.arch, float(lim), int(n))
-    hit = _RC_SWEEP_CACHE.get(key)
-    if hit is not None:
-        return hit
+    with _RC_SWEEP_LOCK:
+        hit = _RC_SWEEP_CACHE.get(key)
+        if hit is not None:
+            return hit
     mech = _new_mech(ax.points, arch=ax.arch)
     design = DesignSpec(camber_deg=ax.camber_deg, toe_deg=ax.toe_deg)
     xs = [float(v) for v in np.linspace(-lim, lim, n)]
@@ -147,9 +159,10 @@ def axle_rc_sweep(ax: AxleSpec, lim: float = 90.0, n: int = 21) -> dict:
         m = pose_metrics(mech, ax.tire_radius, design)
         rc.append(None if m["rc_h"] is None else float(m["rc_h"]))
     out = {"travel": xs, "rc_h": rc}
-    if len(_RC_SWEEP_CACHE) > 16:
-        _RC_SWEEP_CACHE.pop(next(iter(_RC_SWEEP_CACHE)))
-    _RC_SWEEP_CACHE[key] = out
+    with _RC_SWEEP_LOCK:
+        if len(_RC_SWEEP_CACHE) > 16:
+            _RC_SWEEP_CACHE.pop(next(iter(_RC_SWEEP_CACHE)))
+        _RC_SWEEP_CACHE[key] = out
     return out
 
 
@@ -180,13 +193,16 @@ def _kw_at(ax: AxleSpec, tr: float, kw0_nm: float) -> float:
 
 def quasi_loads(vehicle: VehicleSpec, q: QuasiInputs,
                 mr: dict[str, float], rcH: dict[str, float],
-                rc_sw: dict[str, dict]) -> ChassisLoads:
+                rc_sw: dict[str, dict],
+                warnings: list[str] | None = None) -> ChassisLoads:
     """准静态载荷转移 —— 侧倾耦合迭代（镜像前端 solveQuasiStatic 修复版）。
 
     3 轮迭代：每轮由当前侧倾角解外侧（压缩侧）轮行程差 dt=roll·半轮距 →
     rc_h 取引擎扫掠在 dt 处值（GEO 项随行程迁移）、kw 取 ±dt 处均值
     （ELA 项迁移，kw_curve 优先否则常数）→ 更新前后侧倾刚度 → 重解侧倾角。
     迁移后三路径不再与 ay 线性齐次 → TLLTD 随 gy 真实单调变化。
+
+    warnings：可选收集列表（F-16：侧倾失稳时显式上报而非静默置零）。
     """
     wb = vehicle.wheelbase_mm
     L = wb / 1000.0
@@ -209,13 +225,18 @@ def quasi_loads(vehicle: VehicleSpec, q: QuasiInputs,
     ay = q.gy * G
     ax = q.gx * G
 
-    # 初值/回退：当前位 rc_h（前端 zrcF0=SIM.mFR.rcH 同源语义）
-    zrc_f0 = rcH.get("FR") or 45.0
-    zrc_r0 = rcH.get("RR") or 65.0
+    # 初值/回退（F-15，2026-08-30）：`or 45.0` 会吞掉合法 0 值（侧倾中心恰在
+    # 地面）；改为仅对 None/NaN/非正回退。MR≤0 物理退化（摇臂失效）仍走回退。
+    _zf = rcH.get("FR")
+    _zr = rcH.get("RR")
+    zrc_f0 = _zf if (_zf is not None and math.isfinite(_zf)) else 45.0
+    zrc_r0 = _zr if (_zr is not None and math.isfinite(_zr)) else 65.0
     zrc_f, zrc_r = zrc_f0 / 1000.0, zrc_r0 / 1000.0
 
-    mrF = mr.get("front") or 0.75
-    mrR = mr.get("rear") or 0.78
+    _mf = mr.get("front")
+    _mrr = mr.get("rear")
+    mrF = _mf if (_mf is not None and math.isfinite(_mf) and _mf > 0.05) else 0.75
+    mrR = _mrr if (_mrr is not None and math.isfinite(_mrr) and _mrr > 0.05) else 0.78
     kw_f0 = vehicle.front.spring_rate * 1000.0 * mrF * mrF   # N/m
     kw_r0 = vehicle.rear.spring_rate * 1000.0 * mrR * mrR
 
@@ -232,11 +253,18 @@ def quasi_loads(vehicle: VehicleSpec, q: QuasiInputs,
     swf, swr = rc_sw["front"], rc_sw["rear"]
     half_f = abs(vehicle.front.points["WC"][0])   # mm
     half_r = abs(vehicle.rear.points["WC"][0])
+    _roll_unstable = False
     for _ in range(3):
         hra = zrc_f + (a / L) * (zrc_r - zrc_f)
         h_arm = max(0.05, hs - hra)
         denom = kphi_tot - mS * G * h_arm
-        roll_rad = (mS * ay * h_arm) / denom if denom > 100 else 0.0
+        if denom > 100:
+            roll_rad = (mS * ay * h_arm) / denom
+        else:
+            # 第 9 讲失稳判据：kphi_tot ≤ mS·g·h_arm（P-Δ 几何负刚度）→ 侧倾发散。
+            # 防线保留（讲义钦定），但 F-16：显式上报，不再静默置零。
+            _roll_unstable = True
+            roll_rad = 0.0
         dt_f = roll_rad * half_f    # 侧倾角×半轮距 = 轮行程差 mm
         dt_r = roll_rad * half_r
         zrc_f = _interp_fb(swf["travel"], swf["rc_h"], dt_f, zrc_f0) / 1000.0
@@ -250,9 +278,18 @@ def quasi_loads(vehicle: VehicleSpec, q: QuasiInputs,
     hra = zrc_f + (a / L) * (zrc_r - zrc_f)
     h_arm = max(0.05, hs - hra)
     denom = kphi_tot - mS * G * h_arm
-    roll_rad = (mS * ay * h_arm) / denom if denom > 100 else 0.0
+    if denom > 100:
+        roll_rad = (mS * ay * h_arm) / denom
+        roll_grad = ((mS * G * h_arm) / denom) * R2D
+    else:
+        _roll_unstable = True
+        roll_rad = 0.0
+        roll_grad = 0.0
+    if warnings is not None and _roll_unstable:
+        warnings.append(
+            "侧倾失稳：kphi_tot ≤ mS·g·h_arm（P-Δ 几何负刚度，第 9 讲判据），"
+            "侧倾角置零——本工况载荷转移结果不可信")
     roll_deg = roll_rad * R2D
-    roll_grad = ((mS * G * h_arm) / denom) * R2D if denom > 100 else 0.0
 
     F_aero = q.aero_force_n
     Fzf0 = mS * G * (b / L) + mU_f * G + F_aero * q.aero_bias
@@ -268,7 +305,9 @@ def quasi_loads(vehicle: VehicleSpec, q: QuasiInputs,
     dFz_r_tot = dFz_u_r + dFz_geo_r + dFz_elas_r
 
     sum_transfer = dFz_f_tot + dFz_r_tot
-    tlltd = (dFz_f_tot / sum_transfer) * 100 if sum_transfer > 1 else 50.0
+    # F-09（2026-08-30）：`sum_transfer > 1` 使左转（gy<0，sum<0）恒显示 50%。
+    # 改 |sum|>1；50% 占位仅用于 ay≈0（讲义第九讲钦定约定，保留）。
+    tlltd = (dFz_f_tot / sum_transfer) * 100 if abs(sum_transfer) > 1 else 50.0
     dFz_long = (mT * ax * (vehicle.hcg_mm / 1000.0)) / L
 
     sgn_y = 1.0 if q.gy >= 0 else -1.0
@@ -289,6 +328,25 @@ def quasi_loads(vehicle: VehicleSpec, q: QuasiInputs,
     )
 
 
+def _resolve_mr_fb(ax: AxleSpec, points: dict, is_front: bool,
+                   warnings: list[str]) -> tuple[float, bool]:
+    """MR 三路优先级（F-19/F-67）：显式参数 > mr_at_zero 数值推导 > 分轴常量。
+
+    返回 (mr, 是否回退常量)。回退常量分轴（前 0.75 / 后 0.78——旧实现恒
+    0.75 使后轴也吃到前轴常量），且异常原因随 warning 上报（不再静默吞）。
+    """
+    if ax.motion_ratio is not None:
+        return round(float(ax.motion_ratio), 4), False
+    try:
+        v = round(mr_at_zero(ax, points, False), 4)
+        return v, False
+    except Exception as exc:  # noqa: BLE001
+        c = 0.75 if is_front else 0.78
+        warnings.append(f"MR compute failed for {'front' if is_front else 'rear'}: "
+                        f"{exc.__class__.__name__} {exc} → 回退常量 {c}")
+        return c, True
+
+
 def solve_chassis(req: ChassisRequest) -> ChassisPoseResponse:
     """整车单点：四角运动学 + 姿态 + 准静态载荷。"""
     t0 = time.perf_counter()
@@ -299,23 +357,13 @@ def solve_chassis(req: ChassisRequest) -> ChassisPoseResponse:
     warnings: list[str] = []
     statuses: set[str] = set()
     rcH: dict[str, float] = {}
-    # MR 链（P2，2026-08-22）：显式参数 > 引擎数值推导 mr_at_zero（rocker 真实
-    # 三维轴 + strut_attach 对齐后恢复可信）> 前端同源常量回退（SIM.mrRefF||0.75 /
-    # mrRefR||0.78，仅解算异常时使用，并随警告上报）。
-    def _resolve_mr(ax: AxleSpec, points: dict) -> tuple[float, bool]:
-        if ax.motion_ratio is not None:
-            return round(float(ax.motion_ratio), 4), False
-        try:
-            v = round(mr_at_zero(ax, points, False), 4)
-            return v, False
-        except Exception:
-            c = 0.75
-            warnings.append(f"MR compute failed for {ax is req.vehicle.front and 'front' or 'rear'}"
-                            f"→ 回退常量 {c}")
-            return c, True
-
-    mr_f, _fb_f = _resolve_mr(req.vehicle.front, req.vehicle.front.points)
-    mr_r, _fb_r = _resolve_mr(req.vehicle.rear, req.vehicle.rear.points)
+    # MR 链（P2，2026-08-22；F-67 提取模块级）：显式参数 > 引擎数值推导
+    # mr_at_zero（rocker 真实三维轴 + strut_attach 对齐后恢复可信）> 前端
+    # 同源常量回退（SIM.mrRefF||0.75 / mrRefR||0.78，仅解算异常时使用）。
+    mr_f, _fb_f = _resolve_mr_fb(req.vehicle.front, req.vehicle.front.points,
+                                 is_front=True, warnings=warnings)
+    mr_r, _fb_r = _resolve_mr_fb(req.vehicle.rear, req.vehicle.rear.points,
+                                 is_front=False, warnings=warnings)
     mr = {"front": round(mr_f, 4), "rear": round(mr_r, 4)}
 
     for key in CORNER_KEYS:
@@ -343,7 +391,7 @@ def solve_chassis(req: ChassisRequest) -> ChassisPoseResponse:
     if abs(h_weighted - v_.hcg_mm) > 20.0:
         warnings.append(f"hs/hcg 记账不自洽：加权高度 {h_weighted:.0f}mm vs hcg "
                         f"{v_.hcg_mm:.0f}mm（载荷转移之和与整车公式将有偏差）")
-    loads = quasi_loads(req.vehicle, req.quasi, mr, rcH, rc_sw)
+    loads = quasi_loads(req.vehicle, req.quasi, mr, rcH, rc_sw, warnings=warnings)
     attitude = _attitude(trav, req.vehicle)
     return ChassisPoseResponse(
         status="SOLVER_FAILED" if "SOLVER_FAILED" in statuses else "VALID",
@@ -467,11 +515,3 @@ def sweep_steer(req: ChassisRequest) -> ChassisSweepResponse:
         ms=(time.perf_counter() - t0) * 1000.0,
         curves=curves, gains=gains, warnings=list(dict.fromkeys(warnings))[:8],
     )
-
-
-def _slope(y, x, at: float) -> float:
-    x = np.asarray(x, float)
-    y = np.asarray(y, float)
-    if len(x) < 2:
-        return 0.0
-    return float(np.interp(at + 2.0, x, y) - np.interp(at - 2.0, x, y)) / 4.0
