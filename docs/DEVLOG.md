@@ -1,5 +1,71 @@
 # 开发日志
 
+## 2026-08-30 — G2/G3 全部修复完成：W4 口径统一 + W5 体验偿债 + 前端 25 项（100 passed / 57 DOM）
+
+背景：承接 R-0830-2（86 passed），本轮把 grill-me 审查剩余全部修复项做完——
+**G2（W4 口径统一）+ G3（W5 体验偿债）+ 其余 F 项**。用户批示"先修 bug"
+（讲义 G4 暂缓）；验收：`pytest 100 passed`（12.8s）+ `node test_dom.js` 57 项全过。
+完整登记：`LABSUS/.worklog.md` 归档区 R-0830-3；W4 产物 `LABSUS/INTENTIONAL_DIFFERENCES.md`。
+
+**G2 / W4 口径统一（引擎侧）**：
+1. F-65 解析雅可比接线：`bush_force_jac` 块对角注入外层 TRF（全套 22.5s→12.8s）。
+2. F-64 cp_rel 一致化（tire_radius=325）+ CaseLoad 力矩折算进轮心、超静定/力矩残余显式降级 APPROXIMATE（球铰模型承诺兑现）。
+3. F-66 衬套表外刚度：clip（屈服变软）→ 端点刚度线性外推（硬化持续），非单调 x 显式校验。
+4. F-67 `mr_at_zero` 不吞异常 + 回退常量分轴（后轴 0.78 修正）。
+5. F-45 pydantic 校验缺口（硬点有限性/3 分量、SweepSpec、TireParams、TrackPoint）——新增 `test_f45_validation.py` 7 项。
+6. F-12/F-13 `_slope` 三拷贝收敛 `metrics/kandc.py` 唯一内核（最近邻中央差分 + None 跳过 + 端点单侧）；kinematics 委托同源。
+7. F-68 `_apply` 视图别名 → copy；F-70 rc 缓存加锁；F-71 bisection 缓存 err(lo) + steer_axis 默认 (−1,0,0)；F-46 detail 脱敏；F-26 动力半径按轴 tire_radius；F-19 transient MR 分叉登记。
+8. 死代码：`solver/mechanism/project.py`（PBD 投影原语零消费者）删除。
+9. **W4 核心产物**：`INTENTIONAL_DIFFERENCES.md`（坐标系双血脉/定位角双权威/差分窗口/MR 三路/ARB 三处的"故意不同清单"）+ `test_w4_consistency.py` 7 项对拍（v3 设计位自洽锚 + V1 冻结线保留登记 + MR 优先级）。
+
+**G3 / W5（前端侧，两文件同步）**：
+- F-44 XSS：E() innerHTML→textContent（含 sec() 标题节点化）；F-53 UI.sync 重建截断；
+  F-54 预瞄死控件→真状态；F-47 扫掠输入纠偏；F-04 摇臂分支最近根；F-05 findLimits NaN 中断；
+  F-14 ackermann 笔误；F-17 簧载按轴比例；F-18 打分复用 EVAL_BENCHMARKS；
+  F-20 暂停冻结积分；F-21 stepDyn 轻量 cp2；F-28 TPHYS ARB 注入；F-30 制动点头符号+后轴力臂；
+  F-32 真实 MR；F-33 舞台监听防泄漏+真实 dt；F-34 circuit 补 p/n 图元；F-35 轮胎转角真积分；
+  F-36 tieTrim 导入恢复；F-37 换车型清基线；F-38 赛道路点校验；F-42 IC 十字线；
+  F-43 死开关替换；F-55 空格仅回放激活；F-56 .sh.blu CSS；F-57 回放倍率时间累积；
+  F-39 deepClone 收敛；F-40 buildScenePRO 复用 SIM 指标；**F-03 拖拽轻量预览路径**
+  （拖拽中仅 buildMech+单点，pointerup 全量 rebuild）。
+- 防线：`test_dom.js` 23→57 项断言（所有新修复回访）。
+
+**遗留登记（有意保留，见 worklog 五）**：F-48/F-50/F-06/F-07/F-29/F-20 余项均 P3 文档级；
+K-4 与 OpenItem-B 属求解器议程，不动；`test_hand_benchmark.py` 文档漂移待修。
+**下一步**：G4 讲义勘误波次可按 R-0830-1/2/3 三份归档直接产出；或提交本轮工作区改动。
+
+## 2026-08-30 — G1 收尾第二波：六项失败测试全绿 + 对拍基建真正打通（86 passed）
+
+背景：grill-me 修复波次第一波（R-0830-1）落码后，工作区 pytest 处于 **80 passed / 6 failed** 的中间态
+（worklog 登记的 "79 passed" 是第一波前的基线）。本轮以"先修 bug"为目标（讲义勘误 G4 用户批示暂缓），
+把 6 个失败全部转绿，并第一次让 TPHYS↔Python 对拍真正跑通。完整登记见 `LABSUS/.worklog.md` 归档区 R-0830-2。
+
+1. **`test_slip_relaxation_lags_kinematic`（引擎测试断言口径修正，非实现 bug）**
+   - 现象：FR 轮 alphaL=0.953° > alpha=0.803°×1.05，稳态逐点断言偶发失败。
+   - 根因：原断言在"后半程第一行 alpha>0.3"处逐点比较，该点常落在转向/加速暂态段；一阶松弛滞后在
+     目标快速下降时瞬时值高于当前目标是**正确物理**（滞后不放大稳态，仅时间上追不上目标）。
+   - 修法：改"稳态段（后 1/4）中位数"断言——中位数比值 ∈ (0.85, 1.15) 且符号一致率 ≥90%
+     （实测 FR 1.04 / RR 1.02，稳态段同号 100%）；start_speed 提到 12 让稳态更快建立。
+2. **`test_tlltd_negative_g_not_pinned_at_50`（测试语义错误，实现本正确）**
+   - 原断言 `pos+neg≈100`（期望左右转互补）；物理上 TLLTD = 前轴转移/总转移，gy 变号分子分母同号
+     翻转 → 镜像对称车两侧份额**相等**（实测 46.81 / 46.82）。改为 `|pos−neg|<1.0` + 范围断言。
+3. **`test_quasi_loads_zero_rc_height_not_swallowed` / `..._roll_instability_reports_warning`（测试夹具不合契约）**
+   - rc_sw 传 `{}` 而 quasi_loads 契约要求 travel/rc_h 键 → KeyError('travel')。
+   - 修法：新增 `_zero_sweep()` 合法最小 sweep；失稳用例另显式 `arb.d=0`（默认 d=18 的扭杆刚度仍能
+     撑住 kphi_tot，弹簧 0.01 不会触发失稳判据——原用例从未真正测到失稳分支）。
+4. **TPHYS↔Python 对拍基建打通（F-58，此前对拍从未真正跑通）**
+   - `tphys_parity.cjs` 三处修复：①ctx 以 `input.ctx` 优先（HTML `makeSimContext` 依赖页面全局 SIM，
+     vm 沙箱下必然 ReferenceError——测试端 Python 侧已生成同源 rc/kw ctx）；②JS 结果写 argv[3]
+     （测试端从 out 文件读 JS 摘要，旧版从不落盘）；③pyOut 改走 os.tmpdir()（原推导路径在 web/ 残留）。
+   - `tphys_ref.py` 补 `engine/src` sys.path 注入（原只加 engine/，`from geometry import` 必然
+     ModuleNotFound——对拍从未真正跑通的第一手证据）。
+   - `test_dom.js` F-11 断言：正则误匹配源码注释中的旧代码字样 → 先剥离注释再匹配，并新增
+     `Number.isFinite(S.ackermann)` 卫哨在位断言（该修复本身早在前一波已落码）。
+5. 验证：`pytest tests/ -q` **86 passed**（20.8s）；`node test_dom.js` **25 项断言全过**。
+
+遗留登记：README/README.en 测试数（75）过期待勘误（G1 提交轮一并处理）；`test_hand_benchmark.py`
+（convention.py K-4 注释引用）实际不存在，属文档漂移，登记待修。
+
 ## 2026-08-24 - feat(web): 综合版单 HTML（内置赛道物理引擎 TPHYS, 066ac6f）
 - 需求: 用户要"综合版本, 单 html, 实现赛道相关所有后端" - 即一个 HTML 文件打开就能完整跑赛道仿真（无需 Python 引擎/8001 服务）。
 - 交付 LABSUS/web/dwb-pro-allinone.html（dwb-pro-fullchassis.html 全功能副本 + TPHYS 注入）:
