@@ -1,0 +1,42 @@
+{
+  "body": {
+    "vehicle": {
+      "wheelbase_mm": 1620.0, "mass_kg": 480.0, "sprung_mass_kg": 420.0,
+      "hcg_mm": 320.0, "hs_mm": 330.0,
+      "front": {
+        "points": {
+          "LCA_F": [260, 140, 130], "LCA_R": [260, -120, 140], "UCA_F": [350, 110, 340],
+          "UCA_R": [350, -100, 350], "LBJ": [640, 10, 150], "UBJ": [590, -15, 410],
+          "WC": [710, 0, 280], "TRO": [600, -120, 185], "RACK": [220, -135, 180],
+          "STRUT_OUT": [595, 10, 185], "RCK_AX_A": [300, 15, 330], "RCK_AX_B": [300, 70, 328],
+          "STRUT_IN": [315, 45, 400], "RCK_DMP": [230, 48, 345], "DMP_BODY": [30, 48, 170]
+        },
+        "arch": "pushrod", "camber_deg": -1.2, "toe_deg": 0.05,
+        "tire_radius": 305.0, "spring_rate": 110.0, "spring_mass_kg": 300.0,
+        "unsprung_kg": 38.0
+      },
+      "rear": {
+        "points": {
+          "LCA_F": [250, 140, 115], "LCA_R": [250, -130, 125], "UCA_F": [340, 110, 320],
+          "UCA_R": [340, -110, 330], "LBJ": [630, 10, 135], "UBJ": [580, -15, 390],
+          "WC": [700, 0, 290], "TRO": [590, -120, 170], "RACK": [210, -130, 160],
+          "STRUT_OUT": [570, -15, 380], "RCK_AX_A": [340, 25, 290], "RCK_AX_B": [340, 75, 292],
+          "STRUT_IN": [370, 45, 255], "RCK_DMP": [305, 60, 270], "DMP_BODY": [25, 62, 310]
+        },
+        "arch": "pullrod", "camber_deg": -1.5, "toe_deg": 0.1,
+        "tire_radius": 310.0, "spring_rate": 130.0, "spring_mass_kg": 340.0,
+        "unsprung_kg": 42.0
+      }
+    },
+    "track": [
+      { "x": 30.0, "y": 0.0, "target_speed": 12.0 },
+      { "x": 30.0, "y": 15.0, "target_speed": 12.0 },
+      { "x": 0.0, "y": 30.0, "target_speed": 12.0 },
+      { "x": -30.0, "y": 15.0, "target_speed": 12.0 },
+      { "x": 0.0, "y": 0.0, "target_speed": 12.0 }
+    ],
+    "dt": 0.01,
+    "sim_time": 8.0,
+    "start_speed": 10.0
+  }
+}

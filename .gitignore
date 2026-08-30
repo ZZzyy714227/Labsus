@@ -59,4 +59,5 @@ learning/explainers/pdf/
 
 # One-off artifacts (untracked, guard against accidental add)
 LABSUS/web/temp_syn.js
-LABSUS/web/test_dom.js
+# test_dom.js 原是"恒 exit 0 假测试"时期的一次性产物被忽略；F-59 重写为
+# 57 项真断言（前端防线）后应入库，随 CI 一起跑——不再忽略。
