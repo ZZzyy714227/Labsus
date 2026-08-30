@@ -8,6 +8,8 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+**/__pycache__/
+**/.pytest_cache/
 
 # Data (user-specific, runtime state)
 data/hardpoint_overrides.json
@@ -24,10 +26,14 @@ logs/
 **/dist/
 **/package-lock.json
 
-# Backups
+# Backups & Scratch
 *.bak
 *.bak.*
 config_backup_*.py
+scratch_*
+*.txt
+read_docx.py
+docx_output.txt
 
 # IDE
 .vscode/
@@ -35,6 +41,11 @@ config_backup_*.py
 
 # Agent / tool state
 .superpowers/
+.workbuddy/
+.claude/
+CLAUDE.md
+.worklog.md
+**/.worklog.md
 
 # OS
 .DS_Store
@@ -44,29 +55,10 @@ nul
 # Git worktrees
 .worktrees/
 
-# Agent tool runtime
-.workbuddy/
-
-# Scratch / dev detritus
-scratch_*
-
-# Gemini artifact copy (moved out of LABSUS/)
-archive/legacy-root/Gemini.html
-
-# Generated lecture PDFs + conversion tooling (too heavy for git)
-learning/explainers/.claude_pdf/
-learning/explainers/pdf/
-
-# One-off artifacts (untracked, guard against accidental add)
-LABSUS/web/temp_syn.js
-# test_dom.js 原是"恒 exit 0 假测试"时期的一次性产物被忽略；F-59 重写为
-# 57 项真断言（前端防线）后应入库，随 CI 一起跑——不再忽略。
-
-# Scratch & Personal helper scripts
-read_docx.py
-docx_output.txt
-
-# Intermediate visual verification artifacts
-grill-me/_pdf_pages/
-grill-me/_check_*.png
-
+# Private learning, interview & reference materials (LOCAL ONLY - DO NOT PUBLISH)
+learning/
+grill-me/
+archive/
+docs/
+ref/
+LABSUS_Technical_Doc.md
