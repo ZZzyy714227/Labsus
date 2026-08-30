@@ -228,11 +228,11 @@ pre code {
   <table>
     <thead><tr><th>血脉</th><th>约定</th><th>活跃文件</th></tr></thead>
     <tbody>
-      <tr><td>V1 老线（CLAUDE.md 记载）</td><td>$X$ 前 / $Y$ 右 / $Z$ 上</td><td><code>src/</code>（冻结）</td></tr>
-      <tr><td><b>LABSUS 线（主线）</b></td><td><b>$X$ 外侧 / $Y$ 向前 / $Z$ 上</b></td><td>引擎 + dwb-pro 前端</td></tr>
+      <tr><td>V1 冻结线</td><td>$X$ 前 / $Y$ 右 / $Z$ 上</td><td><code>core/convention.py</code>、<code>solver/angles.py</code>（冻结，仅教学/门禁）</td></tr>
+      <tr><td><b>LABSUS v3 主线</b></td><td><b>$X$ 外侧 / $Y$ 向前 / $Z$ 上</b></td><td>引擎 /api/v3、dwb-pro 前端（生产权威）</td></tr>
     </tbody>
   </table>
-  <p><b>判别法（forensics，比背表可靠）</b>：看轮距怎么取——<code>chassis.py</code> 里 $t_f = |WC_x| \times 2 / 1000$，轮距来自 <b>X 坐标</b> ⟹ X 横向、Y 纵向。读任何代码先做这 3 秒检验。</p>
+  <p><b>判别法（forensics，比背表可靠）</b>：看轮距怎么取——<code>chassis.py</code> 里 $t_f = |WC_x| \times 2 / 1000$，轮距来自 <b>X 坐标</b> ⟹ X 横向、Y 纵向。读任何代码先做这 3 秒检验。两套血脉的完整"故意不同清单"见 <code>LABSUS/INTENTIONAL_DIFFERENCES.md</code>。</p>
 </div>
 
 <div class="box proof">
@@ -247,7 +247,7 @@ pre code {
   <p>右轮是定义侧；左轮 = 对整个机构施加镜像变换：</p>
   $$M = \mathrm{diag}(-1, 1, 1), \quad p_{\text{左}} = M\, p_{\text{右}}$$
   <p>用第 2 章的判别法审计 $M$：$M^T M = I$（正交 ✓），但 $\det M = -1$ —— <b>这是反射，不是旋转</b>。物理完全合理：汽车的左右对称本来就是<b>镜像对称</b>（反射对称），不是旋转对称。</p>
-  <p><b>推论（steer_axis 反号的数学解释）</b>：齿条平移方向是（极）向量，镜像下 $x$ 分量变号 ⟹ 左机构的转向输入方向必须取反——引擎 <code>steer_axis = (0, -1, 0)</code>（左）vs $(0, +1, 0)</code>（右）。第 1 章的工程约定，用第 2 章的数学一句话说清。</p>
+  <p><b>推论（齿条输入的镜像语义，2026-08-22 后口径统一）</b>：齿条平移方向是（极）向量，但其作用是<b>整体平移</b>——左右机构各自沿自己坐标系的 $-X$（外侧轴负向 = 指向车内）平移，无需反号。<b>历史弯路（认识它防止复读）</b>：早期引擎默认 <code>steer_axis = (0,±1,0)</code>（纵向）且左右反号，转向灵敏度差 20.8:1，第三讲 3.5 审判后统一为 <code>steer_axis = (−1,0,0)</code>（引擎 <code>build_mechanism</code> 默认与前端 <code>setChassis</code> 的 RACK 平移逐位一致），两侧不再反号。第 1 章的工程约定，用第 2 章的数学一句话说清：向量反射下变号的是"指向"，齿条整体平移不改变相对几何。</p>
 </div>
 
 <figure>
@@ -351,11 +351,11 @@ pre code {
 <text x="416.7" y="223.0" font-size="10.5" fill="#c9c2b2">DMP_BODY</text>
 <text x="60" y="24" font-size="10.5" fill="#9aa3ad" text-anchor="start">右=定义侧(实线) · 左=镜像 x→−x(虚线) · 网格100mm · 轮距=1620mm</text>
 <line x1="505.7" y1="320.0" x2="445.7" y2="320.0" stroke="#d27886" stroke-width="1.6" stroke-dasharray="6 3"/>
-<text x="439.68000000000006" y="316.0" font-size="10" fill="#d27886" text-anchor="start">前端输入: −X(横移)</text>
+<text x="439.68000000000006" y="316.0" font-size="10" fill="#d27886" text-anchor="start">齿条平移: −X(横移, 前端与引擎统一)</text>
 <line x1="505.7" y1="320.0" x2="505.7" y2="260.0" stroke="#8fb0d4" stroke-width="1.6" stroke-dasharray="6 3"/>
-<text x="511.68000000000006" y="268.0" font-size="10" fill="#8fb0d4" text-anchor="start">引擎输入: ±Y(纵移)</text>
+<text x="511.68000000000006" y="268.0" font-size="10" fill="#8fb0d4" text-anchor="start">旧引擎口径: ±Y(纵移, 2026-08-22 废弃)</text>
 </svg>
-<figcaption>图 1 · 俯视图（计算投影）：屏幕横=X、纵=Y。右=定义侧（实线），左=镜像 x→−x（淡虚线）。红/蓝箭头=RACK 点的两种转向输入方向（前端 −X 横移 vs 引擎 ±Y 纵移，第 3 章审判）。生成器：learning/tools/gen_views.py</figcaption>
+<figcaption>图 1 · 俯视图（计算投影）：屏幕横=X、纵=Y。右=定义侧（实线），左=镜像 x→−x（淡虚线）。红箭头=齿条沿 −X 横移（前端 setChassis 与引擎 steer_axis=(−1,0,0) 统一后的口径）；蓝箭头=旧引擎 ±Y 纵移约定（灵敏度 20.8:1 之差的根由，2026-08-22 已废弃，仅为历史对照保留）。生成器：learning/tools/gen_views.py</figcaption>
 </figure>
 
 <h2>1.2 硬点语言：15 个点，一张传力地图</h2>
@@ -588,8 +588,8 @@ pre code {
 </table>
 
 <div class="box warn">
-  <div class="box-title">⚠️ 伏笔：转向输入轴裂缝（已在第 3 章 3.5 审判结案）</div>
-  <p>前端 <code>setChassis</code> 把 RACK 点沿 $-X$（横向，真实齿条）平移；引擎 <code>set_drives</code> 把 FL1 沿 $\pm Y$（纵向）平移。两者都改变横拉杆方位、都能转向，但<b>是不同的物理输入</b>：同样 rack=2mm 的转向灵敏度比 <b>20.8 : 1</b>（手算与实验见第三讲 3.5）。读到这里可以先自己推一遍那个投影。</p>
+  <div class="box-title">⚠️ 历史事故：转向输入轴裂缝（第三讲 3.5 已审判结案，2026-08-22）</div>
+  <p>早期前端 <code>setChassis</code> 把 RACK 点沿 $-X$（横向，真实齿条）平移；引擎 <code>set_drives</code> 却把 FL1 沿 $\pm Y$（纵向）平移——两者都改变横拉杆方位、都能转向，但<b>是不同的物理输入</b>：同样 rack=2mm 的转向灵敏度比 <b>20.8 : 1</b>。修复：引擎 <code>steer_axis</code> 统一 <code>(−1,0,0)</code> 与前端逐位一致（此前的"左右反号"旧约定一并废弃）。教训：同一物理量的两处实现必须在<b>输入语义</b>层面也对齐，只对拍输出数字会漏掉这类裂缝。</p>
 </div>
 
 <h2>1.5 核心检查点与自测</h2>
@@ -602,8 +602,8 @@ pre code {
   <p><b>解析</b>：$X$ 外侧（右轮 +）、$Y$ 向前、$Z$ 上。证明：轮距 $t_f = |WC_x| \times 2$ 取自 $X$ 分量 ⟹ X 横向 ⟹ Y 纵向。右手四指从 X 扫向 Y，拇指 = Z ✓，故 $\hat x \times \hat y = \hat z$ 成立，第 2 章旋转/叉乘公式可直接用。</p>
 </div>
 <div class="qa-box">
-  <p><b>Q3. 左轮为什么必须用镜像生成，而不能把右轮机构"转"过来？steer_axis 为什么反号？</b></p>
-  <p><b>解析</b>：镜像变换 $M = \mathrm{diag}(-1,1,1)$ 满足 $M^TM = I$ 但 $\det M = -1$ —— 是反射不是旋转（第 2 章：物理刚体运动 $\det = +1$）。汽车左右对称本来就是镜像对称。齿条平移方向是极向量，反射下 $x$ 分量变号 ⟹ 左机构转向输入矢量取反。</p>
+  <p><b>Q3. 左轮为什么必须用镜像生成，而不能把右轮机构"转"过来？齿条输入如何处理？</b></p>
+  <p><b>解析</b>：镜像变换 $M = \mathrm{diag}(-1,1,1)$ 满足 $M^TM = I$ 但 $\det M = -1$ —— 是反射不是旋转（第 2 章：物理刚体运动 $\det = +1$）。汽车左右对称本来就是镜像对称。齿条是<b>整体平移</b>：左右机构各自沿本侧坐标系的 $-X$（指向车内）平移，无需反号——引擎 <code>steer_axis=(−1,0,0)</code> 两侧一致（2026-08-22 前旧约定按 $\pm Y$ 且左右反号，灵敏度差 20.8:1，已废弃）。</p>
 </div>
 <div class="qa-box">
   <p><b>Q4.（动手）验证：UCA 与 LCA 枢轴间距各多少？TRO 高度位置在 LBJ→UBJ 的百分之几处？意味着什么？</b></p>

@@ -260,9 +260,9 @@ pre code {
   </div>
 </div>
 
-<p>由此写出<b>铰链圆的两个约束方程</b>（每个控制臂球铰）：</p>
+<p>由此写出<b>铰链圆的两个约束方程</b>（每个控制臂球铰；$s_0$ = 球铰设计位沿臂轴的轴向坐标，$r_0$ = 设计位到轴的距离）：</p>
 <div class="formula-highlight">
-  $$\underbrace{\mathrm{dist}\big(p_{LBJ},\ \ell_{CH1CH2}\big) - r_0}_{\text{径向：留在圆上}} = 0, \qquad \underbrace{\big(p_{LBJ} - a\big)\cdot u - ax_0}_{\text{轴向：圆平面不许滑}} = 0$$
+  $$\underbrace{\mathrm{dist}\big(p_{LBJ},\ \ell_{CH1CH2}\big) - r_0}_{\text{径向：留在圆上}} = 0, \qquad \underbrace{\big(p_{LBJ} - a\big)\cdot u - s_0}_{\text{轴向：圆平面不许滑}} = 0, \qquad s_0 = (p_{LBJ}^{0} - a)\cdot u$$
 </div>
 
 <div class="box warn">
@@ -279,7 +279,7 @@ pre code {
   <div class="box-title">📐 推导：10 个方程只有 9 个独立</div>
   <p>$n$ 个自由点坐标数 $= 3n$；刚体自由度 $= 6$（3 平动 + 3 转动）。钉成刚体需独立约束 $3n - 6$，取 $n = 5$：</p>
   $$15 - 6 = \mathbf{9} \ne 10$$
-  <p>10 个方程含<b>恰好 1 个相容冗余</b>（设计位下全部为零，对求解无害——第 4 章会看到最小二乘天然容忍相容冗余）。这解释了关键数字：残差方程总数 19 > 坐标 18，看似超定矛盾，实际独立约束恰好 18。</p>
+  <p>10 个方程含<b>恰好 1 个相容冗余</b>（设计位下全部为零，对求解无害——第 4 章会看到最小二乘天然容忍相容冗余）。这解释了关键数字的装配依赖：<b>knuckle 兼容模式</b>（UP4 留在转向节）残差方程 19 &gt; 坐标 18，看似超定矛盾，实际独立约束恰好 18；<b>默认装配</b>（UP4 挂下臂，P2 拓扑）残差恰为 18 条方阵（数值秩 18）。两模式独立约束数一致。</p>
 </div>
 
 <h2>3.3 约束 C 与驱动：二力杆 + 双输入</h2>
@@ -298,36 +298,41 @@ pre code {
 </div>
 
 <h2>3.4 自由度审计：坐标 − 独立约束 = DOF</h2>
+<p><b>先分清两种"自由"</b>：双驱动给定 = 位置分析（位形唯一）；不给定驱动 = 机构本身的传动自由度。下表按当前引擎<b>默认装配（pushrod → strut_attach=lca）</b>计数，knuckle 兼容模式另有说明（P2 拓扑，2026-08-22）。</p>
 <table>
-  <thead><tr><th>情形</th><th>坐标</th><th>独立约束</th><th>DOF</th><th>物理含义</th></tr></thead>
+  <thead><tr><th>情形</th><th>残差方程</th><th>独立约束</th><th>DOF</th><th>物理含义</th></tr></thead>
   <tbody>
-    <tr><td>双驱动都给定</td><td>18</td><td>18（2+2+9+1+1+3）</td><td><b>0</b></td><td>位形唯一 → 位置分析可解</td></tr>
-    <tr><td>只给轮跳（齿条自由）</td><td>18</td><td>16</td><td><b>2</b></td><td>轮跳 + 转向 = 传动自由度</td></tr>
+    <tr><td>双驱动都给定</td><td>18（2+2+6+6+1+1+1+3）</td><td>18（数值秩=18）</td><td><b>0</b></td><td>位形唯一 → 位置分析可解</td></tr>
+    <tr><td>只给轮跳（齿条自由→FL1 自由）</td><td>15（去齿条 3 条）</td><td>15（数值秩=15）</td><td><b>3</b></td><td>转向 + FL1 沿横拉杆轴的自由 = 3 个模型自由度（真实齿条将 FL1 锁在线上 → 只剩 1 个转向自由度）</td></tr>
+    <tr><td>无驱动整机构（传动自由度）</td><td>15</td><td>15</td><td><b>2</b><sup>*</sup></td><td>轮跳 + 转向 = <code>dof()</code> 返回 2 的语义（models.py；超静定机构不可靠秩加和）</td></tr>
   </tbody>
 </table>
+<p><sup>*</sup>注（2026-08-30 勘误）：旧讲义写"只给轮跳 → 16 → DOF 2"——16 是 knuckle 模式含冗余的<b>方程数</b>（非独立约束数），且把"传动自由度"错挂到"只给轮跳"行。按"坐标−独立约束"口径：默认 15 条独立约束 → 模型 DOF 3；传动自由度 2 是无驱动整机构的 <code>dof()</code> 语义。</p>
 <div class="box warn">
   <div class="box-title">⚠️ Grübler/Kutzbach 公式在此失效（源码自己承认）</div>
   <p>教科书自由度公式（$6(n{-}1) - \sum$ 运动副约束）对<b>空间超静定连杆</b>会算出负数/误导值。引擎 <code>models.py</code> 模块头原话："双叉臂空间机构是超静定（overconstrained）空间连杆，不能靠 3N−Σ约束 的秩加和得到正确自由度"——所以 <code>dof()</code> 直接返回传动自由度 2，可实现性交给求解器收敛测试验证。工程处理法：<b>坐标-方程计数 + 数值秩验证</b>，而不是背公式。</p>
 </div>
 <div class="box algo">
-  <div class="box-title">🎯 数值实验（真实运行，LABSUS 引擎）</div>
+  <div class="box-title">🎯 数值实验（真实运行，LABSUS 引擎；默认装配 pushrod→lca 附着）</div>
   <table>
     <thead><tr><th>量</th><th>值</th><th>解读</th></tr></thead>
     <tbody>
       <tr><td>状态维数</td><td><b>18</b>（6 节点×3）</td><td>$x \in \mathbb{R}^{18}$</td></tr>
-      <tr><td>残差方程数</td><td><b>19</b>（2+2+10+1+1+3）</td><td>超定 1 个（相容冗余）</td></tr>
-      <tr><td>数值雅可比秩</td><td><b>18</b>（19×18 矩阵）</td><td>独立约束确为 18 ✓</td></tr>
-      <tr><td>雅可比条件数</td><td><b>7.0</b></td><td>良态！第 4 章 TRF 收敛快的结构原因</td></tr>
-      <tr><td>解处 max&#124;残差&#124;</td><td><b>0.00e+00</b></td><td>19 方程在解处全零（冗余相容）</td></tr>
+      <tr><td>残差方程数（默认 lca）</td><td><b>18</b>（2+2+6+6+1+1+1+3）</td><td>方阵 18×18：UP4 挂下臂簇，铰链 6 + 刚体 6 + 刚线 1 + 杆 1 + 轮跳 1 + 齿条 3</td></tr>
+      <tr><td>残差方程数（knuckle 兼容）</td><td><b>19</b>（2+2+10+1+1+3）</td><td>UP4 留在转向节：超定 1（相容冗余，见 3.2）</td></tr>
+      <tr><td>数值雅可比秩</td><td><b>18</b>（两模式）</td><td>独立约束确为 18 ✓</td></tr>
+      <tr><td>雅可比条件数</td><td><b>7.17（lca）/ 6.99（knuckle）≈ 7</b></td><td>良态！第 4 章 TRF 收敛快的结构原因</td></tr>
+      <tr><td>解处 max&#124;残差&#124;</td><td><b>0.00e+00</b></td><td>方程在解处全零</td></tr>
     </tbody>
   </table>
+  <p>注（2026-08-30 勘误）：旧表写"19 方程"——那是对 knuckle 兼容模式的计数；当前默认装配为 18 条方阵。第 4 章引用"ℝ¹⁸→ℝ¹⁹"时默认指 knuckle 模式（教学基线），或按本表按装配说明。</p>
 </div>
 
 <h2>3.5 审判日：前端与引擎的转向输入轴裂缝（第 1 章悬案）</h2>
 <div class="step-card">
-  <div class="step-header"><span class="step-tag">实验</span> 引擎 rack = +2mm 发生了什么？</div>
-  <p>真实运行：toe 从 0.0500° → 0.0849°（$\Delta = +0.0349°$/2mm），<b>而横拉杆长度变化 = 0.0000mm</b>。</p>
-  <p><b>为什么长度不变却转了向？</b>定长是约束 C（$\|TRO - FL1\| = L_0$ 恒成立）！移动 FL1 改变的是横拉杆<b>方位</b>，机构必须转动转向节让 TRO 跟到新位置——"拉伸需求"由关节转动吸收。</p>
+  <div class="step-header"><span class="step-tag">实验（历史，2026-08-22 前）</span> 旧引擎 Y 向输入 rack = +2mm 发生了什么？</div>
+  <p>旧实现（$steer\_axis=(0,\pm1,0)$）真实运行：toe 从 0.0500° → 0.0849°（$\Delta = +0.0349°$/2mm），<b>而横拉杆长度变化 = 0.0000mm</b>。<b>修复后（$steer\_axis=(-1,0,0)$）实测：rack=+2mm → toe ≈ −0.68°</b>（增益 ~0.34°/mm，约为旧纵向输入的 20 倍）。</p>
+  <p><b>为什么长度不变却转了向？</b>定长是约束 C（$\|TRO - FL1\| = L_0$ 恒成立）！移动 FL1 改变的是横拉杆<b>方位</b>，机构必须转动转向节让 TRO 跟到新位置——"拉伸需求"由关节转动吸收。（此物理讲解两代实现通用，数值随输入方向不同。）</p>
 </div>
 <div class="step-card">
   <div class="step-header"><span class="step-tag">手算</span> 拉伸需求 = 输入位移在横拉杆方向上的投影</div>
@@ -344,27 +349,29 @@ pre code {
   <p><b>灵敏度比 20.8 : 1</b>。同样是"rack=2mm"，前端产生约 2mm 转向需求，引擎只有约 0.1mm——两者是<b>不同的物理输入</b>（横向齿条 vs 纵向拉杆），数值不可互换。</p>
 </div>
 <div class="step-card">
-  <div class="step-header"><span class="step-tag">判决</span> 裂缝定性 + 修复方向</div>
+  <div class="step-header"><span class="step-tag">判决</span> 裂缝定性 + 修复落点（2026-08-22 已结案）</div>
   <ul>
-    <li><b>定性</b>：引擎 <code>steer_axis = (0,±1,0)</code>（models.py 注释"齿条平移方向（右轮 +Y）"）与真实齿条的横向（−X）物理不符；前端 <code>RACK.x −= rack</code> 物理正确。双真源风险的活案例：约束方程完全相同，<b>输入语义不同</b>。</li>
-    <li><b>修法</b>：引擎 steer_axis 改 $(\pm 1, 0, 0)$（与前端同号约定），登记 OpenItem；修复后引擎 steering 增益（deg/mm）放大 ~20 倍，需同步默认扫掠范围。</li>
+    <li><b>定性</b>：旧引擎 <code>steer_axis = (0,±1,0)</code>（models.py 注释"齿条平移方向（右轮 +Y）"）与真实齿条的横向（−X）物理不符；前端 <code>RACK.x −= rack</code> 物理正确。双真源风险的活案例：约束方程完全相同，<b>输入语义不同</b>。</li>
+    <li><b>已落码</b>：引擎统一 <code>steer_axis = (−1,0,0)</code>——<code>v3service._new_mech</code> 显式传参 + <code>build_mechanism</code> 默认值同步修改（2026-08-30 复核），左右机构各沿本侧 −X（指向车内）平移、不再反号；与前端 <code>setChassis</code> 的 <code>RACK.x −= rack</code> 逐位一致。转向灵敏度放大 ~20 倍后的默认扫掠范围（±50mm rack）已随测试基线锁定。</li>
     <li><b>教训</b>：约束建模只保证"机构对"，<b>驱动方向也是模型的一部分</b>——审计机构模型，坐标、约束、驱动三样都要过堂。</li>
   </ul>
 </div>
 
 <h2>3.6 残差向量组装：19 个数叠成一个函数（源码逐行对账）</h2>
-<pre><code><span class="keyword">def</span> <span class="func">_build_residual</span>(m, travel, rack):          <span class="comment"># 返回 F(x)：ℝ¹⁸ → ℝ¹⁹</span>
-    pair = 两两组合(_KNUCKLE_IDS)                      <span class="comment"># 约束B 的 10 对</span>
-    <span class="keyword">for</span> c <span class="keyword">in</span> m.axis_clusters:                    <span class="comment"># 约束A：铰链圆（LCA/UCA 各一簇）</span>
+<pre><code><span class="keyword">def</span> <span class="func">_build_residual</span>(m, travel, rack):          <span class="comment"># 返回 F(x)：ℝ¹⁸ → ℝ¹⁸（默认装配）/ ℝ¹⁹（knuckle，超定）</span>
+    body_ids = <span class="func">sorted</span>(m.bodies[<span class="num">0</span>].ids)           <span class="comment"># 约束B：转向节刚体对（由附着拓扑派生，默认 5 点→6 对）</span>
+    pair = [(i, j) <span class="keyword">for</span> idx, i <span class="keyword">in</span> <span class="func">enumerate</span>(body_ids) <span class="keyword">for</span> j <span class="keyword">in</span> body_ids[idx+<span class="num">1</span>:]]
+    <span class="keyword">for</span> c <span class="keyword">in</span> m.axis_clusters:                    <span class="comment"># 约束A：铰链圆（LCA/UCA 各一簇；lca/uca 附着时 UP4 入簇）</span>
         <span class="keyword">for</span> mem <span class="keyword">in</span> c.members:
-            out.append(dist_point_to_line(p, a, b) - r0)    <span class="comment"># 径向方程 ×2</span>
-            out.append(dot(p - a, u) - ax0)                  <span class="comment"># 轴向方程 ×2</span>
-    <span class="keyword">for</span> i, j <span class="keyword">in</span> pair:                              <span class="comment"># 约束B：10 个定长</span>
+            out.append(dist_point_to_line(p, a, b) - r0)    <span class="comment"># 径向方程</span>
+            out.append(dot(p - a, u) - ax0)                  <span class="comment"># 轴向方程</span>
+    <span class="keyword">for</span> i, j <span class="keyword">in</span> pair:                              <span class="comment"># 约束B：刚体定长（5 点→6 对；knuckle 为 10 对）</span>
         out.append(norm(pos_i - pos_j) - d0[(i, j)])
+    <span class="keyword">if</span> m.strut_attach != <span class="string">"knuckle"</span>: out.append(norm(pos_UP4 - pos_臂球头) - d0)  <span class="comment"># P2：UP4↔臂球头刚线 ×1</span>
     out.append(norm(pos_TRO - pos_FL1) - tie.L0)            <span class="comment"># 约束C：二力杆 ×1</span>
     out.append(pos_wheel.z - (z_p0 + travel))               <span class="comment"># 驱动1：轮跳 ×1</span>
     out.extend(pos_FL1 - (anchor + rack * steer_axis))      <span class="comment"># 驱动2：齿条 ×3</span></code></pre>
-<p>位置分析从此变成纯代数问题：<b>找 $x \in \mathbb{R}^{18}$ 使 $F(x) = 0$</b>。摇臂/减振器链（STRUT_IN/RCK_DMP/DMP_BODY）不在 $F$ 内——它是轮侧解完后的<b>运动从动链</b>，由 <code>solve_rocker</code> 二分搜索 θ 单独解（第 6 章专题）。怎么解 $F(x)=0$？19 个非线性方程、超定、要求分支连续……第 4 章的全部内容。</p>
+<p>位置分析从此变成纯代数问题：<b>找 $x \in \mathbb{R}^{18}$ 使 $F(x) = 0$</b>（默认装配 18 条；knuckle 模式 19 条含相容冗余）。摇臂/减振器链（STRUT_IN/RCK_DMP/DMP_BODY）不在 $F$ 内——它是轮侧解完后的<b>运动从动链</b>，由 <code>solve_rocker</code>（Rodrigues 绕 RCK_AX_A→B 三维轴 + 60 次二分）单独解（第 6 章专题）。怎么解 $F(x)=0$？19 个非线性方程、超定、要求分支连续……第 4 章的全部内容。</p>
 
 <h2>3.7 核心检查点与自测</h2>
 <div class="qa-box">
@@ -373,15 +380,15 @@ pre code {
 </div>
 <div class="qa-box">
   <p><b>Q2. 转向节 10 个两两定长方程为什么只有 9 个独立？</b></p>
-  <p><b>解析</b>：5 点 15 坐标 − 刚体 6 DOF = 9 个独立约束；10 方程含 1 个相容冗余。实测残差 19 条、雅可比秩 18，与此吻合。</p>
+  <p><b>解析</b>：5 点 15 坐标 − 刚体 6 DOF = 9 个独立约束；10 方程含 1 个相容冗余。注意这是 <b>knuckle 兼容模式</b>（UP4 留在转向节、5 点 10 对）的计数；默认装配（UP4 挂下臂）刚体 4 点仅 6 对、UP4 由铰链簇 + 一条臂刚线约束——两种模式独立约束数均为 18。实测残差条数、雅可比秩（18）与此吻合。</p>
 </div>
 <div class="qa-box">
-  <p><b>Q3. 为什么引擎 rack=2mm 后横拉杆长度变化为 0，车轮却转了？</b></p>
-  <p><b>解析</b>：定长是约束恒成立；移动内端改变杆的方位，"拉伸需求"（2mm × 0.048 = 0.096mm）由转向节转动吸收 → toe +0.0349°。前端横向输入投影 2×0.9987≈2mm，需求大 20.8 倍。</p>
+  <p><b>Q3. 为什么引擎 rack=2mm 后横拉杆长度变化为 0，车轮却转了？（历史实验，Y 向输入）</b></p>
+  <p><b>解析</b>：定长是约束恒成立；移动内端改变杆的方位，"拉伸需求"（2mm × 0.048 = 0.096mm，纵向投影小）由转向节转动吸收 → toe +0.0349°。前端横向输入投影 2×0.9987≈2mm，需求大 20.8 倍。<b>修复后引擎输入方向与前端一致（−X），同一物理输入、数值统一</b>——20.8:1 的"两种输入"已成为历史。</p>
 </div>
 <div class="qa-box">
-  <p><b>Q4.（动手）把 RACK 的 y 从 −165 改到 −120，两种输入的灵敏度比怎么变？</b></p>
-  <p><b>解析</b>：杆向量的 y 分量 = (−145−(−120))/长度 → 分母不变、分子从 20 变 25？注意符号：u_y = (TRO_y − RACK_y)/L = (−145+120)/L = −25/L，绝对值反而增大到 ~0.06，纵向灵敏度略升、比值略降；横向投影仍 ~0.999 不变。规律：齿条 y 越远离 TRO 的 y，纵向输入越"没劲"。</p>
+  <p><b>Q4.（动手·历史语境）恢复 Y 向输入年代：把 RACK 的 y 从 −165 改到 −120，两种输入的灵敏度比怎么变？</b></p>
+  <p><b>解析</b>：杆向量的 y 分量 = (−145−(−120))/长度 → 分母不变、分子从 20 变 25？注意符号：u_y = (TRO_y − RACK_y)/L = (−145+120)/L = −25/L，绝对值反而增大到 ~0.06，纵向灵敏度略升、比值略降；横向投影仍 ~0.999 不变。规律：齿条 y 越远离 TRO 的 y，纵向输入越"没劲"。（注：修复后引擎只用横向输入，此题保留作投影练习。）</p>
 </div>
 <div class="qa-box">
   <p><b>Q5. models.py 的 dof() 直接返回 2，这偷懒吗？</b></p>

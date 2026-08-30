@@ -20,20 +20,23 @@ window.MathJax = {
 <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 <style>
 :root {
-  --bg: #0f1319;
-  --panel: #161c26;
+  --bg: #0d1117;
+  --panel: #161b22;
+  --panel-card: #1c2128;
   --ink: #e6edf3;
-  --ink-dim: #9aa7b8;
+  --ink-dim: #8b949e;
   --pri: #58a6ff;
-  --pri-dim: rgba(88, 166, 255, 0.15);
+  --pri-dim: rgba(88, 166, 255, 0.12);
   --ok: #3fb950;
-  --ok-dim: rgba(63, 185, 80, 0.15);
+  --ok-dim: rgba(63, 185, 80, 0.12);
   --warn: #d29922;
-  --warn-dim: rgba(210, 153, 34, 0.15);
+  --warn-dim: rgba(210, 153, 34, 0.12);
   --err: #f85149;
-  --err-dim: rgba(248, 81, 73, 0.15);
+  --err-dim: rgba(248, 81, 73, 0.12);
   --purple: #bc8cff;
-  --purple-dim: rgba(188, 140, 255, 0.15);
+  --purple-dim: rgba(188, 140, 255, 0.12);
+  --cyan: #39c5bb;
+  --cyan-dim: rgba(57, 197, 187, 0.12);
   --line: #30363d;
   --code-bg: #0b0e14;
 }
@@ -43,49 +46,50 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  font-size: 15.5px;
+  font-size: 15px;
   line-height: 1.8;
-  max-width: 980px;
+  max-width: 1000px;
   margin: 0 auto;
-  padding: 40px 24px 100px;
+  padding: 40px 24px 120px;
 }
 
 /* 标题体系 */
 h1 {
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 700;
   color: #fff;
   border-bottom: 1px solid var(--line);
-  padding-bottom: 16px;
-  margin-bottom: 24px;
+  padding-bottom: 18px;
+  margin-bottom: 28px;
+  letter-spacing: -0.02em;
 }
 h1 small {
   display: block;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--pri);
-  letter-spacing: 0.15em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  margin-top: 6px;
+  margin-top: 8px;
 }
 h2 {
   font-size: 21px;
   font-weight: 600;
   color: var(--pri);
-  margin: 52px 0 18px;
+  margin: 48px 0 18px;
   padding-left: 12px;
   border-left: 4px solid var(--pri);
   display: flex;
   align-items: center;
 }
 h3 {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 600;
   color: #c9d1d9;
-  margin: 28px 0 10px;
+  margin: 24px 0 10px;
 }
 
-p { margin: 12px 0; color: #c9d1d9; }
+p { margin: 10px 0; color: #c9d1d9; }
 strong, b { color: #fff; }
 em { color: var(--warn); font-style: normal; font-weight: 600; }
 
@@ -94,27 +98,52 @@ em { color: var(--warn); font-style: normal; font-weight: 600; }
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 20px 22px;
+  padding: 22px 24px;
   margin: 20px 0;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
 }
 .box.intuition { border-left: 4px solid var(--purple); background: linear-gradient(90deg, var(--purple-dim) 0%, var(--panel) 25%); }
 .box.proof { border-left: 4px solid var(--ok); background: linear-gradient(90deg, var(--ok-dim) 0%, var(--panel) 25%); }
 .box.warn { border-left: 4px solid var(--warn); background: linear-gradient(90deg, var(--warn-dim) 0%, var(--panel) 25%); }
 .box.algo { border-left: 4px solid var(--pri); background: linear-gradient(90deg, var(--pri-dim) 0%, var(--panel) 25%); }
-.box-title { font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.box.blueprint { border-left: 4px solid var(--cyan); background: linear-gradient(90deg, var(--cyan-dim) 0%, var(--panel) 25%); }
+
+.box-title { 
+  font-weight: 700; 
+  font-size: 16px;
+  margin-bottom: 12px; 
+  display: flex; 
+  align-items: center; 
+  gap: 8px; 
+}
 .box.intuition .box-title { color: var(--purple); }
 .box.proof .box-title { color: var(--ok); }
 .box.warn .box-title { color: var(--warn); }
 .box.algo .box-title { color: var(--pri); }
+.box.blueprint .box-title { color: var(--cyan); }
 
-/* 步骤指示器 */
+/* ASCII 图形卡片 */
+.diagram-box {
+  background: #090c10;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  font-family: "Cascadia Code", "Fira Code", "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #7ee787;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* 步骤卡片 */
 .step-card {
-  background: #121720;
+  background: var(--panel-card);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 16px 20px;
-  margin: 16px 0;
+  margin: 14px 0;
 }
 .step-header {
   display: flex;
@@ -135,23 +164,24 @@ em { color: var(--warn); font-style: normal; font-weight: 600; }
 }
 
 /* 列表与表格 */
-ul, ol { margin: 12px 0 12px 24px; color: #c9d1d9; }
+ul, ol { margin: 10px 0 10px 24px; color: #c9d1d9; }
 li { margin: 6px 0; }
 table {
   width: 100%;
   border-collapse: collapse;
-  margin: 20px 0;
-  background: var(--panel);
+  margin: 18px 0;
+  background: var(--panel-card);
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--line);
+  font-size: 14px;
 }
 th, td {
   padding: 12px 16px;
   text-align: left;
   border-bottom: 1px solid var(--line);
 }
-th { background: #1f2733; color: #fff; font-weight: 600; }
+th { background: #21262d; color: #fff; font-weight: 600; }
 tr:last-child td { border-bottom: none; }
 tr:hover td { background: rgba(255,255,255,0.02); }
 
@@ -178,170 +208,233 @@ pre code {
   padding: 0;
   border: none;
   color: #e6edf3;
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.6;
 }
-.comment { color: #8b949e; }
-.keyword { color: #ff7b72; }
-.func { color: #d2a8ff; }
-.num { color: #79c0ff; }
 
 /* 问答区域 */
 .qa-box {
-  background: #161c24;
-  border: 1px solid #232d3d;
+  background: var(--panel);
+  border: 1px solid #2d333b;
   border-radius: 8px;
-  padding: 16px 20px;
-  margin: 14px 0;
+  padding: 18px 22px;
+  margin: 16px 0;
 }
-.qa-box b { color: var(--ok); }
+.qa-box .qa-q { font-weight: 600; color: #fff; margin-bottom: 8px; }
+.qa-box .qa-q span { color: var(--pri); font-weight: 700; margin-right: 6px; }
+.qa-box .qa-a { color: #c9d1d9; font-size: 14.5px; }
+.qa-box .qa-a b { color: var(--ok); }
 
 .formula-highlight {
-  background: #131922;
+  background: #121720;
   border-left: 3px solid var(--pri);
-  padding: 10px 16px;
-  margin: 12px 0;
-  border-radius: 0 6px 6px 0;
+  padding: 14px 20px;
+  margin: 16px 0;
+  border-radius: 0 8px 8px 0;
 }
 </style>
 </head>
 
-
 <body>
 
 <h1>第 9 章 · 准静态载荷转移——三路径与侧倾
-<small>LABSUS 悬架实验室 · 自底向上 9/11 · 整车综合·皇冠章</small></h1>
+<small>LABSUS 悬架实验室 · 自底向上 9/11 · 整车综合·皇冠章[cite: 1]</small></h1>
 
 <h2>9.0 这一章解决的物理问题</h2>
-<p>稳态过弯，四个车轮各承受多少载荷？这是悬架设计的<b>总决算</b>：几何（RC，第 5 章）、刚度（kw，第 6 章 MR²）、ARB（第 6 章 GJ/L）、数值方法（不动点迭代，第 4 章）在此汇流。载荷决定轮胎能力（第 8 章 $D \propto F_z$），所以<strong>载荷转移分配 = 操纵平衡的第一性杠杆</strong>。本章从整车力矩平衡零跳步推出三路径分解、稳态侧倾角、TLLTD，然后复盘那次著名 bug——<b>线性齐次陷阱</b>，最后讲我们修复它的侧倾耦合迭代（P0）。</p>
-
-<h2>9.1 整车总转移：对接触线取矩</h2>
-<div class="box proof">
-  <div class="box-title">📐 推导（前视平面，右转 ay&gt;0，外侧=右）</div>
-  <p>达朗贝尔视角：弯道稳态中，整车惯性力 $m\,a_y$ 作用在质心（高 $h_{cg}$），方向指离弯心。对<b>外侧（右）轮胎接地线</b>取矩：轮载荷差形成回复力偶。设轴上内外轮载差的一半为 $\Delta F_z$（转移量），轮距 $t$：</p>
-  $$\sum M_{\text{右接地线}} = 0: \quad \underbrace{m\,a_y\,h_{cg}}_{\text{侧倾力矩}} = \underbrace{(2\Delta F_z) \cdot t / 2 \cdot 2}_{\text{两轴内外差形成 的力偶}} \;\Rightarrow\; \Delta F_z^{total} \approx \frac{m\,a_y\,h_{cg}}{t} \;(\text{每轴量级})$$
-  <p>这个总量怎么在<b>前后轴之间分配</b>、经由什么机构传递——就是三路径分解要回答的。分配比 = TLLTD 的分子分母。</p>
+<div class="box blueprint">
+  <div class="box-title">🏆 底盘动力学“总决算”视角</div>
+  <p>稳态过弯时，四个车轮各自承受多少垂直载荷？这是整车悬架设计的<b>总决算时刻</b>：几何（RC，第 5 章）、刚度（$k_w$，第 6 章 $\text{MR}^2$）、防倾杆（ARB，第 6 章 $GJ/L$）、数值迭代（第 4 章不动点法）在此全部汇流[cite: 1]。</p>
+  <p>根据第 8 章轮胎接触力学，由于轮胎橡胶的下凹载荷敏感性（琴生不等式），单轴内外轮载荷转移越大，该轴总抓地力亏损越严重[cite: 1]。因此：<strong>载荷转移分配比（TLLTD）是决定整车转向平衡（推头 vs 甩尾）的第一性杠杆</strong>[cite: 1]。</p>
 </div>
 
-<h2>9.2 三路径分解：转移的三个通道</h2>
+<div class="diagram-box">
+  【第 9 章整车闭环因果图景】
+
+   空间导向几何 (RC) ──┐
+   弹簧速比刚度 (kw)   ──┼──► 侧倾角 φ ──► 载荷转移三路径 ──► 前后分配比 TLLTD[cite: 1]
+   防倾杆刚度 (k_ARB)  ──┘                                       │
+                                                                 ▼
+   输出四轮动态垂直载荷 Fz,ij ◄── 四轮矩阵组装 ◄── 决定单轴抓地力净亏损额[cite: 1]
+             │
+             ▼
+   代入魔术公式 MF D(Fz) ──────► 输出四轮极限侧向力 Fy ──► 终局判定推头 / 中性 / 甩尾[cite: 1]
+</div>
+
+---
+
+<h2>9.1 整车总转移：对外侧接触线取矩</h2>
+<div class="box proof">
+  <div class="box-title">📐 达朗贝尔力矩平衡推导（前视平面，右转 $a_y > 0$，外侧为右）[cite: 1]</div>
+  <p>在稳态弯道中，整车侧向惯性力 $m a_y$ 作用在整车质心（高度 $h_{\text{cg}}$），方向背离弯心指向外侧[cite: 1]。以<b>外侧（右侧）轮胎接地线</b>为力矩参考点建立平衡方程[cite: 1]：</p>
+  
+  $$\sum M_{\text{右接地线}} = 0 \implies \underbrace{m a_y h_{\text{cg}}}_{\text{惯性倾覆力矩}} = \underbrace{\Delta F_{z}^{\text{total}} \cdot t}_{\text{两轴内外轮载差力偶}} \implies \mathbf{\Delta F_{z}^{\text{total}} = \frac{m a_y h_{\text{cg}}}{t}} \quad (\text{整车总载荷转移})[cite: 1]$$
+
+  <p><b>守恒公理</b>：整车总载荷转移量 $\Delta F_z^{\text{total}}$ 仅取决于质量 $m$、加速度 $a_y$、质心高 $h_{\text{cg}}$ 和轮距 $t$，与悬架弹簧的软硬毫无关系[cite: 1]。悬架设计的全部意义，在于决定<b>这笔固定的总转移在前后轴之间如何切蛋糕（TLLTD）</b>[cite: 1]。</p>
+</div>
+
+---
+
+<h2>9.2 三路径分解：单轴转移的三大通道</h2>
 <div class="box intuition">
-  <div class="box-title">💡 物理图景：簧载质量的侧向力怎么传到地面</div>
-  <p>簧载质量（车身）的惯性力 $m_S a_y$ 在质心（高 $h_s$）。它与地面的连接只有悬架。侧倾中心 RC（第 5 章构造的那个点）的关键性质：<b>作用线过 RC 的侧向力不产生车身侧倾力矩</b>（RC = 簧载质量的瞬时转动中心）。于是把质心上的力分解成两条通道 + 非簧载自己的一条：</p>
-</div>
-<div class="box proof">
-  <div class="box-title">📐 路径 A：非簧载直接（不经弹簧）</div>
-  <p>车轮/立柱的质量（每轴 $m_U$，合计两轮）的惯性力直接作用在轴上（质心高 ≈ 轮胎半径 $h_u$），只能靠轮载差平衡：</p>
-  $$\Delta F_z^{uns}_f = \frac{m_{U,f}\,a_y\,h_{uf}}{t_f} \quad (\text{基线} = \tfrac{76 \times 9.81 \times 0.325}{1.620} = 149.6\ \text{N @1g})$$
-</div>
-<div class="box proof">
-  <div class="box-title">📐 路径 B：几何路径（经侧倾中心）</div>
-  <p>把簧载惯性力 $m_S a_y$ 平移到前轴份额质心（按纵向载荷分配，前轴承担 $b/L$ 份），再<b>竖直平移到该轴 RC 高度</b>：平移到 RC 的力不产生车身力矩（见上），但它作用在非簧载/轴上，同样只能由轮载差平衡：</p>
-  $$\Delta F_z^{geo}_f = \frac{\big(m_S a_y \cdot \tfrac{b}{L}\big) \cdot z_{rc,f}}{t_f} \quad (\text{基线} = \tfrac{(1260 \cdot 9.81 \cdot 0.5356) \times 0.0553}{1.620} = 225.7\ \text{N @1g})$$
-  <p><b>RC 越高，几何份额越大</b>——这就是"RC 高度是几何刚度"的含义：它决定多少侧向力"不劳弹簧"直接传到地面。</p>
-</div>
-<div class="box proof">
-  <div class="box-title">📐 路径 C：弹性路径（经弹簧 + ARB）</div>
-  <p>力从质心平移到 RC 的剩余力臂 $h_{arm} = h_s - h_{ra}$ 上的力矩必须由弹簧/ARB 力偶抗：</p>
-  $$m_S a_y h_{arm} \;(\text{侧倾激励}) \leftrightarrow k_{\phi,tot}\,\varphi \;(\text{侧倾刚度} \times \text{侧倾角})$$
-  <p>侧倾后每轴分担的力偶除以轮距即转移：</p>
-  $$\Delta F_z^{elas}_f = \frac{k_{\phi,f}\,\varphi}{t_f}, \qquad k_{\phi} = \underbrace{\tfrac12 k_w t^2}_{\text{第6章 } k_S mr^2} + \underbrace{k_{arb} \tfrac{t^2}{2}}_{\text{第6章 GJ/L 链}}$$
-  <p><b>第 1 章悬赏的 ½ 在此结清</b>：侧倾角 $\varphi$ 下左右行程差 $= \varphi t$，单侧 $\delta = \varphi t/2$（行程取半）；一侧加载一侧卸载，力偶臂是全轮距 $t$（力臂取全）：$M = 2 \times k_w \delta \times t/2 = k_w \varphi t^2/2$。∎</p>
+  <div class="box-title">💡 物理图景：簧载质量的力如何分流到地面？[cite: 1]</div>
+  <p>簧载质量（车身）通过悬架连杆与地面相连[cite: 1]。侧倾中心（Roll Center, RC）具有核心力学性质：<b>作用线穿过 RC 的侧向力不产生车身侧倾力矩</b>（RC 是车身绕底盘的瞬时转动中心）[cite: 1]。由此，簧载力被自然拆分为经 RC 刚性直传的几何通道与驱动车身倾斜的弹性通道[cite: 1]：</p>
 </div>
 
-<h2>9.3 稳态侧倾角：重力失稳项与"负刚度"</h2>
 <div class="box proof">
-  <div class="box-title">📐 推导（含被新手漏掉的那一项）</div>
-  <p>车身侧倾 $\varphi$ 后，簧载质心<b>横移</b> $h_{arm}\sin\varphi \approx h_{arm}\varphi$，重力 $m_S g$ 由此产生<b>附加侧倾力矩</b>（把车身进一步往外推）：</p>
-  $$k_{\phi,tot}\,\varphi = m_S a_y h_{arm} + m_S g\, h_{arm}\,\varphi \;\Longrightarrow\; \boxed{\varphi = \frac{m_S\,a_y\,h_{arm}}{k_{\phi,tot} - m_S g\,h_{arm}}}$$
-  <p><b>解读</b>：重力项 = <b>负刚度</b>（$-m_S g h_{arm}$）。分母必须为正才有稳定侧倾——侧倾刚度必须压过"重心外移自激励"。代码里 <code>denom &gt; 100</code> 的保护正是这个物理（分母 ≤ 100 N·m/rad 视为侧倾失稳，输出 0）。侧倾梯度（每 g 侧倾角）：</p>
-  $$\text{roll grad} = \frac{m_S g\, h_{arm}}{k_{\phi,tot} - m_S g h_{arm}} \;(\text{°/g}), \qquad h_{ra} = z_{rc,f} + \tfrac{a}{L}(z_{rc,r} - z_{rc,f})$$
-  <p>$h_{ra}$（侧倾轴在质心纵向站位处的高度）= 前后 RC 的<b>按纵向位置线性插值</b>——因为侧倾轴是前后 RC 的连线（两点定线，第 5 章插值的又一应用）。</p>
+  <div class="box-title">📐 路径 A：非簧载直接路径（不经弹簧，零延迟）[cite: 1]</div>
+  <p>车轮、立柱、制动盘等非簧载质量（单轴合计 $m_{u,i}$）的横向惯性力直接位于轮心高度 $h_{u,i}$，直接由胎体剪切压向地面平衡[cite: 1]：</p>
+  $$\Delta F_{z,\text{uns},i} = \frac{m_{u,i} \cdot a_y \cdot h_{u,i}}{t_i} \quad \left(\text{前轴基线 @1g: } \frac{76 \times 9.81 \times 0.325}{1.620} = \mathbf{149.6\text{ N}}\right)[cite: 1]$$
 </div>
 
-<h2>9.4 TLLTD 与线性齐次陷阱（著名 bug 的数学尸检）</h2>
+<div class="box proof">
+  <div class="box-title">📐 路径 B：几何传力路径（经侧倾中心 RC，连杆硬顶）[cite: 1]</div>
+  <p>簧载质量惯性力按静态轴荷分配平移到该轴（前轴分得份额 $\frac{b}{L}$），再竖直平移到该轴侧倾中心 $z_{\text{rc},i}$ 高度[cite: 1]。此力不过弹簧，直接由摆臂连杆二力杆刚性支撑传递[cite: 1]：</p>
+  $$\Delta F_{z,\text{geo},i} = \frac{\left(m_s a_y \cdot \frac{b}{L}\right) \cdot z_{\text{rc},i}}{t_i} \quad \left(\text{前轴基线 @1g: } \frac{(1260 \times 9.81 \times 0.5356) \times 0.0553}{1.620} = \mathbf{225.7\text{ N}}\right)[cite: 1]$$
+  <p><b>RC 高度即几何刚度</b>：$z_{\text{rc}}$ 越高，几何硬顶直接传到地面的份额越大[cite: 1]。</p>
+</div>
+
+<div class="box proof">
+  <div class="box-title">📐 路径 C：弹性侧倾路径（经线簧 + 防倾杆 ARB）[cite: 1]</div>
+  <p>力从质心平移到侧倾轴线 $h_{ra}$ 的剩余力臂 $h_{\text{arm}} = h_s - h_{ra}$ 驱动车身倾斜 $\phi$，由悬架弹簧和 ARB 力偶抗衡[cite: 1]：</p>
+  $$\Delta F_{z,\text{elas},i} = \frac{k_{\phi,i} \cdot \phi}{t_i}, \qquad k_{\phi,i} = \underbrace{\frac{1}{2} k_{w,i} t_i^2}_{\text{第 6 章线簧刚度}} + \underbrace{k_{\text{ARB},i}}_{\text{第 6 章防倾杆刚度}}[cite: 1]$$
+  <p><b>结清第 1 章悬赏的 $\frac{1}{2}$ 系数</b>：侧倾角 $\phi$ 下左右车轮行程差为 $\phi t_i$，单侧轮跳变形为 $\delta = \frac{\phi t_i}{2}$（行程取半）[cite: 1]；一侧加载一侧卸载，力偶臂为全轮距 $t_i$（力臂取全）[cite: 1]：</p>
+  $$M = 2 \times \left( k_{w,i} \delta \times \frac{t_i}{2} \right) = 2 \times \left( k_{w,i} \frac{\phi t_i}{2} \right) \frac{t_i}{2} = \mathbf{\frac{1}{2} k_{w,i} t_i^2 \cdot \phi} \quad \blacksquare[cite: 1]$$
+</div>
+
+---
+
+<h2>9.3 稳态侧倾角：重力失稳项与“负刚度”</h2>
+<div class="box proof">
+  <div class="box-title">📐 侧倾平衡推导（含重力 $P\text{-}\Delta$ 效应）[cite: 1]</div>
+  <p>车身侧倾 $\phi$ 后，簧载质心在空间中向外横移 $\Delta y \approx h_{\text{arm}} \phi$，重力 $m_s g$ 由此产生<b>同向推倒的附加侧倾力矩</b>[cite: 1]：</p>
+  
+  $$k_{\phi,\text{tot}} \phi = \underbrace{m_s a_y h_{\text{arm}}}_{\text{惯性侧倾力矩}} + \underbrace{m_s g h_{\text{arm}} \phi}_{\text{重力横移力矩}} \implies \mathbf{\phi = \frac{m_s a_y h_{\text{arm}}}{k_{\phi,\text{tot}} - m_s g h_{\text{arm}}}}[cite: 1]$$
+
+  <p><b>物理本质（几何负刚度）</b>：重力项 $-m_s g h_{\text{arm}}$ 削弱了悬架的总刚度[cite: 1]。分母必须保持为正值系统才稳定[cite: 1]；当 $k_{\phi,\text{tot}} \le m_s g h_{\text{arm}}$ 时，分母趋零，侧倾角发散（车辆发生<b>静力学侧倾失稳/塌陷</b>）[cite: 1]。</p>
+  <p><b>代码防御阈值（F-16 已强化）</b>：求解器中设立 <code>denom = k_phi_tot - m_s * g * h_arm > 100.0</code> 保护防线（100 N·m/rad 量级裕度，避免贴近奇点的病态值）；<b>2026-08-30 起失稳不再静默置零</b>——命中判定时侧倾角置零并<b>显式上报 warning</b>（"侧倾失稳：k_phi_tot ≤ m_s·g·h_arm…结果不可信"），测试 `test_quasi_loads_roll_instability_reports_warning` 钉死该行为。</p>
+  <p><b>侧倾轴线高度插值</b>：$h_{ra} = z_{\text{rc},f} + \frac{a}{L} (z_{\text{rc},r} - z_{\text{rc},f})$（按质心纵向位置 $a$ 两点线性插值）[cite: 1]。</p>
+</div>
+
+---
+
+<h2>9.4 TLLTD 与线性齐次陷阱（著名 Bug 的数学尸检）</h2>
 <div class="box algo">
-  <div class="box-title">🎯 TLLTD 定义</div>
-  $$\text{TLLTD} = \frac{\Delta F_z^{front}_{tot}}{\Delta F_z^{front}_{tot} + \Delta F_z^{rear}_{tot}} \times 100\% \qquad (\Delta F_z^{tot} = A + B + C\ \text{三路径之和})$$
+  <div class="box-title">🎯 TLLTD 严格数学定义</div>
+  $$\text{TLLTD}_{\text{front}} = \frac{\Delta F_{z,f}^{\text{total}}}{\Delta F_{z,f}^{\text{total}} + \Delta F_{z,r}^{\text{total}}} \times 100\% \quad (\Delta F_{z,i}^{\text{total}} = \text{路径 A} + \text{路径 B} + \text{路径 C})[cite: 1]$$
 </div>
+
 <div class="box warn">
-  <div class="box-title">⚠️ 齐次性证明：线性模型下 TLLTD 与 gy 无关（2026-08-22 bug 的根源）</div>
-  <p><b>命题</b>：若 $z_{rc}$、$k_w$ 取常数（线性模型），则 TLLTD 是与 $a_y$ 无关的常数。</p>
-  <p><b>证明</b>：逐路径检查 $a_y$ 的幂次——路径 A：$\Delta F_z^{uns} \propto a_y$；路径 B：$\Delta F_z^{geo} \propto a_y \cdot z_{rc}$（常数）；路径 C：$\varphi \propto a_y$（9.3 分母与 $a_y$ 无关）⟹ $\Delta F_z^{elas} \propto a_y$。所以</p>
-  $$\text{TLLTD} = \frac{a_y \cdot c_f}{a_y \cdot (c_f + c_r)} = \frac{c_f}{c_f + c_r} \quad \text{——} a_y \text{ 被约掉，纯刚度/几何常数。}\;\blacksquare$$
-  <p><b>当时的症状</b>：gy=0 时显示 50%（sumTransfer ≤ 1 触发占位分支）；任何非零 gy 跳到 ~71% 且<b>不动</b>——数学必然，不是计算错误。<b>打破齐次性</b>的唯一办法：让 $z_{rc}$ 或 $k_w$ 依赖侧倾行程（即依赖 $a_y$）——非线性化。这正是修复方案。</p>
+  <div class="box-title">⚠️ 齐次性证明：线性模型下 TLLTD 为什么与 $a_y$ 完全无关？[cite: 1]</div>
+  <p><b>命题</b>：若 $z_{\text{rc}}$ 与 $k_w$ 取常数（线性模型），则 TLLTD 是与加速度 $a_y$ 毫无关系的死锁常数[cite: 1]。</p>
+  <p><b>代数证明</b>：逐一检查三条路径对 $a_y$ 的依赖幂次[cite: 1]：</p>
+  <ul>
+    <li>路径 A：$\Delta F_{z,\text{uns}} \propto a_y$[cite: 1]</li>
+    <li>路径 B：$\Delta F_{z,\text{geo}} \propto a_y \cdot z_{\text{rc}}$ (常数)[cite: 1]</li>
+    <li>路径 C：$\phi \propto a_y \implies \Delta F_{z,\text{elas}} \propto a_y$[cite: 1]</li>
+  </ul>
+  $$\text{TLLTD} = \frac{a_y \cdot c_f}{a_y \cdot (c_f + c_r)} = \mathbf{\frac{c_f}{c_f + c_r}} \quad \text{—— } a_y \text{ 被代数精确约除，死锁为纯几何/刚度常数！} \blacksquare[cite: 1]$$
+  <p><b>Bug 表现</b>：$a_y = 0$ 时显示 50%（触发占位保护分支）；任何非零 $a_y > 0$ 瞬间跳到 ~71% 且<b>水平锁死一条直线</b>[cite: 1]。<b>打破齐次性的唯一办法：让 $z_{\text{rc}}$ 或 $k_w$ 依赖侧倾行程（非线性化）</b>[cite: 1]。</p>
+  <div class="box warn">
+    <div class="box-title">⚠️ F-09 补修（2026-08-30）：负 g 侧与镜像对称</div>
+    <p>侧倾耦合迭代落地后遗留一个符号问题：判定函数写 <code>sum &gt; 1 ? f/tot*100 : 50</code>——左转（$g_y&lt;0$）时分子分母同负、$sum&lt;0$，恒被丢进 50% 占位。<b>修复</b>：改为 <code>abs(sum) &gt; 1</code>；物理上 TLLTD 是"前轴转移份额"，$g_y$ 变号时分子分母同时变号、比值不变——<b>左右转份额相等（pos ≈ neg），并非互补 100</b>（实测 46.81% / 46.82%）。测试 `test_tlltd_negative_g_not_pinned_at_50` 钉死镜像对称；50% 占位仅保留给 $a_y \approx 0$（讲义钦定）。</p>
+  </div>
 </div>
+
+---
 
 <h2>9.5 侧倾耦合迭代（P0 修复）：不动点法打破齐次</h2>
 <div class="box algo">
-  <div class="box-title">🎯 迭代结构（第 4 章不动点思想的直接应用）</div>
+  <div class="box-title">🎯 3-Step 不动点迭代算法回路[cite: 1]</div>
   <div class="step-card">
-    <div class="step-header"><span class="step-tag">Step 1</span> 由当前侧倾角解行程差</div>
-    $$dt_f = \varphi \cdot |WC_x| \;(\text{半轮距} \times \text{侧倾角} = \text{外侧压缩行程})$$
+    <div class="step-header"><span class="step-tag">Step 1</span> 由当前侧倾角解算单侧车轮压缩行程差[cite: 1]</div>
+    $$dt_f = \phi^{(k)} \cdot \left|\text{WC}_x\right| \quad (\text{半轮距} \times \text{侧倾角} = \text{外侧轮垂直压缩行程})[cite: 1]$$
   </div>
   <div class="step-card">
-    <div class="step-header"><span class="step-tag">Step 2</span> 行程迁移：查扫掠表</div>
-    <p>$z_{rc,f} \leftarrow z_{rc}(dt_f)$（<b>外侧压缩轮</b>的 RC，第 5 章扫掠）；$k_{w,f} \leftarrow \tfrac12[k_w(dt_f) + k_w(-dt_f)]$（左右平均）。rc 与 kw 依赖行程 ⟹ 依赖 $\varphi$ ⟹ 依赖 $a_y$——<b>齐次性死亡</b>。</p>
+    <div class="step-header"><span class="step-tag">Step 2</span> 查扫掠表实现行程迁移[cite: 1]</div>
+    <p>$z_{\text{rc},f} \leftarrow z_{\text{rc}}(dt_f)$（查第 5 章外侧压缩轮的动态 RC）[cite: 1]；<br>
+    $k_{w,f} \leftarrow \frac{1}{2}\left[ k_w(dt_f) + k_w(-dt_f) \right]$（查第 6 章双侧刚度取割线均值）[cite: 1]。<br>
+    $\implies z_{\text{rc}}$ 与 $k_w$ 显式依赖于行程 $dt \implies$ 依赖于 $\phi \implies$ 依赖于 $a_y$ —— <b>齐次性被彻底打破</b>[cite: 1]。</p>
   </div>
   <div class="step-card">
-    <div class="step-header"><span class="step-tag">Step 3</span> 更新刚度，重解侧倾角</div>
-    <p>$k_\phi$ 用迁移后的 kw 重建 → 回到 9.3 解新 $\varphi$。3 轮迭代（不动点）；kw 曲线由前端下发（第 6 章：引擎自身 damper 链三病例），rc 曲线引擎自算（第 5 章扫掠）。</p>
+    <div class="step-header"><span class="step-tag">Step 3</span> 更新综合侧倾刚度，重解新侧倾角[cite: 1]</div>
+    <p>用迁移后的 $k_{w,f}, k_{w,r}$ 重建 $k_{\phi,\text{tot}}$，代入 9.3 节公式求解 $\phi^{(k+1)}$[cite: 1]。仅需 3 轮不动点迭代即达收敛[cite: 1]。</p>
   </div>
-</div>
-<div class="box algo">
-  <div class="box-title">🎯 数值（真实浏览器 ↔ 真实引擎，P0 验收）</div>
-  <table>
-    <thead><tr><th>gy</th><th>0.5g</th><th>1g</th><th>2g</th></tr></thead>
-    <tbody>
-      <tr><td>前端 solveQuasiStatic</td><td>68.26%</td><td>67.36%</td><td>64.42%</td></tr>
-      <tr><td>引擎 quasi_loads（统一后）</td><td><b>68.26%</b></td><td><b>67.36%</b></td><td>64.48%</td></tr>
-    </tbody>
-  </table>
-  <p>0.5/1g <b>逐位一致</b>；2g 差 0.06pp（两端扫掠端点钳位差异，第 1 讲已交代）。单调下降 68.3→64.4 的物理：前轴 kw 随压缩变软更快（kphiF 1041→852），前轴弹性份额随侧倾缩水——<b>TLLTD 终于"活"了</b>。</p>
 </div>
 
-<h2>9.6 四轮载荷组装（最后一步）</h2>
+<div class="box algo">
+  <div class="box-title">🎯 P0 验收数值对账（浏览器前端 vs 底层引擎）[cite: 1]</div>
+  <table>
+    <thead><tr><th>侧向加速度 $g_y$</th><th>0.5g</th><th>1.0g</th><th>2.0g</th></tr></thead>
+    <tbody>
+      <tr><td>前端 <code>solveQuasiStatic</code></td><td>68.26%</td><td>67.36%</td><td>64.42%[cite: 1]</td></tr>
+      <tr><td>引擎 <code>quasi_loads</code></td><td><b>68.26%</b></td><td><b>67.36%</b></td><td><b>64.48%</b>[cite: 1]</td></tr>
+    </tbody>
+  </table>
+  <p><b>机理剖析</b>：0.5g 与 1.0g 逐位绝对一致；2.0g 仅差 0.06pp（扫掠端点钳位差异）[cite: 1]。TLLTD 从 68.3% 单调下降至 64.4% 的物理原因：<b>前轴 $k_w$ 随大压缩行程变软更快（$k_{\phi,f}$ 从 1041 降至 852 N·m/rad），前轴弹性载荷转移份额相对缩水——TLLTD 终于“活”了</b>[cite: 1]。</p>
+</div>
+
+---
+
+<h2>9.6 四轮垂直载荷最终组装</h2>
 <div class="formula-highlight">
-  $$F_{z,FL} = \tfrac{F_{z,f}^{static}}{2} - \Delta F_z^{f}_{tot}\cdot \mathrm{sgn}(g_y) - \tfrac{dF_{z,long}}{2}, \quad F_{z,f}^{static} = m_S g \tfrac{b}{L} + m_{U,f} g + F_{aero}\cdot\text{bias}$$
-  <p style="font-size:14px">$dF_{z,long} = \tfrac{m_T a_x h_{cg}}{L}$（俯仰力矩 / 轴距，加速为 + 后移）；内侧减、外侧加；max(0,·) 防离地负值。</p>
+  $$\begin{aligned}
+  F_{z,\text{FL}} &= \max\left( 0, \; \frac{F_{z,f}^{\text{static}}}{2} - \Delta F_{z,f}^{\text{total}} \cdot \mathrm{sgn}(g_y) - \frac{dF_{z,\text{long}}}{2} \right) \\
+  F_{z,\text{FR}} &= \max\left( 0, \; \frac{F_{z,f}^{\text{static}}}{2} + \Delta F_{z,f}^{\text{total}} \cdot \mathrm{sgn}(g_y) - \frac{dF_{z,\text{long}}}{2} \right) \\
+  F_{z,\text{RL}} &= \max\left( 0, \; \frac{F_{z,r}^{\text{static}}}{2} - \Delta F_{z,r}^{\text{total}} \cdot \mathrm{sgn}(g_y) + \frac{dF_{z,\text{long}}}{2} \right) \\
+  F_{z,\text{RR}} &= \max\left( 0, \; \frac{F_{z,r}^{\text{static}}}{2} + \Delta F_{z,r}^{\text{total}} \cdot \mathrm{sgn}(g_y) + \frac{dF_{z,\text{long}}}{2} \right)
+  \end{aligned}[cite: 1]$$
+  <p style="font-size:14px; margin-top:10px;">
+    其中纵向俯仰转移量为 $dF_{z,\text{long}} = \frac{m_T a_x h_{\text{cg}}}{L}$（加速为正后移，制动为负前移）[cite: 1]；静态轴荷 $F_{z,f}^{\text{static}} = m_s g \frac{b}{L} + m_{u,f} g + F_{\text{aero}} \cdot \text{bias}$[cite: 1]；<b><code>max(0, ·)</code> 防止车轮离地工况输入负垂直力导致魔术公式崩溃</b>[cite: 1]。</p>
 </div>
 
-<h2>9.7 全链对账实验（手算 vs 引擎，1g）</h2>
+---
+
+<h2>9.7 全链对账实验（手算解析 vs 仿真引擎 @1g）</h2>
 <div class="box algo">
-  <div class="box-title">🎯 从原始参数手推一遍，对引擎输出（kw 常数版）</div>
+  <div class="box-title">🎯 从原始硬点与刚度手推一遍，对账引擎输出（$k_w$ 常数版）[cite: 1]</div>
   <table>
-    <thead><tr><th>量</th><th>手算</th><th>引擎</th><th>差</th></tr></thead>
+    <thead><tr><th>计算物理量</th><th>手算解析值</th><th>引擎实测值</th><th>相对误差 / 结论</th></tr></thead>
     <tbody>
-      <tr><td>roll</td><td>1.0916°</td><td>1.1026°</td><td>1%</td></tr>
-      <tr><td>ΔFz 非簧载（前）</td><td>149.6 N</td><td>149.6 N</td><td><b>精确</b> ✓</td></tr>
-      <tr><td>ΔFz 几何（前）</td><td>225.7 N</td><td>219.7 N</td><td>2.7%</td></tr>
-      <tr><td>ΔFz 弹性（前）</td><td>1136.0 N</td><td>1147.4 N</td><td>1%</td></tr>
-      <tr><td>前轴合计 / 后轴合计</td><td>1511 / 1718 N</td><td>1517 / 1713 N</td><td>&lt;0.5%</td></tr>
-      <tr><td><b>TLLTD</b></td><td><b>46.80%</b></td><td><b>46.96%</b></td><td><b>0.16pp</b></td></tr>
+      <tr><td>稳态侧倾角 roll</td><td>1.0916°</td><td>1.1026°</td><td>1.0%[cite: 1]</td></tr>
+      <tr><td>$\Delta F_z$ 路径 A（非簧载）</td><td>149.6 N</td><td>149.6 N</td><td><b>精确吻合</b> ✓[cite: 1]</td></tr>
+      <tr><td>$\Delta F_z$ 路径 B（几何 RC）</td><td>225.7 N</td><td>219.7 N</td><td>2.7% ($\Delta = 6\text{ N}$)[cite: 1]</td></tr>
+      <tr><td>$\Delta F_z$ 路径 C（弹性侧倾）</td><td>1136.0 N</td><td>1147.4 N</td><td>1.0%[cite: 1]</td></tr>
+      <tr><td>前轴合计 / 后轴合计</td><td>1511 / 1718 N</td><td>1517 / 1713 N</td><td>&lt; 0.5%[cite: 1]</td></tr>
+      <tr><td><b>前轴分配比 TLLTD</b></td><td><b>46.80%</b></td><td><b>46.96%</b></td><td><b>仅差 0.16 pp</b>[cite: 1]</td></tr>
     </tbody>
   </table>
-  <p>残差溯源：几何路径的 6N 差 = $z_{rc}$ 取数路径不同（手算用扫掠插值、引擎用当前位姿 pose_metrics 值——第 5 章"cp 偏移 6.8mm"同类效应）。<b>守恒记账观察</b>：手算总转移 3229N vs 整车公式 $m a_y h_{cg}/t$ = 3047N，差 6%——模型把 $h_s$（簧载质心高）与 $h_{cg}$（整车质心高）作为<b>独立输入</b>，若 $m_S h_s + m_U h_u \neq m_T h_{cg}$，两条记账路径就不严格闭合。<b>纪律升级</b>：量纲检查之外再加守恒检查（输入参数的自洽性也是模型的一部分）。</p>
+  <p><b>残差溯源</b>：路径 B 的 6N 几何差源于 $z_{\text{rc}}$ 取数路径不同（手算用 1D 扫掠插值，引擎使用 3D 瞬时 <code>pose_metrics</code>，捕获了接地斑横向外移 6.8mm 的微小力臂变化）[cite: 1]。</p>
+  <p><b>守恒记账观察（6% 偏差）</b>：手算三路径累加总转移 3229N vs 整车公式 $m a_y h_{\text{cg}}/t = 3047\text{ N}$，存在 6% 差异——源于模型将 $h_s$（簧载质心）与 $h_{\text{cg}}$（整车质心）作为独立输入[cite: 1]。若未严格满足 $m_s h_s + m_u h_u = m_T h_{\text{cg}}$，两条记账路径在代数上就不闭合[cite: 1]。</p>
+  <p><b>工业级纪律升级</b>：在量纲校验之外强制加入<b>质心自洽性守恒断言</b>[cite: 1]。</p>
 </div>
 
-<h2>9.8 核心检查点与自测</h2>
+---
+
+<h2>9.8 核心检查点与自测题</h2>
+
 <div class="qa-box">
-  <p><b>Q1. 从力矩平衡推出整车总转移 m·ay·hcg/t；三路径分别对应什么物理通道？</b></p>
-  <p><b>解析</b>：对接触线取矩。A=非簧载惯性力直接压轴（高≈胎半径）；B=簧载力经 RC 直传（不过弹簧，份额 ∝ zrc）；C=剩余力臂 hArm 的力矩由弹簧+ARB 力偶抗（份额 ∝ kφ·φ）。</p>
+  <div class="qa-q"><span>Q1.</span> 从力矩平衡推出整车总转移 $m a_y h_{\text{cg}}/t$；三路径分别对应什么物理通道？[cite: 1]</div>
+  <div class="qa-a"><b>解析</b>：对外侧接地线取矩即得总转移公式[cite: 1]。三通道分流为：<b>路径 A</b> = 非簧载惯性力在轮心高度直接由胎体压向地面（不经悬架弹簧）[cite: 1]；<b>路径 B</b> = 簧载力经 RC 连杆直接刚性硬顶传递（不压缩弹簧，份额 $\propto z_{\text{rc}}$）[cite: 1]；<b>路径 C</b> = 剩余力臂 $h_{\text{arm}}$ 驱动车身侧倾，由线簧与防倾杆弹性力偶共同抗衡（份额 $\propto k_\phi \phi$）[cite: 1]。</div>
 </div>
+
 <div class="qa-box">
-  <p><b>Q2. 侧倾角分母里为什么有 −mS·g·hArm？它什么时候危险？</b></p>
-  <p><b>解析</b>：侧倾后质心横移，重力产生附加侧倾力矩 = 负刚度。当 $k_{\phi,tot} \to m_S g h_{arm}^+$ 时分母趋零、侧倾角爆炸（车辆"侧倾失稳"）；代码 denom&gt;100 保护即此物理。</p>
+  <div class="qa-q"><span>Q2.</span> 侧倾角分母里为什么有 $-m_s g h_{\text{arm}}$？它什么时候危险？[cite: 1]</div>
+  <div class="qa-a"><b>解析</b>：车身侧倾后质心横向外移 $\Delta y \approx h_{\text{arm}}\phi$，重力向下产生反向推倒车身的附加力矩，物理表现为<b>几何负刚度</b>[cite: 1]。当悬架刚度不足导致 $k_{\phi,\text{tot}} \to m_s g h_{\text{arm}}^+$ 时，分母趋零，侧倾角发散（发生<b>侧倾失稳/塌陷翻车</b>）[cite: 1]；代码中 <code>denom > 100</code> 保护防线即为此物理设定[cite: 1]。</div>
 </div>
+
 <div class="qa-box">
-  <p><b>Q3. 证明线性模型下 TLLTD 与 ay 无关。要让 TLLTD"随弯强变化"需要什么？</b></p>
-  <p><b>解析</b>：三路径全部 ∝ ay（φ 也 ∝ ay），分子分母齐次约掉。需要让某个系数依赖 ay——本修复让 zrc/kw 依赖侧倾行程（φ·半轮距）形成不动点迭代；备选：D 的载荷敏感性（第 8 章）也会引入非线性，但那改变的是"转移的后果"而非"转移本身"。</p>
+  <div class="qa-q"><span>Q3.</span> 证明线性模型下 TLLTD 与 $a_y$ 无关。要让 TLLTD“随弯强动态演化”需要什么？[cite: 1]</div>
+  <div class="qa-a"><b>解析</b>：在线性模型下，三条路径的载荷转移全部严格与 $a_y$ 成正比（$\Delta F_{z,i} = c_i \cdot a_y$），代入 TLLTD 分式后 $a_y$ 被代数齐次对消，死锁为常数[cite: 1]。打破齐次性必须引入非线性：让 $z_{\text{rc}}$ 或 $k_w$ 依赖侧倾行程（$\phi \cdot \text{半轮距}$）形成不动点迭代闭环[cite: 1]。</div>
 </div>
+
 <div class="qa-box">
-  <p><b>Q4. RC 升高 20mm，TLLTD 怎么动？前后轴各走哪条路径？</b></p>
-  <p><b>解析</b>：该轴几何份额 ∝ zrc → 前轴 rc 升 → 前轴分子增 → TLLTD 升（更多转移"不劳弹簧"直接走几何）。同时 hra 升 → hArm 降 → 侧倾角降 → 两轴弹性份额同缩。净效应：几何路径独增的轴占比升——高 RC 轴抢转移。</p>
+  <div class="qa-q"><span>Q4.</span> 前轴 RC 升高 20mm，TLLTD 怎么动？前后轴各走哪条路径？[cite: 1]</div>
+  <div class="qa-a"><b>解析</b>：<b>前轴 TLLTD 必然上升（高 RC 轴抢夺更多载荷转移）</b>[cite: 1]。机理：前轴几何路径 $\Delta F_{z,\text{geo},f} \propto z_{\text{rc},f}$ 份额直接增大[cite: 1]；同时侧倾轴线 $h_{ra}$ 抬高使得剩余力臂 $h_{\text{arm}}$ 缩短，侧倾角 $\phi$ 下降使得前后两轴的弹性路径份额同步缩水[cite: 1]。净效应为几何独增的前轴在总转移中占比上升，转向不足倾向增强[cite: 1]。</div>
 </div>
+
 <div class="qa-box">
-  <p><b>Q5.（动手）基线 1g 手算链已给全数字。把后轴 kS 从 130 加到 160，重算 TLLTD（用 9.2-9.3 公式），并用引擎验证。</b></p>
-  <p><b>解析</b>：kwR = 160·1000·0.78² = 97344；kphi_r = ½·97344·1.58² + 14944 ≈ 136 165+14944（自算精确值）；kphi_tot 增 → φ 降 → 前轴弹性也降；后轴分子（弹性大头）相对增 → TLLTD <b>下降</b>（转移被推向前轴？不——后轴更硬 → 后轴弹性份额占比升 → TLLTD 降）。数一下：后硬 → 后轴扛更多转移 → 前轴占比降 → 更转向不足倾向。引擎 POST 验证之（quasi gy=1，rear spring_rate=160）。</p>
+  <div class="qa-q"><span>Q5.</span> （动手题）基线 1g 手算链已给全数据。把后轴弹簧刚度 $k_s$ 从 130 增加到 160 N/mm，重算 TLLTD 变化趋势。[cite: 1]</div>
+  <div class="qa-a"><b>解析</b>：后轮轮心线刚度 $k_{w,r} = 160 \times 1000 \times 0.78^2 = 97\,344\text{ N/m}$[cite: 1]；后轴弹簧侧倾刚度 $k_{\phi,\text{spring},r} = \frac{1}{2} \times 97344 \times 1.58^2 \approx 121\,503\text{ N}\cdot\text{m/rad}$，总后侧倾刚度 $k_{\phi,r} \approx 136\,447\text{ N}\cdot\text{m/rad}$[cite: 1]。整车总刚度上升导致侧倾角 $\phi$ 减小，前轴弹性载荷转移下降；后轴凭借更硬的弹性刚度抢走更多载荷转移，<b>前轴 TLLTD 占比下降</b>（后轴载荷差增大导致后轮抓地力衰退更严重，整车转向不足减轻、转向过度倾向增加）[cite: 1]。</div>
 </div>
 
 </body>

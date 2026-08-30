@@ -213,7 +213,7 @@ pre code {
 <small>LABSUS 悬架实验室 · 自底向上 5/11 · K&C 几何主线</small></h1>
 
 <h2>5.0 这一章解决的物理问题</h2>
-<p>第 3-4 章求出了位姿（每个节点在哪、转向节转到哪）。工程师不直接消费坐标——他们消费<b>指标</b>：外倾、前束、主销内倾、后倾、磨胎半径、拖距、瞬心、侧倾中心。本章做三件事：① 把每个指标从几何定义<b>完整推导</b>成公式；② <b>结清第一讲的账</b>（图算 RC=57.5 vs 引擎 55.3 的差异）；③ 讲解静态量如何通过<b>扫掠 + 中心差分</b>变成增益（外倾增益、弯跳转向、RC 迁移）。途中还有一个彩蛋：<b>现场抓到一个引擎真 bug</b>（5.3）。</p>
+<p>第 3-4 章求出了位姿（每个节点在哪、转向节转到哪）。工程师不直接消费坐标——他们消费<b>指标</b>：外倾、前束、主销内倾、后倾、磨胎半径、拖距、瞬心、侧倾中心。本章做四件事：① 把每个指标从几何定义<b>完整推导</b>成公式；② <b>结清第一讲的账</b>（图算 RC=57.5 vs 引擎 55.3 的差异，并修正备课时的错误归因）；③ 讲解静态量如何通过<b>扫掠 + 中心差分</b>变成增益（外倾增益、弯跳转向、RC 迁移）；④ 转向运动学与阿克曼百分比。途中还有一个真实案例：<b>备课实验抓到过引擎真 bug</b>（5.3，已修复并复盘）。</p>
 
 <div class="box algo">
   <div class="box-title">⚖️ 指标 ↔ 车辆行为（为什么工程师关心这些数）</div>
@@ -256,13 +256,13 @@ pre code {
   $$kg = ubj + t^*(lbj - ubj) \implies \text{scrub} = cp_x - kg_x \;(\text{横向}), \quad \text{trail} = kg_y - cp_y \;(\text{纵向，正 = 轴交点在前})$$
 </div>
 
-<h2>5.3 ⚠️ 实战发现：引擎的 kg 符号 bug（教学即审计）</h2>
+<h2>5.3 实战案例：引擎的 kg 符号 bug（已修复，教学即审计）</h2>
 <div class="box warn">
-  <div class="box-title">⚠️ 备课实验抓到的真 bug（证据链完整）</div>
-  <p><b>异常</b>：引擎设计位输出 scrub = <b>229.0mm</b>、trail = <b>−54.7mm</b>——负拖距配正后倾（4.93°），物理不通；229mm 磨胎半径也大得离谱。</p>
-  <p><b>手算复核</b>：用引擎的公式 $t_0 = (cp_z - ubj_z)/dz$（$dz = ubj_z - lbj_z = +290$）得 $t_0 = -1.586$，$kg = (587.8, -54.6, \mathbf{914.8})$——交点落在 <b>UBJ 上方 915mm 高空</b>，不在地面！scrub/trail 输出与这个错误 kg 逐位吻合。</p>
+  <div class="box-title">⚠️ 备课实验抓到的真 bug 复盘（证据链完整，2026-08-22 已修复）</div>
+  <p><b>历史异常</b>：引擎设计位曾输出 scrub = <b>229.0mm</b>、trail = <b>−54.7mm</b>——负拖距配正后倾（4.93°），物理不通；229mm 磨胎半径也大得离谱。<b>（修复后正确值：scrub 54.58 / trail 24.64，与前端逐位一致，测试锁定。）</b></p>
+  <p><b>手算复核（当时）</b>：用引擎的公式 $t_0 = (cp_z - ubj_z)/dz$（$dz = ubj_z - lbj_z = +290$）得 $t_0 = -1.586$，$kg = (587.8, -54.6, \mathbf{914.8})$——交点落在 <b>UBJ 上方 915mm 高空</b>，不在地面！scrub/trail 输出与这个错误 kg 逐位吻合。</p>
   <p><b>对照前端</b>（真实浏览器 playwright 验证）：前端分母是 $(lbj_z - ubj_z) = -290$ ⟹ $t_0 = +1.586$，$kg$ 在地面（$kg_z \approx cp_z$），输出 scrub = <b>54.5mm</b>、trail = <b>+24.9mm</b>（正后倾配正拖距，自洽 ✓）。</p>
-  <p><b>根因</b>：S2-5 移植前端公式时，$t_0$ 的分母被统一成了同时供 KPI/后倾使用的 $dz$——一处符号翻转。修复一行（学习记录 0004 已登记，待解除开发暂停后执行）。<b>注意方向</b>：这次是引擎错、前端对——与第三讲 3.5 的转向轴裂缝（前端对、引擎错）一样，双实现互为审计器。</p>
+  <p><b>根因</b>：S2-5 移植前端公式时，$t_0$ 的分母被统一成了同时供 KPI/后倾使用的 $dz$——一处符号翻转。<b>修复（2026-08-22 落码 + 2026-08-30 测试锁定）</b>：引擎改为 $t_0 = (ubj_z - cp_z)\,/\,(ubj_z - lbj_z)$，输出与前端逐位一致（golden: scrub 54.578 / trail 24.643）；设计位自洽锚（travel=0 精确返回设计 cam/toe）与镜像对称测试已入 `tests/test_w4_consistency.py`。<b>注意方向</b>：这次是引擎错、前端对——与第三讲 3.5 的转向轴裂缝（前端对、引擎错）一样，双实现互为审计器。</p>
 </div>
 
 <h2>5.4 前视瞬心 IC 与侧倾中心 RC：构造 + 结账</h2>
@@ -291,14 +291,35 @@ pre code {
     <tbody>
       <tr><td>IC（真实计算交点）</td><td>$( -847.0,\ 117.67)$</td><td>第一讲图与本章 Step 2 完全一致</td></tr>
       <tr><td>第一讲预览 RC</td><td>57.52 mm</td><td>用了近似 $cp = (810, 0)$</td></tr>
-      <tr><td>真实 $cp$</td><td>$(816.81,\ 0.01,\ -4.93)$</td><td>外倾把接地点向外推 6.81mm（5.2）</td></tr>
+      <tr><td>真实 $cp$</td><td>$(816.81,\ 0.01,\ -4.93)$</td><td>外倾把接地点向外推 6.81mm、轮胎微沉使 cp 落到 z=−4.93（5.2）</td></tr>
       <tr><td>用真实 cp 算 RC</td><td><b>55.26 mm</b></td><td>与引擎 rc_h = 55.258 <b>逐位一致</b> ✓</td></tr>
     </tbody>
   </table>
-  <p><b>账结清</b>：2.27mm 差异 100% 来自接地点横向偏移 $R \sin|\gamma|$。第一讲图上虚线的斜率对了，起点错了 6.8mm——顺带再次看到外倾的物理存在感。</p>
+  <p><b>账结清（逐项归因，2026-08-30 复核）</b>：总差异 −2.26mm 中，<b>垂向主导</b>——只把 cp 的 z 从 0 改到 −4.93 贡献 −2.52mm（RC 沿 cp→IC 射线几乎竖直下移）；横向外移 6.81mm 只贡献 <b>+0.25mm</b>（RC 点沿斜率 ≈ −0.037 的射线向右下滑动，方向相反、量级小一个量级）。"差异全来自外倾横向偏移"是备课时的错误归因，本表即勘误：<b>轮胎下陷（z 变化）才是 2.26mm 的主角</b>。</p>
 </div>
 
-<h2>5.5 从静态量到增益：扫掠 + 中心差分</h2>
+<h2>5.5 侧视瞬心（SVIC）与抗俯冲 / 抗下蹲（Anti-Dive / Anti-Squat）</h2>
+<div class="box proof">
+  <div class="box-title">📐 推导：侧视瞬心与制动抗俯冲几何百分比</div>
+  <p>在侧视平面（$Y-Z$ 平面）内，上下控制臂轴线的延长线交点即为侧视瞬心 $\mathrm{SVIC} = (y_{sv},\ z_{sv})$。车轮接地印迹中心为 $(y_{cp},\ z_{cp})$。</p>
+  <p>从接地点到侧视瞬心的连线与地面构成的俯冲几何角 $\theta_{\text{sv}}$ 满足：</p>
+  $$\tan\theta_{\text{sv}} = \frac{z_{sv} - z_{cp}}{y_{cp} - y_{sv}}$$
+  <p>设整车轴距为 $L$，质心高度为 $h_{cg}$，前轴制动力占整车总制动力的比例为 $k_b = F_{\text{brake}, f} / F_{\text{brake}, \text{total}}$。则前悬架的<b>抗俯冲率（Anti-Dive %）</b>为：</p>
+  $$\text{Anti-Dive}\% = \frac{\tan\theta_{\text{sv}}}{\frac{h_{cg}}{L}} \times k_b \times 100\%$$
+  <p><b>物理意义</b>：当刹车制动力 $F_y$（纵向）作用于车轮时，通过悬架连杆倾角在转向节处产生向下的反拉力，部分抵消由整车惯性俯仰力矩带来的弹簧压缩。若 $\text{Anti-Dive} = 100\%$，则制动时前悬架弹簧无垂向压缩变形（纯几何力学平衡）——<b>严格地说这只在忽略弹簧预载变化、轮胎下沉与衬套柔度时成立</b>（理想几何近似；真实车 100% 抗俯冲会损失颠簸顺性，工程上常取 50% 左右）。</p>
+</div>
+
+<h2>5.6 转向运动学与阿克曼转向几何（Ackermann %）</h2>
+<div class="box proof">
+  <div class="box-title">📐 推导：阿克曼转向几何百分比</div>
+  <p>赛车在低速转弯时，为了消除内外轮侧向滑移，理想状态下所有车轮的轴线延长线应当交于弯道旋转中心（即阿克曼几何）。设轮距为 $t_w$（沿 $X$ 轴），轴距为 $L$（沿 $Y$ 轴），内侧轮转角为 $\delta_i$，则纯阿克曼几何下的理论外侧轮转角 $\delta_{o, \text{ideal}}$ 满足：</p>
+  $$\cot\delta_{o, \text{ideal}} - \cot\delta_i = \frac{t_w}{L} \implies \delta_{o, \text{ideal}} = \arctan\left(\frac{L}{\frac{L}{\tan\delta_i} + t_w}\right)$$
+  <p>实际悬架由转向齿条拉杆驱动，实际外轮转角为 $\delta_o$。定义<b>阿克曼百分比（Ackermann %）</b>为：</p>
+  $$\text{Ackermann}\% = \frac{\delta_i - \delta_o}{\delta_i - \delta_{o, \text{ideal}}} \times 100\%$$
+  <p><b>调校直觉</b>：$100\%$ 为纯阿克曼几何（低速顺畅）；$0\%$ 为平行转向（内外轮转角相同）；赛道上常采用<b>反阿克曼转向（Ackermann &lt; 0%）</b>，利用高速弯外侧轮承载大载荷、最佳侧偏角大的特性，提升整车极限弯道附着力。</p>
+</div>
+
+<h2>5.7 从静态量到增益：扫掠 + 中心差分</h2>
 <div class="box proof">
   <div class="box-title">📐 推导：中心差分的 $O(h^2)$ 精度（偶次项相消）</div>
   <p>泰勒展开两式相减：</p>
@@ -306,7 +327,7 @@ pre code {
   $$f(x-h) = f - f'h + \tfrac{f''}{2}h^2 - \tfrac{f'''}{6}h^3 + \cdots$$
   <p>相减：偶次项（含 $f''$）全部抵消：</p>
   $$\frac{f(x+h) - f(x-h)}{2h} = f' + \frac{f'''}{6}h^2 + O(h^4)$$
-  <p>误差 $O(h^2)$。引擎 <code>_slope</code> 取 $h = 2$mm 窗口（扫掠点间插值），对光滑 K&amp;C 曲线精度绰绰有余。</p>
+  <p>误差 $O(h^2)$。引擎 <code>metrics/kandc.py::_slope</code> 采用<b>最近邻采样点中央差分</b>（取 $t{=}0$ 两侧最近的有效扫掠点做差商，None 跳过、端点单侧差分不虚高）——位移扫掠步长 5mm（±50mm/21 点）即实际 $h$，对光滑 K&amp;C 曲线精度绰绰有余；F-10 修订后力轴（compliance）不再套用固定 ±2N 窗口，统一走同一内核。讲义第五讲钦定的 h=2mm 精神（局部性 vs 噪声折中）由"最近邻采样点"继承。</p>
 </div>
 <div class="box algo">
   <div class="box-title">🎯 增益定义与实测（真实扫掠 ±50mm·21 点）</div>
@@ -321,26 +342,26 @@ pre code {
   <p>弯跳转向 +0.35°/25mm 的几何根源就是第一讲的种子③：TRO 高度在 LBJ→UBJ 的 13.8% 处，远低于"中立带"，横拉杆外点在轮跳时被上臂拉动产生前束变化——第 11 章验证方法论会讨论这个值是否要调零。</p>
 </div>
 
-<h2>5.6 源码逐行对账（v3service.pose_metrics 节选）</h2>
-<pre><code>ax = _estimate_rotation(m) @ _wheel_axis(design)     <span class="comment"># 第2章：Kabsch 恢复 → 旋转设计轴</span>
-cam  = -asin(clip(ax[2])) * R2D                      <span class="comment"># 5.1 提取</span>
-toe  = atan2(ax[1], ax[0]) * R2D
+<h2>5.8 源码逐行对账（v3service.pose_metrics 节选）</h2>
+<pre><code>ax = _estimate_rotation(m) @ _wheel_axis(design, side)  <span class="comment"># 第2章：Kabsch 恢复 → 旋转设计轴（side=±1 按轮心 X 判别，右轮 +X 外侧）</span>
+cam  = -asin(clip(ax[2])) * R2D                      <span class="comment"># 5.1 提取外倾角</span>
+toe  = atan2(ax[1], ax[0]) * R2D                     <span class="comment"># 5.1 提取前束角 (Y 为前向)</span>
 rad = z_hat - ax * dot(z_hat, ax); rad /= norm(rad)  <span class="comment"># 5.2：竖直方向投影进轮平面</span>
 cp  = wc - rad * tire_R                              <span class="comment"># 接地点（外倾 → 外移 R·sin|γ|）</span>
 dz  = ubj[2] - lbj[2]
-kpi  = atan2(-(ubj[0]-lbj[0]), dz) * R2D             <span class="comment"># 5.2 主销前视角</span>
-cast = atan2(-(ubj[1]-lbj[1]), dz) * R2D             <span class="comment"># 5.2 主销侧视角</span>
-t0  = (cp[2] - ubj[2]) / dz                          <span class="comment"># ⚠️ 5.3 bug：分母应为 -dz（前端用 lbj-ubj）</span>
+kpi  = atan2(-(ubj[0]-lbj[0]), dz) * R2D             <span class="comment"># 5.2 主销前视角 (X-Z平面，X 为侧向)</span>
+cast = atan2(-(ubj[1]-lbj[1]), dz) * R2D             <span class="comment"># 5.2 主销侧视角 (Y-Z平面，Y 为前向)</span>
+t0  = (cp[2] - ubj[2]) / dz                          <span class="comment"># ⚠️ 历史上是分母 -dz 的符号 bug（5.3），2026-08-22 已修复：t0=(ubj.z−cp.z)/dz 顺向</span>
 kg  = _lerp3(ubj, lbj, t0)
-scrub = cp[0] - kg[0]; trail = kg[1] - cp[1]         <span class="comment"># 受 bug 影响（229/-54.7，应 54.6/+24.6）</span>
-lp = _axis_at_y(CH1, CH2, wc[1]); up = _axis_at_y(CH3, CH4, wc[1])   <span class="comment"># 5.4 Step1</span>
+scrub = cp[0] - kg[0]; trail = kg[1] - cp[1]         <span class="comment"># 修复后 54.6 / +24.6（与前端逐位一致，见 5.3 与 test_w4_consistency）</span>
+lp = _axis_at_y(CH1, CH2, wc[1]); up = _axis_at_y(CH3, CH4, wc[1])   <span class="comment"># 5.4 Step1: 在轮心 Y 站位截取 X-Z 投影</span>
 ic = _isect2(...)                                    <span class="comment"># 5.4 Step2 克莱姆法则</span>
-rc_h = _isect2(cp→IC 直线, x=0 竖线)                 <span class="comment"># 5.4 Step3</span></code></pre>
+rc_h = _isect2(cp→IC 直线, x=0 中面)                <span class="comment"># 5.4 Step3: 车身中面为 x=0</span></code></pre>
 
-<h2>5.7 核心检查点与自测</h2>
+<h2>5.9 核心检查点与自测</h2>
 <div class="qa-box">
   <p><b>Q1. 负外倾为什么 = 轮顶向内？用轴向量分量推一遍。</b></p>
-  <p><b>解析</b>：右轮轴指 +X；$\gamma<0 \Rightarrow a_z = -\sin\gamma > 0$，轴外端上翘；轮平面⊥轴，轴外端上翘 ⟹ 平面顶部倒向车内。弯道外侧轮被车身侧倾"扶正"，故静态负外倾 + 负外倾增益补偿。</p>
+  <p><b>解析</b>：右轮轴指 +X（外侧）；$\gamma<0 \Rightarrow a_z = -\sin\gamma > 0$，轴外端上翘；轮平面⊥轴，轴外端上翘 ⟹ 平面顶部倒向车内。弯道外侧轮被车身侧倾"扶正"，故静态负外倾 + 负外倾增益补偿。</p>
 </div>
 <div class="qa-box">
   <p><b>Q2. 接地点为什么不在轮心正下方？偏移量公式？</b></p>
@@ -355,8 +376,8 @@ rc_h = _isect2(cp→IC 直线, x=0 竖线)                 <span class="comment"
   <p><b>解析</b>：两臂延长线平行 ⟹ 前视瞬心在无穷远 ⟹ cp→IC 连线趋向水平 ⟹ RC 趋向负无穷；代码返回 None，前端 sampleSweep 对 null 做邻段插值/回退（第 9 章侧倾耦合迭代里的 _interp_fb 同款回退设计）。</p>
 </div>
 <div class="qa-box">
-  <p><b>Q5.（动手）中心差分取 h=2 与 h=10 算外倾增益，差异多大？为什么引擎选 h=2？</b></p>
-  <p><b>解析</b>：曲线在 0 附近近线性，h=10 与 h=2 差异小（三阶项小）；但 h 大会把非局部弯曲平均进来，h 太小则撞上求解器残差噪声（$10^{-13}$ 级，问题不大）。h=2 是"局部性 vs 噪声"的稳妥折中——与第 4 章差分步长的权衡同构。</p>
+  <p><b>Q5.（动手）中心差分 h 的选择：扫掠步长 vs 曲线局部性，怎么权衡？</b></p>
+  <p><b>解析</b>：曲线在 0 附近近线性，h 大与小差异小（三阶项小）；但 h 太大把非局部弯曲平均进来，h 太小则撞上求解器残差噪声（$10^{-13}$ 级，问题不大）。引擎 <code>_slope</code> 取<b>最近邻采样点</b>（实际步长 5mm），讲义 h=2mm 的"局部性 vs 噪声"权衡由采样密度继承——与第 4 章差分步长的权衡同构。</p>
 </div>
 
 </body>

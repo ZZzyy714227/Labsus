@@ -236,14 +236,18 @@ pre code {
 <h2>7.2 力链：从接触斑到车身锚点</h2>
 <div class="box algo">
   <div class="box-title">🎯 结构：转向节处的线性方程组</div>
-  <p>转向节（刚体）在轮心承受外载 $f_{cp}$（接触斑力平移到轮心，S1 简化忽略力矩折算），连接 $n$ 根二力杆。力平衡：</p>
+  <p>转向节（刚体）在轮心承受外载 $f_{cp}$（接触斑力平移到轮心；<b>力矩同样折算进轮心：$M_{hub} = M_{cp} + r_{cp}\times F_{cp}$（F-64，2026-08-30 起），球铰模型无法平衡力矩 → 折算后残余非零时状态降级 APPROXIMATE，不再静默忽略</b>）。连接 $n$ 根二力杆。力平衡：</p>
   $$\underbrace{\begin{bmatrix} \hat u_1 & \hat u_2 & \cdots & \hat u_n \end{bmatrix}}_{A\,(3 \times n)} \begin{bmatrix} m_1 \\ \vdots \\ m_n \end{bmatrix} = -f_{cp}$$
+  <p><b>注：空间刚体 6-DOF 完备力平衡</b>：在真实双叉臂悬架中，转向节作为具有 6 个自由度的空间刚体，同时承受接地点外力 $\mathbf{F}_{cp}$ 与外力矩 $\mathbf{M}_{cp} = \vec{r}_{cp} \times \mathbf{F}_{cp} + \mathbf{M}_{\text{align}}$。空间多杆平衡矩阵严格表达为：</p>
+  $$\underbrace{\begin{bmatrix} \hat{\mathbf{u}}_1 & \hat{\mathbf{u}}_2 & \cdots & \hat{\mathbf{u}}_6 \\ \vec{r}_1 \times \hat{\mathbf{u}}_1 & \vec{r}_2 \times \hat{\mathbf{u}}_2 & \cdots & \vec{r}_6 \times \hat{\mathbf{u}}_6 \end{bmatrix}}_{\mathbf{A}_{\text{rigid}}\,(6 \times 6)} \begin{bmatrix} m_1 \\ \vdots \\ m_6 \end{bmatrix} = -\begin{bmatrix} \mathbf{F}_{cp} \\ \vec{r}_{cp} \times \mathbf{F}_{cp} + \mathbf{M}_{cp} \end{bmatrix}$$
+  <p>上表 3 杆算例是将 A 臂等效为共点力系的教学投影（<b>产品路径是 5 杆</b>：PUSH + LCA_F/R + UCA_F/R，见 <code>solve_compliance_full</code>）；6×6 完备式是课堂教具——产品实现取 3×n 力平衡 + <b>力矩残余 → APPROXIMATE 降级</b>（F-64），不求解刚体 6×6。衬套局部刚度到整车全局刚度的方向余弦变换 $\mathbf{K}_{\text{global}} = \mathbf{R}_{\text{bush}} \mathbf{K}_{\text{local}} \mathbf{R}_{\text{bush}}^T$ 仅作概念注记（当前实现是逐 DOF 曲线直接受力，不做全局刚度装配）。</p>
   <table>
     <thead><tr><th>情形</th><th>数学</th><th>工程处置</th></tr></thead>
     <tbody>
-      <tr><td>$n = 3$</td><td>恰定（$3\times3$）</td><td>直接解（条件好时残差 ~$10^{-12}$）</td></tr>
-      <tr><td>$n &gt; 3$</td><td>超静定（无穷多解）</td><td><b>最小范数最小二乘</b> + 状态标注 APPROXIMATE</td></tr>
-      <tr><td>$n &lt; 3$ 或方向退化</td><td>欠定/不可闭合</td><td>残差 $> 0$ ⟹ 力无法全部传递（真实悬架不应发生）</td></tr>
+      <tr><td>$n = 3$（质点共点力系投影）</td><td>恰定（$3\times3$）</td><td>直接解（条件好时力残差 ~$10^{-12}$）；<b>力矩折算残余另计</b>——CaseLoad 带力矩时 moment_residual&gt;0 → 状态降级 APPROXIMATE（F-64）</td></tr>
+      <tr><td>$n > 3$</td><td>超静定（无穷多解）</td><td><b>最小范数最小二乘</b>（$\|m\|_2$ 最小）+ 力残差/力矩残余 → 状态标注 APPROXIMATE（F-64）</td></tr>
+      <tr><td>$n < 3$</td><td>欠定（无穷多解，若 $b$ 在列空间则残差可为 0）</td><td>不属于真实悬架装配；若发生说明拓扑错误</td></tr>
+      <tr><td>方向退化（杆向共线/接近共线）</td><td>列秩下降</td><td>残差 $> 0$ ⟹ 力无法全部传递（真实悬架不应发生，几何条件性检测）</td></tr>
     </tbody>
   </table>
 </div>
@@ -265,8 +269,8 @@ pre code {
 <div class="box intuition">
   <div class="box-title">💡 为什么是 6 个自由度</div>
   <p>真实控制臂与车身之间不是理想铰链，是<b>橡胶衬套</b>：三个平移方向各有刚度（N/mm），三个转动方向各有刚度（N·mm/rad）。连接点因此可以"让"——让的量就是 δ = [dx, dy, dz, rx, ry, rz]。本构：</p>
-  $$f_i = k_i(\delta_i)\ \text{（逐 DOF 独立，可 linear / table / spline）} + f_{preload} + (K_{coupled}\,\delta)$
-  <p><code>Curve</code> 三种形态：linear（常数刚度）、table/spline（<b>Pchip</b> 单调样条插值——端点钳位防外推爆炸，第 9 章扫掠插值同款思想）。<code>bush_force_jac</code> 给解析雅可比（样条也有导数）——外层求解器因此无需差分。</p>
+  $$f_i = k_i(\delta_i)\ \text{（逐 DOF 独立，可 linear / table / spline）} + f_{\text{preload}} + K_{\text{coupled}}\,\delta$$
+  <p><code>Curve</code> 三种形态：linear（常数刚度）、table/spline（<b>Pchip</b> 单调样条插值）。<b>表外行为（F-66，2026-08-30）</b>：越界不再"端点钳位"（旧 clip 使表外刚度≈0、衬套伪屈服变软）——改为<b>端点斜率线性外推</b>（表外保持端点刚度持续硬化），且 x 非严格递增时显式抛错。<code>bush_force_jac</code> 给解析雅可比（样条也有导数）——<b>已接入外层 TRF（F-65），不再是"写了没用"的死代码</b>。（注：preload 全程生效；coupled 6×6 为可选能力，当前无工况注入非零耦合。）</p>
 </div>
 
 <h2>7.4 小角变换：第 2 章的回归</h2>
@@ -290,12 +294,13 @@ pre code {
   <p>看似简单的问题："给锚点施力 $f_{ext}$，衬套让多少？"陷阱在于<b>循环依赖</b>：</p>
   <ul>
     <li>δ 决定锚点位置 → 决定<b>机构位形</b>（内层：小角变换 + solve_pose 重解）；</li>
-    <li>机构位形决定杆件<b>方向</b> → 决定外载在各衬套上的分配 → 决定需要的衬套力。</li>
+    <li>机构位形又反过来决定<b>同一位形下的定位输出与可达性</b>。</li>
   </ul>
-  <p>所以衬套力不是 $k\delta$ 那么简单——<b>$\delta$ 还通过机构几何反过来改变力本身</b>。拆成两层：</p>
-  $$\text{外层（力平衡）}: \quad r(\delta) = f_{ext} - f_{bush}(\delta; \; \text{pose}(\delta)) = 0$$
+  <p>拆成两层（<b>按实现如实描述，2026-08-30 口径</b>）：</p>
+  $$\text{外层（力平衡）}: \quad r(\delta) = f_{ext} - f_{bush}(\delta) = 0$$
   $$\text{内层（机构）}: \quad \text{pose}(\delta) = \text{solve\_pose}(\text{anchors}(\delta),\ \text{travel},\ \text{rack})$$
-  <p>外层用 TRF（第 4 章信赖域，变量缩放控制步长），失败兜底 <b>Anderson 加速</b>（无雅可比不动点迭代：用历史差商 $\Delta F, \Delta x$ 做最小二乘外推，"免费的超线性收敛"）；内层就是第 3-4 章的机构求解器。状态机四档：VALID / APPROXIMATE（超静定最小范数）/ COMPLIANCE_DIVERGED / SOLVER_FAILED。</p>
+  <p><b>外层残差只含衬套本构</b>（$f_{ext}$ 为 per-bushing 预置载荷，来自全链路单次静力分配；不随 δ 迭代重分配——"载荷随位形重分配"的反馈环<b>不在</b>当前实现中）。非线性来源有二：① 表/样条本构本身；② δ→锚点→机构位形（运动学变化影响定位输出与可达性）。内层 solve_pose 每步重解保证机构一致（残差 &lt;0.02mm），全链路 <code>solve_compliance_full</code> 在<b>单一初始位形</b>上做一次二力杆静力分配。</p>
+  <p>外层用 TRF（第 4 章信赖域，变量缩放控制步长；<b>F-65 起接解析雅可比 <code>jac=_residual_jac</code>，块对角 −J_bush</b>），失败兜底 <b>Anderson 加速</b>（历史差商最小二乘外推）。状态机四档：VALID / APPROXIMATE / COMPLIANCE_DIVERGED / SOLVER_FAILED——<b>APPROXIMATE 的进入路径 ≥3</b>：超静定最小范数力残差、CaseLoad 力矩折算残余（F-64）、TRF 未满收敛但未发散。</p>
 </div>
 <div class="box algo">
   <div class="box-title">🎯 实验 3（真实 HTTP）：LCA 双衬套 fy ±2000N 柔顺扫掠</div>
@@ -307,7 +312,7 @@ pre code {
       <tr><td>toe 曲线</td><td>fy=−2000N → <b>+0.088°</b>；fy=+2000N → <b>−0.335°</b></td></tr>
     </tbody>
   </table>
-  <p><b>不对称性就是两层非线性的签名</b>：若系统线性，±2kN 的 toee 摆幅应严格对称（±0.21°）；实际正负侧摆幅 0.42°/0.18°——大变形侧的机构几何已经变了。注意区分：<b>衬套本征 $f = k\delta$ 恒线性；非线性全部来自"δ 改变几何 → 力方向/力臂变化"这一层</b>（备课时用假想 δ 直评衬套力得到严格线性——证明本征项无罪）。</p>
+  <p><b>读曲线（2026-08-30 复核）</b>：端点 +0.088°(fy=−2kN) / −0.335°(fy=+2kN)，中位 −0.1235°。线性独立检验：斜率 (0.088+0.335)/4 = 0.106°/kN 与 compliance toe 增益 <b>−0.106 °/kN 完全自洽</b>——端点数据本身与"线性响应 + 平移"模型吻合，<b>不能作为"两层非线性"的独立证据</b>。真正的非线性信号是中位偏移 −0.1235°（fy=0 处 toe 非零）：衬套预紧/几何不对称让零力位形已经偏转，扫描两端呈现"平移的非线性"。注意：讲义旧文本"正负侧摆幅 0.42°/0.18° 不对称=两层非线性的签名"与自带数据矛盾（0.42 是全摆幅、非单侧），已按上方读法勘误。<b>本征 vs 几何</b>：衬套本征 $f=k\delta$ 恒线性；两层求解器里的非线性来自"δ 改变锚点 → 机构位形变 → 定位输出变"（7.5 已按实现口径说明）。</p>
 </div>
 
 <h2>7.6 源码逐行对账</h2>
@@ -329,8 +334,11 @@ out[node] = transform_point(p0 - b.anchor, t, R) + b.anchor    <span class="comm
     anchors = apply_bushing_to_anchors(bushings, _unpack(x))   <span class="comment"># δ → 锚点</span>
     rep = solve_pose(mech, travel, rack, ...)                   <span class="comment"># 内层：机构重解（TRF）</span>
     <span class="keyword">return</span> f_ext - bush_force(bushings[n], d[n])          <span class="comment"># 外层：力平衡残差</span>
-res = least_squares(_residual, x0, method=<span class="string">"trf"</span>, x_scale=...)   <span class="comment"># 外层 TRF</span>
+<span class="keyword">def</span> <span class="func">_residual_jac</span>(x):                                        <span class="comment"># F-65：解析雅可比（块对角 −J_bush）</span>
+    J[<span class="num">6k:6k+6</span>, <span class="num">6k:6k+6</span>] = -bush_force_jac(bushings[n], d[n]) <span class="comment"># 含旋转对角 + coupled（7.3）</span>
+res = least_squares(_residual, x0, method=<span class="string">"trf"</span>, x_scale=..., jac=_residual_jac) <span class="comment"># 外层 TRF（解析 J）</span>
 <span class="keyword">if</span> 失败: _anderson(_residual, x0)                             <span class="comment"># Anderson 兜底（历史差商外推）</span></code></pre>
+<p><b>F-63 注（2026-08-30）</b>：全链路 <code>solve_compliance_full</code> 把杆车身端映射到机构节点时，匹配失败<b>显式抛错</b>（atol 1e-6 + 唯一性校验，"宁可 422 不可静默零载荷"）——旧实现模糊匹配失败会静默给衬套零载荷，compliance toe 恒 0 而表面"正常"。</p>
 
 <h2>7.7 核心检查点与自测</h2>
 <div class="qa-box">
@@ -339,7 +347,7 @@ res = least_squares(_residual, x0, method=<span class="string">"trf"</span>, x_s
 </div>
 <div class="qa-box">
   <p><b>Q2. n 根二力杆汇交，方程与未知数怎么数？超静定为什么用最小范数解？</b></p>
-  <p><b>解析</b>：3 个力平衡方程对 n 个轴向力。n=3 恰定；n&gt;3 超静定——真实载荷分配取决于各杆微小的柔度差（本模型没建），最小范数是最不偏不倚的选取（所有满足平衡的解中能量/长度最小者），并诚实标注 APPROXIMATE。</p>
+  <p><b>解析</b>：3 个力平衡方程对 n 个轴向力。n=3 恰定；n&gt;3 超静定——真实载荷分配取决于各杆微小的柔度差（本模型没建），最小范数解选<b>长度（$\|m\|_2$）最小</b>的分配（不是"能量最小"——弹性能应为加权二次型，此处无权重），并诚实标注 APPROXIMATE（F-64 起还包括力矩折算残余降级）。</p>
 </div>
 <div class="qa-box">
   <p><b>Q3. 小角矩阵的误差为什么按 θ² 标度？5° 时误差多少，衬套工作区为什么安全？</b></p>
@@ -347,7 +355,7 @@ res = least_squares(_residual, x0, method=<span class="string">"trf"</span>, x_s
 </div>
 <div class="qa-box">
   <p><b>Q4. 为什么必须两层迭代？把衬套力写成 f=kδ 单层解会怎样？</b></p>
-  <p><b>解析</b>：δ 经小角变换改锚点 → 机构位形变 → 杆件方向变 → 外载在各衬套的分配变——循环依赖。若忽略（单层 f=kδ），得到的是"几何冻结"的近似：小载荷下尚可，大载荷系统性偏差（实验 3 的不对称摆幅正是被冻结近似丢掉的部分）。</p>
+  <p><b>解析</b>：δ 经小角变换改锚点 → 机构位形变 → 定位输出与可达性变——内层必须每步重解（保证机构一致）。若忽略（单层 f=kδ + 不重解机构），得到的是"几何冻结"的近似：小载荷下尚可，大载荷下定位输出用的位形是错的（机构没跟上锚点位移）。<b>注意</b>：当前实现的外层载荷 $f_{ext}$ 是预置量（全链路单次静力分配），不随 δ 迭代重分配——两层耦合的正确表述是"锚点→位形→定位输出"，而非"载荷随位形再分配"（那是尚未实现的更强耦合）。</p>
 </div>
 <div class="qa-box">
   <p><b>Q5.（动手）把实验 1 的输入改成 fz = −3000N（纯垂向），三杆 m 怎么变？锚点和还闭合吗？</b></p>

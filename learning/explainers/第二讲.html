@@ -234,7 +234,7 @@ pre code {
       <tr>
         <td><b>状态维护方式</b></td>
         <td>将转向节的姿态作为<b>直接状态</b>维护（使用四元数 $q$）。每一步迭代直接对四元数进行约束投影。</td>
-        <td>状态向量只包含 18 个独立节点坐标（6 节点 $\times$ 3）。“姿态”在求解过程中从未显式存在。</td>
+        <td>状态向量只包含 18 个<b>可动</b>节点坐标（6 节点 $\times$ 3）。“姿态”在求解过程中从未显式存在。</td>
       </tr>
       <tr>
         <td><b>核心数学工具</b></td>
@@ -300,10 +300,11 @@ $$a \times b = \begin{bmatrix} a_2 b_3 - a_3 b_2 \\ a_3 b_1 - a_1 b_3 \\ a_1 b_2
 <p><b>物理定义</b>：刚体是在运动过程中<b>内部任意两点间欧氏距离恒定不变</b>的点集：</p>
 $$\|p_i(t) - p_j(t)\| = \text{常数}, \quad \forall i, j$$
 
-<p><b>定理</b>：三维空间中任何保距刚体运动，充要数学表示均为一个<b>仿射变换（Affine Transformation）</b>：</p>
+<p><b>定理</b>：三维空间中任何保距刚体运动，充要数学表示均为一个<b>等距仿射变换（刚体变换，Isometry）</b>：</p>
 <div class="formula-highlight">
   $$p' = R \cdot p + t \quad (R \in \mathbb{R}^{3 \times 3}, \; t \in \mathbb{R}^3)$$
 </div>
+<p><b>注意</b>：一般"仿射变换"允许缩放/错切，刚体只允许"旋转 + 平移"——因此 $R$ 必为正交矩阵（紧接 2.2.2 证明），这是"等距"二字的约束力。</p>
 
 <h3>2.2.2 为什么旋转矩阵 $R$ 必须满足正交条件 $R^T R = I$？</h3>
 <div class="box proof">
@@ -406,7 +407,7 @@ $$R_z(90^\circ) R_x(90^\circ) \neq R_x(90^\circ) R_z(90^\circ)$$
 <p><b>Euler 旋转定理</b>：三维空间中任何刚体旋转，均等价于绕空间中某一过原点的单位轴 $n$（满足 $\|n\|=1$）旋转一个标量角 $\theta$。</p>
 
 <div class="box proof">
-  <div class="box-title">📐 罗德里格斯公式几何几何分步推导</div>
+  <div class="box-title">📐 罗德里格斯公式几何分步推导</div>
   <p><b>目标</b>：已知单位转轴 $n$ 与转角 $\theta$，求空间任意向量 $v$ 旋转后的新向量 $v'$ 的闭式表达式。</p>
 
   <div class="step-card">
@@ -414,7 +415,7 @@ $$R_z(90^\circ) R_x(90^\circ) \neq R_x(90^\circ) R_z(90^\circ)$$
     <p>将待旋转向量 $v$ 分解为沿转轴方向的分量 $v_\parallel$ 与垂直于转轴平面的分量 $v_\perp$：</p>
     $$v = v_\parallel + v_\perp$$
     $$v_\parallel = (v \cdot n) n = (n n^T) v$$
-    $$v_\perp = v - v_\parallel = (I - n n^T) v$$
+    $$v_\perp = v - v_\parallel = (I - n n^T) v \quad \text{（在垂直于转轴的平面内，即垂直于轴的分量）}$$
   </div>
 
   <div class="step-card">
@@ -466,6 +467,11 @@ $$R_z(90^\circ) R_x(90^\circ) \neq R_x(90^\circ) R_z(90^\circ)$$
   $$\mathbf{v}' = q \otimes \mathbf{v} \otimes q^* \quad (q^* = (w, -x, -y, -z) \text{ 为共轭四元数})$$
 </div>
 
+<h3>2.5.1 Slerp：四元数插值（承诺兑现）</h3>
+  <p>两个单位四元数 $q_0, q_1$ 之间做<b>球面线性插值（Spherical Linear Interpolation, Slerp）</b>：它们在单位 3-球面 $S^3$ 上走<b>大圆</b>（而非直线——归一化直线会中途"抄近路"偏离旋转群）：</p>
+  $$\mathrm{Slerp}(q_0, q_1, t) = \frac{\sin((1-t)\Omega)}{\sin\Omega}\,q_0 + \frac{\sin(t\Omega)}{\sin\Omega}\,q_1, \qquad \Omega = \arccos(q_0 \cdot q_1)$$
+  <p><b>双覆盖陷阱</b>：$q$ 与 $-q$ 表示同一旋转，插值前须检查 $q_0 \cdot q_1 &lt; 0$ 时翻转其一，否则插值会绕远路（$\Omega &gt; 90°$）。前端实际落地的是 `projBody` 的 <code>polarQ</code>（加权 Kabsch 四元数拟合，见第 4 章 4.3），Slerp 是"前端 WebGL 平滑"语境的理论基础。</p>
+
 <div class="step-card">
   <div class="step-header"><span class="step-tag">矩阵转换</span> 四元数对应旋转矩阵 $R(q)$</div>
   $$R(q) = \begin{bmatrix}
@@ -473,6 +479,7 @@ $$R_z(90^\circ) R_x(90^\circ) \neq R_x(90^\circ) R_z(90^\circ)$$
   2(xy + wz) & 1 - 2(x^2 + z^2) & 2(yz - wx) \\
   2(xz - wy) & 2(yz + wx) & 1 - 2(x^2 + y^2)
   \end{bmatrix}$$
+  <p><b>自检</b>：令 $q = (\cos\frac{\theta}{2}, 0, 0, \sin\frac{\theta}{2})$（绕 $+Z$ 轴），代入上式应还原出 $R_z(\theta)$（2.3.1）——读者可自行验证，与 2.4 三大特例同理。</p>
 </div>
 
 <!-- 2.6 -->
@@ -532,7 +539,8 @@ $$R_z(90^\circ) R_x(90^\circ) \neq R_x(90^\circ) R_z(90^\circ)$$
   $$g(R) = \mathrm{tr}(R U \Sigma V^T) = \mathrm{tr}(V^T R U \cdot \Sigma)$$
   <p>记正交矩阵 $M = V^T R U \in O(3)$。因为 $M$ 是正交矩阵，其每个对角元素的绝对值必然满足 $|M_{ii}| \le 1$（单位向量的分量绝对值 $\le 1$）：</p>
   $$\mathrm{tr}(M \Sigma) = M_{11}\sigma_1 + M_{22}\sigma_2 + M_{33}\sigma_3 \le 1\cdot\sigma_1 + 1\cdot\sigma_2 + 1\cdot\sigma_3 = \mathrm{tr}(\Sigma)$$
-  <p>当且仅当 $M = I$ 时取到理论全局最大值：</p>
+  <p>当且仅当 $M = I$ 时取到理论全局最大值<sup>*</sup>：</p>
+  <p><sup>*退化注</sup>：若最小的奇异值 $\sigma_3 = 0$（点集共面退化）或奇异值重根，最优 $M$ 不唯一（$M=I$ 仅是其一）；工程实测几何远离退化（$\sigma_3 \gg 0$），此处不展开。</p>
   $$M = V^T R U = I \implies R^* = V U^T$$
 </div>
 
@@ -552,47 +560,38 @@ $$R_z(90^\circ) R_x(90^\circ) \neq R_x(90^\circ) R_z(90^\circ)$$
 
 <!-- 2.7 -->
 <h2>2.7 引擎源码逐行对账（v3service._estimate_rotation）</h2>
-<p>以下是悬架动力学求解器中姿态重构的核心 Python 代码，每一行均与上述推导严格闭环：</p>
+<p>以下是悬架动力学求解器中姿态重构的核心 Python 代码（<b>真实签名</b>：引擎以已求解的机构对象 <code>m</code> 为入参，从 <code>m.node(...).p0/pos</code> 取点，与第 1 章"求解器只输出节点坐标"的事实链闭环）。每一行均与上述推导严格闭环（<code>H</code> 采用引擎侧的转置约定 <code>B^T A</code>，与讲义 Step 3 的 <code>A^T B</code> 互为转置，SVD 后殊途同归到同一个最优旋转）：</p>
 
-<pre><code><span class="keyword">import</span> numpy <span class="keyword">as</span> np
+<pre><code><span class="keyword">def</span> <span class="func">_estimate_rotation</span>(m) -&gt; np.ndarray:
+    <span class="comment"># 1. 提取源点集 A (设计位 p0) 与目标点集 B (当前位 pos)：5 个转向节节点</span>
+    A = np.stack([m.node(k).p0 <span class="keyword">for</span> k <span class="keyword">in</span> _KNUCKLE_IDS])   <span class="comment"># (5, 3)</span>
+    B = np.stack([m.node(k).pos <span class="keyword">for</span> k <span class="keyword">in</span> _KNUCKLE_IDS])  <span class="comment"># (5, 3)</span>
 
-<span class="keyword">def</span> <span class="func">_estimate_rotation</span>(p0_dict, current_pos_dict, knuckle_ids):
-    <span class="comment"># 1. 提取源点集 A (设计位) 与目标点集 B (当前位)</span>
-    A = np.stack([p0_dict[k] <span class="keyword">for</span> k <span class="keyword">in</span> knuckle_ids])        <span class="comment"># 形状: (5, 3)</span>
-    B = np.stack([current_pos_dict[k] <span class="keyword">for</span> k <span class="keyword">in</span> knuckle_ids]) <span class="comment"># 形状: (5, 3)</span>
+    <span class="comment"># 2. 质心解耦 + 中心化 (Step 1)</span>
+    c0, c1 = A.mean(<span class="num">0</span>), B.mean(<span class="num">0</span>)
+    H = (B - c1).T @ (A - c0)                              <span class="comment"># 引擎转置约定 H_eng = A^T B 的转置 (Step 3)</span>
 
-    <span class="comment"># 2. 计算质心并中心化点集 (对应 Step 1)</span>
-    c0 = A.mean(axis=<span class="num">0</span>)
-    c1 = B.mean(axis=<span class="num">0</span>)
-    A_hat = A - c0
-    B_hat = B - c1
+    <span class="comment"># 3. 奇异值分解 (Step 4)</span>
+    u, _s, vt = np.linalg.svd(H)
 
-    <span class="comment"># 3. 构造互相关矩阵 H = B_hat^T @ A_hat (注: 引擎代码使用了转置写法 H_eng = H^T)</span>
-    H = (B_hat.T) @ A_hat                                  <span class="comment"># 对应 Step 3</span>
-
-    <span class="comment"># 4. 奇异值分解 (对应 Step 4)</span>
-    <span class="comment"># 对 H_eng 进行 SVD: H_eng = u @ diag(s) @ vt</span>
-    u, s, vt = np.linalg.svd(H)
-
-    <span class="comment"># 5. 计算基础旋转矩阵 R = u @ vt (对应 V @ U^T)</span>
+    <span class="comment"># 4. 基础旋转 R = u @ vt（在引擎约定下即最优 V·U^T）</span>
     R = u @ vt
 
-    <span class="comment"># 6. 手性检查与反射修正 (对应 Step 5)</span>
-    <span class="keyword">if</span> np.linalg.det(R) &lt; <span class="num">0</span>:
-        vt[-<span class="num">1</span>, :] *= -<span class="num">1</span>  <span class="comment"># 将 V 的最小奇异值对应行取反 (等价于中间乘 diag(1,1,-1))</span>
+    <span class="comment"># 5. 手性检查：det &lt; 0 → 反射修正，翻转最小奇异值对应的行 (Step 5)</span>
+    <span class="keyword">if</span> np.linalg.det(R) &lt; <span class="num">0.0</span>:
+        vt[-<span class="num">1</span>] *= -<span class="num">1.0</span>
         R = u @ vt
-
     <span class="keyword">return</span> R  <span class="comment"># 精确返回 SO(3) 旋转矩阵</span></code></pre>
 
 <!-- 2.8 -->
 <h2>2.8 工程应用：从旋转矩阵到外倾角（Camber）与前束角（Toe）</h2>
 
-<p>在悬架坐标系定义中（以右侧车轮为例）：设计基准位下的轮轴主向量为 $ax_0 = (1, 0, 0)^T$（沿 $+X$ 轴指向车身外侧）。</p>
+<p>在悬架坐标系定义中（以右侧车轮为例）：设计基准位下的轮轴主向量为 $ax_0 = (1, 0, 0)^T$（沿 $+X$ 轴指向车身外侧）。<b>引擎实现注记</b>：<code>v3service.pose_metrics</code> 实际使用的设计轮轴是 <code>_wheel_axis(design, side)</code>——在设计 camber/toe 下构造的单位向量（含 $-1.2°$/ $+0.05°$ 级设计角），经 Kabsch 旋转后直接输出<b>绝对定位角</b>；设计位（travel=0/rack=0）时由测试锁定为精确返回设计 cam/toe。本章以 $ax_0 = (1,0,0)$ 简化推导相对姿态，与引擎相差一个固定设计角偏移，反解公式形式相同。</p>
 
 <h3>2.8.1 欧拉角复合几何定义</h3>
 <ul>
-  <li><b>外倾角（Camber, $\gamma$）</b>：车轮绕车辆纵向轴 $+Y$ 的倾角。根据右手定则，定义车轮顶部向内倾斜（负外倾）时绕 $+Y$ 产生正负偏角。</li>
-  <li><b>前束角（Toe, $\alpha$）</b>：车轮绕车辆竖直轴 $+Z$ 的偏转角。定义车轮前端向内收拢为正前束。</li>
+  <li><b>外倾角（Camber, $\gamma$）</b>：轮轴（设计基准沿 $+X$ 外侧）绕<b>车辆纵向轴 $+Y$</b> 的旋转角。旋转 $R_y(\gamma)$ 使轮轴端点的 $z$ 分量变为 $-\sin\gamma$ ⟹ $\gamma < 0$ 时轮轴端上翘、车轮顶部向内倾（<b>负外倾</b>），与第 1 章符号约定一致。</li>
+  <li><b>前束角（Toe, $\alpha$）</b>：轮轴绕<b>车辆竖直轴 $+Z$</b> 的偏转角。$\alpha > 0$ 时轮前指向车辆中心线（<b>正前束</b>）。</li>
 </ul>
 
 <p>对基准轮轴向量 $ax_0 = (1, 0, 0)^T$ 依次施加外倾 $R_y(\gamma)$ 与前束 $R_z(\alpha)$ 变换：</p>
@@ -617,7 +616,7 @@ $$ax = R_z(\alpha) R_y(\gamma) \begin{bmatrix} 1 \\ 0 \\ 0 \end{bmatrix} = \begi
 
 <div class="qa-box">
   <p><b>Q2. 如果实测点云带噪声，Kabsch 算法对噪声的敏感度如何？</b></p>
-  <p><b>解析</b>：由于 Kabsch 是全局最小二乘估计，噪声会被 $N$ 个标记点平均化。对于转向节 5 个标记点，实测表明：$10\,\mu\text{m}$ 的几何节点坐标噪声仅引起约 $0.0045^\circ$ 的姿态估计误差，完全满足悬架工程开发精度的要求。</p>
+  <p><b>解析</b>：由于 Kabsch 是全局最小二乘估计，噪声会被 $N$ 个标记点平均化。量级估算：$10\,\mu\text{m}$ 节点噪声 / 典型特征力臂 ~200mm ⟹ 角度误差 $\approx 10/200000 \approx 5\times10^{-5}\,\text{rad} \approx 0.003°$；实测转向节 5 标记点约 <b>0.0045°</b>（量级 ~0.005°，远低于悬架工程精度要求）。</p>
 </div>
 
 </body>

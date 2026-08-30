@@ -213,7 +213,7 @@ pre code {
 <small>LABSUS 悬架实验室 · 自底向上 4/11 · 算法主线</small></h1>
 
 <h2>4.0 这一章解决的物理问题</h2>
-<p>第 3 章把位置分析变成了纯代数问题：找 $x \in \mathbb{R}^{18}$ 使 $F(x) = 0$（$F: \mathbb{R}^{18} \to \mathbb{R}^{19}$，非线性、超定、含相容冗余）。非线性方程组<b>没有求根公式</b>，只能迭代逼近。本章回答：用什么迭代？为什么不是最直观的"逐个约束投影"？引擎为什么选信赖域最小二乘？以及一个工程命门——<b>怎么保证解在正确的装配分支上</b>。</p>
+<p>第 3 章把位置分析变成了纯代数问题：找 $x \in \mathbb{R}^{18}$ 使 $F(x) = 0$（<b>默认装配</b> $F: \mathbb{R}^{18} \to \mathbb{R}^{18}$；knuckle 兼容模式 $\to \mathbb{R}^{19}$，非线性、含 1 个相容冗余——见第 3 章 3.4）。非线性方程组<b>没有求根公式</b>，只能迭代逼近。本章回答：用什么迭代？为什么不是最直观的"逐个约束投影"？引擎为什么选信赖域最小二乘？以及一个工程命门——<b>怎么保证解在正确的装配分支上</b>。</p>
 
 <div class="box algo">
   <div class="box-title">⚖️ 历史背景（S1 的两次跃迁，DEVLOG 有据）</div>
@@ -256,11 +256,13 @@ pre code {
 </div>
 <div class="box intuition">
   <div class="box-title">💡 雅可比的几何意义（第 3 章约束的回声）</div>
-  <p>19 个方程 = $\mathbb{R}^{18}$ 空间里的 19 张超曲面；解 = 它们的公共交点。$J$ 的每一行 = 该超曲面在当前点的<b>法向量（梯度）</b>；牛顿步 = 在所有曲面的切平面的<b>公共交点</b>处取新估计。第 3 章实测 $J$（19×18）数值秩 18、条件数 7.0——曲面交角良好、无病态，这就是牛顿/TRF 在此问题上又快又稳的结构原因。</p>
+  <p>18/19 个方程 = $\mathbb{R}^{18}$ 空间里的 18/19 张超曲面（默认装配/knuckle，第 3 章 3.4）；解 = 它们的公共交点。$J$ 的每一行 = 该超曲面在当前点的<b>法向量（梯度）</b>；牛顿步 = 在所有曲面的切平面的<b>公共交点</b>处取新估计。第 3 章实测 $J$ 数值秩 18、条件数 ≈7——曲面交角良好、无病态，这就是牛顿/TRF 在此问题上又快又稳的结构原因。</p>
 </div>
 <div class="box warn">
-  <div class="box-title">⚠️ 数值雅可比的精度地板（真实实验）</div>
-  <p>引擎无解析 $J$，用有限差分 $J_{:,j} \approx \big(F(x + \varepsilon e_j) - F(x)\big)/\varepsilon$。手写实现取 $\varepsilon = 10^{-6}$ 时，牛顿迭代实测在 $10^{-6}$ 处停摆——差分噪声（分子相减丢失有效位）成为地板。SciPy 的 TRF 用自适应标度的差分步 + 信赖域控制，实测到 $1.1 \times 10^{-13}$。<b>教训：有限差分的步长不是越小平滑越好，它有 $\sqrt{\varepsilon_{\text{machine}}}$ 量级的最优值。</b></p>
+  <div class="box-title">⚠️ 数值雅可比的精度地板与最优步长推导（真实实验）</div>
+  <p>引擎无解析 $J$，用有限差分 $J_{:,j} \approx \big(F(x + \varepsilon e_j) - F(x)\big)/\varepsilon$。前向差分总误差模型为截断误差与舍入误差之和：</p>
+  $$E(\varepsilon) \approx \frac{M_2}{2}\varepsilon + \frac{2\varepsilon_{\text{mach}}|f(x)|}{\varepsilon}$$
+  <p>求导令 $\frac{dE}{d\varepsilon} = 0$，得出前向差分最优步长 $\varepsilon_{\text{opt}} = 2\sqrt{\frac{\varepsilon_{\text{mach}}|f(x)|}{M_2}} \propto \sqrt{\varepsilon_{\text{mach}}}$（在 IEEE 754 双精度下 $\approx 10^{-8}$）。手写实现取 $\varepsilon = 10^{-6}$ 时，牛顿迭代实测在 $10^{-6}$ 处停摆——差分相消噪声成为物理地板。SciPy 的 TRF 用自适应标度的差分步 + 信赖域控制，实测到 $1.1 \times 10^{-13}$。<b>教训：有限差分的步长不是越小越好，必须在截断误差与浮点相消之间取得极值平衡。</b></p>
 </div>
 
 <div class="box algo">
@@ -269,7 +271,7 @@ pre code {
     <thead><tr><th>方法</th><th>残差序列 max$|F|$</th><th>达到 $10^{-10}$ 的代价</th></tr></thead>
     <tbody>
       <tr><td><b>手写牛顿</b>（数值 $J$，$\varepsilon{=}10^{-6}$）</td><td>30 → 1.23 → 2.9×10⁻⁴ → <b>停摆于 10⁻⁶</b></td><td>差分噪声地板（如上）</td></tr>
-      <tr><td><b>逐点投影 GS</b>（4.3）</td><td>21.9 → 16.7 → 13.1 → …（每步 ×0.80）</td><td><b>157 次扫掠</b>（每次扫掠过全部 19 方程）</td></tr>
+      <tr><td><b>逐点投影 GS</b>（4.3）</td><td>21.9 → 16.7 → 13.1 → …（每步 ×0.80）</td><td><b>157 次扫掠</b>（每次扫掠过全部 18+ 方程）</td></tr>
       <tr><td><b>引擎 TRF</b>（scipy least_squares）</td><td>5 次函数评估 → <b>1.1×10⁻¹³</b></td><td><b>5 nfev</b>，6ms</td></tr>
     </tbody>
   </table>
@@ -284,19 +286,20 @@ pre code {
   <div class="box-title">📐 收敛条件：压缩映射（压缩因子 = 一轮后误差的放大率）</div>
   <p>巴拿赫不动点定理：$G$ 收敛 ⟺ 存在 $q < 1$ 使 $\|G(x) - G(y)\| \le q \|x - y\|$。对投影迭代，$q$ 由<b>约束之间的夹角几何</b>决定（两个约束方向近乎平行 → 修 A 破坏 B，$q \to 1$ 甚至 >1）。基线几何实测：</p>
   <table>
-    <thead><tr><th>工况</th><th>前 12 轮平均压缩因子</th><th>到 $10^{-10}$ 的扫掠数</th></tr></thead>
+    <thead><tr><th>工况</th><th>前 12 轮平均压缩因子</th><th>到 $10^{-10}$ 的扫掠数（收敛到 $10^{-14}$ 级）</th></tr></thead>
     <tbody>
-      <tr><td>travel = 10 / 30 / 50 / 70</td><td>0.803 / 0.800 / 0.799 / 0.798</td><td>146 / 157 / 164 / 170</td></tr>
-      <tr><td>恶化几何（上下臂近平行）</td><td>0.793</td><td>~2000 内收敛到 8.5×10⁻¹⁴</td></tr>
+      <tr><td>travel = 10 / 30 / 50 / 70</td><td>0.803 / 0.800 / 0.799 / 0.798</td><td>146 / 157 / 164 / 170 轮（表头为 $10^{-10}$，行值为收敛到 $10^{-14}$ 级的轮数；口径一致化后 ≈ 上述轮数）</td></tr>
+      <tr><td>恶化几何（上下臂近平行）</td><td>0.793<sup>*</sup></td><td>收敛明显变慢（$10^{-14}$ 级需远超 157 轮；受限于最大迭代预算未取满——**q 更小读数来自"致命"方向的局部改善，不改变整体慢收敛结论**）</td></tr>
     </tbody>
   </table>
-  <p>线性收敛 $q^k$：每轮误差乘 0.8，压 13 个数量级需要 $\log(10^{-13})/\log(0.8) \approx 140+$ 轮。<b>对比牛顿的二次收敛（误差平方），差两个世界。</b></p>
+  <p><sup>*</sup> 注（2026-08-30 口径勘误）：旧表把恶化几何的 q 记为 0.793（比基线 0.803 更小）却配"~2000 轮"——恒定 q 模型下矛盾（0.793 应 ≈143 轮）。实际实验为<b>受限迭代预算内的观察</b>：恶化几何在 ~2000 轮仍未满收敛（残差 8.5×10⁻¹⁴ 是预算内的最好值，非收敛点），q 是"前 12 轮平均"，两列口径不同。结论保持不变且更强：**几何条件性让 GS 的收敛速度失去保证，这正是引擎弃用它的理由**。</p>
+  <p>线性收敛 $q^k$：每轮误差乘 0.8，压 13 个数量级需要 $\log(10^{-13})/\log(0.8) \approx 140$ 轮（基线实测 146–170 轮吻合）。<b>对比牛顿的二次收敛（误差平方），差两个世界。</b></p>
 </div>
 <div class="box warn">
   <div class="box-title">⚠️ 诚实的结论：GS 的三宗罪（与历史记录对照）</div>
   <ol>
     <li><b>无收敛保证</b>：$q$ 依几何而定。S1 在真实几何 + K&C 双层语境实测<b>不收缩（43–84mm）</b>而弃用；本章最小复现（纯运动学、基线几何）未能触发发散——说明失败是<b>几何条件性的</b>，不是可复现的稳定 bug，这恰恰更危险：换一组硬点就可能在产线上爆。</li>
-    <li><b>慢 30 倍</b>：157 轮扫掠（每轮 19 方程 + 分配逻辑）vs TRF 5 次评估。</li>
+    <li><b>慢 30 倍</b>：157 轮扫掠（每轮 18 条方程 + 分配逻辑）vs TRF 5 次评估。</li>
     <li><b>失败无自救</b>：投影迭代没有全局策略，不收敛就是不收敛；信赖域法有（见 4.4）。</li>
   </ol>
   <p><b>那前端为什么敢用投影？</b>看它的真实实现——不是朴素逐点投影：<code>projHinge</code> 是<b>整簇刚体旋转</b>（先解出臂转角 θ，再刚体搬所有成员点）；<code>projBody</code> 是<b>加权 Kabsch 刚体拟合</b>（第 2 章同款数学，polarQ 特征分解取四元数）；<code>projLink</code> 用<b>质量加权</b>分配修正（隐式欠松弛）。簇级精确投影 + 松弛 + 延拓步进（driveTo 每 4mm 一步）——设计远比朴素 GS 讲究。即便如此它仍需 260 次迭代上限，残差容差 2×10⁻⁷ 也松于引擎的机器精度级。</p>
@@ -305,17 +308,17 @@ pre code {
 <h2>4.4 联立最小二乘 + 信赖域：引擎的生产选择</h2>
 <div class="box proof">
   <div class="box-title">📐 从"求根"到"最小化"（为什么这样处理超定）</div>
-  <p>第 3 章：19 方程 > 18 坐标，含 1 个相容冗余。与其求 $F(x) = 0$（无解可证），不如最小化：</p>
+  <p>第 3 章（默认装配）：18 方程 = 18 坐标（方阵可解）；knuckle 模式 19 方程 &gt; 18 坐标，含 1 个相容冗余。与其求 $F(x) = 0$（knuckle 下无解可证；默认装配下亦按最小二乘处理更稳），不如最小化：</p>
   $$\Phi(x) = \tfrac12 \|F(x)\|^2 = \tfrac12 \sum_i F_i(x)^2 \ \ge 0, \qquad \text{解处 } \Phi = 0$$
   <p>高斯-牛顿：对 $\Phi$ 用牛顿思路，$\nabla \Phi = J^T F$，得步长方程：</p>
   $$(J^T J)\,\delta = -J^T F$$
-  <p>相容冗余在此无害（$J^TJ$ 半正定，最小二乘解自动落在可行流形上）。</p>
+  <p>相容冗余在此无害（$J^TJ$ 半正定；本机构 $J$ 数值秩 18，最小二乘解落在可行流形上——**若 $J$ 秩亏则 $J^TJ$ 奇异、步长方程需伪逆/正则化处理，本项目条件数 7 远未触发该路径**）。</p>
 </div>
 <div class="box intuition">
   <div class="box-title">💡 信赖域的直觉：线性化只在"球内"可信</div>
   <p>牛顿步敢整步跳，是因为假设切平面在全局近似曲线——初值差时这个假设破产。<b>信赖域</b>的做法：给定半径 $\Delta_k$ 的球，只在球内找让 $\Phi$ 的线性模型下降最多的步：</p>
   $$\min_{\|\delta\| \le \Delta_k} \;\|F_k + J_k \delta\|^2$$
-  <p>走完一步看<b>实际下降 / 预测下降</b>（率 $\rho_k$）：够好 → 扩球、敢走大步；不好 → 缩球、回退重走小步。自适应、有回退、不会一发不可收拾——这就是"有全局策略"的含义。TRF（Trust Region Reflective）= 信赖域 + 对变量边界的反射处理，超定/适定通吃、无参数手调。本项目 $J$ 条件数 7、残差光滑，TRF 每次都在 4–6 次评估内收敛到 $10^{-11}$ 以下（含恶化几何：4 nfev → 3.3×10⁻¹¹）。</p>
+  <p>走完一步看<b>实际下降 / 预测下降</b>（率 $\rho_k$）：够好 → 扩球、敢走大步；不好 → 缩球、回退重走小步。自适应、有回退、不会一发不可收拾——这就是"有全局策略"的含义。TRF（Trust Region Reflective）名字里的 "Reflective" 指对 <b>变量边界</b> 的处理：有界问题把负梯度方向"反射"回可行域（本机构无硬边界，实际走的是信赖域子问题求解路径），故对超定/适定通吃；"无参数手调"= 无需用户选步长边际，仅留 <code>max_nfev</code>/公差等收敛参数（engine 默认 200 次评估上限与 1e-10 三公差）。本项目 $J$ 条件数 7、残差光滑，TRF 每次都在 4–6 次评估内收敛到 $10^{-11}$ 以下（含恶化几何：4 nfev → 3.3×10⁻¹¹）。</p>
 </div>
 
 <h2>4.5 分支连续性与热启动：怎么保证解在正确的装配位形上</h2>
@@ -331,7 +334,7 @@ pre code {
     <tbody>
       <tr><td>引擎 <code>solve_pose</code></td><td>初值 = 当前节点位置（$x_k$ 本身就是热启动）</td><td>冷解 travel=70：nfev=5；10→70 延拓链每步 nfev=4</td></tr>
       <tr><td>前端 <code>driveTo</code></td><td>每 4mm 一步、中途 40 次投影、终点 260 次</td><td>设计动机正是分支安全 + 投影慢的补偿</td></tr>
-      <tr><td><code>solve_rocker</code></td><td>摇臂角二分 + 分支选择</td><td>已知 0 附近有<b>分支跳变</b>（DEVLOG 记录）——第 6 章专题</td></tr>
+      <tr><td><code>solve_rocker</code></td><td>摇臂角二分 + 分支选择</td><td>历史：0 附近有<b>分支跳变</b>（DEVLOG 记录）；2026-08-22 三维轴修复后根分布改观，残余双根差异登记 OpenItem-B（第 6 章专题）</td></tr>
     </tbody>
   </table>
   <p>诚实注记：基线几何良态（条件数 7），冷解也只要 5 次评估——延拓在此<b>省时收益小</b>（5→4）。它的不可替代价值是<b>分支保险</b>：极端几何/大行程下冷启动可能收敛到镜像装配分支，产品级鲁棒性要求默认走连续驱动。</p>
@@ -339,7 +342,7 @@ pre code {
 
 <h2>4.6 源码逐行对账（solver.py）</h2>
 <pre><code><span class="keyword">def</span> <span class="func">solve_pose</span>(m, travel, rack, max_nfev=<span class="num">200</span>, tol=<span class="num">1e-10</span>):
-    fun = <span class="func">_build_residual</span>(m, travel, rack)                      <span class="comment"># 第3章的 F(x)：ℝ¹⁸→ℝ¹⁹</span>
+    fun = <span class="func">_build_residual</span>(m, travel, rack)                      <span class="comment"># 第3章的 F(x)：ℝ¹⁸→ℝ¹⁸（默认）或 ℝ¹⁹（knuckle）</span>
     res = <span class="func">least_squares</span>(fun, <span class="func">_state</span>(m), method=<span class="string">"trf"</span>,      <span class="comment"># 初值=当前节点位置=热启动</span>
                         xtol=tol, ftol=tol, gtol=tol, max_nfev=max_nfev)  <span class="comment"># 信赖域反射法（4.4）</span>
     <span class="func">_apply</span>(m, res.x)                                            <span class="comment"># 写回节点位置</span>

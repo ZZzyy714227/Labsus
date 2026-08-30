@@ -213,7 +213,7 @@ pre code {
 <small>LABSUS 悬架实验室 · 自底向上 10/11 · 时域仿真主线</small></h1>
 
 <h2>10.0 这一章解决的物理问题</h2>
-<p>第 9 章是<b>稳态</b>（弯道保持住的那一刻）。真实路面是时变的：颠簸让轮载波动，轮载波动 = 抓地力波动（第 8 章 $D \propto F_z$）。本章：① 四分之一车 2-DOF 理论（两个固有频率为什么差一个量级）；② 本项目实现的<strong>真实模型边界</strong>（诚实声明：车身接地的角台架，不是完整 1/4 车）；③ 元件本构四件套（弹簧/非对称阻尼/缓冲块/单向轮胎）；④ <strong>PBD 时间推进</strong>——第 4 章投影路线在时域的胜场；⑤ 步长稳定性分析（算出 9.7× 裕度）。</p>
+<p>第 9 章是<b>稳态</b>（弯道保持住的那一刻）。真实路面是时变的：颠簸让轮载波动，轮载波动 = 抓地力波动（第 8 章 $D \propto F_z$）。本章：① 四分之一车 2-DOF 理论（两个固有频率：2.2Hz 车身起伏 vs 13.7Hz 轮跳，相差 6.3 倍——"差一个量级"是口语化说法，精确比值 $\frac{13.7}{2.18} \approx 6.3$）；② 本项目实现的<strong>真实模型边界</strong>（诚实声明：车身接地的角台架，不是完整 1/4 车）；③ 元件本构四件套（弹簧/非对称阻尼/缓冲块/单向轮胎）；④ <strong>PBD 时间推进</strong>——第 4 章投影路线在时域的胜场；⑤ 步长稳定性分析（算出 9.7× 裕度）。</p>
 
 <h2>10.1 四分之一车 2-DOF：理论地标</h2>
 <div class="box proof">
@@ -221,8 +221,8 @@ pre code {
   <p>簧上质量 $m_s$（那 1/4 车身）经弹簧 $k$、阻尼 $c$ 连到簧下质量 $m_u$（车轮立柱），轮胎刚度 $k_t$ 接路面 $r(t)$：</p>
   $$m_s \ddot{x}_s = -k(x_s - x_u) - c(\dot{x}_s - \dot{x}_u)$$
   $$m_u \ddot{x}_u = +k(x_s - x_u) + c(\dot{x}_s - \dot{x}_u) - k_t(x_u - r)$$
-  <p>无阻尼固有频率（质量比 $m_s/m_u \approx 10$，$k_t \gg k$）：</p>
-  $$f_{body} = \tfrac{1}{2\pi}\sqrt{\tfrac{k}{m_s}} = \tfrac{1}{2\pi}\sqrt{\tfrac{61875}{330}} = \mathbf{2.18\ Hz}, \qquad f_{hop} = \tfrac{1}{2\pi}\sqrt{\tfrac{k + k_t}{m_u}} = \mathbf{13.7\ Hz}$$
+  <p>无阻尼固有频率（质量比 $m_s/m_u = 330/38 \approx 8.7$，理论课堂常取 $\approx 10$；$k_t = 220$ N/mm 约为 $k{}_w = 61.9$ N/mm 的 3.5 倍）：</p>
+  $$f_{body} = \tfrac{1}{2\pi}\sqrt{\tfrac{k}{m_s}} = \tfrac{1}{2\pi}\sqrt{\tfrac{61875}{330}} = \mathbf{2.18\ Hz}, \qquad f_{hop} = \tfrac{1}{2\pi}\sqrt{\tfrac{k + k_t}{m_u}} = \tfrac{1}{2\pi}\sqrt{\tfrac{281875}{38}} = \mathbf{13.7\ Hz}$$
   <p><b>频率分离的物理</b>：低频时簧下跟着簧上走（车身起伏模态），高频时簧下独自抖而簧上不动（wheel hop 模态，$k_t$ 主导）。调阻尼的目标区间就在两峰之间压平传递率。</p>
 </div>
 
@@ -243,7 +243,7 @@ pre code {
     <thead><tr><th>元件</th><th>公式</th><th>细节与物理</th></tr></thead>
     <tbody>
       <tr><td>弹簧</td><td>$F_k = F_0 + k_S(L_0 - L)$，$F \ge 0$</td><td>$F_0$ = 预载（静态轴荷/$mr$，撑住车身）；$F&lt;0$ 钳零 = <b>弹簧脱离座</b>（拉杆悬挂/跳台腾空）</td></tr>
-      <tr><td>阻尼（非对称）</td><td>$F_c = -(\dot{L} &lt; 0\ ?\ c_B : c_R)\,\dot{L}$</td><td>压缩 $c_B{=}8$、回弹 $c_R{=}12$ N·s/mm——<b>回弹更硬</b>是调车惯例（吸收后控制回弹防弹跳）。轮端计价 $c_w = c\,mr^2$ ⟹ 阻尼比 $\zeta_{bump}{=}0.50$、$\zeta_{rebound}{=}0.75$</td></tr>
+      <tr><td>阻尼（非对称）</td><td>$F_c = -(\dot{L} &lt; 0\ ?\ c_B : c_R)\,\dot{L}$</td><td>压缩 $c_B{=}8$、回弹 $c_R{=}12$ N·s/mm——<b>回弹更硬</b>是调车惯例（吸收后控制回弹防弹跳）。轮端计价 $c_w = c\,mr^2$ ⟹ 阻尼比 $\zeta_{\text{bump}} = \frac{c_w}{2\sqrt{k_w m_s}} = 0.50$、$\zeta_{\text{rebound}} = 0.75$（注：以整车簧上质量 $m_s=330\text{kg}$ 为起伏模态设计基准）</td></tr>
       <tr><td>缓冲块</td><td>越界 $x$（&gt;70mm 或 &lt;−75mm）时 $F = k_{BS} x^2/20$</td><td><b>二次渐进</b>：5mm→1.25kN、10mm→5kN、20mm→20kN、30mm→45kN——末段变"砖"。/20 是形状标定常数（第 6 章校准包袱的同族）</td></tr>
       <tr><td>轮胎（单向）</td><td>$pen = z_{road} - z_{cp} &gt; 0$ 才有 $F = k_t pen + c_t \dot{pen}$，$F \ge 0$</td><td><b>只能推不能拉</b>（腾空 = 零轮载）；接触阻尼 $c_t$ 抑制穿透振荡</td></tr>
     </tbody>
@@ -274,15 +274,22 @@ pre code {
 
 <h2>10.5 稳定性分析：步长的数学</h2>
 <div class="box proof">
-  <div class="box-title">📐 显式积分的 CFL 式限制（对最硬模态）</div>
-  <p>对 $\ddot{x} = -\omega^2 x$ 用显式 Euler，放大矩阵特征值离开单位圈的条件：<b>$\omega h &lt; 2$</b>（半隐式 Euler 同限制但无数值增阻）。本项目最硬自由度 = rig 模态 $\omega = 123$ rad/s：</p>
+  <div class="box-title">📐 辛/半隐式积分的稳定边界（对最硬模态）</div>
+  <p>对 $\ddot{x} = -\omega^2 x$ 写成一阶系统 $[x,\ v]' = [v,\ -\omega^2 x]$。用 <b>半隐式（辛）Euler</b>（先更新 $v$、再更新 $x$，第 10.4 步正是 stepDyn 的顺序）：</p>
+  $$v_{n+1} = v_n - \omega^2 h\, x_n, \qquad x_{n+1} = x_n + h\, v_{n+1}$$
+  <p>放大矩阵 $\begin{bmatrix} 1-\omega^2 h^2 & h \\ -\omega^2 h & 1 \end{bmatrix}$ 的特征值满足 $\lambda^2 - (2 - \omega^2 h^2)\lambda + 1 = 0$，模长 $=1$（单位圆上、无数值增阻——辛性）<b>当且仅当</b>：</p>
+  <div class="formula-highlight">
+    $$\omega h &lt; 2$$
+  </div>
+  <p><b>对照显式（前向）Euler</b>：放大矩阵 $\begin{bmatrix} 1 & h \\ -\omega^2 h & 1 \end{bmatrix}$ 的特征值 $1 \pm i\omega h$ 模长 $\sqrt{1 + \omega^2 h^2} &gt; 1$ <b>恒成立</b>——无阻尼振子对显式 Euler <b>无条件不稳定</b>（特征值永远在单位圆外，能量只增不减）。所以 $\omega h &lt; 2$ 这条边界属于辛/半隐式积分器，项目选它正是为了拿到这条边界；显式 Euler 根本拿不到（教材常把两者混为一谈的坑）。</p>
+  <p>本项目最硬自由度 = rig 模态 $\omega = 123$ rad/s：</p>
   $$h_{max} = \tfrac{2}{\omega} = 16.2\ \mathrm{ms}, \qquad h_{actual} = \tfrac{16.7\ \mathrm{ms}}{10} = 1.67\ \mathrm{ms} \;\Longrightarrow\; \textbf{9.7 倍裕度}$$
-  <p>NS=10 子步不是玄学，是对 19.65Hz 模态 + 约束投影精度的定价。若把 $k_t$ 加倍或运动质量减半，$\omega$ 升 $\sqrt{2}$ 倍，裕度降到 ~7×——改参数前先算这道题。</p>
+  <p>NS=10 子步不是玄学，是对 19.65Hz 模态 + 约束投影精度的定价。若把 $k_t$ 加倍（$k{+}k_t$：281875→501875 N/m），$\omega$ 升 $\sqrt{1.78} \approx 1.33$ 倍，裕度降到 ~7.3×；若运动质量减半，$\omega$ 升 $\sqrt{2} \approx 1.41$ 倍——改参数前先算这道题。</p>
 </div>
 
 <h2>10.6 源码逐行对账（stepDyn 核心）</h2>
 <pre><code><span class="keyword">const</span> NS=<span class="num">10</span>, h=dt/NS;  kS=state.kS*FS; ...        <span class="comment"># FS=1000：N/mm→N/m（第1章单位纪律）</span>
-<span class="keyword">for</span>(let s=&lt;NS; s++){
+<p><span class="keyword">for</span>(<span class="keyword">let</span> s=<span class="num">0</span>; s&lt;NS; s++){
   rz = M.roadZ0 + roadSignal(tt);                        <span class="comment"># 路面瞬时高度（10.3 谱）</span>
   节点清力 + 重力 −m·g;
   d = B.p − A.p; L = |d|; u = d/L;  rel = (B.v−A.v)·u;    <span class="comment"># 减振器轴向相对速度</span>
@@ -299,7 +306,7 @@ pre code {
 <h2>10.7 核心检查点与自测</h2>
 <div class="qa-box">
   <p><b>Q1. 推导 1/4 车两个固有频率；为什么差一个量级？</b></p>
-  <p><b>解析</b>：$f_{body}=\sqrt{k/m_s}/2\pi$（弹簧只对抗簧上质量）、$f_{hop}=\sqrt{(k+k_t)/m_u}/2\pi$（簧下对抗弹簧+轮胎，且质量小 ~10×）。频率 ∝ $\sqrt{k/m}$：分子硬 3.5×、分母轻 10× ⟹ 频率差 $\sqrt{35}≈6$×。</p>
+  <p><b>解析</b>：$f_{body}=\sqrt{k/m_s}/2\pi$（弹簧只对抗簧上质量）、$f_{hop}=\sqrt{(k+k_t)/m_u}/2\pi$（簧下对抗弹簧+轮胎，且质量小 $\approx 8.7$×）。频率 ∝ $\sqrt{k/m}$：$k{+}k_t$ 是 $k$ 的 4.55 倍、$m_s/m_u \approx 8.7$ ⟹ 频率比 $\sqrt{4.55 \times 8.7} \approx 6.3$×（10.1 的 2.18/13.7 Hz 精确对账）。"差一个量级"是口语，精确 6.3×。</p>
 </div>
 <div class="qa-box">
   <p><b>Q2. 本项目 4-Post 面板接地了什么？能看到/看不到什么模态？</b></p>
@@ -315,7 +322,7 @@ pre code {
 </div>
 <div class="qa-box">
   <p><b>Q5.（动手）把 kT 从 220 改到 440 N/mm（胎压翻倍效果），稳定性裕度变多少？NS 要不要动？</b></p>
-  <p><b>解析</b>：$\omega \propto \sqrt{k_w+k_t}$：281875→501875 ⟹ $\omega$×1.33 = 164 rad/s ⟹ $h_{max}$ = 12.2ms，裕度 9.7→7.3×。仍安全，NS=10 可不动；但若同时减运动质量（轻量化轮心节点）到 ~9kg，$\omega$≈230，裕度 ~5×——建议 NS 加到 16。先算后改。</p>
+  <p><b>解析</b>：$\omega \propto \sqrt{k_w+k_t}$：281875→501875 ⟹ $\omega$×1.33 = 164 rad/s ⟹ $h_{max}$ = 12.2ms，裕度 9.7→7.3×。仍安全，NS=10 可不动；但若同时减运动质量（轻量化轮心节点）到 ~9.5kg，$\omega \approx 230$，裕度 ~5×——建议 NS 加到 16。先算后改。</p>
 </div>
 
 </body>

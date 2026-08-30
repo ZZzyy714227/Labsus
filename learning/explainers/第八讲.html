@@ -267,23 +267,25 @@ pre code {
   $$D(F_z) = F_{y0} \cdot \frac{F_z}{F_{z,nom}} \;\Longrightarrow\; \mu_{eff}(F_z) = \frac{D}{F_z} = \frac{F_{y0}}{F_{z,nom}} = \text{常数（实测 2.2485 恒定）}$$
 </div>
 <div class="box warn">
-  <div class="box-title">⚠️ 已知简化：载荷敏感性（load sensitivity）缺失</div>
-  <p><b>真实轮胎</b>：$\mu$ 随 $F_z$ <b>递减</b>（胎体非线性，重压下接触压强分布恶化）——经验式 $D \sim (a F_z + a_2 F_z^2)$ 带负二次项。<b>本子集</b>：D 线性 ⟹ μ 恒定（实验 2 实测 2.2485 全载荷不变）。</p>
-  <p><b>后果链（第 9/11 章的伏笔，现在埋下）</b>：载荷转移把轴上一轮加到 $F_z + \Delta$、另一轮减到 $F_z - \Delta$，真实轮胎下两轮侧向力之和 $\sum F_y = f(F_z+\Delta) + f(F_z-\Delta) &lt; 2f(F_z)$（凹函数性质，Jensen 不等式）；线性 μ 下两者相等——<b>本模型会低估载荷转移的抓地力损失</b>，也因此无法表达"TLLTD 偏轻载端更好"的经典结论。要模拟该效应：给 D 加负二次项（一处改动，OpenItem 级）。</p>
+  <div class="box-title">⚠️ 载荷敏感性的实现与残余代价（LS 参数已落地）</div>
+  <p><b>真实轮胎</b>：$\mu$ 随 $F_z$ <b>递减</b>（胎体非线性，重压下接触压强分布恶化）——经验式 $D \sim (a F_z + a_2 F_z^2)$ 带负二次项。<b>引擎实现</b>：`tire_mf.py::_d` 支持载荷敏感性参数 <code>LS</code>（2026-08-22 起，$D = F_{y0}\cdot\frac{F_z}{F_{z,nom}}\cdot\big(1 - LS(\frac{F_z}{F_{z,nom}}-1)\big)$），默认 LS=0 保持线性基线（实验 2 实测 μ 2.2485 恒定），设 LS&gt;0 即激活重载 μ 递减。</p>
+  <p><b>后果链（第 9/11 章的伏笔，现在埋下）</b>：载荷转移把轴上一轮加到 $F_z + \Delta$、另一轮减到 $F_z - \Delta$，真实轮胎下两轮侧向力之和 $\sum F_y = f(F_z+\Delta) + f(F_z-\Delta) &lt; 2f(F_z)$（凹函数性质，Jensen 不等式）；线性 μ 下两者相等——<b>线性基线会低估载荷转移的抓地力损失</b>，也因此无法表达"TLLTD 偏轻载端更好"的经典结论。要使绝对数值进入真实区：设 LS&gt;0 并给出经验标定值（当前默认 0 仅为架构预留，见 `v3models.TireParams.LS` 注释）。</p>
 </div>
 
-<h2>8.4 复合滑移：摩擦圆与一个不一致观察</h2>
+<h2>8.4 复合滑移：摩擦圆与一个已修的一致性观察</h2>
 <div class="box intuition">
   <div class="box-title">💡 摩擦椭圆（本项目的回退检查）</div>
   <p>同一点上，可用摩擦在 Fx/Fy 之间分配：$\sqrt{(F_x/\mu_x F_z)^2 + (F_y/\mu_y F_z)^2} \le 1$。直觉：摩擦力是"预算"，驱动/制动花掉的预算不能再买侧向力——弯中给油推头、刹车入弯甩尾，都是圆被吃满的表象。完整 MF 联合模型（MF-Tyre 的复合滑移耦合）远比圆复杂；本项目用<b>圆作为无 MF 参数时的回退</b>。</p>
 </div>
 <div class="box warn">
-  <div class="box-title">⚠️ 观察：回退 μ 与 MF 默认值不一致（读码发现）</div>
-  <p>实验：MF 默认参数下 $F_x(\kappa{=}0.05) = 4614$N 已<b>超过</b>回退检查的 $\mu F_z = 0.9 \times 3500 = 3150$N——回退圆的 μ=0.9 硬编码，而 MF 默认参数实际描述的是 $\mu \approx 2.25$ 的胎（FSAE 赛事+下压力语境的合理值，但两者各说各话）。<b>生产级一致性要求</b>：回退 μ 应从 MF 参数推导（$F_{y0}/F_{z,nom}$）或由用户统一给定——登记为观察项。</p>
+  <div class="box-title">✅ 已修复：回退 μ 与 MF 默认值一致性（2026-08-22）</div>
+  <p><b>历史观察</b>：旧回退圆 $\mu{=}0.9$ 硬编码，而 MF 默认参数描述 $\mu \approx 2.25$ 的胎——两者各说各话（$F_x(\kappa{=}0.05) = 4614$N 曾超过回退预算 3150N）。<b>修复</b>：`tire_mf.py::mu` 属性改为 $\mu = F_{y0}/F_{z,nom}$（源码注释"2026-08-22 不再独立硬编码"），`transient.py` 摩擦圆同源——回退检查与 MF 峰值永远一致，不再出现"圆比曲线小"的自相矛盾。第 11 章对拍（TPHYS Parity）把两端 μ 的行为钉在同一条线上。</p>
 </div>
 
-<h2>8.5 回正力矩 Mz：占位实现与其物理</h2>
-<p>本项目 $M_z = 0.06\,F_y$（常数拖距 60mm，源码自标 APPROXIMATE）。<b>真实物理</b>： pneumatic trail $t(\alpha)$ 随侧偏增大<b>递减</b>（滑移区从后向前侵蚀接触斑，合力中心前移）——所以 Mz 的峰值比 Fy 的峰值来得早，越过之后回正力矩衰减甚至反号（手感变轻、丢方向的来源）。常数拖距丢掉了整段故事，但力矩量级正确。</p>
+<h2>8.5 回正力矩 Mz、外倾推力与一阶松弛长度</h2>
+<p><b>外倾推力（Camber Thrust）</b>：车轮外倾 $\gamma$ 使得滚动的轮胎接触印迹产生圆锥形滚动趋势，产生侧向剪切推力 $F_{y,\gamma} \approx -C_\gamma \gamma F_z$。在 MF 中，常通过水平与垂直平移项引入：$S_h = S_{h0} + \frac{C_\gamma \gamma}{C_\alpha}, S_v = S_{v0} + C_\gamma \gamma F_z$。<b>本项目的实现位置</b>：<code>transient.py::wheel_force</code> 用线性增益 $F_{y,\gamma} = -C_g\,\gamma\,F_z$（<code>Cg</code> 系数，v3models.TireParams 默认 0.5），叠加在 MF 侧向力之上——平移项与线性增益是同一物理的两种参数化。</p>
+<p><b>一阶动态松弛长度（Relaxation Length）</b>：在瞬态剧烈变道或绕桩工况下，侧偏力的建立存在空间距离滞后：$\frac{\sigma}{v_x} \frac{d F_y}{dt} + F_y = F_{y,\text{steady}}(\alpha)$（$\sigma \approx 0.15 \sim 0.30\text{ m}$），它是高速赛车滤震与响应时延的关键物理本构。</p>
+<p><b>回正力矩 Mz 占位实现</b>：本项目 $M_z = 0.06\,F_y$（常数拖距 60mm，源码自标 APPROXIMATE）。<b>真实物理</b>： pneumatic trail $t(\alpha)$ 随侧偏增大<b>递减</b>（滑移区从后向前侵蚀接触斑，合力中心前移）——所以 Mz 的峰值比 Fy 的峰值来得早，越过之后回正力矩衰减甚至反号（手感变轻、丢方向的来源）。常数拖距丢掉了整段故事，但力矩量级正确。</p>
 
 <h2>8.6 源码对账（tire_mf.py）</h2>
 <pre><code><span class="keyword">def</span> <span class="func">fy</span>(alpha_deg, fz):
@@ -291,10 +293,10 @@ pre code {
     x = B * a
     <span class="keyword">return</span> D(fz) * sin(C * arctan(x - E*(x - arctan(x)))) + Sv   <span class="comment"># 8.2 公式逐字</span>
 
-<span class="keyword">def</span> <span class="func">_d</span>(fz):  <span class="keyword">return</span> Fy0 * (fz / FzNom)  <span class="keyword">if</span> fz &gt; <span class="num">0</span> <span class="keyword">else</span> <span class="num">0.0</span>            <span class="comment"># D 线性载荷（8.3 简化所在）</span>
+<span class="keyword">def</span> <span class="func">_d</span>(fz):  <span class="keyword">return</span> Fy0 * (fz / FzNom) * max(<span class="num">0.1</span>, <span class="num">1.0</span> - LS*(fz / FzNom - <span class="num">1.0</span>))  <span class="comment"># D 线性基线 + 载荷敏感性 LS（8.3，默认 0）</span>
 <span class="keyword">def</span> <span class="func">fx</span>(kappa, fz): ... B*<span class="num">1.2</span> ...                              <span class="comment"># 纵向：同一骨架，刚度系数 ×1.2</span>
-<span class="keyword">def</span> <span class="func">mz</span>(alpha_deg, fz): <span class="keyword">return</span> fy(...) * <span class="num">0.06</span>               <span class="comment"># 常数拖距 60mm 占位（8.5）</span>
-<span class="comment"># 回退：无 MF 参数时用摩擦圆 μ(Fz)·Fz 检查（μ=0.9 硬编码 ⚠ 8.4 观察）</span></code></pre>
+<span class="keyword">def</span> <span class="func">mz</span>(alpha_deg, fz): <span class="keyword">return</span> fy(...) * (trail_mm / <span class="num">1000.0</span>)   <span class="comment"># 参数化拖距（默认 60mm 占位，8.5）</span>
+<span class="comment"># μ = Fy0 / FzNom（2026-08-22 起同源——摩擦圆与 MF 峰值永远一致，8.4）</span></code></pre>
 
 <h2>8.7 核心检查点与自测</h2>
 <div class="qa-box">
