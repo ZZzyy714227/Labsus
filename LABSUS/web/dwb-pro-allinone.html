@@ -3324,9 +3324,20 @@ const TRK={
   preset:"skidpad", custom:null, lookahead:0.9   /* F-54（2026-08-30）：预瞄增益真状态 */
 };
 const TRACK_PRESETS={
-  skidpad:{zh:"稳态定圆 R=30m",closed:true,v:12.0,pts:(function(){
+  skidpad:{zh:"FSAE 稳态定圆 R=30m",closed:true,v:12.0,pts:(function(){
     const o=[];for(let k=0;k<64;k++){const t=2*PI*k/64;o.push([30*Math.cos(t),30*Math.sin(t)]);}return o;})()},
-  slalom:{zh:"蛇形绕桩 30m 桩距",closed:false,v:13.0,pts:(function(){
+  skidpad8:{zh:"FSAE 官方 8字定圆 (双环 R=15m)",closed:true,v:11.0,pts:(function(){
+    const o=[];
+    for(let k=0;k<48;k++){const t=-PI/2-2*PI*k/48;o.push([+(15+15*Math.cos(t)).toFixed(3),+(15*Math.sin(t)).toFixed(3),11.0]);}
+    for(let k=0;k<48;k++){const t=-PI/2+2*PI*k/48;o.push([+(-15-15*Math.cos(t)).toFixed(3),+(15*Math.sin(t)).toFixed(3),11.0]);}
+    return o;})()},
+  autocross:{zh:"FSAE 官方 Autocross (800m 综合计时)",closed:true,v:0,pts:[
+    [0,0,14],[40,0,18],[80,5,16],[110,25,12],[125,55,10],[115,85,11],[95,115,13],[70,140,9],
+    [40,145,9],[15,130,12],[-15,105,15],[-45,85,14],[-75,70,11],[-95,45,9],[-85,20,11],
+    [-65,0,13],[-40,-15,12],[-15,-15,11]]},
+  accel:{zh:"FSAE 官方 75m 加速与制动区",closed:false,v:0,pts:[
+    [0,0,0],[10,0,10],[25,0,18],[50,0,26],[75,0,32],[90,0,15],[110,0,0]]},
+  slalom:{zh:"FSAE 蛇形绕桩 (30m 桩距)",closed:false,v:13.0,pts:(function(){
     const o=[[0,0]];for(let k=0;k<5;k++)o.push([15+30*k,(k%2?3.6:-3.6)]);o.push([180,0]);return o;})()},
   minigp:{zh:"Mini GP 短道（发卡+S弯）",closed:true,v:0,pts:[
     [0,0,15],[50,0,17],[80,2,13],[95,15,10],[92,35,9],[75,45,10],
@@ -3338,7 +3349,7 @@ function trackPayload(){
   const lut=sw=>({travel:sw.rows.map(r=>r.tr),toe:sw.rows.map(r=>r.toe),cam:sw.rows.map(r=>r.cam)});
   let pts,closed=false;
   if(TRK.preset==="custom"&&TRK.custom){pts=TRK.custom;closed=false;}
-  else{const P=TRACK_PRESETS[TRK.preset];closed=P.closed;
+  else{const P=TRACK_PRESETS[TRK.preset]||TRACK_PRESETS.skidpad;closed=P.closed;
     pts=P.pts.map(p=>({x:p[0],y:p[1],target_speed:(p[2]!==undefined?p[2]:P.v)}));}
   return {vehicle:base.vehicle,
     kc_luts:{front:lut(SIM.swF),rear:lut(SIM.swR)},
@@ -3347,23 +3358,30 @@ function trackPayload(){
     start_speed:parseFloat(document.getElementById("trkV0").value)||6.0, _closed:closed};
 }
 async function trackRun(){
-  if(!ENG.ok){setTrkStatus("未连接引擎 → 先连接，或点「进入赛道仿真大厅 [独立]」走内置 JS 物理 (TPHYS)",C.ela);return;}
   const btn=document.getElementById("trkRun");if(btn)btn.textContent="仿真中…";
-  setTrkStatus("赛道瞬态仿真中…（平面 3-DOF + 四轮 MF + 准静态载荷）",C.txt2);
+  setTrkStatus(ENG.ok?"赛道瞬态仿真中…（引擎 /api/v3/chassis/simulate_track）":"赛道瞬态仿真中…（内置 JS 物理 TPHYS）",C.txt2);
   try{
     const body=trackPayload();TRK.req=body;
-    const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),120000);
-    const r=await fetch(ENG.url+"/api/v3/chassis/simulate_track",
-      {method:"POST",headers:{"Content-Type":"application/json"},
-       body:JSON.stringify(body),signal:ctl.signal});
-    clearTimeout(to);
-    if(!r.ok){const t=await r.text();throw new Error("HTTP "+r.status+" "+t.slice(0,140));}
-    TRK.res=await r.json();
-    if(TRK.res.status!=="VALID")throw new Error(TRK.res.status+" "+(TRK.res.warnings||[]).join(";"));
+    let res;
+    if(ENG.ok){
+      const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),120000);
+      const r=await fetch(ENG.url+"/api/v3/chassis/simulate_track",
+        {method:"POST",headers:{"Content-Type":"application/json"},
+         body:JSON.stringify(body),signal:ctl.signal});
+      clearTimeout(to);
+      if(!r.ok){const t=await r.text();throw new Error("HTTP "+r.status+" "+t.slice(0,140));}
+      res=await r.json();
+    }else{
+      await new Promise(r=>setTimeout(r,30));
+      res=TPHYS.run(body, TPHYS.makeSimContext(body));
+      res.ms=0;res.builtin=true;
+    }
+    if(res.status!=="VALID")throw new Error(res.status+" "+(res.warnings||[]).join(";"));
+    TRK.res=res;
     TRK.i=0;TRK.playing=true;TRK.active=true;TRK.ready=true;
     fitTopViewToTrack();
     const sm=TRK.res.summary;
-    setTrkStatus(`完成：${sm.path_length_m}m · v_max ${sm.v_max}m/s · max ${sm.max_ay_g}g · ${TRK.res.ms|0}ms`+
+    setTrkStatus((res.builtin?"[内置JS] ":"")+`完成：${sm.path_length_m}m · v_max ${sm.v_max}m/s · max ${sm.max_ay_g}g · ${TRK.res.ms|0}ms`+
       (TRK.res.finished?"（到达终点）":"（限时截止）"),C.ok);
   }catch(err){setTrkStatus("仿真失败："+err.message,C.nodeFix);}
   finally{if(btn)btn.textContent="运行赛道仿真 RUN";}

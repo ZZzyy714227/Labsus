@@ -87,6 +87,33 @@ ok(/F-04|rck\.lastTheta/.test(fc), 'fullchassis: F-04 摇臂分支最近根连�
 ok(/F-14|\* 2;   \/\* F-14/.test(fc), 'fullchassis: F-14 ackermann track 笔误修正');
 ok(/F-20|simulate\(S\.play\?dt:0\)/.test(fc), 'fullchassis: F-20 暂停真正冻结积分');
 ok(/F-03|拖拽预览保持当前轮跳/.test(fc), 'fullchassis: F-03 拖拽轻量预览路径在位');
+/* Milestone 1 / FSAE 赛道升级新增断言 */
+ok(fc.includes('const TPHYS'), 'fullchassis: TPHYS 闭包存在');
+(function () {
+  const marker = 'const TPHYS = (function(){';
+  const start = fc.indexOf(marker);
+  if (start < 0) { failures.push('fullchassis: TPHYS 闭包不可抽取'); return; }
+  const end = fc.indexOf('\n})();', start);
+  if (end < 0) { failures.push('fullchassis: TPHYS 闭包未闭合'); return; }
+  checks++;
+  try {
+    const sandbox = { console: { log() {}, warn() {}, error() {} }, Math, JSON, isFinite, NaN, Infinity, Number };
+    vm.createContext(sandbox);
+    vm.runInContext(fc.slice(start, end + '\n})();'.length) + '\nthis.__T = TPHYS;', sandbox);
+    const T = sandbox.__T;
+    ok(T && typeof T.run === 'function', 'fullchassis: TPHYS.run 可导出');
+    ok(T && typeof T.makeSimContext === 'function', 'fullchassis: TPHYS.makeSimContext 可导出');
+  } catch (e) {
+    failures.push('fullchassis: TPHYS 闭包求值失败：' + e.message);
+  }
+})();
+ok(/autocross:\{zh:"FSAE 官方 Autocross/.test(fc), 'fullchassis: FSAE Autocross 预设在位');
+ok(/skidpad8:\{zh:"FSAE 官方 8字定圆/.test(fc), 'fullchassis: FSAE 8字定圆 预设在位');
+ok(/accel:\{zh:"FSAE 官方 75m 加速/.test(fc), 'fullchassis: FSAE 75m加速 预设在位');
+ok(/respawnCircuitVehicle/.test(fc), 'fullchassis: 脱轨保险函数 respawnCircuitVehicle 在位');
+ok(/nx:\s*pt\.nx,\s*ny:\s*pt\.ny/.test(fc), 'fullchassis: CircuitPath.getLookahead 导出 nx/ny 法向矢');
+ok(/gt3_sport:/.test(fc), 'fullchassis: GT3 日常运动型 (gt3_sport) 预设在位');
+ok(/baja:\s*\{[\s\S]*?Baja Off-Road - 长行程越野型/.test(fc), 'fullchassis: Baja 长行程越野型预设在位');
 
 // ── B. allinone ────────────────────────────────────────────────
 const ai = readHtml('dwb-pro-allinone.html');
@@ -126,6 +153,10 @@ ok(/F-57|TRK\._acc/.test(ai), 'allinone: F-57 回放倍率时间累积');
 ok(/F-20|simulate\(S\.play\?dt:0\)/.test(ai), 'allinone: F-20 暂停真正冻结积分');
 ok(/F-21|cosCam/.test(ai), 'allinone: F-21 stepDyn 轻量接地点 z');
 ok(/F-04|rck\.lastTheta/.test(ai), 'allinone: F-04 摇臂分支最近根连续性');
+/* Milestone 1 / FSAE 赛道升级新增断言 */
+ok(/autocross:\{zh:"FSAE 官方 Autocross/.test(ai), 'allinone: FSAE Autocross 预设在位');
+ok(/skidpad8:\{zh:"FSAE 官方 8字定圆/.test(ai), 'allinone: FSAE 8字定圆 预设在位');
+ok(/accel:\{zh:"FSAE 官方 75m 加速/.test(ai), 'allinone: FSAE 75m加速 预设在位');
 
 // ── 结果 ───────────────────────────────────────────────────────
 if (failures.length) {
