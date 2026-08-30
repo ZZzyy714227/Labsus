@@ -76,19 +76,21 @@ def steering_camber_gain(camber_0: float, camber_1: float,
 
 
 def bump_steer_deg_per_25(toe_curve, travel_curve, at_travel: float) -> MetricResult:
-    """Bump Steer：Δtoe/Δtravel，归一化 °/25mm（中央差分）。"""
-    idx = min(range(len(travel_curve)),
-              key=lambda i: abs(float(travel_curve[i]) - at_travel))
-    slope = _slope_at(toe_curve, [float(t) for t in travel_curve], idx)
+    """Bump Steer：Δtoe/Δtravel，归一化 °/25mm。
+
+    F-12（2026-08-30）：数值内核委托 metrics/kandc.slope_at_travel（最近邻
+    中央差分单一实现），不再维护第二份 _slope_at 差分逻辑。
+    """
+    from src.metrics.kandc import slope_at_travel
+    slope = slope_at_travel(toe_curve, travel_curve, at_travel)
     if slope is None:
         return solver_failed("bump_steer", "deg/25mm", "扫掠曲线不足以计算导数")
     return ok(slope[0] * 25.0, "deg/25mm")
 
 
 def camber_gain_deg_per_25(camber_curve, travel_curve, at_travel: float) -> MetricResult:
-    idx = min(range(len(travel_curve)),
-              key=lambda i: abs(float(travel_curve[i]) - at_travel))
-    slope = _slope_at(camber_curve, [float(t) for t in travel_curve], idx)
+    from src.metrics.kandc import slope_at_travel
+    slope = slope_at_travel(camber_curve, travel_curve, at_travel)
     if slope is None:
         return solver_failed("camber_gain", "deg/25mm", "扫掠曲线不足以计算导数")
     return ok(slope[0] * 25.0, "deg/25mm")

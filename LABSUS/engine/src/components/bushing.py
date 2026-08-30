@@ -27,10 +27,30 @@ class Curve:
             x = np.asarray(self.xs, float); y = np.asarray(self.ys, float)
             if len(x) < 2:
                 raise ValueError(f"table/spline curve requires >=2 points, got {len(x)}")
+            # F-66（2026-08-30）：x 非严格递增 → PchipInterpolator 静默抛错（仅 422
+            # 兜底）。改为显式校验并给出明确错误信息。
+            if np.any(np.diff(x) <= 0):
+                raise ValueError(
+                    f"curve xs must be strictly increasing, got non-monotonic: {x.tolist()}")
             lo, hi = float(x[0]), float(x[-1])
             p = PchipInterpolator(x, y)
-            def _f(v): return p(np.clip(np.asarray(v, float), lo, hi))
-            def _d(v): return p.derivative()(np.clip(np.asarray(v, float), lo, hi))
+            # F-66（2026-08-30）：越界不再 np.clip —— 旧实现 clip 后表外刚度按端点
+            # 值恒等（导数≈0），衬套表现为"屈服变软"（物理相反，且无警告）。
+            # 改为端点斜率线性外推：表外仍保持端点刚度 k0/k1（硬化持续），
+            # 边界行为物理连续（f(lo)=y0、f'(lo)=k0）。
+            k0 = float(p.derivative()(lo))
+            k1 = float(p.derivative()(hi))
+            y0, y1 = float(y[0]), float(y[-1])
+            def _f(v):
+                v = np.asarray(v, float)
+                return np.where(v < lo, y0 + k0 * (v - lo),
+                                np.where(v > hi, y1 + k1 * (v - hi),
+                                         p(np.clip(v, lo, hi))))
+            def _d(v):
+                v = np.asarray(v, float)
+                return np.where(v < lo, k0,
+                                np.where(v > hi, k1,
+                                         p.derivative()(np.clip(v, lo, hi))))
             return _f, _d
         raise ValueError(f"unknown curve kind {self.kind}")
 

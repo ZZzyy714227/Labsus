@@ -26,6 +26,7 @@ from src.solver.compliance import solve_compliance_full
 from src.solver.forces import QSLoad
 from src.solver.mechanism.models import build_mechanism
 from src.solver.mechanism.solver import solve_pose
+from src.metrics.kandc import _slope  # F-13：单一差分内核（全局共用）
 
 R2D = 180.0 / math.pi
 
@@ -419,7 +420,6 @@ def run_compliance(req: KandcRequest) -> KandcResponse:
 
 def run_pose(req: PoseRequest) -> PoseResponse:
     points = req.points or DEFAULT_DWB_POINTS
-    bushings = make_bushings([], points)
     t0 = time.perf_counter()
     mech = _new_mech(points, arch=req.arch)
     rep = solve_pose(mech, req.travel, req.rack)
@@ -448,12 +448,3 @@ def _merge_status(statuses: set[str]) -> str:
     if "APPROXIMATE" in statuses:
         return "APPROXIMATE"
     return "VALID"
-
-
-def _slope(y, x, at: float) -> float:
-    """中心差分斜率（与 metrics/kandc._slope 同款，供本模块内部用）。"""
-    x = np.asarray(x, float)
-    y = np.asarray(y, float)
-    if len(x) < 2:
-        return 0.0
-    return float(np.interp(at + 2.0, x, y) - np.interp(at - 2.0, x, y)) / 4.0

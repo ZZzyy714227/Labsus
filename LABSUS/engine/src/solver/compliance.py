@@ -26,7 +26,7 @@ import time
 import numpy as np
 from scipy.optimize import least_squares
 
-from src.components.bushing import Bushing6DOF, bush_force
+from src.components.bushing import Bushing6DOF, bush_force, bush_force_jac
 from src.solver.mechanism.solver import solve_pose
 from src.solver.compliance_transform import apply_bushing_to_anchors
 
@@ -193,7 +193,18 @@ def solve_compliance(
             r[6 * k: 6 * k + 6] = f_ext - bush_force(bushings[n], d[n])
         return r
 
-    # ── 外层求解：scipy TRF ──
+    # F-65（2026-08-30）：解析雅可比接线 —— bush_force_jac 此前完整实现却
+    # 无人调用，外层 TRF 全程数值差分（每迭代 (6·nd+1) 次残差评估 × 每次
+    # 内层 200-nfev 机构重解，多衬套时 O(nd) 恶化）。解析雅可比为块对角：
+    #   ∂r_k/∂δ_k = -J_bush,k（衬套独立；耦合矩阵在 bush_force_jac 内生效）
+    def _residual_jac(x: np.ndarray) -> np.ndarray:
+        d = _unpack(x)
+        J = np.zeros((6 * nd, 6 * nd))
+        for k, n in enumerate(names):
+            J[6 * k: 6 * k + 6, 6 * k: 6 * k + 6] = -bush_force_jac(bushings[n], d[n])
+        return J
+
+    # ── 外层求解：scipy TRF（解析雅可比）──
     x0 = np.zeros(6 * nd)
     trf_nfev = 0
     try:
@@ -201,6 +212,7 @@ def solve_compliance(
             _residual, x0, method="trf", max_nfev=max_nfev,
             xtol=1e-8, ftol=1e-8, gtol=1e-8,
             x_scale=np.ones(6 * nd) * max_disp_step,
+            jac=_residual_jac,
         )
         trf_nfev = int(res.nfev)
     except Exception:
@@ -278,15 +290,22 @@ def solve_compliance_full(
     rack: float,
     mk_links=None,
     cp_rel=None,
+    tire_radius: float | None = None,
 ) -> ComplianceSolverResult:
     """K&C 全链路：接地点外载 →（二力杆静力）→ 锚点合力 → solve_compliance。
 
     mk_links: (mech) -> list[LinkForce] 回调；默认构造 PUSH(UP4→CH5) +
               LCA 前/后杆(CH3/CH4→UP2) + UCA 前/后杆(CH1/CH2→UP1)。
-    cp_rel: 接地点相对轮心（默认 [0,0,-320] 近似，标注 APPROXIMATE）。
+    cp_rel: 接地点相对轮心（默认 [0,0,-tire_radius]；tire_radius 缺省 325，
+            与 API v3models.CaseLoad/KandcRequest.tire_radius 默认一致——
+            F-64：旧默认 [0,0,-320] 与 API 默认 325 自相矛盾）。
+    tire_radius: 轮胎半径 mm，仅用于派生默认 cp_rel。
 
-    依赖 T5 corner_to_anchor_loads 返回 {杆id: 锚点合力}；本函数把杆车身端映射到
-    mech 节点名（位置 allclose 匹配），按节点聚合后传入 solve_compliance 的 loads。
+    F-64（2026-08-30）：状态机兑现 docstring 承诺——
+    - 超静定力残差（corner.residual）非零 → APPROXIMATE（根因：最小范数解
+      是近似仲裁，非精确刚度分配）；
+    - 外力矩折算到轮心后的残余 moment_residual 非零 → APPROXIMATE（球铰
+      模型无法平衡力矩），并在返回值上携带说明（warnings 合并入 status）。
     """
     from src.solver.forces import LinkForce, corner_to_anchor_loads, _chassis_end
 
@@ -309,23 +328,32 @@ def solve_compliance_full(
 
     # 3) 接地点外载 → 各杆轴向力 → 车身锚点合力
     hub_point = mech.node(mech.wheel).pos.copy()
-    _cp = cp_rel if cp_rel is not None else np.array([0.0, 0.0, -320.0])
-    corner = corner_to_anchor_loads(case, links, hub_point=hub_point, cp_rel=_cp)
+    if cp_rel is None:
+        cp_rel = np.array([0.0, 0.0, -(tire_radius if tire_radius is not None else 325.0)])
+    corner = corner_to_anchor_loads(case, links, hub_point=hub_point, cp_rel=cp_rel)
 
-    # 4) 杆车身端 → 节点名（位置 allclose 匹配）
+    # 4) 杆车身端 → 节点名（F-63 修复，2026-08-30：atol 由 1.0 收紧到 1e-6 并
+    #    做唯一性校验；匹配失败抛异常——宁可显式 422/500，不可静默零载荷。
+    #    旧实现 allclose(atol=1.0) 失败时返回 "" → per_node 缺键 → 衬套载荷 0，
+    #    compliance toe 恒 0 而表面"正常"）
     def _node_name(pos: np.ndarray) -> str:
-        for nm, nd in mech.nodes.items():
-            if np.allclose(nd.pos, pos, atol=1.0):
-                return nm
-        return ""
+        hits = [nm for nm, nd in mech.nodes.items()
+                if float(np.linalg.norm(np.asarray(nd.pos, float) - pos)) < 1e-6]
+        if len(hits) > 1:
+            raise ValueError(
+                f"compliance: 锚点位置与多个节点重合 {hits}（间距<1e-6mm），无法唯一映射")
+        if not hits:
+            raise ValueError(
+                f"compliance: 杆车身端锚点 {np.round(np.asarray(pos, float), 2).tolist()} "
+                "无法映射到机构节点（位置不重合）——载荷映射失败必须显式报错")
+        return hits[0]
 
     # 5) 按节点聚合力（anchor_loads 值已是车身端力，直接累加）
     per_node: dict[str, np.ndarray] = {}
     for l in links:
         end = _chassis_end(l, hub_point)
         nm = _node_name(end)
-        if nm:
-            per_node[nm] = per_node.get(nm, np.zeros(3)) + corner.anchor_loads.get(l.id, np.zeros(3))
+        per_node[nm] = per_node.get(nm, np.zeros(3)) + corner.anchor_loads.get(l.id, np.zeros(3))
 
     # 6) 衬套载荷映射：{衬套名: 对应成员节点合力}
     loads: dict[str, np.ndarray] = {}
@@ -334,5 +362,14 @@ def solve_compliance_full(
         loads[name] = per_node.get(node, np.zeros(3))
 
     # 7) 调用 T4 求解器
-    return solve_compliance(mech, bushings=bushings, loads=loads,
-                            load=np.zeros(3), travel=travel, rack=rack)
+    res = solve_compliance(mech, bushings=bushings, loads=loads,
+                           load=np.zeros(3), travel=travel, rack=rack)
+
+    # F-64（2026-08-30）：状态机兑现 docstring 承诺——超静定最小范数残差与
+    # 力矩折算残余无法由二力杆/球铰模型精确闭合，条件满足时降级 APPROXIMATE。
+    if res.status in ("VALID", "APPROXIMATE"):
+        if corner.residual > 1e-6:
+            res.status = "APPROXIMATE"
+        if corner.moment_residual > 1e-6:
+            res.status = "APPROXIMATE"
+    return res
