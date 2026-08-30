@@ -602,7 +602,8 @@ function buildMech(axis){
   const rocker={
     iAxA:idx.RCK_AX_A, iAxB:idx.RCK_AX_B,
     iInNode:idx.STRUT_IN, iDmpNode:idx.RCK_DMP, iOutNode:idx.STRUT_OUT,
-    relIn:relIn, relDmp:relDmp, rodL0:strutRod.L0, angle:0
+    relIn:relIn, relDmp:relDmp, rodL0:strutRod.L0, angle:0,
+    lastTheta:null   /* F-04（2026-08-30）：摇臂根分支连续性（与 fullchassis 同步） */
   };
 
   const camb=state.cam0*D2R, toe=state.toe0*D2R;
@@ -676,7 +677,19 @@ function projRockerStrut(M, rck){
   const A=2*dot(d0,rPerp), B=2*dot(d0,vPerp), C=rck.rodL0*rck.rodL0 - dot(d0,d0) - R_r*R_r;
   const hyp=Math.hypot(A, B);
   if(hyp<1e-9) return;
-  const cosPsi=clamp(C/hyp, -1, 1), psi=acos(cosPsi), phi=atan2(B, A), branch=phi>=0?1:-1, theta=phi - branch*psi;
+  const cosPsi=clamp(C/hyp, -1, 1), psi=acos(cosPsi), phi=atan2(B, A);
+  /* F-04（2026-08-30）：摇臂双根分支连续性——与 fullchassis 同步：
+     用上一步 θ 在 θ=φ±ψ 两根中选最近根，避免跨 φ=0 时瞬间跳支。 */
+  const thA=phi-psi, thB=phi+psi;
+  let theta;
+  if(rck.lastTheta===null||rck.lastTheta===undefined){
+    theta=(phi>=0?thA:thB);
+  }else{
+    const dA=Math.abs(((thA-rck.lastTheta+PI)%(2*PI)+2*PI)%(2*PI)-PI);
+    const dB=Math.abs(((thB-rck.lastTheta+PI)%(2*PI)+2*PI)%(2*PI)-PI);
+    theta=(dA<=dB?thA:thB);
+  }
+  rck.lastTheta=theta;
   rck.angle=theta;
   const ct=cos(theta), st=sin(theta);
   const pIn=add(oAxis,add(rPara,add(mul(rPerp,ct),mul(vPerp,st))));
@@ -694,7 +707,7 @@ function residual(M,drvZ){
   for(let k=0;k<M.L.length;k++){
     const l=M.L[k];if(l.type!=="R"||!coreLinks.includes(l.id))continue;
     const d=abs(dst(M.n[l.a].p,M.n[l.b].p)-l.L0);
-    if(d>r)r=d;
+    if(!(d<=r))r=d;   /* F-01（2026-08-30）：NaN 安全——`if(d>r)` 对 NaN 恒 false */
   }
   if(drvZ!==null&&drvZ!==undefined) r=Math.max(r,abs(M.n[M.idx.WC].p[2]-drvZ));
   return r;
@@ -714,7 +727,8 @@ function solveKin(M,drvZ,maxIt,tol){
     if((it&3)===3){res=residual(M,drvZ); if(res<tol){it++;break;}}
   }
   res=residual(M,drvZ);
-  M.res=res;M.iter=it;M.ms=performance.now()-t0;M.ok=res<0.025;
+  if(!isFinite(res))res=Infinity;   /* F-01/F-05：NaN 残差显式升级为 ∞ */
+  M.res=res;M.iter=it;M.ms=performance.now()-t0;M.ok=isFinite(res)&&res<0.025;
   return res;
 }
 
@@ -1046,8 +1060,14 @@ function stepDyn(M,dt,rack,tSim,axis){
     if(tr>S.bsU){const x=tr-S.bsU;M.n[iW].f[2]-=kBS*x*x/20;}
     if(tr<-S.bsD){const x=-S.bsD-tr;M.n[iW].f[2]+=kBS*x*x/20;}
 
-    const mm=metrics(M,axis);
-    pen=rz-mm.cp[2];
+    /* F-21（2026-08-30）：子步内原调 full metrics()（10 子步×4 机构 = 40 次/帧，
+       含 isect2/arbGeom 等全部开销），实际只需接地点 z。轻量版：轮心 z − R·cos(cam)，
+       cos(cam) 由转向节刚体旋转 × 设计轮向实时给出（与 metrics 的 cp[2] 数学一致，
+       无近似误差）。 */
+    const KN0=M.cl[2], Rq=KN0.R||qM(KN0.q), axv=mApply(Rq,M.axL);
+    const cosCam=Math.sqrt(Math.max(0,1-axv[2]*axv[2]));
+    const cp2=M.n[iW].p[2]-state.tire.R*cosCam;
+    pen=rz-cp2;
     if(pen>0){
       const vz=M.n[iW].v[2];
       let fz=kT*pen+cT*(rzv-vz); if(fz<0)fz=0;
@@ -2421,7 +2441,7 @@ function drawHUD(v){
 const PICK=[];
 const UI={hover:null,selHP:null,drag:null,ro:{},sync:[],plots:[]};
 
-function E(t,c,h){const e=document.createElement(t);if(c)e.className=c;if(h!==undefined)e.innerHTML=h;return e;}
+function E(t,c,h){const e=document.createElement(t);if(c)e.className=c;if(h!==undefined)e.textContent=h;return e;} /* F-44（2026-08-30）：innerHTML→textContent，引擎响应入 DOM 不再有 XSS 面 */
 function sec(host,zh,en,col,cls){
   const s=E("div","sec"+(col?" col":""));
   const h=E("div","sh"+(cls?" "+cls:""),'<span class="zh">'+zh+'</span>'+en+'<span class="tg"></span>');
@@ -3263,7 +3283,7 @@ function updateSweeps(){
   SIM.mrRefR = Math.max(0.05, sampleSweep(SIM.swR, 0, "mr") || 0.75);
 }
 
-let _last=0,_fps=0,_fc=0,_ft=0;
+let _last=0,_fps=0,_fc=0,_ft=0,_stageAutoDone=false;
 function loop(ts){
   const dt=Math.min(0.045,_last?(ts-_last)/1000:0.016);_last=ts;
   if(S.play){
@@ -3276,14 +3296,21 @@ function loop(ts){
     }
   }
   updateSweeps();
-  try{simulate(dt);}catch(err){console.error(err);S.play=false;}
+  /* F-20（2026-08-30）：暂停必须真正冻结时域积分——旧实现 simulate(dt) 无条件
+     调用，rig 模式下暂停时 stepDyn 仍以真实 dt 积分。传 S.play?dt:0 使暂停时
+     积分步长为零（kin/quasi 分支 driveTo 依旧刷新显示，姿态冻结）。 */
+  try{simulate(S.play?dt:0);}catch(err){console.error(err);S.play=false;}
   drawAll();updateReadouts();drawPlots();
   UI.sync.forEach(f=>f());
 
   _fc++;_ft+=dt;
   if(_ft>0.4){_fps=_fc/_ft;_fc=0;_ft=0;document.getElementById("tbFps").textContent=fmt(_fps,0);}
   requestAnimationFrame(loop);
-if(location.search.indexOf("stagedemo")>=0){setTimeout(function(){_stageOpenSetup();setTimeout(function(){trackStageRun();},300);},800);}else if(location.search.indexOf("stage")>=0){setTimeout(function(){_stageOpenSetup();},800);}
+  /* F-51（2026-08-30）：定时器移出循环体语义——一次性 flag，只触发一次。 */
+  if(!_stageAutoDone){
+    if(location.search.indexOf("stagedemo")>=0){_stageAutoDone=true;setTimeout(function(){_stageOpenSetup();setTimeout(function(){trackStageRun();},300);},800);}
+    else if(location.search.indexOf("stage")>=0){_stageAutoDone=true;setTimeout(function(){_stageOpenSetup();},800);}
+  }
 }
 
 
@@ -3294,7 +3321,7 @@ if(location.search.indexOf("stagedemo")>=0){setTimeout(function(){_stageOpenSetu
 const TRK={
   res:null, req:null, mu:8000/3500,
   playing:false, i:0, speed:1.0, active:false, ready:false,
-  preset:"skidpad", custom:null
+  preset:"skidpad", custom:null, lookahead:0.9   /* F-54（2026-08-30）：预瞄增益真状态 */
 };
 const TRACK_PRESETS={
   skidpad:{zh:"稳态定圆 R=30m",closed:true,v:12.0,pts:(function(){
@@ -3316,7 +3343,7 @@ function trackPayload(){
   return {vehicle:base.vehicle,
     kc_luts:{front:lut(SIM.swF),rear:lut(SIM.swR)},
     track:pts, dt:0.01, sim_time:25.0,
-    lookahead_gain:parseFloat(document.getElementById("trkLook").value)||0.9,
+    lookahead_gain:TRK.lookahead,   /* F-54：真状态，非 DOM 死读 */
     start_speed:parseFloat(document.getElementById("trkV0").value)||6.0, _closed:closed};
 }
 async function trackRun(){
@@ -3361,8 +3388,15 @@ function applyTrackFrame(i){
 function trackStep(dt){
   if(!TRK.res||!TRK.playing)return;
   const n=TRK.res.trace.length;
-  const adv=Math.max(1,Math.round(dt*TRK.speed/TRK.res.t[1]||0.01));
-  const ni=Math.min(n-1,TRK.i+adv);
+  /* F-57（2026-08-30）：回放倍率不再随刷新率漂移——旧实现
+     adv=round(dt·speed/Δt)，60Hz 下 dt≈0.0167、Δt=0.01 → round 恒 2 → 2 倍速。
+     改为累积时间基：acc += dt·speed，每积满一个仿真帧步推进一帧。 */
+  if(!TRK.res.t||TRK.res.t.length<n)return;
+  const fstep=TRK.res.t[1]-TRK.res.t[0]||0.01;
+  TRK._acc=(TRK._acc||0)+dt*TRK.speed;
+  let steps=Math.floor(TRK._acc/fstep);
+  TRK._acc-=steps*fstep;
+  const ni=Math.min(n-1,TRK.i+Math.max(1,steps));
   applyTrackFrame(ni);
   if(ni>=n-1){TRK.playing=false;}
   syncTrackUI();
@@ -3712,9 +3746,10 @@ const TPHYS = (function(){
     this.hr_=Math.abs(v.rear.points.WC[0])/1000;
     this.pos={FR:[this.a,+this.hf],FL:[this.a,-this.hf],RR:[-this.b,+this.hr_],RL:[-this.b,-this.hr_]};
     this.iz=body.iz_kg_m2||v.mass_kg*(this.L*this.L+1.6*1.6)/12;
-    this.LsT=this.Ls;
+    this.LsT=Math.max(0.3,this.Ls);   /* F-24：σ 地板 0.3m，与 Python max(0.3,Ls) 对齐 */
     this.rollDeg=0; this.pitchDeg=0; this.prevAy=0; this.prevAx=0; this.tNow=0;
     this.alphaLat={FR:0,FL:0,RR:0,RL:0};
+    this._aStT={FR:0,FL:0,RR:0,RL:0};   /* F-22：侧偏目标缓存（derivs 只记录不推进） */
     this.lutF=body.kc_luts&&body.kc_luts.front||{};
     this.lutR=body.kc_luts&&body.kc_luts.rear||{};
     this.rc=ctx.rc; this.kw=ctx.kw;
@@ -3724,9 +3759,11 @@ const TPHYS = (function(){
     const v2=vx*vx; return [kf*v2,kr*v2,kd*v2];
   };
   Veh.prototype.loads=function(vx){
-    const [df,dr]=this._aero(vx);
+    /* 勘误（2026-08-30，F-23 复核）：dnf/dnr 是前/后轴下压力，阻力不入垂向载荷
+       （阻力在 derivs 单独作用于 Fx）——审查报告误读 dr 为 drag，物理本就正确。 */
+    const [dnf,dnr]=this._aero(vx);
     return quasiLoads(this.v, this.prevAy/G, this.prevAx/G,
-      df+dr, df/(df+dr||1), this.rc, this.kw);
+      dnf+dnr, dnf/(dnf+dnr||1), this.rc, this.kw);
   };
   Veh.prototype.steer=function(delta){
     if(Math.abs(delta)<1e-6)return {FR:0,FL:0};
@@ -3747,11 +3784,13 @@ const TPHYS = (function(){
     const spd=Math.hypot(vwx,vwy);
     const ts=this.alphaLat;
     if(spd<0.8||fz<=1){
-      ts[w]=0;
-      return {fx:0,fy:0,alpha:0,alphaL:0,toe:toeDeg,cam:camRad*R2D,fz:fz,muUse:0};
+      this._aStT[w]=ts[w];   /* 失活轮：松弛目标=当前值（状态冻结，与 Python 对齐） */
+      return {fx:0,fy:0,alpha:0,alphaL:ts[w]*R2D,toe:toeDeg,cam:camRad*R2D,fz:fz,muUse:0};
     }
     const aSt=Math.atan2(vwy,Math.max(Math.abs(vwx),0.5));
-    ts[w]+=dt*(vx/this.LsT)*(aSt-ts[w]);
+    /* F-22/F-24（2026-08-30）：derivs 保持纯函数——只记录侧偏目标不推进状态
+       （RK2 中间评估不得污染滞后状态）；推进在 step() 末尾用解析精确解。 */
+    this._aStT[w]=aSt;
     const aLat=ts[w];
     const muFz=this.mu*fz;
     let fy=-this.fy(aLat,fz);
@@ -3778,13 +3817,12 @@ const TPHYS = (function(){
             fz:fz, muUse:muUse};
   };
   Veh.prototype.derivs=function(s,delta,thr,brk,dt){
+    /* 纯函数导数（F-22 修复，2026-08-30）：不再推进 rollDeg/pitchDeg/alphaLat——
+       旧实现让 RK2 的 k1/k2 各推一次滞后，τ_eff 减半且中点状态被污染。
+       滞后推进统一移到 step() 末尾。 */
     const vx=s[3],vy=s[4],r=s[5];
     const L=this.loads(vx);
     this._rollSs=L.rollDeg;
-    const tr=0.18;
-    this.rollDeg+=(this._rollSs-this.rollDeg)*(dt/tr);
-    const pSs=Math.atan2(this.prevAx,G)*R2D*0.55;
-    this.pitchDeg+=(pSs-this.pitchDeg)*(dt/0.25);
     const st=this.steer(delta);
     let Fx=0,Fy=0,Mz=0,camRow={};
     for(const w of _W){
@@ -3813,12 +3851,20 @@ const TPHYS = (function(){
     s2[2]+=dt*s2[5];
     this.prevAx=k2.d[3]-s2[5]*s2[4];
     this.prevAy=k2.d[4]+s2[5]*s2[3];
+    /* —— 滞后状态推进（F-22：移出 derivs，每 RK2 步只积分一次）—— */
+    this.rollDeg+=(this._rollSs-this.rollDeg)*(dt/0.18);
+    const pSs=Math.atan2(this.prevAx,G)*R2D*0.55;
+    this.pitchDeg+=(pSs-this.pitchDeg)*(dt/0.25);
+    /* —— 松弛滞后（F-24：解析精确解 1−e^(−dt·vx/σ)，无条件稳定）—— */
+    const sig=Math.max(0.3,this.LsT);
+    const vxNow=Math.max(s2[3],0);
+    for(const w of _W) this.alphaLat[w]+=(this._aStT[w]-this.alphaLat[w])*(1-Math.exp(-dt*vxNow/sig));
     this.tNow+=dt;
     return {s:s2, diag:k2.diag};
   };
   // --- driver (pure pursuit + PI) ---
   function DriverPI(gain){ this.gain=gain; this.ei=0; }
-  DriverPI.prototype.call=function(track,s,idx,vT,L){
+  DriverPI.prototype.call=function(track,s,idx,vT,L,dt){
     const x=s[0],y=s[1],psi=s[2],vx=s[3];
     // closest idx
     let best=idx,bd=Infinity;
@@ -3845,7 +3891,7 @@ const TPHYS = (function(){
     const al=Math.atan2(ly,Math.max(lx,1));
     const delta=Math.atan2(2*L*Math.sin(al),ld);
     const e=vT-vx;
-    this.ei=Math.max(-2,Math.min(2,this.ei+e*0.05));
+    this.ei=Math.max(-2,Math.min(2,this.ei+e*(dt||0.05)));   /* F-27：按真实 dt 缩放 */
     const thr=Math.max(0,Math.min(1,0.9*e+0.12*this.ei));
     const brk=e<-0.5?Math.max(0,Math.min(1,-0.9*e-0.15)):0;
     return [delta,thr,brk,idx];
@@ -3872,7 +3918,7 @@ const TPHYS = (function(){
     for(let k=0;k<nSteps;k++){
       const t=k*dt;
       const vT=tgt[Math.min(idx,tgt.length-1)];
-      const [delta,thr,brk,nidx]=drv.call(track,s,idx,vT,L);
+      const [delta,thr,brk,nidx]=drv.call(track,s,idx,vT,L,dt);
       idx=nidx;
       let t2=thr, b2=brk;
       if(thr<0.02&&brk<0.02&&Math.abs(vT-s[3])>0.5)t2=0.05;
@@ -3927,9 +3973,44 @@ const TPHYS = (function(){
     const rF=col(SIM.swF,"rcH",55), rR=col(SIM.swR,"rcH",63);
     const kwF=col(SIM.swF,"kw",(v.front.spring_rate||60)*(v.front.motion_ratio||0.75)**2);
     const kwR=col(SIM.swR,"kw",(v.rear.spring_rate||65)*(v.rear.motion_ratio||0.78)**2);
+    /* F-28（2026-08-30）：TPHYS 不再忽略 ARB —— 用 body.vehicle 的稳定杆参数
+       按 arbRate(0.55) 同口径折算等效侧倾刚度 karb_f/karb_r（与 solveQuasiStatic
+       及引擎 chassis.arb_rate 一致：k = kt/a²·mr²，再经 1000·t²/2 折算进 kphi）。
+       注意：对拍场景由测试端注入 ctx（Python axle_rc_sweep 同源），此处仅
+       页面内置 TPHYS 默认路径生效。 */
+    const arbK=(ax)=>{const ab=ax.arb||{};const d=ab.d||0;
+      if(d<=0.5)return 0;
+      const J=Math.PI*Math.pow(d,4)/32;
+      const F=ax.points?ax.points.LCA_F:null;
+      const B=ax.points?ax.points.LBJ:null;
+      if(!F||!B)return 0;
+      /* 与页面 arbGeom/arbRate(0.55) 逐行一致（F-28：闭包内无法复用全局函数，
+         对拍 ctx 由测试端注入 Python 同源值，不影响一致性） */
+      const t=ab.t||0.55, dy=ab.dy||50, dz=ab.dz||120, G=ab.G||79000;
+      const P0=[F[0]+(B[0]-F[0])*t, F[1]+(B[1]-F[1])*t, F[2]+(B[2]-F[2])*t];
+      const xa=P0[0], ay=F[1]+dy, az=F[2]+dz;
+      const a=ay-P0[1];
+      const E0=[xa, ay-a, az];
+      const ldl=Math.hypot(E0[0]-P0[0],E0[1]-P0[1],E0[2]-P0[2]);
+      const P=[F[0]+(B[0]-F[0])*t, F[1]+(B[1]-F[1])*t, F[2]+(B[2]-F[2])*t];
+      const A=ay-P[1], Bz=az-P[2], R=Math.hypot(A,Bz);
+      const K=(xa-P[0])**2+A*A+Bz*Bz+a*a-ldl*ldl;
+      const c=Math.max(-1,Math.min(1,K/(2*a*R||1e-9)));
+      const f0=Math.atan2(Bz,A), sg=Math.atan2(az-P0[2],ay-P0[1])>=0?1:-1;
+      const psi=f0-sg*Math.acos(c);
+      void [xa, ay, az, E0, P, A, Bz, R, K, c, f0, sg, psi];   /* 保持结构可读 */
+      const L=2*xa;
+      const kt=G*J/(L||1e-9);
+      return kt/(a*a)*0.55*0.55;   /* mr_arb=0.55 校准值（第六讲，双端一致） */
+    };
+    const kf=arbK(v.front), kr=arbK(v.rear);
+    const tF=(Math.abs((v.front.points&&v.front.points.WC[0])||750)*2)/1000;
+    const tR=(Math.abs((v.rear.points&&v.rear.points.WC[0])||750)*2)/1000;
     return {
       rc:{travel:rF.travel,rcF:rF.vals,rcR:rR.vals,
-          zrc0_f:(SIM.mFR&&SIM.mFR.rcH)||55,zrc0_r:(SIM.mRR&&SIM.mRR.rcH)||63,karb_f:0,karb_r:0},
+          zrc0_f:(SIM.mFR&&SIM.mFR.rcH)||55,zrc0_r:(SIM.mRR&&SIM.mRR.rcH)||63,
+          /* F-28：ARB 等效侧倾刚度注入（k[kgf/mm]→kphi: 1000·t²/2 折算） */
+          karb_f:kf*1000*(tF*tF)/2,karb_r:kr*1000*(tR*tR)/2},
       kw:{travel:kwF.travel,kwF:kwF.vals,kwR:kwR.vals}
     };
   }
@@ -4056,8 +4137,13 @@ function stageTick(ts){
   }
   if(STAGE.playing&&STAGE.trace){
     const n=STAGE.trace.length;
-    const adv=Math.max(1,Math.round(dt*STAGE.speed/(STAGE.tMax/Math.max(1,n-1))));
-    STAGE.i+=adv;
+    /* F-57（2026-08-30）：STAGE 回放倍率同 trackStep 修复——时间累积基，
+       不再 round(dt·speed/Δt) 使 60Hz 下恒 2× 漂移。 */
+    const fstep=STAGE.tMax/Math.max(1,n-1);
+    STAGE._acc=(STAGE._acc||0)+dt*STAGE.speed;
+    let nSteps=Math.floor(STAGE._acc/fstep);
+    STAGE._acc-=nSteps*fstep;
+    STAGE.i+=Math.max(1,nSteps);
     if(STAGE.i>=n-1){STAGE.i=0;if(!STAGE.loop){STAGE.playing=false;STAGE.i=n-1;}}
   }
   const row=STAGE.trace[Math.min(STAGE.i,STAGE.trace.length-1)];
@@ -4173,13 +4259,20 @@ function buildTrackPanel(host){
       else{pts=rd.result.trim().split(/\r?\n/).slice(1).map(ln=>{
         const c=ln.split(/[;,\t]/).map(parseFloat);return {x:c[0],y:c[1],target_speed:c[2]||12};});}
       if(!Array.isArray(pts)||pts.length<2)throw new Error("至少 2 个路点");
+      /* F-38（2026-08-30）：字段校验 —— 旧实现接受 [[x,y]] 数组，下游 p.x
+         undefined → NaN 路点静默发散；必须为 {x,y} 对象 / [x,y] 数组且有限。 */
+      pts=pts.map(p=>Array.isArray(p)?{x:p[0],y:p[1],target_speed:p[2]||12}:p)
+        .map(p=>({x:Number(p.x),y:Number(p.y),target_speed:(p.target_speed===undefined||p.target_speed===null)?12:Number(p.target_speed)}))
+        .filter(p=>isFinite(p.x)&&isFinite(p.y)&&isFinite(p.target_speed)&&p.target_speed>=0);
+      if(pts.length<2)throw new Error("有效路点不足 2 个（x/y 必须为有限数）");
       TRK.custom=pts;TRK.preset="custom";sel.value="custom";
       setTrkStatus("自定义赛道已载入 "+pts.length+" 点",C.ok);
     }catch(e){setTrkStatus("导入失败："+e.message,C.nodeFix);}};
     rd.readAsText(f);};
   b.appendChild(fr);
   rowBtns(b,[["导入 JSON/CSV 路点",()=>fr.click(),()=>TRK.preset==="custom"]]);
-  rowSlider(b,"预瞄增益","LOOKAHEAD GAIN","",0.4,1.5,0.05,()=>0.9,v=>{},2);
+  /* F-54（2026-08-30）：预瞄增益不再恒 0.9 死控件——绑定 TRK.lookahead */
+  rowSlider(b,"预瞄增益","LOOKAHEAD GAIN","",0.4,1.5,0.05,()=>TRK.lookahead,v=>{TRK.lookahead=v;},2);
   const ls=b.querySelectorAll("input[type=range]");ls[0].id="trkLook";
   const rowV=E("div","ctl");
   rowV.appendChild(E("label",null,'初速 <u>START V</u> [m/s]'));
