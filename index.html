@@ -1,26 +1,23 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LABSUS 悬架实验室 · 全车底盘多体运动学、4-Post动力学与准静态操稳分析平台</title>
+<title>LABSUS 鎮灦瀹為獙瀹?路 鍏ㄨ溅搴曠洏澶氫綋杩愬姩瀛︺€?-Post鍔ㄥ姏瀛︿笌鍑嗛潤鎬佹搷绋冲垎鏋愬钩鍙?/title>
 <style>
 /* ============================================================
-   LABSUS 悬架实验室 · Apple 液态玻璃拟态工作台 (Liquid Glass)
-   主色：普鲁士蓝 / 奶杏 / 酒红 · 低饱和复古辅助色组（灰靛蓝 / 陶土棕 /
-   鼠尾灰绿 / 雾蓝灰 / 暗铜金 / 蜜橘赭 / 灰薰紫 / 雾茶）
-   支持浅色（奶杏米白基底）与深色（深普鲁士蓝灰基底）双主题自动适配，
-   SF 风格无衬线 + 等宽数值 · 大圆角卡片 · 磨砂玻璃 · 柔和弥散阴影。
-   ============================================================ */
+   LABSUS 鎮灦瀹為獙瀹?路 Apple 娑叉€佺幓鐠冩嫙鎬佸伐浣滃彴 (Liquid Glass)
+   涓昏壊锛氭櫘椴佸＋钃?/ 濂舵潖 / 閰掔孩 路 浣庨ケ鍜屽鍙よ緟鍔╄壊缁勶紙鐏伴潧钃?/ 闄跺湡妫?/
+   榧犲熬鐏扮豢 / 闆捐摑鐏?/ 鏆楅摐閲?/ 铚滄璧?/ 鐏拌柊绱?/ 闆捐尪锛?   鏀寔娴呰壊锛堝ザ鏉忕背鐧藉熀搴曪級涓庢繁鑹诧紙娣辨櫘椴佸＋钃濈伆鍩哄簳锛夊弻涓婚鑷姩閫傞厤锛?   SF 椋庢牸鏃犺‖绾?+ 绛夊鏁板€?路 澶у渾瑙掑崱鐗?路 纾ㄧ爞鐜荤拑 路 鏌斿拰寮ユ暎闃村奖銆?   ============================================================ */
 :root{
   color-scheme:dark;
-  /* 圆角体系 */
+  /* 鍦嗚浣撶郴 */
   --r-xl:20px; --r-lg:16px; --r-md:12px; --r-sm:9px; --r-xs:7px; --r-pill:999px;
-  /* 专属分类色（两套模式共享色相，深浅随主题微调，见 JS PAL） */
+  /* 涓撳睘鍒嗙被鑹诧紙涓ゅ妯″紡鍏变韩鑹茬浉锛屾繁娴呴殢涓婚寰皟锛岃 JS PAL锛?*/
   --s-prus:#405A78; --s-terra:#A66B58; --s-sage:#7A8C7E; --s-mist:#637B94;
   --s-copper:#C98C65; --s-honey:#C99C65; --s-lav:#8B7A9E; --s-tea:#8F988A;
   --s-wine:#943948; --s-oat:#E8D4BF;
-  /* —— 深色主题（默认）：低饱和深普鲁士蓝灰基底 —— */
+  /* 鈥斺€?娣辫壊涓婚锛堥粯璁わ級锛氫綆楗卞拰娣辨櫘椴佸＋钃濈伆鍩哄簳 鈥斺€?*/
   --bg-base:#12161F;
   --bg-blob-a:rgba(64,90,120,.32); --bg-blob-b:rgba(148,57,72,.14); --bg-blob-c:rgba(201,156,101,.09);
   --glass:rgba(31,38,51,.60); --glass-2:rgba(38,46,62,.48); --glass-3:rgba(48,58,76,.50);
@@ -38,12 +35,12 @@
   --knob:linear-gradient(180deg,#F7F1E6,#D9CDB9);
   --font-ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
   --font-mono:"SF Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
-  /* 语义别名（兼容 JS 内联引用） */
+  /* 璇箟鍒悕锛堝吋瀹?JS 鍐呰仈寮曠敤锛?*/
   --txt2:var(--ink-2); --txt3:var(--ink-3);
 }
 [data-theme="light"]{
   color-scheme:light;
-  /* —— 浅色主题：柔和奶杏米白基底 —— */
+  /* 鈥斺€?娴呰壊涓婚锛氭煍鍜屽ザ鏉忕背鐧藉熀搴?鈥斺€?*/
   --bg-base:#F7F1E7;
   --bg-blob-a:rgba(64,90,120,.12); --bg-blob-b:rgba(148,57,72,.08); --bg-blob-c:rgba(232,212,191,.85);
   --glass:rgba(255,252,247,.62); --glass-2:rgba(255,253,249,.50); --glass-3:rgba(255,255,255,.70);
@@ -99,13 +96,13 @@ body{
 .dot.r{background:var(--err);box-shadow:0 0 6px var(--err)}
 .dot.c{background:var(--pri)}
 @keyframes dotb{0%,100%{opacity:1}50%{opacity:.45}}
-/* 浅色 / 深色主题切换开关 */
+/* 娴呰壊 / 娣辫壊涓婚鍒囨崲寮€鍏?*/
 .theme-tg{position:relative;flex:0 0 50px;width:50px;height:26px;align-self:center;margin:0 12px;cursor:pointer;
   background:var(--glass-3);border:1px solid var(--glass-bd-2);border-radius:var(--r-pill);
   box-shadow:inset 0 1px 0 var(--glass-hi),var(--shadow-sm);transition:background .2s}
 .theme-tg:hover{background:var(--glass-hov)}
-.theme-tg::before{content:"☀";position:absolute;left:7px;top:50%;transform:translateY(-52%);font-size:10px;color:var(--warn);opacity:.9}
-.theme-tg::after{content:"☾";position:absolute;right:7px;top:50%;transform:translateY(-52%);font-size:10px;color:var(--pri);opacity:.9}
+.theme-tg::before{content:"鈽€";position:absolute;left:7px;top:50%;transform:translateY(-52%);font-size:10px;color:var(--warn);opacity:.9}
+.theme-tg::after{content:"鈽?;position:absolute;right:7px;top:50%;transform:translateY(-52%);font-size:10px;color:var(--pri);opacity:.9}
 .theme-tg i{position:absolute;left:3px;top:2.5px;width:19px;height:19px;border-radius:var(--r-pill);
   background:var(--knob);border:1px solid var(--glass-bd-2);
   box-shadow:0 1px 4px rgba(0,0,0,.30);transition:transform .28s cubic-bezier(.4,0,.2,1)}
@@ -138,8 +135,8 @@ body{
 .sb{padding:5px 0 6px}
 .sec.col .sb{display:none}
 .sec.col .sh{border-bottom-color:transparent}
-.sec.col .sh .tg::after{content:"▸"}
-.sec .sh .tg::after{content:"▾"}
+.sec.col .sh .tg::after{content:"鈻?}
+.sec .sh .tg::after{content:"鈻?}
 
 .ctl{display:grid;grid-template-columns:1fr 60px;grid-template-rows:14px 20px;gap:0 7px;
      padding:4px 10px 5px;align-items:center}
@@ -226,7 +223,7 @@ table.hp td.rk input{color:var(--pri)}
 .ro.k>b{color:var(--pri)}
 .ro.g>b{color:var(--ok)}
 .ro.warn>b{color:var(--err)}
-.ro.warn::after{content:"▲";font-size:7px;color:var(--err);justify-self:center}
+.ro.warn::after{content:"鈻?;font-size:7px;color:var(--err);justify-self:center}
 
 .diffbox{display:grid;grid-template-columns:1fr 60px 60px 56px;align-items:center;padding:3.5px 10px;font-size:9.5px;border-bottom:1px solid var(--glass-bd)}
 .diffbox:last-child{border-bottom:none}
@@ -280,7 +277,7 @@ canvas.plot{display:block;width:100%;height:84px;background:var(--well);border:1
 #sb .c.ok u::before{content:"";display:inline-block;width:5px;height:5px;border-radius:var(--r-pill);background:var(--ok);margin-right:4px;box-shadow:0 0 5px var(--ok)}
 #sb .c.bad u::before{content:"";display:inline-block;width:5px;height:5px;border-radius:var(--r-pill);background:var(--err);margin-right:4px;box-shadow:0 0 5px var(--err)}
 
-/* 引擎面板专用组件 */
+/* 寮曟搸闈㈡澘涓撶敤缁勪欢 */
 .eng-row{display:flex;align-items:center;gap:6px;padding:3px 10px}
 .eng-lb{width:74px;flex:0 0 auto;font-size:9.5px;color:var(--ink-2)}
 .eng-input{width:62px!important;text-align:right}
@@ -336,14 +333,14 @@ canvas.plot{display:block;width:100%;height:84px;background:var(--well);border:1
 <div id="app">
   <div id="tb">
     <div class="brand"><b>LABSUS</b></div>
-    <div class="tt"><span>全车底盘 高性能悬架 · 运动学 / 动力学 / 准静态操稳分析台</span><span>Full Chassis Inboard Suspension K&C, Rig Dynamics & Quasi-Static Handling</span></div>
+    <div class="tt"><span>鍏ㄨ溅搴曠洏 楂樻€ц兘鎮灦 路 杩愬姩瀛?/ 鍔ㄥ姏瀛?/ 鍑嗛潤鎬佹搷绋冲垎鏋愬彴</span><span>Full Chassis Inboard Suspension K&C, Rig Dynamics & Quasi-Static Handling</span></div>
     <div class="sp"></div>
-    <div id="themeTg" class="theme-tg" title="切换浅色 / 深色模式"><i></i></div>
-    <div class="cell"><i>正在调校</i><b class="a" id="tbArch">前悬架 PUSHROD</b></div>
-    <div class="cell"><i>Baseline 快照</i><b id="tbBase">未锁定 (无比对)</b></div>
-    <div class="cell"><i>求解内核</i><b class="c" id="tbSolver">闭式几何 + 静力平衡</b></div>
-    <div class="cell"><i>仿真状态</i><b class="g" id="tbStateBox"><i class="dot g" id="tbStateDot"></i><span id="tbState">运行</span></b></div>
-    <div class="cell"><i>引擎 /api/v3</i><b id="tbEng">内置 JS</b></div>
+    <div id="themeTg" class="theme-tg" title="鍒囨崲娴呰壊 / 娣辫壊妯″紡"><i></i></div>
+    <div class="cell"><i>姝ｅ湪璋冩牎</i><b class="a" id="tbArch">鍓嶆偓鏋?PUSHROD</b></div>
+    <div class="cell"><i>Baseline 蹇収</i><b id="tbBase">鏈攣瀹?(鏃犳瘮瀵?</b></div>
+    <div class="cell"><i>姹傝В鍐呮牳</i><b class="c" id="tbSolver">闂紡鍑犱綍 + 闈欏姏骞宠　</b></div>
+    <div class="cell"><i>浠跨湡鐘舵€?/i><b class="g" id="tbStateBox"><i class="dot g" id="tbStateDot"></i><span id="tbState">杩愯</span></b></div>
+    <div class="cell"><i>寮曟搸 /api/v3</i><b id="tbEng">鍐呯疆 JS</b></div>
     <div class="cell"><i>fps</i><b id="tbFps">--</b></div>
   </div>
   <div id="main">
@@ -352,24 +349,24 @@ canvas.plot{display:block;width:100%;height:84px;background:var(--well);border:1
     <aside class="pnl" id="rp"></aside>
   </div>
   <div id="sb">
-    <div class="c"><u>构型</u><b id="sbArchName">前悬架 (推杆)</b></div>
-    <div class="c"><u>节点</u><b id="sbNode">-</b></div>
-    <div class="c"><u>刚性线约束</u><b id="sbRig">-</b></div>
-    <div class="c"><u>系统自由度</u><b id="sbDof">-</b></div>
-    <div class="c ok" id="sbResC"><u>残差 RESIDUAL</u><b id="sbRes">-</b></div>
-    <div class="c"><u>前轴 TLLTD</u><b class="hl" id="sbTLLTD">52.4%</b></div>
-    <div class="c"><u>侧倾梯度</u><b id="sbRollGrad">1.68 °/g</b></div>
-    <div class="c"><u>求解耗时</u><b id="sbMs">-</b></div>
+    <div class="c"><u>鏋勫瀷</u><b id="sbArchName">鍓嶆偓鏋?(鎺ㄦ潌)</b></div>
+    <div class="c"><u>鑺傜偣</u><b id="sbNode">-</b></div>
+    <div class="c"><u>鍒氭€х嚎绾︽潫</u><b id="sbRig">-</b></div>
+    <div class="c"><u>绯荤粺鑷敱搴?/u><b id="sbDof">-</b></div>
+    <div class="c ok" id="sbResC"><u>娈嬪樊 RESIDUAL</u><b id="sbRes">-</b></div>
+    <div class="c"><u>鍓嶈酱 TLLTD</u><b class="hl" id="sbTLLTD">52.4%</b></div>
+    <div class="c"><u>渚у€炬搴?/u><b id="sbRollGrad">1.68 掳/g</b></div>
+    <div class="c"><u>姹傝В鑰楁椂</u><b id="sbMs">-</b></div>
     <div class="sp"></div>
-    <div class="c"><u>坐标拾取</u><b id="sbCur">-</b></div>
-    <div class="c hl"><u>提示</u><b id="sbHint">正交视图左键拖拽硬点 · 随时快照基准线(Save Baseline)进行多曲线比对</b></div>
+    <div class="c"><u>鍧愭爣鎷惧彇</u><b id="sbCur">-</b></div>
+    <div class="c hl"><u>鎻愮ず</u><b id="sbHint">姝ｄ氦瑙嗗浘宸﹂敭鎷栨嫿纭偣 路 闅忔椂蹇収鍩哄噯绾?Save Baseline)杩涜澶氭洸绾挎瘮瀵?/b></div>
   </div>
 </div>
 
 <script>
 "use strict";
 
-/* ================================ 0. 基础数学库 ================================ */
+/* ================================ 0. 鍩虹鏁板搴?================================ */
 const abs=Math.abs, sqrt=Math.sqrt, sin=Math.sin, cos=Math.cos, atan2=Math.atan2, acos=Math.acos, PI=Math.PI;
 const D2R=PI/180, R2D=180/PI;
 const add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]];
@@ -421,9 +418,9 @@ const fmt=(v,d)=>(v===null||v===undefined||!isFinite(v))?"--":v.toFixed(d===unde
 const sfmt=(v,d)=>{const s=fmt(v,d);return(isFinite(v)&&v>0)?"+"+s:s;};
 function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
 
-/* ================================ 1. 结构与状态初始化 ================================ */
+/* ================================ 1. 缁撴瀯涓庣姸鎬佸垵濮嬪寲 ================================ */
 const PRESETS={
-  "后悬架 (拉杆 Pullrod 架构)":{
+  "鍚庢偓鏋?(鎷夋潌 Pullrod 鏋舵瀯)":{
     arch:"pullrod", hp:{
       LCA_F:[250.0, 140.0, 115.0], LCA_R:[250.0, -130.0, 125.0], LBJ:  [630.0, 10.0, 135.0],
       UCA_F:[340.0, 110.0, 320.0], UCA_R:[340.0, -110.0, 330.0], UBJ:  [580.0, -15.0, 390.0],
@@ -434,7 +431,7 @@ const PRESETS={
     cam0:-1.5,toe0:0.10,mS:340,kS:130,kT:250,cB:9,cR:14,wb:1620,hcg:320,
     arb:{d:18, dy:35, dz:95, t:0.55, G:79000}
   },
-  "前悬架 (推杆 Pushrod 架构)":{
+  "鍓嶆偓鏋?(鎺ㄦ潌 Pushrod 鏋舵瀯)":{
     arch:"pushrod", hp:{
       LCA_F:[260.0, 140.0, 130.0], LCA_R:[260.0, -120.0, 140.0], LBJ:  [640.0, 10.0, 150.0],
       UCA_F:[350.0, 110.0, 340.0], UCA_R:[350.0, -100.0, 350.0], UBJ:  [590.0, -15.0, 410.0],
@@ -449,24 +446,24 @@ const PRESETS={
 
 
 const HP_META=[
-  ["LCA_F","下摆臂前铰点","LWR ARM FRT PIVOT","chassis",1,0],
-  ["LCA_R","下摆臂后铰点","LWR ARM RR PIVOT","chassis",1,0],
-  ["LBJ",  "下球头销",    "LWR BALL JOINT", "lca",    0,2.0],
-  ["UCA_F","上摆臂前铰点","UPR ARM FRT PIVOT","chassis",1,0],
-  ["UCA_R","上摆臂后铰点","UPR ARM RR PIVOT","chassis",1,0],
-  ["UBJ",  "上球头销",    "UPR BALL JOINT", "uca",    0,1.5],
-  ["WC",   "轮心点",      "WHEEL CENTRE",   "knuckle",0,10.2],
-  ["TRO",  "转向拉杆外点","TIE ROD OUTER",  "knuckle",0,0.9],
-  ["RACK", "转向齿条内点","TIE ROD INNER",  "chassis",1,0],
-  ["STRUT_OUT","推/拉杆外侧支点","STRUT OUT MOUNT","strut_out",0,1.2],
-  ["RCK_AX_A", "摇臂转轴前基点","ROCKER PIVOT IN", "chassis",  1,0],
-  ["RCK_AX_B", "摇臂转轴后基点","ROCKER PIVOT OUT","chassis",  1,0],
-  ["STRUT_IN", "摇臂推拉杆输入点","ROCKER STRUT IN","rocker",  0,1.5],
-  ["RCK_DMP",  "摇臂减振器输出点","ROCKER DAMPER OUT","rocker", 0,1.2],
-  ["DMP_BODY", "内置减振器车身点","INBOARD DMP BODY","chassis", 1,0]
+  ["LCA_F","涓嬫憜鑷傚墠閾扮偣","LWR ARM FRT PIVOT","chassis",1,0],
+  ["LCA_R","涓嬫憜鑷傚悗閾扮偣","LWR ARM RR PIVOT","chassis",1,0],
+  ["LBJ",  "涓嬬悆澶撮攢",    "LWR BALL JOINT", "lca",    0,2.0],
+  ["UCA_F","涓婃憜鑷傚墠閾扮偣","UPR ARM FRT PIVOT","chassis",1,0],
+  ["UCA_R","涓婃憜鑷傚悗閾扮偣","UPR ARM RR PIVOT","chassis",1,0],
+  ["UBJ",  "涓婄悆澶撮攢",    "UPR BALL JOINT", "uca",    0,1.5],
+  ["WC",   "杞績鐐?,      "WHEEL CENTRE",   "knuckle",0,10.2],
+  ["TRO",  "杞悜鎷夋潌澶栫偣","TIE ROD OUTER",  "knuckle",0,0.9],
+  ["RACK", "杞悜榻挎潯鍐呯偣","TIE ROD INNER",  "chassis",1,0],
+  ["STRUT_OUT","鎺?鎷夋潌澶栦晶鏀偣","STRUT OUT MOUNT","strut_out",0,1.2],
+  ["RCK_AX_A", "鎽囪噦杞酱鍓嶅熀鐐?,"ROCKER PIVOT IN", "chassis",  1,0],
+  ["RCK_AX_B", "鎽囪噦杞酱鍚庡熀鐐?,"ROCKER PIVOT OUT","chassis",  1,0],
+  ["STRUT_IN", "鎽囪噦鎺ㄦ媺鏉嗚緭鍏ョ偣","ROCKER STRUT IN","rocker",  0,1.5],
+  ["RCK_DMP",  "鎽囪噦鍑忔尟鍣ㄨ緭鍑虹偣","ROCKER DAMPER OUT","rocker", 0,1.2],
+  ["DMP_BODY", "鍐呯疆鍑忔尟鍣ㄨ溅韬偣","INBOARD DMP BODY","chassis", 1,0]
 ];
 
-/* 全局活动仿真状态 (包含完整底盘与增量分析参数) */
+/* 鍏ㄥ眬娲诲姩浠跨湡鐘舵€?(鍖呭惈瀹屾暣搴曠洏涓庡閲忓垎鏋愬弬鏁? */
 const S={
   axis: "front", front: null, rear: null,
   mode:"kin", // 'kin' | 'rig' | 'quasi'
@@ -477,8 +474,7 @@ const S={
   mTotal:1420, mSprung:1260,
   trMin:-80, trMax:80,
   
-  // 准静态工况增量参数
-  qs:{
+  // 鍑嗛潤鎬佸伐鍐靛閲忓弬鏁?  qs:{
     gx: 0.0,
     gy: 1.0,
     speed: 120,
@@ -486,7 +482,7 @@ const S={
     aeroBias: 0.45
   },
   
-  // Baseline 快照比对
+  // Baseline 蹇収姣斿
   baseline: null,
   hasBaseline: false,
 
@@ -497,8 +493,8 @@ const S={
 };
 
 function initData(){
-  const PF = PRESETS["前悬架 (推杆 Pushrod 架构)"];
-  const PR = PRESETS["后悬架 (拉杆 Pullrod 架构)"];
+  const PF = PRESETS["鍓嶆偓鏋?(鎺ㄦ潌 Pushrod 鏋舵瀯)"];
+  const PR = PRESETS["鍚庢偓鏋?(鎷夋潌 Pullrod 鏋舵瀯)"];
   S.front = {
     arch: PF.arch, tire: JSON.parse(JSON.stringify(PF.tire)),
     cam0: PF.cam0, toe0: PF.toe0, mS: PF.mS, mU: 38, kS: PF.kS, kT: PF.kT, cB: PF.cB, cR: PF.cR, strutOutAttach: PF.strutOutAttach, hp: {}, tieTrim: 0,
@@ -517,7 +513,7 @@ function initData(){
 }
 initData();
 
-/* ================================ 2. 机构构建与多体投影求解 ================================ */
+/* ================================ 2. 鏈烘瀯鏋勫缓涓庡浣撴姇褰辨眰瑙?================================ */
 function buildMech(axis){
   const state = S[axis];
   const n=[], idx={};
@@ -546,7 +542,7 @@ function buildMech(axis){
     {a:idx.RCK_DMP,b:idx.DMP_BODY,id:"INBOARD_COIL",type:"E",grp:"damper"}
   ];
 
-  /* 补全核心刚性拓扑网格，构成刚体力学传递路径 */
+  /* 琛ュ叏鏍稿績鍒氭€ф嫇鎵戠綉鏍硷紝鏋勬垚鍒氫綋鍔涘浼犻€掕矾寰?*/
   const att = state.strutOutAttach;
   const baseF = att==="lca" ? idx.LCA_F : idx.UCA_F;
   const baseR = att==="lca" ? idx.LCA_R : idx.UCA_R;
@@ -557,7 +553,7 @@ function buildMech(axis){
     {a:baseR, b:idx.STRUT_OUT, id:"ATT_R-ST_O", type:"R", grp:att},
     {a:baseB, b:idx.STRUT_OUT, id:"ATT_B-ST_O", type:"R", grp:att},
     
-    // Rocker 刚体成型
+    // Rocker 鍒氫綋鎴愬瀷
     {a:idx.RCK_AX_A, b:idx.STRUT_IN, id:"RA-SI", type:"R", grp:"rocker"},
     {a:idx.RCK_AX_B, b:idx.STRUT_IN, id:"RB-SI", type:"R", grp:"rocker"},
     {a:idx.RCK_AX_A, b:idx.RCK_DMP,  id:"RA-RD", type:"R", grp:"rocker"},
@@ -602,7 +598,8 @@ function buildMech(axis){
   const rocker={
     iAxA:idx.RCK_AX_A, iAxB:idx.RCK_AX_B,
     iInNode:idx.STRUT_IN, iDmpNode:idx.RCK_DMP, iOutNode:idx.STRUT_OUT,
-    relIn:relIn, relDmp:relDmp, rodL0:strutRod.L0, angle:0
+    relIn:relIn, relDmp:relDmp, rodL0:strutRod.L0, angle:0,
+    lastTheta:null   /* F-04锛?026-08-30锛夛細鎽囪噦鏍瑰垎鏀繛缁€э紙涓?fullchassis 鍚屾锛?*/
   };
 
   const camb=state.cam0*D2R, toe=state.toe0*D2R;
@@ -676,7 +673,18 @@ function projRockerStrut(M, rck){
   const A=2*dot(d0,rPerp), B=2*dot(d0,vPerp), C=rck.rodL0*rck.rodL0 - dot(d0,d0) - R_r*R_r;
   const hyp=Math.hypot(A, B);
   if(hyp<1e-9) return;
-  const cosPsi=clamp(C/hyp, -1, 1), psi=acos(cosPsi), phi=atan2(B, A), branch=phi>=0?1:-1, theta=phi - branch*psi;
+  const cosPsi=clamp(C/hyp, -1, 1), psi=acos(cosPsi), phi=atan2(B, A);
+  /* F-04锛?026-08-30锛夛細鎽囪噦鍙屾牴鍒嗘敮杩炵画鎬р€斺€斾笌 fullchassis 鍚屾锛?     鐢ㄤ笂涓€姝?胃 鍦?胃=蠁卤蠄 涓ゆ牴涓€夋渶杩戞牴锛岄伩鍏嶈法 蠁=0 鏃剁灛闂磋烦鏀€?*/
+  const thA=phi-psi, thB=phi+psi;
+  let theta;
+  if(rck.lastTheta===null||rck.lastTheta===undefined){
+    theta=(phi>=0?thA:thB);
+  }else{
+    const dA=Math.abs(((thA-rck.lastTheta+PI)%(2*PI)+2*PI)%(2*PI)-PI);
+    const dB=Math.abs(((thB-rck.lastTheta+PI)%(2*PI)+2*PI)%(2*PI)-PI);
+    theta=(dA<=dB?thA:thB);
+  }
+  rck.lastTheta=theta;
   rck.angle=theta;
   const ct=cos(theta), st=sin(theta);
   const pIn=add(oAxis,add(rPara,add(mul(rPerp,ct),mul(vPerp,st))));
@@ -694,7 +702,7 @@ function residual(M,drvZ){
   for(let k=0;k<M.L.length;k++){
     const l=M.L[k];if(l.type!=="R"||!coreLinks.includes(l.id))continue;
     const d=abs(dst(M.n[l.a].p,M.n[l.b].p)-l.L0);
-    if(d>r)r=d;
+    if(!(d<=r))r=d;   /* F-01锛?026-08-30锛夛細NaN 瀹夊叏鈥斺€擿if(d>r)` 瀵?NaN 鎭?false */
   }
   if(drvZ!==null&&drvZ!==undefined) r=Math.max(r,abs(M.n[M.idx.WC].p[2]-drvZ));
   return r;
@@ -714,7 +722,8 @@ function solveKin(M,drvZ,maxIt,tol){
     if((it&3)===3){res=residual(M,drvZ); if(res<tol){it++;break;}}
   }
   res=residual(M,drvZ);
-  M.res=res;M.iter=it;M.ms=performance.now()-t0;M.ok=res<0.025;
+  if(!isFinite(res))res=Infinity;   /* F-01/F-05锛歂aN 娈嬪樊鏄惧紡鍗囩骇涓?鈭?*/
+  M.res=res;M.iter=it;M.ms=performance.now()-t0;M.ok=isFinite(res)&&res<0.025;
   return res;
 }
 
@@ -741,7 +750,7 @@ function driveTo(M,targetZ,rack,axis){
   return M.res;
 }
 
-/* ================================ 3. 悬架高阶几何与运动学指标 ================================ */
+/* ================================ 3. 鎮灦楂橀樁鍑犱綍涓庤繍鍔ㄥ鎸囨爣 ================================ */
 function isect2(p1,d1,p2,d2){
   const den=d1[0]*d2[1]-d1[1]*d2[0];
   if(abs(den)<1e-12)return null;
@@ -750,7 +759,7 @@ function isect2(p1,d1,p2,d2){
 }
 function axisAtY(a,b,y){const t=(y-a[1])/((b[1]-a[1])||1e-9);return lerp3(a,b,t);}
 
-/* 横向稳定杆几何学解算 */
+/* 妯悜绋冲畾鏉嗗嚑浣曞瑙ｇ畻 */
 function arbGeom(lbj, state){
   const F=state.hp.LCA_F, B=state.hp.LBJ, t=state.arb.t;
   const P0=lerp3(F,B,t);
@@ -776,7 +785,7 @@ function arbRate(mrArb, state){
   return{k:kt/(g.a*g.a)*mrArb*mrArb, J:J, kt:kt, a:g.a, L:L};
 }
 
-/* 阿克曼转向解算 */
+/* 闃垮厠鏇艰浆鍚戣В绠?*/
 function ackermann(axis){
   const R = axis==='front' ? SIM.mFR : SIM.mRR;
   const L = axis==='front' ? SIM.mFL : SIM.mRL;
@@ -848,7 +857,7 @@ function metrics(M, axis){
   };
 }
 
-/* ================================ 4. 扫掠分析与多维导数 ================================ */
+/* ================================ 4. 鎵帬鍒嗘瀽涓庡缁村鏁?================================ */
 function findLimits(M,rack,axis){
   const z0=M.n[M.idx.WC].p0[2];let up=0,dn=0;
   resetMech(M);setChassis(M,rack,axis);
@@ -907,7 +916,7 @@ function sampleSweep(sw,tr,key){
   return R[R.length-1][key];
 }
 
-/* ================================ 5. 准静态载荷转移代数解算 ================================ */
+/* ================================ 5. 鍑嗛潤鎬佽浇鑽疯浆绉讳唬鏁拌В绠?================================ */
 function solveQuasiStatic(){
   const g = 9.81;
   const L = S.wb / 1000;
@@ -923,7 +932,7 @@ function solveQuasiStatic(){
   const hur = S.rear.tire.R / 1000;
   const hs = S.hs / 1000;
   
-  // 运动速比与轮端刚度初值（随行程迁移在迭代内更新）
+  // 杩愬姩閫熸瘮涓庤疆绔垰搴﹀垵鍊硷紙闅忚绋嬭縼绉诲湪杩唬鍐呮洿鏂帮級
   const mrF = SIM.mrRefF || 0.75, mrR = SIM.mrRefR || 0.78;
   const kwF0 = (S.front.kS * 1000) * mrF * mrF;
   const kwR0 = (S.rear.kS * 1000) * mrR * mrR;
@@ -938,13 +947,11 @@ function solveQuasiStatic(){
   const Gy = S.qs.gy, Gx = S.qs.gx;
   const ay = Gy * g, ax = Gx * g;
 
-  // —— 侧倾耦合迭代：RC 高度(zrc)取外侧压缩轮、侧倾刚度(kphi)取左右 kw 均值，均随行程迁移 ——
-  // 迁移后 dFz_geo / dFz_elas 不再与 ay 线性齐次 → TLLTD 随 gy 真实变化（修复线性恒定观感）。
-  const rcHAt=(sw,tr,f0)=>{ if(!sw||!sw.rows||!sw.rows.length)return f0;
+  // 鈥斺€?渚у€捐€﹀悎杩唬锛歊C 楂樺害(zrc)鍙栧渚у帇缂╄疆銆佷晶鍊惧垰搴?kphi)鍙栧乏鍙?kw 鍧囧€硷紝鍧囬殢琛岀▼杩佺Щ 鈥斺€?  // 杩佺Щ鍚?dFz_geo / dFz_elas 涓嶅啀涓?ay 绾挎€ч綈娆?鈫?TLLTD 闅?gy 鐪熷疄鍙樺寲锛堜慨澶嶇嚎鎬ф亽瀹氳鎰燂級銆?  const rcHAt=(sw,tr,f0)=>{ if(!sw||!sw.rows||!sw.rows.length)return f0;
     const v=sampleSweep(sw,tr,"rcH"); return (v===null||v===undefined||!isFinite(v))?f0:v; };
   const kwAt=(sw,tr,k0)=>{ if(!sw||!sw.rows||!sw.rows.length)return k0;
     const v=sampleSweep(sw,tr,"kw"); return (v===null||v===undefined||!isFinite(v)||v<=0)?k0:v*1000; };
-  const zrcF0=((SIM.mFR?SIM.mFR.rcH:45)||45);   // mm @0 行程
+  const zrcF0=((SIM.mFR?SIM.mFR.rcH:45)||45);   // mm @0 琛岀▼
   const zrcR0=((SIM.mRR?SIM.mRR.rcH:65)||65);
   let zrc_f=zrcF0/1000, zrc_r=zrcR0/1000;
   let kphi_f=0.5*kwF0*(tf*tf)+kphi_arb_f, kphi_r=0.5*kwR0*(tr*tr)+kphi_arb_r;
@@ -954,9 +961,9 @@ function solveQuasiStatic(){
     const hArm=Math.max(0.05,hs-hra);
     const denom=kphi_tot-mS*g*hArm;
     rollAngleRad=denom>100?(mS*ay*hArm)/denom:0;
-    const dtF=rollAngleRad*abs(S.front.hp.WC[0]);   // 滚转角×半轮距 = 轮行程差 mm
+    const dtF=rollAngleRad*abs(S.front.hp.WC[0]);   // 婊氳浆瑙捗楀崐杞窛 = 杞绋嬪樊 mm
     const dtR=rollAngleRad*abs(S.rear.hp.WC[0]);
-    zrc_f=rcHAt(SIM.swF,dtF,zrcF0)/1000;            // 外侧（压缩侧）RC 高度
+    zrc_f=rcHAt(SIM.swF,dtF,zrcF0)/1000;            // 澶栦晶锛堝帇缂╀晶锛塕C 楂樺害
     zrc_r=rcHAt(SIM.swR,dtR,zrcR0)/1000;
     const kf=(kwAt(SIM.swF,dtF,kwF0)+kwAt(SIM.swF,-dtF,kwF0))/2;
     const kr=(kwAt(SIM.swR,dtR,kwR0)+kwAt(SIM.swR,-dtR,kwR0))/2;
@@ -1005,7 +1012,7 @@ function solveQuasiStatic(){
   };
 }
 
-/* ================================ 6. 动力学 (4-Post Rig 显式积分) ================================ */
+/* ================================ 6. 鍔ㄥ姏瀛?(4-Post Rig 鏄惧紡绉垎) ================================ */
 const FS=1000;
 function unsprungMass(axis){let s=0;HP_META.forEach(d=>{if(!d[4])s+=d[5];});return s;}
 function roadSignal(t){
@@ -1046,8 +1053,13 @@ function stepDyn(M,dt,rack,tSim,axis){
     if(tr>S.bsU){const x=tr-S.bsU;M.n[iW].f[2]-=kBS*x*x/20;}
     if(tr<-S.bsD){const x=-S.bsD-tr;M.n[iW].f[2]+=kBS*x*x/20;}
 
-    const mm=metrics(M,axis);
-    pen=rz-mm.cp[2];
+    /* F-21锛?026-08-30锛夛細瀛愭鍐呭師璋?full metrics()锛?0 瀛愭脳4 鏈烘瀯 = 40 娆?甯э紝
+       鍚?isect2/arbGeom 绛夊叏閮ㄥ紑閿€锛夛紝瀹為檯鍙渶鎺ュ湴鐐?z銆傝交閲忕増锛氳疆蹇?z 鈭?R路cos(cam)锛?       cos(cam) 鐢辫浆鍚戣妭鍒氫綋鏃嬭浆 脳 璁捐杞悜瀹炴椂缁欏嚭锛堜笌 metrics 鐨?cp[2] 鏁板涓€鑷达紝
+       鏃犺繎浼艰宸級銆?*/
+    const KN0=M.cl[2], Rq=KN0.R||qM(KN0.q), axv=mApply(Rq,M.axL);
+    const cosCam=Math.sqrt(Math.max(0,1-axv[2]*axv[2]));
+    const cp2=M.n[iW].p[2]-state.tire.R*cosCam;
+    pen=rz-cp2;
     if(pen>0){
       const vz=M.n[iW].v[2];
       let fz=kT*pen+cT*(rzv-vz); if(fz<0)fz=0;
@@ -1076,7 +1088,7 @@ function stepDyn(M,dt,rack,tSim,axis){
   return{load:Ft/FS,fs:Fs/FS,fd:Fd/FS,pen:pen,acc:accz/1000,road:roadSignal(tSim)};
 }
 
-/* ================================ 7. 全车多体仿真管理体系 ================================ */
+/* ================================ 7. 鍏ㄨ溅澶氫綋浠跨湡绠＄悊浣撶郴 ================================ */
 const SIM={
   FR:null, FL:null, RR:null, RL:null,
   mFR:null, mFL:null, mRR:null, mRL:null,
@@ -1132,8 +1144,7 @@ function travelL(half, deg){return clamp(S.travel-rollOffset(half,deg),S.trMin,S
 
 function simulate(dt){
   if(TRK.active){trackStep(dt);return;}
-  if(STAGE.open){requestAnimationFrame(loop);return;}   // 舞台打开时挂起主渲染（省帧率）
-  const MF=SIM.FR, NF=SIM.FL, MR=SIM.RR, NR=SIM.RL;
+  if(STAGE.open){requestAnimationFrame(loop);return;}   // 鑸炲彴鎵撳紑鏃舵寕璧蜂富娓叉煋锛堢渷甯х巼锛?  const MF=SIM.FR, NF=SIM.FL, MR=SIM.RR, NR=SIM.RL;
   if(S.mode==="kin"){
     const z0F=MF.n[MF.idx.WC].p0[2], z0R=MR.n[MR.idx.WC].p0[2];
     driveTo(MF, z0F+travelR(SIM.halfF), S.rack, 'front'); SIM.mFR = metrics(MF, 'front');
@@ -1187,20 +1198,19 @@ function takeBaselineSnapshot(){
     qsRes: deepClone(SIM.qsRes)
   };
   S.hasBaseline = true;
-  document.getElementById("tbBase").textContent = "已锁定 (双线比对)";
+  document.getElementById("tbBase").textContent = "宸查攣瀹?(鍙岀嚎姣斿)";
   document.getElementById("tbBase").className = "a";
 }
 function clearBaselineSnapshot(){
   S.baseline = null;
   S.hasBaseline = false;
-  document.getElementById("tbBase").textContent = "未锁定 (无比对)";
+  document.getElementById("tbBase").textContent = "鏈攣瀹?(鏃犳瘮瀵?";
   document.getElementById("tbBase").className = "";
 }
 
-/* ================================ 8. 渲染色彩与全局装配 ================================ */
-/* 双主题画布调色板：浅色（奶杏米白基底）/ 深色（深普鲁士蓝灰基底），
-   数据分类专属映射：普鲁士蓝=主操作/速比 · 陶土棕=外倾/转向节 · 鼠尾灰绿=前束/拉杆 ·
-   蜜橘赭=摇臂/弹性 · 灰薰紫=轨迹 · 雾蓝灰=稳定杆 · 暗铜金=瞬心 · 酒红=固定点/力 */
+/* ================================ 8. 娓叉煋鑹插僵涓庡叏灞€瑁呴厤 ================================ */
+/* 鍙屼富棰樼敾甯冭皟鑹叉澘锛氭祬鑹诧紙濂舵潖绫崇櫧鍩哄簳锛? 娣辫壊锛堟繁鏅瞾澹摑鐏板熀搴曪級锛?   鏁版嵁鍒嗙被涓撳睘鏄犲皠锛氭櫘椴佸＋钃?涓绘搷浣?閫熸瘮 路 闄跺湡妫?澶栧€?杞悜鑺?路 榧犲熬鐏扮豢=鍓嶆潫/鎷夋潌 路
+   铚滄璧?鎽囪噦/寮规€?路 鐏拌柊绱?杞ㄨ抗 路 闆捐摑鐏?绋冲畾鏉?路 鏆楅摐閲?鐬績 路 閰掔孩=鍥哄畾鐐?鍔?*/
 const PAL={
 light:{bg:"#F5EFE4",grid:"#E9DFCE",grid2:"#DCD0BA",axis:"#C6B89F",
  rig:"#8C96A2",rigArm:"#6E7883",arm:"rgba(64,90,120,0.05)",
@@ -1335,25 +1345,23 @@ function arcTube(sc, pts, r, col, w){
   }
 }
 
-/* ================================ 5. 定形防撞区与自适应悬架舱总装 ================================ */
+/* ================================ 5. 瀹氬舰闃叉挒鍖轰笌鑷€傚簲鎮灦鑸辨€昏 ================================ */
 function buildScenePRO(){
   const sc=[];
   const yF = S.wb/2, yR = -S.wb/2;
 
-  // 1. 定形乘员舱/前后定形防撞区 + 悬架动联过渡舱
-  buildDecoupledImpactSpaceframe(sc, yF, yR);
+  // 1. 瀹氬舰涔樺憳鑸?鍓嶅悗瀹氬舰闃叉挒鍖?+ 鎮灦鍔ㄨ仈杩囨浮鑸?  buildDecoupledImpactSpaceframe(sc, yF, yR);
 
-  // 2. 传动系：EDU 电驱动总成与差速器
+  // 2. 浼犲姩绯伙細EDU 鐢甸┍鍔ㄦ€绘垚涓庡樊閫熷櫒
   if(S.show.powertrain) buildPowertrainEDU(sc, yF, yR);
 
-  // 3. 转向系：中置单座方程式转向总成
+  // 3. 杞悜绯伙細涓疆鍗曞骇鏂圭▼寮忚浆鍚戞€绘垚
   if(S.show.steer_col) buildFormulaCentralSteering(sc, yF);
 
-  // 4. 制动系：中置双回路主缸与踏板
+  // 4. 鍒跺姩绯伙細涓疆鍙屽洖璺富缂镐笌韪忔澘
   if(S.show.master_cyl) buildBrakeHydraulicSystem(sc, yF, yR);
 
-  // 5. 悬架与车轮端各系统实例装配
-  addAxleAssemblyPRO(sc, SIM.FR, SIM.mFR, 1, yF, 'front');
+  // 5. 鎮灦涓庤溅杞鍚勭郴缁熷疄渚嬭閰?  addAxleAssemblyPRO(sc, SIM.FR, SIM.mFR, 1, yF, 'front');
   addAxleAssemblyPRO(sc, SIM.RR, SIM.mRR, 1, yR, 'rear');
   if(S.show.mirror){
     addAxleAssemblyPRO(sc, SIM.FL, SIM.mFL, -1, yF, 'front');
@@ -1362,7 +1370,7 @@ function buildScenePRO(){
   return sc;
 }
 
-/* 核心车架建模：前后防撞吸能区与乘员舱完全定形，仅悬架舱过渡管件随硬点自适应 */
+/* 鏍稿績杞︽灦寤烘ā锛氬墠鍚庨槻鎾炲惛鑳藉尯涓庝箻鍛樿埍瀹屽叏瀹氬舰锛屼粎鎮灦鑸辫繃娓＄浠堕殢纭偣鑷€傚簲 */
 function buildDecoupledImpactSpaceframe(sc, yF, yR){
   const hF = S.front.hp, hR = S.rear.hp;
 
@@ -1370,9 +1378,8 @@ function buildDecoupledImpactSpaceframe(sc, yF, yR){
   const D = (a, b, r, col) => cylinder(sc, a, b, r||10, col||SYSTEM_COLORS.frameDiag, 1.1, 8);
 
   // =========================================================================
-  // 1. 前防撞区与前隔框 (Decoupled & Fixed Front Impact Cell)
-  // 尺寸与位置绝对固定，完全解耦，不随任何悬架硬点改变！
-  // =========================================================================
+  // 1. 鍓嶉槻鎾炲尯涓庡墠闅旀 (Decoupled & Fixed Front Impact Cell)
+  // 灏哄涓庝綅缃粷瀵瑰浐瀹氾紝瀹屽叏瑙ｈ€︼紝涓嶉殢浠讳綍鎮灦纭偣鏀瑰彉锛?  // =========================================================================
   const FBH_Y = yF + 270;
   const FBH_W_Top = 155;
   const FBH_W_Bot = 170;
@@ -1389,20 +1396,19 @@ function buildDecoupledImpactSpaceframe(sc, yF, yR){
   const IA_BL = [-IA_W_Bot, IA_Y, IA_Z_Bot], IA_BR = [IA_W_Bot, IA_Y, IA_Z_Bot];
 
   if(S.show.frame_front){
-    // 前隔框闭合主框架
+    // 鍓嶉殧妗嗛棴鍚堜富妗嗘灦
     T(FBH_TL, FBH_TR, 14); T(FBH_BL, FBH_BR, 14);
     T(FBH_TL, FBH_BL, 14); T(FBH_TR, FBH_BR, 14);
     D(FBH_TL, FBH_BR, 10);
 
-    // 吸能盒框架
-    T(IA_TL, IA_TR, 8, SYSTEM_COLORS.frameSec); T(IA_BL, IA_BR, 8, SYSTEM_COLORS.frameSec);
+    // 鍚歌兘鐩掓鏋?    T(IA_TL, IA_TR, 8, SYSTEM_COLORS.frameSec); T(IA_BL, IA_BR, 8, SYSTEM_COLORS.frameSec);
     T(IA_TL, IA_BL, 8, SYSTEM_COLORS.frameSec); T(IA_TR, IA_BR, 8, SYSTEM_COLORS.frameSec);
     T(FBH_TL, IA_TL, 8, SYSTEM_COLORS.frameSec); T(FBH_TR, IA_TR, 8, SYSTEM_COLORS.frameSec);
     T(FBH_BL, IA_BL, 8, SYSTEM_COLORS.frameSec); T(FBH_BR, IA_BR, 8, SYSTEM_COLORS.frameSec);
   }
 
   // =========================================================================
-  // 2. 定形独立乘员舱 (Fixed Cockpit Cell - 侧向高度提升 10%)
+  // 2. 瀹氬舰鐙珛涔樺憳鑸?(Fixed Cockpit Cell - 渚у悜楂樺害鎻愬崌 10%)
   // =========================================================================
   const FH_Y = yF - 260;
   const FH_Z_Top = 640;
@@ -1464,7 +1470,7 @@ function buildDecoupledImpactSpaceframe(sc, yF, yR){
   }
 
   // =========================================================================
-  // 3. 后防撞尾框 (Decoupled & Fixed Rear Impact Structure) - 完全固定
+  // 3. 鍚庨槻鎾炲熬妗?(Decoupled & Fixed Rear Impact Structure) - 瀹屽叏鍥哄畾
   // =========================================================================
   const RSB2_Y = yR - 180;
   const RSB2_W_Top = 160, RSB2_W_Bot = 175;
@@ -1491,7 +1497,7 @@ function buildDecoupledImpactSpaceframe(sc, yF, yR){
   }
 
   // =========================================================================
-  // 4. 自适应前后悬架承力舱 (Adaptive Suspension Bays - 动态吸纳硬点变动)
+  // 4. 鑷€傚簲鍓嶅悗鎮灦鎵垮姏鑸?(Adaptive Suspension Bays - 鍔ㄦ€佸惛绾崇‖鐐瑰彉鍔?
   // =========================================================================
   const R_LCA_F = [hF.LCA_F[0], hF.LCA_F[1] + yF, hF.LCA_F[2]];
   const L_LCA_F = [-hF.LCA_F[0], hF.LCA_F[1] + yF, hF.LCA_F[2]];
@@ -1512,14 +1518,13 @@ function buildDecoupledImpactSpaceframe(sc, yF, yR){
   const L_DMP_B = [-hF.DMP_BODY[0], hF.DMP_BODY[1] + yF, hF.DMP_BODY[2]];
 
   if(S.show.frame_front){
-    // 过渡管件：定形前隔框(FBH) ──> 动联前悬架硬点(UCA_F / LCA_F)
+    // 杩囨浮绠′欢锛氬畾褰㈠墠闅旀(FBH) 鈹€鈹€> 鍔ㄨ仈鍓嶆偓鏋剁‖鐐?UCA_F / LCA_F)
     T(FBH_TL, L_UCA_F, 13); T(FBH_TR, R_UCA_F, 13);
     T(FBH_BL, L_LCA_F, 14); T(FBH_BR, R_LCA_F, 14);
     D(FBH_TL, L_LCA_F, 11); D(FBH_TR, R_LCA_F, 11);
     D(FBH_BL, L_UCA_F, 11); D(FBH_BR, R_UCA_F, 11);
 
-    // 前悬架舱内侧自适应刚性结构
-    T(L_UCA_F, L_UCA_R, 13); T(R_UCA_F, R_UCA_R, 13);
+    // 鍓嶆偓鏋惰埍鍐呬晶鑷€傚簲鍒氭€х粨鏋?    T(L_UCA_F, L_UCA_R, 13); T(R_UCA_F, R_UCA_R, 13);
     T(L_LCA_F, L_LCA_R, 14); T(R_LCA_F, R_LCA_R, 14);
     T(L_UCA_F, L_LCA_F, 12); T(R_UCA_F, R_LCA_F, 12);
     T(L_UCA_R, L_LCA_R, 12); T(R_UCA_R, R_LCA_R, 12);
@@ -1528,7 +1533,7 @@ function buildDecoupledImpactSpaceframe(sc, yF, yR){
     T(L_LCA_F, R_LCA_F, 13); T(L_LCA_R, R_LCA_R, 13);
     D(L_LCA_F, R_LCA_R, 11); D(R_LCA_F, L_LCA_R, 11);
 
-    // 摇臂轴承座与推杆避震安装塔架
+    // 鎽囪噦杞存壙搴т笌鎺ㄦ潌閬块渿瀹夎濉旀灦
     T(L_UCA_F, L_RCK_A, 11, SYSTEM_COLORS.frameSec); T(R_UCA_F, R_RCK_A, 11, SYSTEM_COLORS.frameSec);
     T(L_UCA_R, L_RCK_B, 11, SYSTEM_COLORS.frameSec); T(R_UCA_R, R_RCK_B, 11, SYSTEM_COLORS.frameSec);
     T(L_RCK_A, L_RCK_B, 12, SYSTEM_COLORS.frameSec); T(R_RCK_A, R_RCK_B, 12, SYSTEM_COLORS.frameSec);
@@ -1536,7 +1541,7 @@ function buildDecoupledImpactSpaceframe(sc, yF, yR){
     T(L_DMP_B, [0, L_DMP_B[1], L_DMP_B[2]-40], 11, SYSTEM_COLORS.frameSec);
     T(R_DMP_B, [0, R_DMP_B[1], R_DMP_B[2]-40], 11, SYSTEM_COLORS.frameSec);
 
-    // 过渡管件：动联前悬架后硬点(UCA_R / LCA_R) ──> 定形前防滚架(FH)
+    // 杩囨浮绠′欢锛氬姩鑱斿墠鎮灦鍚庣‖鐐?UCA_R / LCA_R) 鈹€鈹€> 瀹氬舰鍓嶉槻婊氭灦(FH)
     T(L_UCA_R, FH_ML, 14); T(R_UCA_R, FH_MR, 14);
     T(L_LCA_R, FH_BL, 15); T(R_LCA_R, FH_BR, 15);
     D(L_UCA_R, FH_BL, 11); D(R_UCA_R, FH_BR, 11);
@@ -1544,7 +1549,7 @@ function buildDecoupledImpactSpaceframe(sc, yF, yR){
     D(L_UCA_F, FH_TopL, 11); D(R_UCA_F, FH_TopR, 11);
   }
 
-  // 后悬架承力舱
+  // 鍚庢偓鏋舵壙鍔涜埍
   const R_RLCA_F = [hR.LCA_F[0], hR.LCA_F[1] + yR, hR.LCA_F[2]];
   const L_RLCA_F = [-hR.LCA_F[0], hR.LCA_F[1] + yR, hR.LCA_F[2]];
   const R_RLCA_R = [hR.LCA_R[0], hR.LCA_R[1] + yR, hR.LCA_R[2]];
@@ -1564,7 +1569,7 @@ function buildDecoupledImpactSpaceframe(sc, yF, yR){
   const L_RDMP_B = [-hR.DMP_BODY[0], hR.DMP_BODY[1] + yR, hR.DMP_BODY[2]];
 
   if(S.show.frame_rear){
-    // 过渡管件：定形主防滚架(MH) ──> 动联后悬架前硬点
+    // 杩囨浮绠′欢锛氬畾褰富闃叉粴鏋?MH) 鈹€鈹€> 鍔ㄨ仈鍚庢偓鏋跺墠纭偣
     T(MH_TopL, L_RUCA_F, 16, SYSTEM_COLORS.frameMain);
     T(MH_TopR, R_RUCA_F, 16, SYSTEM_COLORS.frameMain);
     T(MH_ML, L_RUCA_F, 14); T(MH_MR, R_RUCA_F, 14);
@@ -1572,7 +1577,7 @@ function buildDecoupledImpactSpaceframe(sc, yF, yR){
     D(MH_ML, L_RLCA_F, 12); D(MH_MR, R_RLCA_F, 12);
     D(MH_BL, L_RUCA_F, 12); D(MH_BR, R_RUCA_F, 12);
 
-    // 后悬架舱内部管架结构
+    // 鍚庢偓鏋惰埍鍐呴儴绠℃灦缁撴瀯
     T(L_RUCA_F, L_RUCA_R, 14); T(R_RUCA_F, R_RUCA_R, 14);
     T(L_RLCA_F, L_RLCA_R, 15); T(R_RLCA_F, R_RLCA_R, 15);
     T(L_RUCA_F, L_RLCA_F, 13); T(R_RUCA_F, R_RLCA_F, 13);
@@ -1582,7 +1587,7 @@ function buildDecoupledImpactSpaceframe(sc, yF, yR){
     T(L_RLCA_F, R_RLCA_F, 14); T(L_RLCA_R, R_RLCA_R, 14);
     D(L_RLCA_F, R_RLCA_R, 12); D(R_RLCA_F, L_RLCA_R, 12);
 
-    // 后摇臂与拉杆避震安装塔架
+    // 鍚庢憞鑷備笌鎷夋潌閬块渿瀹夎濉旀灦
     T(L_RUCA_F, L_RRCK_A, 11, SYSTEM_COLORS.frameSec); T(R_RUCA_F, R_RRCK_A, 11, SYSTEM_COLORS.frameSec);
     T(L_RUCA_R, L_RRCK_B, 11, SYSTEM_COLORS.frameSec); T(R_RUCA_R, R_RRCK_B, 11, SYSTEM_COLORS.frameSec);
     T(L_RRCK_A, L_RRCK_B, 12, SYSTEM_COLORS.frameSec); T(R_RRCK_A, R_RRCK_B, 12, SYSTEM_COLORS.frameSec);
@@ -1590,15 +1595,14 @@ function buildDecoupledImpactSpaceframe(sc, yF, yR){
     T(L_RDMP_B, [0, L_RDMP_B[1], L_RDMP_B[2]+30], 11, SYSTEM_COLORS.frameSec);
     T(R_RDMP_B, [0, R_RDMP_B[1], R_RDMP_B[2]+30], 11, SYSTEM_COLORS.frameSec);
 
-    // 过渡管件：动联后悬架后硬点 ──> 定形后隔框(RSB2)
+    // 杩囨浮绠′欢锛氬姩鑱斿悗鎮灦鍚庣‖鐐?鈹€鈹€> 瀹氬舰鍚庨殧妗?RSB2)
     T(L_RUCA_R, RSB2_TL, 13); T(R_RUCA_R, RSB2_TR, 13);
     T(L_RLCA_R, RSB2_BL, 14); T(R_RLCA_R, RSB2_BR, 14);
     D(L_RUCA_R, RSB2_BL, 11); D(R_RUCA_R, RSB2_BR, 11);
     D(L_RLCA_R, RSB2_TL, 11); D(R_RLCA_R, RSB2_TR, 11);
   }
 
-  // 悬架硬点金属安装支耳
-  if(S.show.bushing){
+  // 鎮灦纭偣閲戝睘瀹夎鏀€?  if(S.show.bushing){
     const renderNodeTabs = (nodes) => {
       nodes.forEach(pt => {
         cylinder(sc, sub(pt,[12,0,0]), add(pt,[12,0,0]), 16, SYSTEM_COLORS.frameNode, 1.2, 10, "rgba(224,160,64,0.45)");
@@ -1609,7 +1613,7 @@ function buildDecoupledImpactSpaceframe(sc, yF, yR){
   }
 }
 
-/* 2. 传动系：EDU 电驱动单元与差速器几何 */
+/* 2. 浼犲姩绯伙細EDU 鐢甸┍鍔ㄥ崟鍏冧笌宸€熷櫒鍑犱綍 */
 function buildPowertrainEDU(sc, yF, yR){
   box3D(sc, [0, yF-30, 250], [220, 170, 150], SYSTEM_COLORS.motor, 1.3, SYSTEM_COLORS.motorBody);
   cylinder(sc, [-110, yF-30, 250], [110, yF-30, 250], 75, SYSTEM_COLORS.motor, 1.2, 14);
@@ -1623,7 +1627,7 @@ function buildPowertrainEDU(sc, yF, yR){
   cylinder(sc, [120, yR, 260], [150, yR, 260], 44, SYSTEM_COLORS.diff, 1.2, 12);
 }
 
-/* 3. 转向系：单座方程式中置横向蝴蝶方向盘与转向管柱 */
+/* 3. 杞悜绯伙細鍗曞骇鏂圭▼寮忎腑缃í鍚戣澊铦舵柟鍚戠洏涓庤浆鍚戠鏌?*/
 function buildFormulaCentralSteering(sc, yF){
   const swAngle = S.swAngle * D2R;
   const rackY = S.front.hp.RACK[1] + yF;
@@ -1708,7 +1712,7 @@ function buildFormulaCentralSteering(sc, yF){
   }
 }
 
-/* 4. 制动系：中置双回路总泵、踏板平衡杆与管网 */
+/* 4. 鍒跺姩绯伙細涓疆鍙屽洖璺€绘车銆佽笍鏉垮钩琛℃潌涓庣缃?*/
 function buildBrakeHydraulicSystem(sc, yF, yR){
   const pMC_L = [-40, yF + 120, S.front.hp.LCA_F[2] + 45];
   const pMC_R = [40,  yF + 120, S.front.hp.LCA_F[2] + 45];
@@ -1735,7 +1739,7 @@ function buildBrakeHydraulicSystem(sc, yF, yR){
   }
 }
 
-/* 5. 车轮端与悬架总成装配 */
+/* 5. 杞﹁疆绔笌鎮灦鎬绘垚瑁呴厤 */
 function addAxleAssemblyPRO(sc, M, m, sx, yOff, axis){
   const state = S[axis];
   const T=p=>[p[0]*sx, p[1]+yOff, p[2]];
@@ -1871,8 +1875,7 @@ function drawSubframe(sc, h, yOff, bx, mir, state){
 
   const sgn = [1].concat(mir?[-1]:[]);
   sgn.forEach(s=>{
-    // Rocker 枢轴与支架
-    const a = [h.RCK_AX_A[0]*s, h.RCK_AX_A[1]+yOff, h.RCK_AX_A[2]];
+    // Rocker 鏋㈣酱涓庢敮鏋?    const a = [h.RCK_AX_A[0]*s, h.RCK_AX_A[1]+yOff, h.RCK_AX_A[2]];
     const b = [h.RCK_AX_B[0]*s, h.RCK_AX_B[1]+yOff, h.RCK_AX_B[2]];
     cylinder(sc, a, b, 16, C.chas, 1, 12);
     L3(sc, a, [s*bx, a[1], a[2]], C.chas2, 1);
@@ -1881,7 +1884,7 @@ function drawSubframe(sc, h, yOff, bx, mir, state){
     cylinder(sc, sub(db,[0,0,10]), add(db,[0,0,10]), 14, C.chas, 1, 10);
     L3(sc, db, [0, db[1], db[2]], C.chas2, 1);
 
-    // LCA & UCA 车架侧铰轴转轴设计 (Bushing / Pivot Axis)
+    // LCA & UCA 杞︽灦渚ч摪杞磋浆杞磋璁?(Bushing / Pivot Axis)
     const renderBushing = (idF, idR, rBush) => {
       const pF = [h[idF][0]*s, h[idF][1]+yOff, h[idF][2]];
       const pR = [h[idR][0]*s, h[idR][1]+yOff, h[idR][2]];
@@ -1896,7 +1899,7 @@ function drawSubframe(sc, h, yOff, bx, mir, state){
     renderBushing("UCA_F", "UCA_R", 13);
   });
   
-  // ARB 机架硬点
+  // ARB 鏈烘灦纭偣
   if(S.show.arb && state.arb.d>0.5){
     const P0 = lerp3(h.LCA_F, h.LBJ, state.arb.t);
     const ay = h.LCA_F[1] + state.arb.dy + yOff;
@@ -2064,12 +2067,12 @@ function addInstance(sc,M,m,sw,sx,yOff,axis){
   if(S.show.node) M.n.forEach(n=>ND(sc,T(n.p),n.fix,n.id,n.zh,sx,axis));
 }
 
-/* ================================ 9. 四视口正交/透视投影引擎 ================================ */
+/* ================================ 9. 鍥涜鍙ｆ浜?閫忚鎶曞奖寮曟搸 ================================ */
 const VDEF=[
-  {key:"front",zh:"正视图",en:"FRONT VIEW",ax:"X-Z",bx:[1,0,0],by:[0,0,1],type:"o",note:"+Y⊗车头  +X→外侧"},
-  {key:"top",  zh:"俯视图",en:"PLAN VIEW", ax:"X-Y",bx:[1,0,0],by:[0,1,0],type:"o",note:"+Z⊙向上  ↑车头"},
-  {key:"side", zh:"侧视图",en:"SIDE VIEW", ax:"Y-Z",bx:[0,1,0],by:[0,0,1],type:"o",note:"+X⊙外侧  →车头"},
-  {key:"iso",  zh:"等轴测",en:"ISOMETRIC", ax:"3D", type:"p",note:"左键旋转 · 滚轮缩放"}
+  {key:"front",zh:"姝ｈ鍥?,en:"FRONT VIEW",ax:"X-Z",bx:[1,0,0],by:[0,0,1],type:"o",note:"+Y鈯楄溅澶? +X鈫掑渚?},
+  {key:"top",  zh:"淇鍥?,en:"PLAN VIEW", ax:"X-Y",bx:[1,0,0],by:[0,1,0],type:"o",note:"+Z鈯欏悜涓? 鈫戣溅澶?},
+  {key:"side", zh:"渚ц鍥?,en:"SIDE VIEW", ax:"Y-Z",bx:[0,1,0],by:[0,0,1],type:"o",note:"+X鈯欏渚? 鈫掕溅澶?},
+  {key:"iso",  zh:"绛夎酱娴?,en:"ISOMETRIC", ax:"3D", type:"p",note:"宸﹂敭鏃嬭浆 路 婊氳疆缂╂斁"}
 ];
 const VW=[];
 
@@ -2078,7 +2081,7 @@ function initViews(){
   VDEF.forEach((d)=>{
     const w=document.createElement("div");w.className="vw";w.dataset.k=d.key;
     w.innerHTML='<div class="vwh"><b>'+d.zh+'</b>'+d.en+' <span class="vax">['+d.ax+']</span>'+
-      '<span class="vi">'+d.note+'</span><span class="vb" title="适应">F</span><span class="vb" title="最大化">M</span></div>'+
+      '<span class="vi">'+d.note+'</span><span class="vb" title="閫傚簲">F</span><span class="vb" title="鏈€澶у寲">M</span></div>'+
       '<canvas></canvas>';
     vp.appendChild(w);
     const v=Object.assign({},d,{el:w,cv:w.querySelector("canvas"),w:10,h:10,dpr:1,
@@ -2131,7 +2134,7 @@ function fitPoints(){
   pts.push([0,0,0]); return pts;
 }
 function fitView(v){
-  if(v.w<20||v.h<20){v.s=0.5;return;}   // 防初次布局竞态 (2026-08-24)
+  if(v.w<20||v.h<20){v.s=0.5;return;}   // 闃插垵娆″竷灞€绔炴€?(2026-08-24)
   const pts=fitPoints();
   if(v.type==="o"){
     let a0=1e9,a1=-1e9,b0=1e9,b1=-1e9;
@@ -2147,7 +2150,7 @@ function fitView(v){
   }
 }
 
-/* ================================ 10. 渲染绘制与 HUD ================================ */
+/* ================================ 10. 娓叉煋缁樺埗涓?HUD ================================ */
 function dash(ctx,d){ctx.setLineDash(d||[]);}
 
 function dimLine(ctx,A,B,txt,off,col){
@@ -2173,7 +2176,7 @@ function dimLine(ctx,A,B,txt,off,col){
 }
 
 function angArc(ctx,O,r,a0,a1,txt,col){
-  if(!O||!(r>0))return;   // 防负半径竞态 (2026-08-24)
+  if(!O||!(r>0))return;   // 闃茶礋鍗婂緞绔炴€?(2026-08-24)
   ctx.strokeStyle=col||C.dim;ctx.lineWidth=1;dash(ctx,[3,2]);
   ctx.beginPath();ctx.arc(O[0],O[1],r,Math.min(a0,a1),Math.max(a0,a1));ctx.stroke();dash(ctx,[]);
   const am=(a0+a1)/2;
@@ -2186,7 +2189,7 @@ function drawOverlay(v){
   const ctx = v.ctx;
   const yF = S.wb/2, yR = -S.wb/2;
 
-  /* ---- 1. 正视图：瞬心 IC / 侧倾中心 RC / KPI / Camber / 主销偏移距 ---- */
+  /* ---- 1. 姝ｈ鍥撅細鐬績 IC / 渚у€句腑蹇?RC / KPI / Camber / 涓婚攢鍋忕Щ璺?---- */
   if(v.key === "front"){
     const isF = S.axis === 'front';
     const m = isF ? SIM.mFR : SIM.mRR;
@@ -2216,10 +2219,9 @@ function drawOverlay(v){
       ctx.moveTo(icS[0], icS[1]-7); ctx.lineTo(icS[0]+7, icS[1]);
       ctx.stroke();
       ctx.fillStyle = C.ic; ctx.font = "8.5px ui-monospace,monospace";
-      ctx.fillText("IC 瞬心", icS[0]+9, icS[1]-4);
+      ctx.fillText("IC 鐬績", icS[0]+9, icS[1]-4);
 
-      // RC 侧倾中心
-      const rc = SIM.rc2 ? SIM.rc2 : (m.rcH!==null ? [0, m.rcH] : null);
+      // RC 渚у€句腑蹇?      const rc = SIM.rc2 ? SIM.rc2 : (m.rcH!==null ? [0, m.rcH] : null);
       if(rc){
         const rS = P2(v, [rc[0], yOff, rc[1]]);
         if(mL && mL.ic){
@@ -2231,34 +2233,34 @@ function drawOverlay(v){
         ctx.beginPath(); ctx.arc(rS[0], rS[1], 4.5, 0, 6.2832); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(rS[0]-9, rS[1]); ctx.lineTo(rS[0]+9, rS[1]);
         ctx.moveTo(rS[0], rS[1]-9); ctx.lineTo(rS[0]+9, rS[1]+9); ctx.stroke();
-        ctx.fillStyle = C.rc; ctx.fillText("RC 侧倾中心 "+fmt(rc[1],1)+"mm", rS[0]+11, rS[1]-4);
+        ctx.fillStyle = C.rc; ctx.fillText("RC 渚у€句腑蹇?"+fmt(rc[1],1)+"mm", rS[0]+11, rS[1]-4);
       }
     }
 
     if(S.show.dim){
       const O = P2(v, [0, yOff, m.cp[2]]), Cp = P2(v, [m.cp[0], yOff, m.cp[2]]);
-      dimLine(ctx, O, Cp, "轮距半宽 "+fmt(m.cp[0],1), 34, C.dim);
+      dimLine(ctx, O, Cp, "杞窛鍗婂 "+fmt(m.cp[0],1), 34, C.dim);
       const K = P2(v, [m.kg[0], yOff, m.kg[2]]);
-      dimLine(ctx, K, Cp, "主销偏移距 "+fmt(m.scrub,1), -30, C.kpg);
+      dimLine(ctx, K, Cp, "涓婚攢鍋忕Щ璺?"+fmt(m.scrub,1), -30, C.kpg);
       
       const Mcur = isF ? SIM.FR : SIM.RR;
       const W0 = P2(v, [m.wc[0], yOff, Mcur.n[Mcur.idx.WC].p0[2]]), W1 = P2(v, [m.wc[0], yOff, m.wc[2]]);
-      if(abs(m.tr) > 0.5) dimLine(ctx, W0, W1, "轮跳 "+sfmt(m.tr,1), 46, C.path);
+      if(abs(m.tr) > 0.5) dimLine(ctx, W0, W1, "杞烦 "+sfmt(m.tr,1), 46, C.path);
 
-      // KPI 主销内倾角
+      // KPI 涓婚攢鍐呭€捐
       const kb = P2(v, [m.lbj[0], yOff, m.lbj[2]]), kt = P2(v, [m.ubj[0], yOff, m.ubj[2]]);
       const a0 = atan2(kt[1]-kb[1], kt[0]-kb[0]);
-      angArc(ctx, kb, 52, -PI/2, a0, "KPI "+fmt(m.kpi,2)+"°", C.kp);
+      angArc(ctx, kb, 52, -PI/2, a0, "KPI "+fmt(m.kpi,2)+"掳", C.kp);
 
-      // Camber 外倾角
+      // Camber 澶栧€捐
       const wcS = P2(v, [m.wc[0], yOff, m.wc[2]]);
       const up = [-m.ax[2], m.ax[0]];
       const a1 = atan2(-up[1], up[0]);
-      angArc(ctx, wcS, state.tire.R * v.s * 0.72, -PI/2, a1, "γ "+fmt(m.cam,2)+"°", C.knu);
+      angArc(ctx, wcS, state.tire.R * v.s * 0.72, -PI/2, a1, "纬 "+fmt(m.cam,2)+"掳", C.knu);
     }
   }
 
-  /* ---- 2. 侧视图：后倾角 Caster / 拖距 Trail / 侧视瞬心 SVIC & Anti-Dive ---- */
+  /* ---- 2. 渚ц鍥撅細鍚庡€捐 Caster / 鎷栬窛 Trail / 渚ц鐬績 SVIC & Anti-Dive ---- */
   if(v.key === "side" && S.show.dim){
     const isF = S.axis === 'front';
     const m = isF ? SIM.mFR : SIM.mRR;
@@ -2267,20 +2269,20 @@ function drawOverlay(v){
 
     const kb = P2(v, [0, m.lbj[1]+yOff, m.lbj[2]]), kt = P2(v, [0, m.ubj[1]+yOff, m.ubj[2]]);
     const a0 = atan2(kt[1]-kb[1], kt[0]-kb[0]);
-    angArc(ctx, kb, 55, -PI/2, a0, "后倾 "+fmt(m.cast,2)+"°", C.kp);
+    angArc(ctx, kb, 55, -PI/2, a0, "鍚庡€?"+fmt(m.cast,2)+"掳", C.kp);
     const K = P2(v, [0, m.kg[1]+yOff, m.kg[2]]), Cp = P2(v, [0, m.cp[1]+yOff, m.cp[2]]);
-    dimLine(ctx, Cp, K, "拖距 "+fmt(m.trail,1), -26, C.kpg);
+    dimLine(ctx, Cp, K, "鎷栬窛 "+fmt(m.trail,1), -26, C.kpg);
 
     if(m.svic){
       const A = P2(v, [0, m.cp[1]+yOff, m.cp[2]]), B = P2(v, [0, m.svic[0]+yOff, m.svic[1]]);
       dash(ctx, [6,3]); ctx.strokeStyle = C.ic; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); dash(ctx, []);
       ctx.fillStyle = C.ic; ctx.font = "8.5px ui-monospace,monospace";
-      ctx.fillText("→侧视瞬心 抗俯仰 "+(m.anti===null?"--":fmt(m.anti,0)+"%"), A[0]+14, A[1]-8);
+      ctx.fillText("鈫掍晶瑙嗙灛蹇?鎶椾刊浠?"+(m.anti===null?"--":fmt(m.anti,0)+"%"), A[0]+14, A[1]-8);
     }
   }
 
-  /* ---- 3. 俯视图：车轮中心基准线 / 角度扇形弧 / Toe-In & Toe-Out 辅助线 / 转向中心 ---- */
+  /* ---- 3. 淇鍥撅細杞﹁疆涓績鍩哄噯绾?/ 瑙掑害鎵囧舰寮?/ Toe-In & Toe-Out 杈呭姪绾?/ 杞悜涓績 ---- */
   if(v.key === "top"){
     const drawSteerGuide = (mm, sx, yAxisOff, labelPrefix, state) => {
       if(!mm) return;
@@ -2304,15 +2306,15 @@ function drawOverlay(v){
       const bb = atan2(B_wheel[1]-O[1], B_wheel[0]-O[0]);
       const currentToe = sx > 0 ? -mm.toe : mm.toe;
       const toeState = abs(mm.toe) < 0.005 ? "PARALLEL" : (mm.toe > 0 ? "TOE-IN" : "TOE-OUT");
-      const lbl = labelPrefix + " " + sfmt(currentToe, 2) + "° (" + toeState + ")";
+      const lbl = labelPrefix + " " + sfmt(currentToe, 2) + "掳 (" + toeState + ")";
       angArc(ctx, O, state.tire.R * v.s * 0.95, aa, bb, lbl, C.knu);
     };
 
-    drawSteerGuide(SIM.mFR, 1, yF, "前右 FR", S.front);
-    if(S.show.mirror) drawSteerGuide(SIM.mFL, -1, yF, "前左 FL", S.front);
+    drawSteerGuide(SIM.mFR, 1, yF, "鍓嶅彸 FR", S.front);
+    if(S.show.mirror) drawSteerGuide(SIM.mFL, -1, yF, "鍓嶅乏 FL", S.front);
 
-    drawSteerGuide(SIM.mRR, 1, yR, "后右 RR", S.rear);
-    if(S.show.mirror) drawSteerGuide(SIM.mRL, -1, yR, "后左 RL", S.rear);
+    drawSteerGuide(SIM.mRR, 1, yR, "鍚庡彸 RR", S.rear);
+    if(S.show.mirror) drawSteerGuide(SIM.mRL, -1, yR, "鍚庡乏 RL", S.rear);
 
     if(S.show.dim && SIM.mFL && abs(S.rack) > 2){
       const ak = ackermann('front');
@@ -2328,7 +2330,7 @@ function drawOverlay(v){
           ctx.moveTo(P[0]-6, P[1]); ctx.lineTo(P[0]+6, P[1]);
           ctx.moveTo(P[0], P[1]-6); ctx.lineTo(P[0]+6, P[1]);
           ctx.stroke();
-          ctx.fillStyle = C.ic; ctx.fillText("转向中心 ICR", P[0]+8, P[1]-4);
+          ctx.fillStyle = C.ic; ctx.fillText("杞悜涓績 ICR", P[0]+8, P[1]-4);
         }
       }
     }
@@ -2417,11 +2419,11 @@ function drawHUD(v){
   ctx.fillText("1:"+fmt(1/v.s,1),8,14);
 }
 
-/* ================================ 11. UI 控制面板构建 ================================ */
+/* ================================ 11. UI 鎺у埗闈㈡澘鏋勫缓 ================================ */
 const PICK=[];
 const UI={hover:null,selHP:null,drag:null,ro:{},sync:[],plots:[]};
 
-function E(t,c,h){const e=document.createElement(t);if(c)e.className=c;if(h!==undefined)e.innerHTML=h;return e;}
+function E(t,c,h){const e=document.createElement(t);if(c)e.className=c;if(h!==undefined)e.textContent=h;return e;} /* F-44锛?026-08-30锛夛細innerHTML鈫抰extContent锛屽紩鎿庡搷搴斿叆 DOM 涓嶅啀鏈?XSS 闈?*/
 function sec(host,zh,en,col,cls){
   const s=E("div","sec"+(col?" col":""));
   const h=E("div","sh"+(cls?" "+cls:""),'<span class="zh">'+zh+'</span>'+en+'<span class="tg"></span>');
@@ -2483,69 +2485,69 @@ function buildLeft(){
   buildPersistencePanel(host);
   buildSystemShowPanel(host);
 
-  let b=sec(host,"悬架底盘模块编辑","CHASSIS EDITOR");
-  rowBtns(b,[["编辑前悬架 (FRONT)",()=>{S.axis='front'; UI.sync.forEach(f=>f());},()=>S.axis==='front'],
-             ["编辑后悬架 (REAR)",()=>{S.axis='rear'; UI.sync.forEach(f=>f());},()=>S.axis==='rear']]);
+  let b=sec(host,"鎮灦搴曠洏妯″潡缂栬緫","CHASSIS EDITOR");
+  rowBtns(b,[["缂栬緫鍓嶆偓鏋?(FRONT)",()=>{S.axis='front'; UI.sync.forEach(f=>f());},()=>S.axis==='front'],
+             ["缂栬緫鍚庢偓鏋?(REAR)",()=>{S.axis='rear'; UI.sync.forEach(f=>f());},()=>S.axis==='rear']]);
 
-  b=sec(host,"多体求解模式控制","SOLVER CONTROLS",false,"grn");
-  rowBtns(b,[["运动学 KIN",()=>{S.mode="kin";},()=>S.mode==="kin"],
-             ["4-Post 台架 RIG",()=>{S.mode="rig";S.simT=0;},()=>S.mode==="rig"],
-             ["准静态操稳 QS",()=>{S.mode="quasi";},()=>S.mode==="quasi"]]);
-  rowBtns(b,[["运行 / 暂停",()=>{S.play=!S.play;},()=>S.play],
-             ["复位 RESET",()=>{S.travel=0;S.roll=0;S.rack=0;rebuild();}]]);
-  rowSlider(b,"轮跳幅值","TRAVEL AMP","mm",0,75,1,()=>S.excA,v=>S.excA=v,0);
-  rowSlider(b,"轮跳频率","FREQ","Hz",0.05,1.5,0.01,()=>S.excF,v=>S.excF=v,2);
+  b=sec(host,"澶氫綋姹傝В妯″紡鎺у埗","SOLVER CONTROLS",false,"grn");
+  rowBtns(b,[["杩愬姩瀛?KIN",()=>{S.mode="kin";},()=>S.mode==="kin"],
+             ["4-Post 鍙版灦 RIG",()=>{S.mode="rig";S.simT=0;},()=>S.mode==="rig"],
+             ["鍑嗛潤鎬佹搷绋?QS",()=>{S.mode="quasi";},()=>S.mode==="quasi"]]);
+  rowBtns(b,[["杩愯 / 鏆傚仠",()=>{S.play=!S.play;},()=>S.play],
+             ["澶嶄綅 RESET",()=>{S.travel=0;S.roll=0;S.rack=0;rebuild();}]]);
+  rowSlider(b,"杞烦骞呭€?,"TRAVEL AMP","mm",0,75,1,()=>S.excA,v=>S.excA=v,0);
+  rowSlider(b,"杞烦棰戠巼","FREQ","Hz",0.05,1.5,0.01,()=>S.excF,v=>S.excF=v,2);
 
-  b=sec(host,"几何与转向输入 (整车关联)","INPUT DRIVERS");
-  rowSlider(b,"轮心垂向行程","WHEEL TRAVEL","mm",()=>S.trMin,()=>S.trMax,0.5,()=>S.travel,
+  b=sec(host,"鍑犱綍涓庤浆鍚戣緭鍏?(鏁磋溅鍏宠仈)","INPUT DRIVERS");
+  rowSlider(b,"杞績鍨傚悜琛岀▼","WHEEL TRAVEL","mm",()=>S.trMin,()=>S.trMax,0.5,()=>S.travel,
     v=>{S.travel=v;S.exc="off";},1);
-  rowSlider(b,"车身侧倾角","BODY ROLL","°",-5,5,0.1,()=>S.roll,v=>S.roll=v,2);
-  rowSlider(b,"前轮转向位移","FRONT RACK","mm",-60,60,0.5,()=>S.rack,
+  rowSlider(b,"杞﹁韩渚у€捐","BODY ROLL","掳",-5,5,0.1,()=>S.roll,v=>S.roll=v,2);
+  rowSlider(b,"鍓嶈疆杞悜浣嶇Щ","FRONT RACK","mm",-60,60,0.5,()=>S.rack,
     v=>{S.rack=v;SIM.dirtySweep=true;},1);
-  rowSlider(b,"单侧前束微调","TOE TRIM","mm",-15,15,0.1,()=>S[S.axis].tieTrim,
+  rowSlider(b,"鍗曚晶鍓嶆潫寰皟","TOE TRIM","mm",-15,15,0.1,()=>S[S.axis].tieTrim,
     v=>{S[S.axis].tieTrim=v;rebuild();},2);
 
-  b=sec(host,"Baseline 基准快照比对","BASELINE SNAPSHOT",false,"amb");
-  rowBtns(b,[["快照基准线 SAVE",()=>{takeBaselineSnapshot();buildRight();},null,"hl"],
-             ["清除基准线 CLEAR",()=>{clearBaselineSnapshot();buildRight();},null,"danger"]]);
+  b=sec(host,"Baseline 鍩哄噯蹇収姣斿","BASELINE SNAPSHOT",false,"amb");
+  rowBtns(b,[["蹇収鍩哄噯绾?SAVE",()=>{takeBaselineSnapshot();buildRight();},null,"hl"],
+             ["娓呴櫎鍩哄噯绾?CLEAR",()=>{clearBaselineSnapshot();buildRight();},null,"danger"]]);
 
-  b=sec(host,"准静态操稳工况输入","QUASI-STATIC CONDITIONS",false,"amb");
-  rowSlider(b,"侧向加速度","LATERAL ACC","g",-1.8,1.8,0.05,()=>S.qs.gy,v=>{S.qs.gy=v;simulate(0.016);},2);
-  rowSlider(b,"纵向加速度","LONG ACC","g",-1.5,1.5,0.05,()=>S.qs.gx,v=>{S.qs.gx=v;simulate(0.016);},2);
-  rowSlider(b,"气动总下压力","AERO DOWNFORCE","N",0,5000,50,()=>S.qs.aeroF,v=>{S.qs.aeroF=v;simulate(0.016);},0);
-  rowSlider(b,"气动前轴分配比","AERO FRONT BIAS","-",0.2,0.8,0.01,()=>S.qs.aeroBias,v=>{S.qs.aeroBias=v;simulate(0.016);},2);
-  rowSlider(b,"整车总质量","TOTAL MASS","kg",800,2200,10,()=>S.mTotal,v=>{S.mTotal=v;refreshDerived(false);},0);
-  rowSlider(b,"簧载总质量","SPRUNG MASS","kg",700,2000,10,()=>S.mSprung,v=>{S.mSprung=v;refreshDerived(false);},0);
+  b=sec(host,"鍑嗛潤鎬佹搷绋冲伐鍐佃緭鍏?,"QUASI-STATIC CONDITIONS",false,"amb");
+  rowSlider(b,"渚у悜鍔犻€熷害","LATERAL ACC","g",-1.8,1.8,0.05,()=>S.qs.gy,v=>{S.qs.gy=v;simulate(0.016);},2);
+  rowSlider(b,"绾靛悜鍔犻€熷害","LONG ACC","g",-1.5,1.5,0.05,()=>S.qs.gx,v=>{S.qs.gx=v;simulate(0.016);},2);
+  rowSlider(b,"姘斿姩鎬讳笅鍘嬪姏","AERO DOWNFORCE","N",0,5000,50,()=>S.qs.aeroF,v=>{S.qs.aeroF=v;simulate(0.016);},0);
+  rowSlider(b,"姘斿姩鍓嶈酱鍒嗛厤姣?,"AERO FRONT BIAS","-",0.2,0.8,0.01,()=>S.qs.aeroBias,v=>{S.qs.aeroBias=v;simulate(0.016);},2);
+  rowSlider(b,"鏁磋溅鎬昏川閲?,"TOTAL MASS","kg",800,2200,10,()=>S.mTotal,v=>{S.mTotal=v;refreshDerived(false);},0);
+  rowSlider(b,"绨ц浇鎬昏川閲?,"SPRUNG MASS","kg",700,2000,10,()=>S.mSprung,v=>{S.mSprung=v;refreshDerived(false);},0);
 
-  b=sec(host,"内置弹性与阻尼元件","INBOARD SPRINGS & DAMPERS");
-  rowSlider(b,"主弹簧刚度","SPRING RATE","N/mm",40,300,5,()=>S[S.axis].kS,v=>{S[S.axis].kS=v;refreshDerived(false);},0);
-  rowSlider(b,"压缩阻尼系数","BUMP DAMP","N·s/mm",1,30,0.5,()=>S[S.axis].cB,v=>S[S.axis].cB=v,1);
-  rowSlider(b,"复原阻尼系数","REB DAMP","N·s/mm",1,40,0.5,()=>S[S.axis].cR,v=>S[S.axis].cR=v,1);
-  rowSlider(b,"轮胎垂向刚度","TIRE RATE","N/mm",100,450,10,()=>S[S.axis].kT,v=>{S[S.axis].kT=v;refreshDerived(false);},0);
-  rowSlider(b,"角簧上质量","SPRUNG MASS","kg",150,700,5,()=>S[S.axis].mS,v=>{S[S.axis].mS=v;refreshDerived(false);},0);
+  b=sec(host,"鍐呯疆寮规€т笌闃诲凹鍏冧欢","INBOARD SPRINGS & DAMPERS");
+  rowSlider(b,"涓诲脊绨у垰搴?,"SPRING RATE","N/mm",40,300,5,()=>S[S.axis].kS,v=>{S[S.axis].kS=v;refreshDerived(false);},0);
+  rowSlider(b,"鍘嬬缉闃诲凹绯绘暟","BUMP DAMP","N路s/mm",1,30,0.5,()=>S[S.axis].cB,v=>S[S.axis].cB=v,1);
+  rowSlider(b,"澶嶅師闃诲凹绯绘暟","REB DAMP","N路s/mm",1,40,0.5,()=>S[S.axis].cR,v=>S[S.axis].cR=v,1);
+  rowSlider(b,"杞儙鍨傚悜鍒氬害","TIRE RATE","N/mm",100,450,10,()=>S[S.axis].kT,v=>{S[S.axis].kT=v;refreshDerived(false);},0);
+  rowSlider(b,"瑙掔哀涓婅川閲?,"SPRUNG MASS","kg",150,700,5,()=>S[S.axis].mS,v=>{S[S.axis].mS=v;refreshDerived(false);},0);
   
-  b=sec(host,"横向稳定杆 (ARB)","ANTI-ROLL BAR");
-  rowSlider(b,"稳定杆直径 (0=拆除)","ARB DIA","mm",0,34,0.5,()=>S[S.axis].arb.d,v=>S[S.axis].arb.d=v,1);
-  rowSlider(b,"稳定杆连杆位置比","ARB LINK POS","-",0.25,0.92,0.01,()=>S[S.axis].arb.t,v=>{S[S.axis].arb.t=v;SIM.dirtySweep=true;},2);
-  rowSlider(b,"稳定杆纵向偏置","ARB OFFSET Y","mm",-60,180,2,()=>S[S.axis].arb.dy,v=>{S[S.axis].arb.dy=v;SIM.dirtySweep=true;},0);
-  rowSlider(b,"稳定杆高度偏置","ARB OFFSET Z","mm",40,300,2,()=>S[S.axis].arb.dz,v=>{S[S.axis].arb.dz=v;SIM.dirtySweep=true;},0);
+  b=sec(host,"妯悜绋冲畾鏉?(ARB)","ANTI-ROLL BAR");
+  rowSlider(b,"绋冲畾鏉嗙洿寰?(0=鎷嗛櫎)","ARB DIA","mm",0,34,0.5,()=>S[S.axis].arb.d,v=>S[S.axis].arb.d=v,1);
+  rowSlider(b,"绋冲畾鏉嗚繛鏉嗕綅缃瘮","ARB LINK POS","-",0.25,0.92,0.01,()=>S[S.axis].arb.t,v=>{S[S.axis].arb.t=v;SIM.dirtySweep=true;},2);
+  rowSlider(b,"绋冲畾鏉嗙旱鍚戝亸缃?,"ARB OFFSET Y","mm",-60,180,2,()=>S[S.axis].arb.dy,v=>{S[S.axis].arb.dy=v;SIM.dirtySweep=true;},0);
+  rowSlider(b,"绋冲畾鏉嗛珮搴﹀亸缃?,"ARB OFFSET Z","mm",40,300,2,()=>S[S.axis].arb.dz,v=>{S[S.axis].arb.dz=v;SIM.dirtySweep=true;},0);
 
-  b=sec(host,"4-Post 台架路面激励","4-POST RIG ROAD PROFILE",true);
+  b=sec(host,"4-Post 鍙版灦璺潰婵€鍔?,"4-POST RIG ROAD PROFILE",true);
   const roadSel=E("div","ctl");
-  roadSel.innerHTML='<label>路面输入信号 <u>ROAD INPUT</u></label>';
+  roadSel.innerHTML='<label>璺潰杈撳叆淇″彿 <u>ROAD INPUT</u></label>';
   const sel=E("select");
-  [["none","平整路面 (NONE)"],["step","阶跃冲击 (STEP)"],["sine","连续正弦 (SINE)"],["pulse","单次脉冲 (PULSE)"],["chirp","扫频激励 (CHIRP)"],["rand","随机粗糙路面 (RAND)"]].forEach(it=>{
+  [["none","骞虫暣璺潰 (NONE)"],["step","闃惰穬鍐插嚮 (STEP)"],["sine","杩炵画姝ｅ鸡 (SINE)"],["pulse","鍗曟鑴夊啿 (PULSE)"],["chirp","鎵婵€鍔?(CHIRP)"],["rand","闅忔満绮楃硻璺潰 (RAND)"]].forEach(it=>{
     const opt=E("option",null,it[1]);opt.value=it[0];sel.appendChild(opt);
   });
   sel.onchange=()=>{S.road=sel.value;};
   roadSel.appendChild(sel);b.appendChild(roadSel);
   UI.sync.push(()=>{sel.value=S.road;});
-  rowSlider(b,"路面位移幅值","ROAD AMP","mm",1,40,1,()=>S.rA,v=>S.rA=v,0);
-  rowSlider(b,"路面输入频率","ROAD FREQ","Hz",0.2,8.0,0.1,()=>S.rF,v=>S.rF=v,1);
+  rowSlider(b,"璺潰浣嶇Щ骞呭€?,"ROAD AMP","mm",1,40,1,()=>S.rA,v=>S.rA=v,0);
+  rowSlider(b,"璺潰杈撳叆棰戠巼","ROAD FREQ","Hz",0.2,8.0,0.1,()=>S.rF,v=>S.rF=v,1);
 
-  b=sec(host,"3D 空间硬点表 (右侧)","3D HARDPOINTS [mm]");
+  b=sec(host,"3D 绌洪棿纭偣琛?(鍙充晶)","3D HARDPOINTS [mm]");
   const tb=E("table","hp");
-  tb.innerHTML="<thead><tr><th>硬点 ID</th><th>X 横向</th><th>Y 纵向</th><th>Z 垂向</th></tr></thead>";
+  tb.innerHTML="<thead><tr><th>纭偣 ID</th><th>X 妯悜</th><th>Y 绾靛悜</th><th>Z 鍨傚悜</th></tr></thead>";
   const tbody=E("tbody");
   HP_META.forEach(d=>{
     const tr=E("tr");tr.dataset.id=d[0];
@@ -2564,11 +2566,11 @@ function buildLeft(){
   });
   tb.appendChild(tbody);b.appendChild(tb);
 
-  b=sec(host,"显示图层控制","DISPLAY LAYERS");
-  chkList(b,[["node","节点"],["label","硬点标号"],["rigid","刚体杆件"],["elastic","内置弹簧"],
-    ["face","摆臂三角面"],["rocker","摇臂总成"],["wheel","车轮与轮胎"],["disc","制动盘/卡钳"],
-    ["arb","横向稳定杆"],["chassis","副车架/机架"],["steer","转向拉杆"],["kp","主销轴线"],
-    ["kpsw","主销扫掠"],["path","运动轨迹"],["dim","尺寸/角度辅助"],["ic","瞬心/侧倾中心"],["mirror","对侧镜像悬架"]]);
+  b=sec(host,"鏄剧ず鍥惧眰鎺у埗","DISPLAY LAYERS");
+  chkList(b,[["node","鑺傜偣"],["label","纭偣鏍囧彿"],["rigid","鍒氫綋鏉嗕欢"],["elastic","鍐呯疆寮圭哀"],
+    ["face","鎽嗚噦涓夎闈?],["rocker","鎽囪噦鎬绘垚"],["wheel","杞﹁疆涓庤疆鑳?],["disc","鍒跺姩鐩?鍗￠挸"],
+    ["arb","妯悜绋冲畾鏉?],["chassis","鍓溅鏋?鏈烘灦"],["steer","杞悜鎷夋潌"],["kp","涓婚攢杞寸嚎"],
+    ["kpsw","涓婚攢鎵帬"],["path","杩愬姩杞ㄨ抗"],["dim","灏哄/瑙掑害杈呭姪"],["ic","鐬績/渚у€句腑蹇?],["mirror","瀵逛晶闀滃儚鎮灦"]]);
 }
 
 function buildRight(){
@@ -2576,50 +2578,50 @@ function buildRight(){
   host.innerHTML="";
   UI.plots.length=0;
 
-  let b=sec(host,"推拉杆与摇臂高阶读数","PUSH/PULL & ROCKER METRICS");
-  ro(b,"构型模式","ARCH MODE","","roArch","k");
-  ro(b,"摇臂转角","ROCKER ANGLE","°","roRckDeg","hl");
-  ro(b,"瞬态运动速比","MOTION RATIO","-","roMR","k");
-  ro(b,"减振器行程","DAMPER DISP","mm","roDmpDisp");
-  ro(b,"内置弹簧弹力","SPRING FORCE","N","roSprF","hl");
-  ro(b,"轮端等效刚度","WHEEL RATE","N/mm","roWR","k");
+  let b=sec(host,"鎺ㄦ媺鏉嗕笌鎽囪噦楂橀樁璇绘暟","PUSH/PULL & ROCKER METRICS");
+  ro(b,"鏋勫瀷妯″紡","ARCH MODE","","roArch","k");
+  ro(b,"鎽囪噦杞","ROCKER ANGLE","掳","roRckDeg","hl");
+  ro(b,"鐬€佽繍鍔ㄩ€熸瘮","MOTION RATIO","-","roMR","k");
+  ro(b,"鍑忔尟鍣ㄨ绋?,"DAMPER DISP","mm","roDmpDisp");
+  ro(b,"鍐呯疆寮圭哀寮瑰姏","SPRING FORCE","N","roSprF","hl");
+  ro(b,"杞绛夋晥鍒氬害","WHEEL RATE","N/mm","roWR","k");
 
-  b=sec(host,"车轮定位参数","WHEEL ALIGNMENT");
-  ro(b,"车轮外倾角","CAMBER","°","roCam","k");
-  ro(b,"车轮前束角","TOE","°","roToe","k");
-  ro(b,"主销内倾角","KPI / SAI","°","roKpi");
-  ro(b,"主销后倾角","CASTER","°","roCast");
-  ro(b,"主销接地偏移距","SCRUB RADIUS","mm","roScrub","hl");
-  ro(b,"主销后倾拖距","CASTER TRAIL","mm","roTrail");
+  b=sec(host,"杞﹁疆瀹氫綅鍙傛暟","WHEEL ALIGNMENT");
+  ro(b,"杞﹁疆澶栧€捐","CAMBER","掳","roCam","k");
+  ro(b,"杞﹁疆鍓嶆潫瑙?,"TOE","掳","roToe","k");
+  ro(b,"涓婚攢鍐呭€捐","KPI / SAI","掳","roKpi");
+  ro(b,"涓婚攢鍚庡€捐","CASTER","掳","roCast");
+  ro(b,"涓婚攢鎺ュ湴鍋忕Щ璺?,"SCRUB RADIUS","mm","roScrub","hl");
+  ro(b,"涓婚攢鍚庡€炬嫋璺?,"CASTER TRAIL","mm","roTrail");
 
-  b=sec(host,"转向与侧倾刚度 (ARB)","STEERING & ROLL STIFFNESS");
-  ro(b,"阿克曼率 (前桥)","ACKERMANN","%","roAck","hl");
-  ro(b,"转弯半径","TURN RADIUS","m","roTrad");
-  ro(b,"扭杆扭转角","ARB TWIST","°","roArbTw");
-  ro(b,"扭杆扭转刚度","ARB TORSION","N·m/°","roArbKt");
-  ro(b,"稳定杆侧倾刚度","ARB ROLL K","N·m/°","roArbKr");
-  ro(b,"轴总侧倾刚度","AXLE ROLL K","N·m/°","roArbTot","k");
-  ro(b,"稳定杆占比","ARB SHARE","%","roArbSh","hl");
+  b=sec(host,"杞悜涓庝晶鍊惧垰搴?(ARB)","STEERING & ROLL STIFFNESS");
+  ro(b,"闃垮厠鏇肩巼 (鍓嶆ˉ)","ACKERMANN","%","roAck","hl");
+  ro(b,"杞集鍗婂緞","TURN RADIUS","m","roTrad");
+  ro(b,"鎵潌鎵浆瑙?,"ARB TWIST","掳","roArbTw");
+  ro(b,"鎵潌鎵浆鍒氬害","ARB TORSION","N路m/掳","roArbKt");
+  ro(b,"绋冲畾鏉嗕晶鍊惧垰搴?,"ARB ROLL K","N路m/掳","roArbKr");
+  ro(b,"杞存€讳晶鍊惧垰搴?,"AXLE ROLL K","N路m/掳","roArbTot","k");
+  ro(b,"绋冲畾鏉嗗崰姣?,"ARB SHARE","%","roArbSh","hl");
 
-  b=sec(host,"准静态载荷转移分析","LOAD TRANSFER BREAKDOWN",false,"amb");
-  ro(b,"稳态车身侧倾角","ROLL ANGLE","°","roQsRoll","hl");
-  ro(b,"整车侧倾梯度","ROLL GRADIENT","°/g","roQsRollGrad","k");
-  ro(b,"前轴侧倾刚度","FRONT ROLL K","Nm/°","roQsKf");
-  ro(b,"后轴侧倾刚度","REAR ROLL K","Nm/°","roQsKr");
-  ro(b,"左前轮接触载荷 FL","LOAD FL","N","roFzFL");
-  ro(b,"右前轮接触载荷 FR","LOAD FR","N","roFzFR","hl");
-  ro(b,"左后轮接触载荷 RL","LOAD RL","N","roFzRL");
-  ro(b,"右后轮接触载荷 RR","LOAD RR","N","roFzRR","hl");
+  b=sec(host,"鍑嗛潤鎬佽浇鑽疯浆绉诲垎鏋?,"LOAD TRANSFER BREAKDOWN",false,"amb");
+  ro(b,"绋虫€佽溅韬晶鍊捐","ROLL ANGLE","掳","roQsRoll","hl");
+  ro(b,"鏁磋溅渚у€炬搴?,"ROLL GRADIENT","掳/g","roQsRollGrad","k");
+  ro(b,"鍓嶈酱渚у€惧垰搴?,"FRONT ROLL K","Nm/掳","roQsKf");
+  ro(b,"鍚庤酱渚у€惧垰搴?,"REAR ROLL K","Nm/掳","roQsKr");
+  ro(b,"宸﹀墠杞帴瑙﹁浇鑽?FL","LOAD FL","N","roFzFL");
+  ro(b,"鍙冲墠杞帴瑙﹁浇鑽?FR","LOAD FR","N","roFzFR","hl");
+  ro(b,"宸﹀悗杞帴瑙﹁浇鑽?RL","LOAD RL","N","roFzRL");
+  ro(b,"鍙冲悗杞帴瑙﹁浇鑽?RR","LOAD RR","N","roFzRR","hl");
   const bb=E("div","bar-box");
-  bb.innerHTML='<div class="bar-fill-f" id="tlltdBar" style="width:52%"></div><div class="bar-lbl" style="left:6px" id="tlltdLblF">前: 52%</div><div class="bar-lbl" style="right:6px" id="tlltdLblR">后: 48%</div>';
+  bb.innerHTML='<div class="bar-fill-f" id="tlltdBar" style="width:52%"></div><div class="bar-lbl" style="left:6px" id="tlltdLblF">鍓? 52%</div><div class="bar-lbl" style="right:6px" id="tlltdLblR">鍚? 48%</div>';
   b.appendChild(bb);
-  ro(b,"操稳倾向判断","HANDLING BIAS","","roHandling","g");
+  ro(b,"鎿嶇ǔ鍊惧悜鍒ゆ柇","HANDLING BIAS","","roHandling","g");
 
   if(S.hasBaseline){
-    b=sec(host,"基准线差异分析 (Delta Diff)","BASELINE DELTA",false,"purp");
+    b=sec(host,"鍩哄噯绾垮樊寮傚垎鏋?(Delta Diff)","BASELINE DELTA",false,"purp");
     const db=E("div",null);
-    db.innerHTML='<div class="diffbox head"><span>项目 PARAM</span><b>ACTIVE</b><b>BASE</b><b>DELTA</b></div>';
-    const items=[["外倾增益 CG","cg","°/25mm"],["跳动转向 BS","bs","°/25mm"],["运动速比 MR","mr","-"],["侧倾中心 RC","rcH","mm"],["轮端刚度 WR","kw","N/mm"]];
+    db.innerHTML='<div class="diffbox head"><span>椤圭洰 PARAM</span><b>ACTIVE</b><b>BASE</b><b>DELTA</b></div>';
+    const items=[["澶栧€惧鐩?CG","cg","掳/25mm"],["璺冲姩杞悜 BS","bs","掳/25mm"],["杩愬姩閫熸瘮 MR","mr","-"],["渚у€句腑蹇?RC","rcH","mm"],["杞鍒氬害 WR","kw","N/mm"]];
     items.forEach(it=>{
       const row=E("div","diffbox");
       row.innerHTML='<span>'+it[0]+'</span><b class="act" id="df_a_'+it[1]+'">--</b><b class="base" id="df_b_'+it[1]+'">--</b><b class="delta" id="df_d_'+it[1]+'">--</b>';
@@ -2628,14 +2630,14 @@ function buildRight(){
     b.appendChild(db);
   }
 
-  b=sec(host,"运动学导数与动态","KINEMATICS DERIVATIVES");
-  ro(b,"外倾角增益","CAMBER GAIN","°/25","roCG","hl");
-  ro(b,"跳动转向","BUMP STEER","°/25","roBS");
-  ro(b,"侧倾中心高度","ROLL CTR H","mm","roRC","k");
-  ro(b,"抗俯仰率","ANTI-DIVE","%","roAnti");
-  ro(b,"簧载固有频率","RIDE FREQ","Hz","roFreq");
+  b=sec(host,"杩愬姩瀛﹀鏁颁笌鍔ㄦ€?,"KINEMATICS DERIVATIVES");
+  ro(b,"澶栧€捐澧炵泭","CAMBER GAIN","掳/25","roCG","hl");
+  ro(b,"璺冲姩杞悜","BUMP STEER","掳/25","roBS");
+  ro(b,"渚у€句腑蹇冮珮搴?,"ROLL CTR H","mm","roRC","k");
+  ro(b,"鎶椾刊浠扮巼","ANTI-DIVE","%","roAnti");
+  ro(b,"绨ц浇鍥烘湁棰戠巼","RIDE FREQ","Hz","roFreq");
 
-  b=sec(host,"运动学特性曲线扫掠 (含双线对比)","CHARACTERISTIC CURVES");
+  b=sec(host,"杩愬姩瀛︾壒鎬ф洸绾挎壂鎺?(鍚弻绾垮姣?","CHARACTERISTIC CURVES");
   const pb=E("div","plotbox");
   for(let i=0;i<4;i++){
     const cv=E("canvas","plot");pb.appendChild(cv);UI.plots.push(cv);
@@ -2646,14 +2648,14 @@ function buildRight(){
   buildChassisResults(host);
   buildTrackTelemetry(host);
 
-  b=sec(host,"多体求解器状态","SOLVER RESIDUALS",true);
-  ro(b,"活动节点数","NODES","","roNodes");
-  ro(b,"拓扑刚性约束","RIGID LINKS","","roRigLinks");
-  ro(b,"最大约束残差","MAX RESIDUAL","mm","roRes");
-  ro(b,"单步迭代耗时","SOLVE TIME","ms","roSolveMs");
+  b=sec(host,"澶氫綋姹傝В鍣ㄧ姸鎬?,"SOLVER RESIDUALS",true);
+  ro(b,"娲诲姩鑺傜偣鏁?,"NODES","","roNodes");
+  ro(b,"鎷撴墤鍒氭€х害鏉?,"RIGID LINKS","","roRigLinks");
+  ro(b,"鏈€澶х害鏉熸畫宸?,"MAX RESIDUAL","mm","roRes");
+  ro(b,"鍗曟杩唬鑰楁椂","SOLVE TIME","ms","roSolveMs");
 }
 
-/* ================================ 11.5 引擎接入 /api/v3（S2-2 双模，移植并入 Gemini 基线） ================================ */
+/* ================================ 11.5 寮曟搸鎺ュ叆 /api/v3锛圫2-2 鍙屾ā锛岀Щ妞嶅苟鍏?Gemini 鍩虹嚎锛?================================ */
 const ENG={url:"http://127.0.0.1:8001",ok:false,busy:false,kcCase:"bump",
   sweep:{min:-50,max:50,n:21},fz:3000,useBush:true,result:null};
 function engRow(lb,el){const d=E("div","eng-row");
@@ -2662,8 +2664,8 @@ function engRow(lb,el){const d=E("div","eng-row");
 function engNum(def,step){const i=E("input","eng-input");i.type="number";i.value=def;i.step=step;return i;}
 function setKcStatus(t,c){const e=document.getElementById("kcStatus");if(e){e.textContent=t;e.style.color=c||C.txt3;}}
 function engineSyncTb(){const e=document.getElementById("tbEng");if(!e)return;
-  e.textContent=ENG.ok?"引擎 v3":"内置 JS";e.className=ENG.ok?"g":"";
-  const btn=document.getElementById("engBtn");if(btn)btn.textContent=ENG.ok?"断开引擎":"连接引擎";}
+  e.textContent=ENG.ok?"寮曟搸 v3":"鍐呯疆 JS";e.className=ENG.ok?"g":"";
+  const btn=document.getElementById("engBtn");if(btn)btn.textContent=ENG.ok?"鏂紑寮曟搸":"杩炴帴寮曟搸";}
 async function engineConnect(){
   const url=ENG.url.replace(/\/+$/,"");
   try{
@@ -2673,12 +2675,12 @@ async function engineConnect(){
     const h=await r.json();
     if(h.status!=="ok")throw new Error("engine status="+h.status);
     ENG.ok=true;ENG.url=url;
-    setKcStatus("已连接引擎 "+url+"\nK&C 工况: "+h.kandc.join(" / "),C.pathC);engineSyncTb();
+    setKcStatus("宸茶繛鎺ュ紩鎿?"+url+"\nK&C 宸ュ喌: "+h.kandc.join(" / "),C.pathC);engineSyncTb();
   }catch(err){
-    ENG.ok=false;setKcStatus("连接失败："+err.message+"\n→ 当前由内置 JS 求解器即时运算",C.nodeFix);engineSyncTb();
+    ENG.ok=false;setKcStatus("杩炴帴澶辫触锛?+err.message+"\n鈫?鏈湴 JS 浠呰繍鍔ㄥ/鍑犱綍鎵帬锛汯&C/鏁磋溅/璧涢亾闇€寮曟搸 ("+ENG.url+")",C.nodeFix);engineSyncTb();
   }
 }
-function engineDisconnect(){ENG.ok=false;setKcStatus("已断开引擎 → 内置 JS 求解器",C.txt3);engineSyncTb();}
+function engineDisconnect(){ENG.ok=false;setKcStatus("宸叉柇寮€寮曟搸 鈫?鍐呯疆 JS 姹傝В鍣?,C.txt3);engineSyncTb();}
 function enginePayload(){
   const st=S[S.axis];
   return {
@@ -2691,10 +2693,10 @@ function enginePayload(){
   };
 }
 async function engineRun(){
-  if(!ENG.ok){setKcStatus("未连接引擎 → 请先连接（或继续使用内置 JS）",C.ela);return;}
+  if(!ENG.ok){setKcStatus("鏈繛鎺ュ紩鎿?鈫?璇峰厛杩炴帴锛堟垨缁х画浣跨敤鍐呯疆 JS锛?,C.ela);return;}
   if(ENG.busy)return;ENG.busy=true;
-  const runBtn=document.getElementById("kcRun");if(runBtn)runBtn.textContent="求解中…";
-  setKcStatus("求解 "+ENG.kcCase+" …",C.txt2);
+  const runBtn=document.getElementById("kcRun");if(runBtn)runBtn.textContent="姹傝В涓€?;
+  setKcStatus("姹傝В "+ENG.kcCase+" 鈥?,C.txt2);
   try{
     const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),60000);
     const r=await fetch(ENG.url+"/api/v3/kandc/"+ENG.kcCase,
@@ -2703,8 +2705,8 @@ async function engineRun(){
     if(!r.ok){const t=await r.text();throw new Error("HTTP "+r.status+" "+t.slice(0,140));}
     ENG.result=await r.json();
     engineRender();
-  }catch(err){setKcStatus("求解失败："+err.message,C.nodeFix);}
-  finally{ENG.busy=false;if(runBtn)runBtn.textContent="运行 K&C 分析 RUN";}
+  }catch(err){setKcStatus("姹傝В澶辫触锛?+err.message,C.nodeFix);}
+  finally{ENG.busy=false;if(runBtn)runBtn.textContent="杩愯 K&C 鍒嗘瀽 RUN";}
 }
 function engineRender(){
   const d=ENG.result;if(!d)return;
@@ -2712,7 +2714,7 @@ function engineRender(){
     const mk=(lb,val,col)=>{const r=E("div","ro"+(col?((col===C.pathC)?"":" warn"):""));
       r.appendChild(E("span",null,lb));
       const v=E("b",null,String(val));if(col)v.style.color=col;r.appendChild(v);g.appendChild(r);};
-    mk("状态 STATUS · "+d.case,d.status+" · "+d.ms.toFixed(0)+"ms",
+    mk("鐘舵€?STATUS 路 "+d.case,d.status+" 路 "+d.ms.toFixed(0)+"ms",
        d.status==="VALID"?C.pathC:C.nodeFix);
     for(const k in d.gains)mk(k,d.gains[k]);
   }
@@ -2725,23 +2727,23 @@ function engineRender(){
     [["cam",C.knu],["toe",C.ela],["cast",C.kp]];
   pairs.forEach(([k,c])=>{if(!d.curves[k])return;
     ser.push({pts:xs.map((x,i)=>[x,d.curves[k][i]]),c:c,w:1.4});});
-  const title={bump:"外倾/前束 ← 轮跳 [mm]",roll:"左右外倾/前束 ← 轮跳 [mm]",
-    steer:"前束/外倾/后倾 ← 齿条 [mm]",compliance:"前束/外倾/后倾 ← 力 [N]"}[d.case]||d.case;
-  plotXYMulti(cv,title,"°",ser,[xs[0],xs[xs.length-1]],null);
-  setKcStatus(d.case+" 完成 · status="+d.status+" · "+d.ms.toFixed(1)+"ms"+(d.warnings&&d.warnings.length?"\n⚠ "+d.warnings.join("；"):""),C.pathC);
+  const title={bump:"澶栧€?鍓嶆潫 鈫?杞烦 [mm]",roll:"宸﹀彸澶栧€?鍓嶆潫 鈫?杞烦 [mm]",
+    steer:"鍓嶆潫/澶栧€?鍚庡€?鈫?榻挎潯 [mm]",compliance:"鍓嶆潫/澶栧€?鍚庡€?鈫?鍔?[N]"}[d.case]||d.case;
+  plotXYMulti(cv,title,"掳",ser,[xs[0],xs[xs.length-1]],null);
+  setKcStatus(d.case+" 瀹屾垚 路 status="+d.status+" 路 "+d.ms.toFixed(1)+"ms"+(d.warnings&&d.warnings.length?"\n鈿?"+d.warnings.join("锛?):""),C.pathC);
 }
 function buildEnginePanel(host){
-  let b=sec(host,"引擎连接与 K&C 分析","ENGINE /api/v3");
+  let b=sec(host,"寮曟搸杩炴帴涓?K&C 鍒嗘瀽","ENGINE /api/v3");
   const urlInp=E("input");urlInp.type="text";urlInp.value=ENG.url;
   urlInp.className="eng-input";urlInp.style.cssText="flex:1;min-width:0";
   urlInp.onchange=()=>{ENG.url=urlInp.value.replace(/\/+$/,"");};
-  b.appendChild(engRow("引擎地址",urlInp));
-  const engBtn=E("button","eng-btn");engBtn.id="engBtn";engBtn.textContent="连接引擎";
+  b.appendChild(engRow("寮曟搸鍦板潃",urlInp));
+  const engBtn=E("button","eng-btn");engBtn.id="engBtn";engBtn.textContent="杩炴帴寮曟搸";
   engBtn.onclick=()=>{ENG.ok?engineDisconnect():engineConnect();};
-  b.appendChild(engRow("连接",engBtn));
+  b.appendChild(engRow("杩炴帴",engBtn));
   const kcCaseBtns=E("div");kcCaseBtns.id="kcCaseBtns";
   kcCaseBtns.style.cssText="display:flex;gap:3px;padding:3px 8px;flex-wrap:wrap";
-  [["bump","平行跳动"],["roll","侧倾"],["steer","转向"],["compliance","力偏移"]].forEach(([v,lb])=>{
+  [["bump","骞宠璺冲姩"],["roll","渚у€?],["steer","杞悜"],["compliance","鍔涘亸绉?]].forEach(([v,lb])=>{
     const k=E("button","eng-btn");k.textContent=lb;k.dataset.c=v;k.style.flex="1";k.style.minWidth="64px";
     k.onclick=()=>{ENG.kcCase=v;kcCaseBtns.querySelectorAll("button").forEach(x=>x.style.borderColor="");k.style.borderColor=C.strut;};
     kcCaseBtns.appendChild(k);
@@ -2751,30 +2753,30 @@ function buildEnginePanel(host){
   kcMin.onchange=()=>{ENG.sweep.min=parseFloat(kcMin.value)||0;};kcMax.onchange=()=>{ENG.sweep.max=parseFloat(kcMax.value)||0;};
   kcN.onchange=()=>{ENG.sweep.n=Math.max(3,parseInt(kcN.value)||3);};kcFz.onchange=()=>{ENG.fz=parseFloat(kcFz.value)||0;};
   const r1=E("div");r1.style.cssText="display:flex;align-items:center;gap:4px;padding:2px 8px";
-  r1.appendChild(E("span",null,"范围"));r1.appendChild(kcMin);r1.appendChild(E("span",null,"~"));r1.appendChild(kcMax);
-  r1.appendChild(E("span",null,"点"));r1.appendChild(kcN);r1.appendChild(E("span",null,"Fz"));r1.appendChild(kcFz);
+  r1.appendChild(E("span",null,"鑼冨洿"));r1.appendChild(kcMin);r1.appendChild(E("span",null,"~"));r1.appendChild(kcMax);
+  r1.appendChild(E("span",null,"鐐?));r1.appendChild(kcN);r1.appendChild(E("span",null,"Fz"));r1.appendChild(kcFz);
   b.appendChild(r1);
   const kcBush=E("input");kcBush.type="checkbox";kcBush.checked=ENG.useBush;
   kcBush.onchange=()=>{ENG.useBush=kcBush.checked;};
-  b.appendChild(engRow("LCA 衬套 500N/mm",kcBush));
-  const kcRun=E("button","eng-run");kcRun.id="kcRun";kcRun.textContent="运行 K&C 分析 RUN";
+  b.appendChild(engRow("LCA 琛 500N/mm",kcBush));
+  const kcRun=E("button","eng-run");kcRun.id="kcRun";kcRun.textContent="杩愯 K&C 鍒嗘瀽 RUN";
   kcRun.onclick=engineRun;b.appendChild(kcRun);
   const kcStatus=E("div","eng-status");kcStatus.id="kcStatus";
-  kcStatus.textContent="未连接 → 由内置 JS 求解器即时运算";
+  kcStatus.textContent="鏈繛鎺?鈫?鏈湴 JS 浠呰繍鍔ㄥ/鍑犱綍鎵帬锛汯&C 鏇茬嚎闇€寮曟搸锛?+ENG.url+"锛?;
   b.appendChild(kcStatus);
 }
 function buildEngineResults(host){
-  const b2=sec(host,"引擎 K&C 结果","ENGINE K&C RESULTS",true);
+  const b2=sec(host,"寮曟搸 K&C 缁撴灉","ENGINE K&C RESULTS",true);
   const kcGains=E("div");kcGains.id="kcGains";b2.appendChild(kcGains);
   const kcPlot=E("canvas","plot");kcPlot.id="kcPlot";kcPlot.style.height="120px";kcPlot.style.width="100%";
   b2.appendChild(kcPlot);
 }
-/* ── 整车底盘分析（S2-5：四角+整车参数 → /api/v3/chassis/*，双模） ── */
+/* 鈹€鈹€ 鏁磋溅搴曠洏鍒嗘瀽锛圫2-5锛氬洓瑙?鏁磋溅鍙傛暟 鈫?/api/v3/chassis/*锛屽弻妯★級 鈹€鈹€ */
 const CH={busy:false,kcCase:"solve",sweep:{min:-50,max:50,n:21},result:null};
 function buildChassisPanel(host){
-  let b=sec(host,"整车底盘分析 (引擎)","FULL-CHASSIS ENGINE");
+  let b=sec(host,"鏁磋溅搴曠洏鍒嗘瀽 (寮曟搸)","FULL-CHASSIS ENGINE");
   const ck=E("div");ck.style.cssText="display:flex;gap:3px;padding:3px 8px;flex-wrap:wrap";
-  [["solve","单点 SOLVE"],["bump","整车 BUMP"],["roll","整车 ROLL"],["steer","整车 STEER"]].forEach(([v,lb])=>{
+  [["solve","鍗曠偣 SOLVE"],["bump","鏁磋溅 BUMP"],["roll","鏁磋溅 ROLL"],["steer","鏁磋溅 STEER"]].forEach(([v,lb])=>{
     const k=E("button","eng-btn");k.textContent=lb;k.dataset.c=v;k.style.flex="1";k.style.minWidth="58px";
     k.onclick=()=>{CH.kcCase=v;ck.querySelectorAll("button").forEach(x=>x.style.borderColor="");k.style.borderColor=C.rc;};
     ck.appendChild(k);
@@ -2785,17 +2787,17 @@ function buildChassisPanel(host){
   cMin.onchange=()=>{CH.sweep.min=parseFloat(cMin.value)||0;};
   cMax.onchange=()=>{CH.sweep.max=parseFloat(cMax.value)||0;};
   cN.onchange=()=>{CH.sweep.n=Math.max(3,parseInt(cN.value)||3);};
-  cs.appendChild(E("span",null,"扫掠"));cs.appendChild(cMin);cs.appendChild(E("span",null,"~"));
-  cs.appendChild(cMax);cs.appendChild(E("span",null,"点"));cs.appendChild(cN);
+  cs.appendChild(E("span",null,"鎵帬"));cs.appendChild(cMin);cs.appendChild(E("span",null,"~"));
+  cs.appendChild(cMax);cs.appendChild(E("span",null,"鐐?));cs.appendChild(cN);
   b.appendChild(cs);
-  const cRun=E("button","eng-run ch");cRun.id="chRun";cRun.textContent="运行整车分析 RUN";
+  const cRun=E("button","eng-run ch");cRun.id="chRun";cRun.textContent="杩愯鏁磋溅鍒嗘瀽 RUN";
   cRun.onclick=chassisRun;b.appendChild(cRun);
   const cSt=E("div","eng-status");cSt.id="chStatus";
-  cSt.textContent="整车分析：四角硬点+整车参数 → /api/v3/chassis/*（需先连接引擎）";
+  cSt.textContent="鏁磋溅鍒嗘瀽锛氬洓瑙掔‖鐐?鏁磋溅鍙傛暟 鈫?/api/v3/chassis/*锛堥渶鍏堣繛鎺ュ紩鎿庯級";
   b.appendChild(cSt);
 }
 function buildChassisResults(host){
-  const b2=sec(host,"整车引擎结果","FULL-CHASSIS ENGINE RESULTS",true);
+  const b2=sec(host,"鏁磋溅寮曟搸缁撴灉","FULL-CHASSIS ENGINE RESULTS",true);
   const box=E("div");box.id="chResult";b2.appendChild(box);
   const cv=E("canvas","plot");cv.id="chPlot";cv.style.height="120px";cv.style.width="100%";
   b2.appendChild(cv);
@@ -2828,10 +2830,10 @@ function chassisPayload(){
 }
 function setChStatus(t,c){const e=document.getElementById("chStatus");if(e){e.textContent=t;e.style.color=c||C.txt3;}}
 async function chassisRun(){
-  if(!ENG.ok){setChStatus("未连接引擎 → 请先连接引擎（连接后整车分析走 /api/v3/chassis/*）",C.ela);return;}
+  if(!ENG.ok){setChStatus("鏈繛鎺ュ紩鎿?鈫?璇峰厛杩炴帴寮曟搸锛堣繛鎺ュ悗鏁磋溅鍒嗘瀽璧?/api/v3/chassis/*锛?,C.ela);return;}
   if(CH.busy)return;CH.busy=true;
-  const runBtn=document.getElementById("chRun");if(runBtn)runBtn.textContent="求解中…";
-  setChStatus("整车 "+CH.kcCase+" 求解中…（四角机制 + 准静态载荷）",C.txt2);
+  const runBtn=document.getElementById("chRun");if(runBtn)runBtn.textContent="姹傝В涓€?;
+  setChStatus("鏁磋溅 "+CH.kcCase+" 姹傝В涓€︼紙鍥涜鏈哄埗 + 鍑嗛潤鎬佽浇鑽凤級",C.txt2);
   const ep=CH.kcCase==="solve"?"solve":"kandc/"+CH.kcCase;
   try{
     const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),90000);
@@ -2841,17 +2843,17 @@ async function chassisRun(){
     if(!r.ok){const t=await r.text();throw new Error("HTTP "+r.status+" "+t.slice(0,140));}
     CH.result=await r.json();
     chassisRender();
-  }catch(err){setChStatus("整车求解失败："+err.message,C.nodeFix);}
-  finally{CH.busy=false;if(runBtn)runBtn.textContent="运行整车分析 RUN";}
+  }catch(err){setChStatus("鏁磋溅姹傝В澶辫触锛?+err.message,C.nodeFix);}
+  finally{CH.busy=false;if(runBtn)runBtn.textContent="杩愯鏁磋溅鍒嗘瀽 RUN";}
 }
 function chassisRender(){
   const d=CH.result;if(!d)return;
   const box=document.getElementById("chResult");if(!box)return;
   box.innerHTML="";
   if(d.pose){
-    /* 单点：四轮定位表 + 姿态 + 载荷 */
+    /* 鍗曠偣锛氬洓杞畾浣嶈〃 + 濮挎€?+ 杞借嵎 */
     const tb=E("table","hp");
-    tb.innerHTML="<thead><tr><th>角</th><th>CAM°</th><th>TOE°</th><th>CAST°</th><th>KPI°</th><th>SCRUB</th><th>TRAIL</th><th>RC</th></tr></thead>";
+    tb.innerHTML="<thead><tr><th>瑙?/th><th>CAM掳</th><th>TOE掳</th><th>CAST掳</th><th>KPI掳</th><th>SCRUB</th><th>TRAIL</th><th>RC</th></tr></thead>";
     const tbb=E("tbody");
     ["FL","FR","RL","RR"].forEach(k=>{
       const m=d.pose[k]||{};
@@ -2866,20 +2868,20 @@ function chassisRender(){
     tb.appendChild(tbb);box.appendChild(tb);
     const L=d.loads||{},att=d.attitude||{},fz=L.fz||{};
     const rows=[
-      ["整车姿态","heave "+fmt(att.heave_mm,1)+"mm · roll "+fmt(att.roll_deg,2)+"° · pitch "+fmt(att.pitch_deg,2)+"°",C.pathC],
-      ["稳态侧倾",""+fmt(L.roll_deg,2)+"° @ "+fmt(L.roll_grad_deg_per_g,2)+"°/g",C.knu],
-      ["侧倾刚度","Kφ前 "+fmt(L.kphi_f,0)+" · 后 "+fmt(L.kphi_r,0)+" N·m/°（ARB 占 "+fmt(L.arb_share_f,1)+"/"+fmt(L.arb_share_r,1)+"%）",C.ela],
-      ["前轴载荷转移","UNS "+fmt(L.dFz_u_f,0)+" + GEO "+fmt(L.dFz_geo_f,0)+" + ELA "+fmt(L.dFz_elas_f,0)+" = "+fmt(L.dFz_f_tot,0)+" N",C.tie],
-      ["四轮接地载荷","FL "+fmt(fz.FL,0)+" · FR "+fmt(fz.FR,0)+" · RL "+fmt(fz.RL,0)+" · RR "+fmt(fz.RR,0)+" N",C.kp],
-      ["TLLTD 前轴占比",""+fmt(L.tlltd_pct,1)+"%",(L.tlltd_pct>54)?C.nodeFix:((L.tlltd_pct<47)?C.ela:C.pathC)],
+      ["鏁磋溅濮挎€?,"heave "+fmt(att.heave_mm,1)+"mm 路 roll "+fmt(att.roll_deg,2)+"掳 路 pitch "+fmt(att.pitch_deg,2)+"掳",C.pathC],
+      ["绋虫€佷晶鍊?,""+fmt(L.roll_deg,2)+"掳 @ "+fmt(L.roll_grad_deg_per_g,2)+"掳/g",C.knu],
+      ["渚у€惧垰搴?,"K蠁鍓?"+fmt(L.kphi_f,0)+" 路 鍚?"+fmt(L.kphi_r,0)+" N路m/掳锛圓RB 鍗?"+fmt(L.arb_share_f,1)+"/"+fmt(L.arb_share_r,1)+"%锛?,C.ela],
+      ["鍓嶈酱杞借嵎杞Щ","UNS "+fmt(L.dFz_u_f,0)+" + GEO "+fmt(L.dFz_geo_f,0)+" + ELA "+fmt(L.dFz_elas_f,0)+" = "+fmt(L.dFz_f_tot,0)+" N",C.tie],
+      ["鍥涜疆鎺ュ湴杞借嵎","FL "+fmt(fz.FL,0)+" 路 FR "+fmt(fz.FR,0)+" 路 RL "+fmt(fz.RL,0)+" 路 RR "+fmt(fz.RR,0)+" N",C.kp],
+      ["TLLTD 鍓嶈酱鍗犳瘮",""+fmt(L.tlltd_pct,1)+"%",(L.tlltd_pct>54)?C.nodeFix:((L.tlltd_pct<47)?C.ela:C.pathC)],
     ];
     rows.forEach(([lb,val,col])=>{
       const r2=E("div","ro");r2.appendChild(E("span",null,lb));
       const v2=E("b",null,val);if(col)v2.style.color=col;r2.appendChild(v2);box.appendChild(r2);
     });
-    setChStatus("整车单点完成 · status="+d.status+" · "+d.ms.toFixed(1)+"ms"+(d.warnings&&d.warnings.length?"\n⚠ "+d.warnings.join("；"):""),C.pathC);
+    setChStatus("鏁磋溅鍗曠偣瀹屾垚 路 status="+d.status+" 路 "+d.ms.toFixed(1)+"ms"+(d.warnings&&d.warnings.length?"\n鈿?"+d.warnings.join("锛?):""),C.pathC);
   } else if(d.curves){
-    /* 扫掠：四轮 cam 曲线 + 增益 */
+    /* 鎵帬锛氬洓杞?cam 鏇茬嚎 + 澧炵泭 */
     const cv=document.getElementById("chPlot");
     const xk=d.case==="steer"?"rack":(d.case==="roll"?"roll_deg":"travel");
     const xs=d.curves[xk];
@@ -2887,21 +2889,21 @@ function chassisRender(){
       const ser=[];
       [["cam_FL",C.knu],["cam_FR",C.ela],["cam_RL",C.path],["cam_RR",C.kp]].forEach(([k,c])=>{
         if(!d.curves[k])return;ser.push({pts:xs.map((x,i)=>[x,d.curves[k][i]]),c:c,w:1.4});});
-      plotXYMulti(cv,d.case+" 四轮外倾 CAMBER ← "+(d.case==="roll"?"roll [°]":(d.case==="steer"?"rack [mm]":"travel [mm]")),
-        "°",ser,[xs[0],xs[xs.length-1]],null);
+      plotXYMulti(cv,d.case+" 鍥涜疆澶栧€?CAMBER 鈫?"+(d.case==="roll"?"roll [掳]":(d.case==="steer"?"rack [mm]":"travel [mm]")),
+        "掳",ser,[xs[0],xs[xs.length-1]],null);
     }
     const gx=E("div");
     for(const k in (d.gains||{})){
       const r3=E("div","ro");r3.appendChild(E("span",null,k));r3.appendChild(E("b",null,String(d.gains[k])));gx.appendChild(r3);
     }
     box.appendChild(gx);
-    setChStatus("整车 "+d.case+" 完成 · status="+d.status+" · "+d.ms.toFixed(1)+"ms"+(d.warnings&&d.warnings.length?"\n⚠ "+d.warnings.join("；"):""),C.pathC);
+    setChStatus("鏁磋溅 "+d.case+" 瀹屾垚 路 status="+d.status+" 路 "+d.ms.toFixed(1)+"ms"+(d.warnings&&d.warnings.length?"\n鈿?"+d.warnings.join("锛?):""),C.pathC);
   } else {
-    setChStatus("响应无 pose/curves 字段："+JSON.stringify(d).slice(0,120),C.nodeFix);
+    setChStatus("鍝嶅簲鏃?pose/curves 瀛楁锛?+JSON.stringify(d).slice(0,120),C.nodeFix);
   }
 }
 function plotXYMulti(cv,title,unit,series,xr,curx){
-  /* 多实线绘制（plotXYOverlay 的多线版本，供引擎结果面板使用） */
+  /* 澶氬疄绾跨粯鍒讹紙plotXYOverlay 鐨勫绾跨増鏈紝渚涘紩鎿庣粨鏋滈潰鏉夸娇鐢級 */
   const dpr=Math.min(2,window.devicePixelRatio||1);
   const w=cv.clientWidth||300,h=cv.clientHeight||84;
   if(cv.width!==w*dpr||cv.height!==h*dpr){cv.width=w*dpr;cv.height=h*dpr;}
@@ -2940,7 +2942,7 @@ function plotXYMulti(cv,title,unit,series,xr,curx){
 
 function fitAll(){ VW.forEach(fitView); }
 
-/* ================================ 12. 读数更新与双线曲线绘制 ================================ */
+/* ================================ 12. 璇绘暟鏇存柊涓庡弻绾挎洸绾跨粯鍒?================================ */
 function updateReadouts(){
   const isF = S.axis === 'front';
   const m = isF ? SIM.mFR : SIM.mRR;
@@ -2954,7 +2956,7 @@ function updateReadouts(){
   const wr = state.kS * mr * mr;
   const frq = sqrt(wr * 1000 / state.mS) / (2 * PI);
 
-  setRO("roArch", state.arch==="pushrod"?"推杆 (Pushrod)":"拉杆 (Pullrod)");
+  setRO("roArch", state.arch==="pushrod"?"鎺ㄦ潌 (Pushrod)":"鎷夋潌 (Pullrod)");
   setRO("roRckDeg", sfmt(m.rockerDeg, 2));
   setRO("roMR", fmt(mr, 3));
   setRO("roDmpDisp", sfmt(M.damperL0 - m.damperL, 1));
@@ -2968,12 +2970,12 @@ function updateReadouts(){
   setRO("roScrub", sfmt(m.scrub, 1));
   setRO("roTrail", sfmt(m.trail, 1));
   
-  /* 阿克曼计算 (仅前悬) */
+  /* 闃垮厠鏇艰绠?(浠呭墠鎮? */
   const ak = ackermann('front');
   setRO("roAck", ak&&ak.pct!==null ? fmt(ak.pct, 0) : "--");
   setRO("roTrad", ak&&ak.R!==null ? fmt(abs(ak.R), 2) : "--");
   
-  /* ARB 刚度计算 */
+  /* ARB 鍒氬害璁＄畻 */
   const mra = sampleSweep(sw, m.tr, "mra") || 0.55;
   const ar = arbRate(mra, state);
   const track = abs(m.cp[0])*2;
@@ -2988,7 +2990,7 @@ function updateReadouts(){
   setRO("roArbTot", fmt(Ks+Ka, 0));
   setRO("roArbSh", fmt(100*Ka/Math.max(1e-6, Ks+Ka), 0));
 
-  /* 准静态分析结果读数 */
+  /* 鍑嗛潤鎬佸垎鏋愮粨鏋滆鏁?*/
   const qs = SIM.qsRes;
   if(qs){
     setRO("roQsRoll", fmt(qs.rollDeg, 2));
@@ -3003,17 +3005,17 @@ function updateReadouts(){
     const tb=document.getElementById("tlltdBar");
     if(tb){
       tb.style.width=qs.tlltd.toFixed(1)+"%";
-      document.getElementById("tlltdLblF").textContent="前轴: "+qs.tlltd.toFixed(1)+"%";
-      document.getElementById("tlltdLblR").textContent="后轴: "+(100-qs.tlltd).toFixed(1)+"%";
+      document.getElementById("tlltdLblF").textContent="鍓嶈酱: "+qs.tlltd.toFixed(1)+"%";
+      document.getElementById("tlltdLblR").textContent="鍚庤酱: "+(100-qs.tlltd).toFixed(1)+"%";
     }
-    const bias = qs.tlltd > 54 ? "倾向不足转向 (UNDERSTEER)" : (qs.tlltd < 47 ? "倾向过度转向 (OVERSTEER)" : "中性偏稳定 (NEUTRAL)");
+    const bias = qs.tlltd > 54 ? "鍊惧悜涓嶈冻杞悜 (UNDERSTEER)" : (qs.tlltd < 47 ? "鍊惧悜杩囧害杞悜 (OVERSTEER)" : "涓€у亸绋冲畾 (NEUTRAL)");
     setRO("roHandling", bias);
 
     document.getElementById("sbTLLTD").textContent = qs.tlltd.toFixed(1)+"%";
-    document.getElementById("sbRollGrad").textContent = qs.rollGrad.toFixed(2)+" °/g";
+    document.getElementById("sbRollGrad").textContent = qs.rollGrad.toFixed(2)+" 掳/g";
   }
 
-  /* Baseline 差异读数 */
+  /* Baseline 宸紓璇绘暟 */
   if(S.hasBaseline && S.baseline){
     const b_sw = isF ? S.baseline.swF : S.baseline.swR;
     const updateDiff = (id, key, scale)=>{
@@ -3036,8 +3038,8 @@ function updateReadouts(){
   setRO("roAnti", m.anti===null?"--":fmt(m.anti, 1));
   setRO("roFreq", fmt(frq, 2));
 
-  setRO("roNodes", M.n.length+" ("+M.nFree+" 自由)");
-  setRO("roRigLinks", M.nRig+" 条约束");
+  setRO("roNodes", M.n.length+" ("+M.nFree+" 鑷敱)");
+  setRO("roRigLinks", M.nRig+" 鏉＄害鏉?);
   setRO("roRes", M.res<1e-4?M.res.toExponential(2):fmt(M.res,5), M.res>0.025);
   setRO("roSolveMs", fmt(M.ms,2));
 
@@ -3047,12 +3049,12 @@ function updateReadouts(){
   document.getElementById("sbRes").textContent=M.res<1e-4?M.res.toExponential(1):fmt(M.res,4);
   document.getElementById("sbResC").className="c "+(M.res<0.001?"ok":(M.res<0.025?"hl":"bad"));
   document.getElementById("sbMs").textContent=fmt(M.ms,2)+" ms";
-  document.getElementById("tbState").textContent=S.play?"运行":"暂停";
+  document.getElementById("tbState").textContent=S.play?"杩愯":"鏆傚仠";
   document.getElementById("tbStateBox").className=S.play?"g":"a";
   document.getElementById("tbStateDot").className="dot "+(S.play?"g":"a");
   
-  document.getElementById("tbArch").textContent = (isF?"前 ":"后 ") + (state.arch==="pushrod"?"推杆 PUSHROD":"拉杆 PULLROD");
-  document.getElementById("sbArchName").textContent = isF?"前悬架 (推杆)":"后悬架 (拉杆)";
+  document.getElementById("tbArch").textContent = (isF?"鍓?":"鍚?") + (state.arch==="pushrod"?"鎺ㄦ潌 PUSHROD":"鎷夋潌 PULLROD");
+  document.getElementById("sbArchName").textContent = isF?"鍓嶆偓鏋?(鎺ㄦ潌)":"鍚庢偓鏋?(鎷夋潌)";
 }
 
 function plotXYOverlay(cv,title,unit,seriesActive,seriesBase,xr,curx){
@@ -3078,7 +3080,7 @@ function plotXYOverlay(cv,title,unit,seriesActive,seriesBase,xr,curx){
   for(let i=0;i<=4;i++){const y=mt+ph*i/4;ctx.beginPath();ctx.moveTo(ml,y);ctx.lineTo(ml+pw,y);ctx.stroke();}
   for(let i=0;i<=5;i++){const x=ml+pw*i/5;ctx.beginPath();ctx.moveTo(x,mt);ctx.lineTo(x,mt+ph);ctx.stroke();}
 
-  // 1. 绘制 Baseline 基准曲线 (虚线)
+  // 1. 缁樺埗 Baseline 鍩哄噯鏇茬嚎 (铏氱嚎)
   if(seriesBase && seriesBase.pts.length){
     ctx.strokeStyle=C.base;ctx.lineWidth=1.3;ctx.setLineDash([4,3]);ctx.beginPath();let st=false;
     seriesBase.pts.forEach(p=>{if(p[1]===null||!isFinite(p[1])){st=false;return;}
@@ -3086,7 +3088,7 @@ function plotXYOverlay(cv,title,unit,seriesActive,seriesBase,xr,curx){
     ctx.stroke();
   }
 
-  // 2. 绘制 Active 活动曲线 (实线)
+  // 2. 缁樺埗 Active 娲诲姩鏇茬嚎 (瀹炵嚎)
   ctx.strokeStyle=seriesActive.c;ctx.lineWidth=seriesActive.w||1.4;ctx.setLineDash([]);ctx.beginPath();let st=false;
   seriesActive.pts.forEach(p=>{if(p[1]===null||!isFinite(p[1])){st=false;return;}
     const x=X(p[0]),y=Y(p[1]);if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y);});
@@ -3116,26 +3118,26 @@ function drawPlots(){
   const S1=(obj,k,col)=>obj?{pts:obj.rows.map(r=>[r.tr,r[k]]),c:col}:null;
 
   const P=[
-    ["瞬态运动速比 MOTION RATIO","-","mr",C.ela],
-    ["外倾角变化 CAMBER","°","cam",C.knu],
-    ["摇臂旋转角 ROCKER DEG","°","rockerDeg",C.rocker],
-    ["前束角变化 (跳动转向) TOE","°","toe",C.tie]
+    ["鐬€佽繍鍔ㄩ€熸瘮 MOTION RATIO","-","mr",C.ela],
+    ["澶栧€捐鍙樺寲 CAMBER","掳","cam",C.knu],
+    ["鎽囪噦鏃嬭浆瑙?ROCKER DEG","掳","rockerDeg",C.rocker],
+    ["鍓嶆潫瑙掑彉鍖?(璺冲姩杞悜) TOE","掳","toe",C.tie]
   ];
 
   P.forEach((p,i)=>{
     if(!UI.plots[i]) return;
     const act = S1(sw, p[2], p[3]);
     const bas = S1(b_sw, p[2], C.base);
-    plotXYOverlay(UI.plots[i], p[0]+"  ← 轮跳行程 [mm] →", p[1], act, bas, xr, cur);
+    plotXYOverlay(UI.plots[i], p[0]+"  鈫?杞烦琛岀▼ [mm] 鈫?, p[1], act, bas, xr, cur);
   });
 }
 
-/* ================================ 12b. 硬点永久保存（2026-08-23 移植新增） ================================ */
+/* ================================ 12b. 纭偣姘镐箙淇濆瓨锛?026-08-23 绉绘鏂板锛?================================ */
 const HP_SAVE_KEY="labsus.hp.v1";
 function hpSnapshot(){return {front:S.front.hp, rear:S.rear.hp,
   tieTrimF:S.front.tieTrim, tieTrimR:S.rear.tieTrim, wb:S.wb, hcg:S.hcg, t:Date.now()};}
 function hpSave(quiet){try{localStorage.setItem(HP_SAVE_KEY, JSON.stringify(hpSnapshot()));
-  if(!quiet)setKcStatus("硬点已保存 "+new Date().toLocaleTimeString(), C.pathC);}
+  if(!quiet)setKcStatus("纭偣宸蹭繚瀛?"+new Date().toLocaleTimeString(), C.pathC);}
   catch(e){console.warn("hpSave failed",e);}}
 function hpLoad(){try{const raw=localStorage.getItem(HP_SAVE_KEY); if(!raw)return;
   const d=JSON.parse(raw); if(!d||!d.front||!d.rear)return;
@@ -3144,17 +3146,17 @@ function hpLoad(){try{const raw=localStorage.getItem(HP_SAVE_KEY); if(!raw)retur
   if(typeof d.tieTrimF==="number")S.front.tieTrim=d.tieTrimF;
   if(typeof d.tieTrimR==="number")S.rear.tieTrim=d.tieTrimR;
   if(typeof d.wb==="number")S.wb=d.wb; if(typeof d.hcg==="number")S.hcg=d.hcg;
-  setKcStatus("已载入永久保存的硬点（localStorage）", C.pathC);}
+  setKcStatus("宸茶浇鍏ユ案涔呬繚瀛樼殑纭偣锛坙ocalStorage锛?, C.pathC);}
   catch(e){console.warn("hpLoad failed",e);}}
 function hpReset(){try{localStorage.removeItem(HP_SAVE_KEY);}catch(e){}
   initData(); rebuild(); UI.sync.forEach(f=>f());
-  setKcStatus("已恢复出厂预设硬点（紧凑宽体 1620mm 比例）", C.nodeFix);}
+  setKcStatus("宸叉仮澶嶅嚭鍘傞璁剧‖鐐癸紙绱у噾瀹戒綋 1620mm 姣斾緥锛?, C.nodeFix);}
 function hpExport(){const blob=new Blob([JSON.stringify(hpSnapshot(),null,1)],
   {type:"application/json"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
   a.download="labsus-hardpoints-"+new Date().toISOString().slice(0,10)+".json";
   a.click(); URL.revokeObjectURL(a.href);
-  setKcStatus("硬点已导出为 JSON 文件", C.pathC);}
+  setKcStatus("纭偣宸插鍑轰负 JSON 鏂囦欢", C.pathC);}
 function hpImport(){const inp=document.createElement("input");
   inp.type="file"; inp.accept=".json,application/json";
   inp.onchange=()=>{const f=inp.files&&inp.files[0]; if(!f)return;
@@ -3165,29 +3167,29 @@ function hpImport(){const inp=document.createElement("input");
         for(const k in hp) if(d[ax][k]&&d[ax][k].length===3) hp[k]=d[ax][k].map(Number);}
       if(typeof d.wb==="number")S.wb=d.wb; if(typeof d.hcg==="number")S.hcg=d.hcg;
       hpSave(true); rebuild(); UI.sync.forEach(f=>f());
-      setKcStatus("硬点导入成功并已保存", C.pathC);}
-      catch(e){setKcStatus("导入失败：非有效硬点文件", C.nodeFix);}};
+      setKcStatus("纭偣瀵煎叆鎴愬姛骞跺凡淇濆瓨", C.pathC);}
+      catch(e){setKcStatus("瀵煎叆澶辫触锛氶潪鏈夋晥纭偣鏂囦欢", C.nodeFix);}};
     rd.readAsText(f);};
   inp.click();}
 function buildPersistencePanel(host){
-  let b=sec(host,"硬点永久保存","HARDPOINT PERSISTENCE",false,"grn");
-  rowBtns(b,[["保存 SAVE",()=>hpSave()],["复位 RESET",hpReset],
-             ["导出 EXPORT",hpExport],["导入 IMPORT",hpImport]]);
-  const st=E("div","ro"); st.appendChild(E("span",null,'自动保存 <u>AUTO</u>'));
-  const v=E("b",null,"拖拽/编辑后即时写盘"); st.appendChild(v); b.appendChild(st);
-  b.appendChild(E("div",null,'<i style="opacity:.65">localStorage 永久保存（刷新不丢）；导出 JSON 可跨机器备份。</i>'));
+  let b=sec(host,"纭偣姘镐箙淇濆瓨","HARDPOINT PERSISTENCE",false,"grn");
+  rowBtns(b,[["淇濆瓨 SAVE",()=>hpSave()],["澶嶄綅 RESET",hpReset],
+             ["瀵煎嚭 EXPORT",hpExport],["瀵煎叆 IMPORT",hpImport]]);
+  const st=E("div","ro"); st.appendChild(E("span",null,'鑷姩淇濆瓨 <u>AUTO</u>'));
+  const v=E("b",null,"鎷栨嫿/缂栬緫鍚庡嵆鏃跺啓鐩?); st.appendChild(v); b.appendChild(st);
+  b.appendChild(E("div",null,'<i style="opacity:.65">localStorage 姘镐箙淇濆瓨锛堝埛鏂颁笉涓級锛涘鍑?JSON 鍙法鏈哄櫒澶囦唤銆?/i>'));
 }
 function buildSystemShowPanel(host){
-  let b=sec(host,"系统显示·默认分色","SYSTEM LAYERS",false,"amb");
+  let b=sec(host,"绯荤粺鏄剧ず路榛樿鍒嗚壊","SYSTEM LAYERS",false,"amb");
   chkList(b,[
-    ["frame_main","车架·主滚架/乘员舱"],["frame_front","车架·前防撞吸能"],["frame_side","车架·侧防撞梁"],["frame_rear","车架·后防撞尾框"],
-    ["powertrain","传动·EDU 电驱"],["halfshaft","传动·半轴"],["cv_boot","传动·CV 防尘套"],
-    ["steer_rack","转向·齿条箱"],["steer_col","转向·管柱万向节"],["steer_wheel","转向·方向盘"],
-    ["disc_vent","制动·通风盘"],["caliper","制动·卡钳"],["brake_hyd","制动·管路"],["master_cyl","制动·总泵踏瓣"],
-    ["rocker","行驶·摇臂"],["elastic","行驶·弹簧减振"],["wheel","行驶·轮胎轮毂"],["face","行驶·臂面/转向节"],["arb","行驶·防倾杆"],["rigid","连杆刚线"],["node","硬点标记"]]);
+    ["frame_main","杞︽灦路涓绘粴鏋?涔樺憳鑸?],["frame_front","杞︽灦路鍓嶉槻鎾炲惛鑳?],["frame_side","杞︽灦路渚ч槻鎾炴"],["frame_rear","杞︽灦路鍚庨槻鎾炲熬妗?],
+    ["powertrain","浼犲姩路EDU 鐢甸┍"],["halfshaft","浼犲姩路鍗婅酱"],["cv_boot","浼犲姩路CV 闃插皹濂?],
+    ["steer_rack","杞悜路榻挎潯绠?],["steer_col","杞悜路绠℃煴涓囧悜鑺?],["steer_wheel","杞悜路鏂瑰悜鐩?],
+    ["disc_vent","鍒跺姩路閫氶鐩?],["caliper","鍒跺姩路鍗￠挸"],["brake_hyd","鍒跺姩路绠¤矾"],["master_cyl","鍒跺姩路鎬绘车韪忕摚"],
+    ["rocker","琛岄┒路鎽囪噦"],["elastic","琛岄┒路寮圭哀鍑忔尟"],["wheel","琛岄┒路杞儙杞瘋"],["face","琛岄┒路鑷傞潰/杞悜鑺?],["arb","琛岄┒路闃插€炬潌"],["rigid","杩炴潌鍒氱嚎"],["node","纭偣鏍囪"]]);
 }
 
-/* ================================ 13. 交互系统 ================================ */
+/* ================================ 13. 浜や簰绯荤粺 ================================ */
 function hookView(v){
   const cv=v.cv;
   cv.addEventListener("mousedown",e=>{
@@ -3212,7 +3214,7 @@ function hookView(v){
       UI.hover=hit?hit.id:null;
       cv.style.cursor=hit?"crosshair":"default";
       if(hit){
-        document.getElementById("sbCur").textContent=(hit.axis==='front'?"[前] ":"[后] ")+hit.id+" ["+
+        document.getElementById("sbCur").textContent=(hit.axis==='front'?"[鍓峕 ":"[鍚嶿 ")+hit.id+" ["+
           fmt(S[hit.axis].hp[hit.id][0],1)+", "+fmt(S[hit.axis].hp[hit.id][1],1)+", "+fmt(S[hit.axis].hp[hit.id][2],1)+"]";
       }
     }
@@ -3251,7 +3253,7 @@ window.addEventListener("mousemove",e=>{
 });
 window.addEventListener("mouseup",()=>{if(UI.drag&&UI.drag.mode==="hp")hpSave();UI.drag=null;});
 
-/* ================================ 14. 主仿真循环 ================================ */
+/* ================================ 14. 涓讳豢鐪熷惊鐜?================================ */
 function updateSweeps(){
   if(!SIM.dirtySweep)return;
   const now=performance.now();
@@ -3263,7 +3265,7 @@ function updateSweeps(){
   SIM.mrRefR = Math.max(0.05, sampleSweep(SIM.swR, 0, "mr") || 0.75);
 }
 
-let _last=0,_fps=0,_fc=0,_ft=0;
+let _last=0,_fps=0,_fc=0,_ft=0,_stageAutoDone=false;
 function loop(ts){
   const dt=Math.min(0.045,_last?(ts-_last)/1000:0.016);_last=ts;
   if(S.play){
@@ -3276,32 +3278,47 @@ function loop(ts){
     }
   }
   updateSweeps();
-  try{simulate(dt);}catch(err){console.error(err);S.play=false;}
+  /* F-20锛?026-08-30锛夛細鏆傚仠蹇呴』鐪熸鍐荤粨鏃跺煙绉垎鈥斺€旀棫瀹炵幇 simulate(dt) 鏃犳潯浠?     璋冪敤锛宺ig 妯″紡涓嬫殏鍋滄椂 stepDyn 浠嶄互鐪熷疄 dt 绉垎銆備紶 S.play?dt:0 浣挎殏鍋滄椂
+     绉垎姝ラ暱涓洪浂锛坘in/quasi 鍒嗘敮 driveTo 渚濇棫鍒锋柊鏄剧ず锛屽Э鎬佸喕缁擄級銆?*/
+  try{simulate(S.play?dt:0);}catch(err){console.error(err);S.play=false;}
   drawAll();updateReadouts();drawPlots();
   UI.sync.forEach(f=>f());
 
   _fc++;_ft+=dt;
   if(_ft>0.4){_fps=_fc/_ft;_fc=0;_ft=0;document.getElementById("tbFps").textContent=fmt(_fps,0);}
   requestAnimationFrame(loop);
-if(location.search.indexOf("stagedemo")>=0){setTimeout(function(){_stageOpenSetup();setTimeout(function(){trackStageRun();},300);},800);}else if(location.search.indexOf("stage")>=0){setTimeout(function(){_stageOpenSetup();},800);}
+  /* F-51锛?026-08-30锛夛細瀹氭椂鍣ㄧЩ鍑哄惊鐜綋璇箟鈥斺€斾竴娆℃€?flag锛屽彧瑙﹀彂涓€娆°€?*/
+  if(!_stageAutoDone){
+    if(location.search.indexOf("stagedemo")>=0){_stageAutoDone=true;setTimeout(function(){_stageOpenSetup();setTimeout(function(){trackStageRun();},300);},800);}
+    else if(location.search.indexOf("stage")>=0){_stageAutoDone=true;setTimeout(function(){_stageOpenSetup();},800);}
+  }
 }
 
 
-/* ================================ 14b. 赛道瞬态仿真（S3-2 前端闭环） ================================ */
-/* 数据链：本面板调校状态 → trackPayload()（复用整车 vehicle + 前端扫掠 K&C 查表）
-   → POST /api/v3/chassis/simulate_track → trace 时序 → 回放（俯视轨迹 + 3D 侧倾联动
-   + 遥测 HUD）。回放时 simulate() 被 trackStep 接管（roll 来自引擎准静态内核）。 */
+/* ================================ 14b. 璧涢亾鐬€佷豢鐪燂紙S3-2 鍓嶇闂幆锛?================================ */
+/* 鏁版嵁閾撅細鏈潰鏉胯皟鏍＄姸鎬?鈫?trackPayload()锛堝鐢ㄦ暣杞?vehicle + 鍓嶇鎵帬 K&C 鏌ヨ〃锛?   鈫?POST /api/v3/chassis/simulate_track 鈫?trace 鏃跺簭 鈫?鍥炴斁锛堜刊瑙嗚建杩?+ 3D 渚у€捐仈鍔?   + 閬ユ祴 HUD锛夈€傚洖鏀炬椂 simulate() 琚?trackStep 鎺ョ锛坮oll 鏉ヨ嚜寮曟搸鍑嗛潤鎬佸唴鏍革級銆?*/
 const TRK={
   res:null, req:null, mu:8000/3500,
   playing:false, i:0, speed:1.0, active:false, ready:false,
-  preset:"skidpad", custom:null
+  preset:"skidpad", custom:null, lookahead:0.9   /* F-54锛?026-08-30锛夛細棰勭瀯澧炵泭鐪熺姸鎬?*/
 };
 const TRACK_PRESETS={
-  skidpad:{zh:"稳态定圆 R=30m",closed:true,v:12.0,pts:(function(){
+  skidpad:{zh:"FSAE 绋虫€佸畾鍦?R=30m",closed:true,v:12.0,pts:(function(){
     const o=[];for(let k=0;k<64;k++){const t=2*PI*k/64;o.push([30*Math.cos(t),30*Math.sin(t)]);}return o;})()},
-  slalom:{zh:"蛇形绕桩 30m 桩距",closed:false,v:13.0,pts:(function(){
+  skidpad8:{zh:"FSAE 瀹樻柟 8瀛楀畾鍦?(鍙岀幆 R=15m)",closed:true,v:11.0,pts:(function(){
+    const o=[];
+    for(let k=0;k<48;k++){const t=-PI/2-2*PI*k/48;o.push([+(15+15*Math.cos(t)).toFixed(3),+(15*Math.sin(t)).toFixed(3),11.0]);}
+    for(let k=0;k<48;k++){const t=-PI/2+2*PI*k/48;o.push([+(-15-15*Math.cos(t)).toFixed(3),+(15*Math.sin(t)).toFixed(3),11.0]);}
+    return o;})()},
+  autocross:{zh:"FSAE 瀹樻柟 Autocross (800m 缁煎悎璁℃椂)",closed:true,v:0,pts:[
+    [0,0,14],[40,0,18],[80,5,16],[110,25,12],[125,55,10],[115,85,11],[95,115,13],[70,140,9],
+    [40,145,9],[15,130,12],[-15,105,15],[-45,85,14],[-75,70,11],[-95,45,9],[-85,20,11],
+    [-65,0,13],[-40,-15,12],[-15,-15,11]]},
+  accel:{zh:"FSAE 瀹樻柟 75m 鍔犻€熶笌鍒跺姩鍖?,closed:false,v:0,pts:[
+    [0,0,0],[10,0,10],[25,0,18],[50,0,26],[75,0,32],[90,0,15],[110,0,0]]},
+  slalom:{zh:"FSAE 铔囧舰缁曟々 (30m 妗╄窛)",closed:false,v:13.0,pts:(function(){
     const o=[[0,0]];for(let k=0;k<5;k++)o.push([15+30*k,(k%2?3.6:-3.6)]);o.push([180,0]);return o;})()},
-  minigp:{zh:"Mini GP 短道（发卡+S弯）",closed:true,v:0,pts:[
+  minigp:{zh:"Mini GP 鐭亾锛堝彂鍗?S寮級",closed:true,v:0,pts:[
     [0,0,15],[50,0,17],[80,2,13],[95,15,10],[92,35,9],[75,45,10],
     [50,42,13],[35,48,11],[18,42,10],[5,28,9],[0,12,12]]}
 };
@@ -3311,45 +3328,52 @@ function trackPayload(){
   const lut=sw=>({travel:sw.rows.map(r=>r.tr),toe:sw.rows.map(r=>r.toe),cam:sw.rows.map(r=>r.cam)});
   let pts,closed=false;
   if(TRK.preset==="custom"&&TRK.custom){pts=TRK.custom;closed=false;}
-  else{const P=TRACK_PRESETS[TRK.preset];closed=P.closed;
+  else{const P=TRACK_PRESETS[TRK.preset]||TRACK_PRESETS.skidpad;closed=P.closed;
     pts=P.pts.map(p=>({x:p[0],y:p[1],target_speed:(p[2]!==undefined?p[2]:P.v)}));}
   return {vehicle:base.vehicle,
     kc_luts:{front:lut(SIM.swF),rear:lut(SIM.swR)},
     track:pts, dt:0.01, sim_time:25.0,
-    lookahead_gain:parseFloat(document.getElementById("trkLook").value)||0.9,
+    lookahead_gain:TRK.lookahead,   /* F-54锛氱湡鐘舵€侊紝闈?DOM 姝昏 */
     start_speed:parseFloat(document.getElementById("trkV0").value)||6.0, _closed:closed};
 }
 async function trackRun(){
-  if(!ENG.ok){setTrkStatus("未连接引擎 → 先连接（赛道仿真走 /api/v3/chassis/simulate_track）",C.ela);return;}
-  const btn=document.getElementById("trkRun");if(btn)btn.textContent="仿真中…";
-  setTrkStatus("赛道瞬态仿真中…（平面 3-DOF + 四轮 MF + 准静态载荷）",C.txt2);
+  const btn=document.getElementById("trkRun");if(btn)btn.textContent="浠跨湡涓€?;
+  setTrkStatus(ENG.ok?"璧涢亾鐬€佷豢鐪熶腑鈥︼紙寮曟搸 /api/v3/chassis/simulate_track锛?:"璧涢亾鐬€佷豢鐪熶腑鈥︼紙鍐呯疆 JS 鐗╃悊 TPHYS锛?,C.txt2);
   try{
     const body=trackPayload();TRK.req=body;
-    const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),120000);
-    const r=await fetch(ENG.url+"/api/v3/chassis/simulate_track",
-      {method:"POST",headers:{"Content-Type":"application/json"},
-       body:JSON.stringify(body),signal:ctl.signal});
-    clearTimeout(to);
-    if(!r.ok){const t=await r.text();throw new Error("HTTP "+r.status+" "+t.slice(0,140));}
-    TRK.res=await r.json();
-    if(TRK.res.status!=="VALID")throw new Error(TRK.res.status+" "+(TRK.res.warnings||[]).join(";"));
+    let res;
+    if(ENG.ok){
+      const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),120000);
+      const r=await fetch(ENG.url+"/api/v3/chassis/simulate_track",
+        {method:"POST",headers:{"Content-Type":"application/json"},
+         body:JSON.stringify(body),signal:ctl.signal});
+      clearTimeout(to);
+      if(!r.ok){const t=await r.text();throw new Error("HTTP "+r.status+" "+t.slice(0,140));}
+      res=await r.json();
+    }else{
+      await new Promise(r=>setTimeout(r,30));
+      res=TPHYS.run(body, TPHYS.makeSimContext(body));
+      res.ms=0;res.builtin=true;
+    }
+    if(res.status!=="VALID")throw new Error(res.status+" "+(res.warnings||[]).join(";"));
+    TRK.res=res;
     TRK.i=0;TRK.playing=true;TRK.active=true;TRK.ready=true;
     fitTopViewToTrack();
     const sm=TRK.res.summary;
-    setTrkStatus(`完成：${sm.path_length_m}m · v_max ${sm.v_max}m/s · max ${sm.max_ay_g}g · ${TRK.res.ms|0}ms`+
-      (TRK.res.finished?"（到达终点）":"（限时截止）"),C.ok);
-  }catch(err){setTrkStatus("仿真失败："+err.message,C.nodeFix);}
-  finally{if(btn)btn.textContent="运行赛道仿真 RUN";}
+    setTrkStatus((res.builtin?"[鍐呯疆JS] ":"")+`瀹屾垚锛?{sm.path_length_m}m 路 v_max ${sm.v_max}m/s 路 max ${sm.max_ay_g}g 路 ${TRK.res.ms|0}ms`+
+      (TRK.res.finished?"锛堝埌杈剧粓鐐癸級":"锛堥檺鏃舵埅姝級"),C.ok);
+  }catch(err){setTrkStatus("浠跨湡澶辫触锛?+err.message,C.nodeFix);}
+  finally{if(btn)btn.textContent="杩愯璧涢亾浠跨湡 RUN";}
   syncTrackUI();
 }
-function trackExit(){TRK.active=false;TRK.playing=false;syncTrackUI();setTrkStatus("已退出回放（恢复本地求解模式）",C.txt3);}
+function trackExit(){TRK.active=false;TRK.playing=false;syncTrackUI();setTrkStatus("宸查€€鍑哄洖鏀撅紙鎭㈠鏈湴姹傝В妯″紡锛?,C.txt3);}
 
 function applyTrackFrame(i){
   const tr=TRK.res.trace;if(!tr||!tr[i])return;
   const row=tr[i],rDeg=row.roll||0;
   const MF=SIM.FR,MR=SIM.RR,NF=SIM.FL,NR=SIM.RL;
   const z0F=MF.n[MF.idx.WC].p0[2],z0R=MR.n[MR.idx.WC].p0[2];
-  const rack=clamp((row.delta||0)*R2D/0.5,-20,20);      /* 自行车转角→齿条 mm（显示用近似） */
+  const rack=clamp((row.delta||0)*R2D/0.5,-20,20);      /* 鑷杞﹁浆瑙掆啋榻挎潯 mm锛堟樉绀虹敤杩戜技锛?*/
   driveTo(MF,z0F+travelR(SIM.halfF,rDeg),rack,'front');  SIM.mFR=metrics(MF,'front');
   driveTo(MR,z0R+travelR(SIM.halfR,rDeg),0,'rear');      SIM.mRR=metrics(MR,'rear');
   if(S.show.mirror){
@@ -3361,8 +3385,14 @@ function applyTrackFrame(i){
 function trackStep(dt){
   if(!TRK.res||!TRK.playing)return;
   const n=TRK.res.trace.length;
-  const adv=Math.max(1,Math.round(dt*TRK.speed/TRK.res.t[1]||0.01));
-  const ni=Math.min(n-1,TRK.i+adv);
+  /* F-57锛?026-08-30锛夛細鍥炴斁鍊嶇巼涓嶅啀闅忓埛鏂扮巼婕傜Щ鈥斺€旀棫瀹炵幇
+     adv=round(dt路speed/螖t)锛?0Hz 涓?dt鈮?.0167銆佄攖=0.01 鈫?round 鎭?2 鈫?2 鍊嶉€熴€?     鏀逛负绱Н鏃堕棿鍩猴細acc += dt路speed锛屾瘡绉弧涓€涓豢鐪熷抚姝ユ帹杩涗竴甯с€?*/
+  if(!TRK.res.t||TRK.res.t.length<n)return;
+  const fstep=TRK.res.t[1]-TRK.res.t[0]||0.01;
+  TRK._acc=(TRK._acc||0)+dt*TRK.speed;
+  let steps=Math.floor(TRK._acc/fstep);
+  TRK._acc-=steps*fstep;
+  const ni=Math.min(n-1,TRK.i+Math.max(1,steps));
   applyTrackFrame(ni);
   if(ni>=n-1){TRK.playing=false;}
   syncTrackUI();
@@ -3405,7 +3435,7 @@ function drawTrackOverlay(v){
 }
 function renderTrackTelemetry(row,i){
   const tr=TRK.res.trace;
-  /* G-G 图（ax 数值微分） */
+  /* G-G 鍥撅紙ax 鏁板€煎井鍒嗭級 */
   const gg=document.getElementById("trkGG");
   if(gg){const tArr=TRK.res.t;const dpr=Math.min(2,devicePixelRatio||1),w=gg.clientWidth||200,h=gg.clientHeight||200;
     if(gg.width!==w*dpr){gg.width=w*dpr;gg.height=h*dpr;}
@@ -3426,8 +3456,8 @@ function renderTrackTelemetry(row,i){
     ctx.fillStyle=C.nodeSel;ctx.beginPath();
     ctx.arc(cx0+ax*sc,cy0-(row.ay/9.81)*sc,3.6,0,6.2832);ctx.fill();
     ctx.fillStyle=C.txt3;ctx.font="8.5px ui-monospace,monospace";
-    ctx.fillText("G-G (μ="+TRK.mu.toFixed(2)+")",6,11);}
-  /* 四轮载荷柱 */
+    ctx.fillText("G-G (渭="+TRK.mu.toFixed(2)+")",6,11);}
+  /* 鍥涜疆杞借嵎鏌?*/
   const fz=document.getElementById("trkFZ");
   if(fz){const dpr=Math.min(2,devicePixelRatio||1),w=fz.clientWidth||280,h=fz.clientHeight||64;
     if(fz.width!==w*dpr){fz.width=w*dpr;fz.height=h*dpr;}
@@ -3441,23 +3471,23 @@ function renderTrackTelemetry(row,i){
       ctx.fillStyle=C.txt2;ctx.font="8.5px ui-monospace,monospace";
       ctx.fillText(k,12+q*bw+bw/2-6,h-3);
       ctx.fillText((v0|0)+"",12+q*bw+4,h-16-bh);});}
-  /* 三联曲线 */
+  /* 涓夎仈鏇茬嚎 */
   const t=TRK.res.t,xr=[t[0],t[t.length-1]||1];
   const mk=(id,title,unit,key,fn)=>{
     const cv=document.getElementById(id);if(!cv)return;
     plotXYMulti(cv,title,unit,[{c:C.strut,pts:tr.map((p,k)=>[t[k],fn?fn(p):(p[key]||0)])}],xr,t[i]);};
-  mk("trkC1","车速 SPEED","m/s","vx");
-  mk("trkC2","侧向加速度 LAT ACC","m/s²","ay");
-  mk("trkC3","转向角 STEER","rad","delta");
+  mk("trkC1","杞﹂€?SPEED","m/s","vx");
+  mk("trkC2","渚у悜鍔犻€熷害 LAT ACC","m/s虏","ay");
+  mk("trkC3","杞悜瑙?STEER","rad","delta");
 }
 function syncTrackUI(){
   const pb=document.getElementById("trkPlay"),sc=document.getElementById("trkScrub");
-  if(pb)pb.textContent=TRK.playing?"⏸ 暂停":"▶ 播放";
+  if(pb)pb.textContent=TRK.playing?"鈴?鏆傚仠":"鈻?鎾斁";
   if(sc&&TRK.res){sc.max=TRK.res.trace.length-1;sc.value=TRK.i;}
 }
 function setTrkStatus(t,c){const e=document.getElementById("trkStatus");if(e){e.textContent=t;e.style.color=c||C.txt3;}}
 function trackCSV(){
-  if(!TRK.res){setTrkStatus("先运行一次仿真",C.ela);return;}
+  if(!TRK.res){setTrkStatus("鍏堣繍琛屼竴娆′豢鐪?,C.ela);return;}
   const tr=TRK.res.trace,ks=Object.keys(tr[0]);
   const csv=[ks.join(",")].concat(tr.map(p=>ks.map(k=>p[k]).join(","))).join("\n");
   const a=document.createElement("a");
@@ -3473,8 +3503,8 @@ const STAGE={
   cam:"behind", trace:null, v:null, tMax:1, raf:0, last:0, built:false, loop:true
 };
 const STAGE_CAMS=[
-  ["behind","尾部跟随"],["front","前部跟随"],["threeq","斜45deg跟随"],
-  ["top","顶视跟随"],["trackside","固定机位(起点)"]
+  ["behind","灏鹃儴璺熼殢"],["front","鍓嶉儴璺熼殢"],["threeq","鏂?5deg璺熼殢"],
+  ["top","椤惰璺熼殢"],["trackside","鍥哄畾鏈轰綅(璧风偣)"]
 ];
 const STAGE_CAM_OFF={
   behind:[0,-13.5,4.4], front:[0,13.5,3.6], threeq:[8.5,-10.5,4.8],
@@ -3497,58 +3527,58 @@ function _stageBuild(){
   const w=document.createElement("div");w.id="stageWrap";
   w.innerHTML=
     '<div id="stageTop">'+
-      '<b class="st-bt">LABSUS - 赛道瞬态舞台</b><span class="st-st" id="stStatus">--</span>'+
+      '<b class="st-bt">LABSUS - 璧涢亾鐬€佽垶鍙?/b><span class="st-st" id="stStatus">--</span>'+
       '<span class="sp"></span><span class="st-cams" id="stCams"></span>'+
       '<button class="st-btn" id="stPlay">PAUSE</button>'+
       '<select class="st-sel" id="stRate"><option value="0.5">0.5x</option><option value="1" selected>1.0x</option><option value="2">2.0x</option></select>'+
       '<input id="stScrub" type="range" min="0" max="1000" value="0">'+
-      '<button class="st-btn danger" id="stExit">X 退出</button>'+
+      '<button class="st-btn danger" id="stExit">X 閫€鍑?/button>'+
     '</div>'+
     '<div id="stageBody">'+
       '<div id="stageCanvasBox"><canvas id="stageCanvas"></canvas></div>'+
       '<div id="stageSide">'+
-        '<div class="ss-t">四轮摩擦圆 TIRE FRICTION CIRCLES</div>'+
+        '<div class="ss-t">鍥涜疆鎽╂摝鍦?TIRE FRICTION CIRCLES</div>'+
         '<div id="fcGrid"></div>'+
-        '<div class="ss-t">关键物理 LIVE TELEMETRY</div>'+
+        '<div class="ss-t">鍏抽敭鐗╃悊 LIVE TELEMETRY</div>'+
         '<div id="telGrid" class="telg"></div>'+
       '</div>'+
     '</div>';
   body.appendChild(w);
   const st=document.createElement("div");st.id="stageSetup";
   st.innerHTML=
-    '<div id="ssHead"><b>赛道仿真 - 初始属性设置</b><button class="st-btn danger" id="ssCancel">取消</button></div>'+
+    '<div id="ssHead"><b>璧涢亾浠跨湡 - 鍒濆灞炴€ц缃?/b><button class="st-btn danger" id="ssCancel">鍙栨秷</button></div>'+
     '<div id="ssBody">'+
       '<div class="ss-col">'+
-        '<div class="ss-t">赛道图 TRACK</div>'+
-        '<div class="selrow"><label>预设</label><select id="ssPreset"></select></div>'+
+        '<div class="ss-t">璧涢亾鍥?TRACK</div>'+
+        '<div class="selrow"><label>棰勮</label><select id="ssPreset"></select></div>'+
         '<canvas id="ssPreview" width="320" height="200"></canvas>'+
-        '<div class="selrow"><button class="st-btn" id="ssImport">导入 JSON/CSV 路点</button></div>'+
-        '<div class="selrow"><label>模拟时长 s</label><input id="ssTime" type="number" value="25" step="1" min="5" max="120"></div>'+
+        '<div class="selrow"><button class="st-btn" id="ssImport">瀵煎叆 JSON/CSV 璺偣</button></div>'+
+        '<div class="selrow"><label>妯℃嫙鏃堕暱 s</label><input id="ssTime" type="number" value="25" step="1" min="5" max="120"></div>'+
       '</div>'+
       '<div class="ss-col">'+
-        '<div class="ss-t">车辆与动力 VEHICLE and POWERTRAIN</div>'+
+        '<div class="ss-t">杞﹁締涓庡姩鍔?VEHICLE and POWERTRAIN</div>'+
         '<div class="telg">'+
-          '<label>初速 m/s</label><input id="ssV0" type="number" value="6" step="0.5" min="2" max="30">'+
-          '<label>预瞄增益</label><input id="ssLook" type="number" value="0.9" step="0.05" min="0.4" max="1.5">'+
-          '<label>峰值扭矩 Nm</label><input id="ssTq" type="number" value="250" step="10" min="40" max="800">'+
-          '<label>峰值功率 kW</label><input id="ssPw" type="number" value="80" step="5" min="20" max="400">'+
-          '<label>前轴制动 %</label><input id="ssBrk" type="number" value="60" step="5" min="0" max="100">'+
+          '<label>鍒濋€?m/s</label><input id="ssV0" type="number" value="6" step="0.5" min="2" max="30">'+
+          '<label>棰勭瀯澧炵泭</label><input id="ssLook" type="number" value="0.9" step="0.05" min="0.4" max="1.5">'+
+          '<label>宄板€兼壄鐭?Nm</label><input id="ssTq" type="number" value="250" step="10" min="40" max="800">'+
+          '<label>宄板€煎姛鐜?kW</label><input id="ssPw" type="number" value="80" step="5" min="20" max="400">'+
+          '<label>鍓嶈酱鍒跺姩 %</label><input id="ssBrk" type="number" value="60" step="5" min="0" max="100">'+
         '</div>'+
-        '<div class="ss-t">气动 AERO</div>'+
+        '<div class="ss-t">姘斿姩 AERO</div>'+
         '<div class="telg">'+
-          '<label>前下压 k</label><input id="ssAkf" type="number" value="0.55" step="0.05" min="0" max="4">'+
-          '<label>后下压 k</label><input id="ssAkr" type="number" value="0.45" step="0.05" min="0" max="4">'+
-          '<label>阻力 k</label><input id="ssAkd" type="number" value="0.35" step="0.05" min="0" max="4">'+
+          '<label>鍓嶄笅鍘?k</label><input id="ssAkf" type="number" value="0.55" step="0.05" min="0" max="4">'+
+          '<label>鍚庝笅鍘?k</label><input id="ssAkr" type="number" value="0.45" step="0.05" min="0" max="4">'+
+          '<label>闃诲姏 k</label><input id="ssAkd" type="number" value="0.35" step="0.05" min="0" max="4">'+
         '</div>'+
-        '<div class="ss-t">轮胎 TIRE (MF)</div>'+
+        '<div class="ss-t">杞儙 TIRE (MF)</div>'+
         '<div class="telg">'+
           '<label>Fy0 N</label><input id="ssFy0" type="number" value="8000" step="500" min="2000" max="20000">'+
           '<label>FzNom N</label><input id="ssFzN" type="number" value="3500" step="100" min="1000" max="8000">'+
-          '<label>松弛长度 m</label><input id="ssLs" type="number" value="0.35" step="0.05" min="0.05" max="1">'+
-          '<label>外倾系数 /rad</label><input id="ssCg" type="number" value="0.5" step="0.1" min="0" max="2">'+
+          '<label>鏉惧紱闀垮害 m</label><input id="ssLs" type="number" value="0.35" step="0.05" min="0.05" max="1">'+
+          '<label>澶栧€剧郴鏁?/rad</label><input id="ssCg" type="number" value="0.5" step="0.1" min="0" max="2">'+
         '</div>'+
-        '<button class="st-btn go" id="ssGo">开始赛道仿真</button>'+
-        '<div class="ss-st" id="ssStatus">选择预设或导入路点 - 设置参数 - 开始仿真（需引擎在线）</div>'+
+        '<button class="st-btn go" id="ssGo">寮€濮嬭禌閬撲豢鐪?/button>'+
+        '<div class="ss-st" id="ssStatus">閫夋嫨棰勮鎴栧鍏ヨ矾鐐?- 璁剧疆鍙傛暟 - 寮€濮嬩豢鐪燂紙闇€寮曟搸鍦ㄧ嚎锛?/div>'+
       '</div>'+
     '</div>';
   body.appendChild(st);
@@ -3568,10 +3598,10 @@ function _stageBuild(){
     fg.appendChild(cell);
   });
   const tg=document.getElementById("telGrid");
-  [["telV","车速 v","m/s"],["telAx","纵向 ax","m/s2"],["telAy","侧向 ay","g"],
-   ["telYaw","横摆 yaw","rad/s"],["telRoll","侧倾 roll","deg"],["telPitch","俯仰 pitch","deg"],
-   ["telDelta","转向 delta","deg"],["telMuMax","mu 利用率",""],["telThr","油门",""],
-   ["telBrk","制动",""],["telSlipMax","松弛滑移 max","deg"],["telDist","时间","s"]].forEach(d=>{
+  [["telV","杞﹂€?v","m/s"],["telAx","绾靛悜 ax","m/s2"],["telAy","渚у悜 ay","g"],
+   ["telYaw","妯憜 yaw","rad/s"],["telRoll","渚у€?roll","deg"],["telPitch","淇话 pitch","deg"],
+   ["telDelta","杞悜 delta","deg"],["telMuMax","mu 鍒╃敤鐜?,""],["telThr","娌归棬",""],
+   ["telBrk","鍒跺姩",""],["telSlipMax","鏉惧紱婊戠Щ max","deg"],["telDist","鏃堕棿","s"]].forEach(d=>{
     const g=document.createElement("div");g.className="telg-item";
     g.innerHTML="<span>"+d[1]+" <u>"+d[2]+"</u></span><b id='"+d[0]+"'>--</b>";
     tg.appendChild(g);
@@ -3585,7 +3615,7 @@ function _stageBuild(){
   Object.keys(TRACK_PRESETS).forEach(k=>{const o=document.createElement("option");o.value=k;o.textContent=TRACK_PRESETS[k].zh;pr.appendChild(o);});
   pr.onchange=()=>drawStageSetupPreview();
     {const lb=document.createElement("label");lb.className="selrow";lb.style.cssText="display:flex;align-items:center;gap:6px;margin:8px 0;font:9px var(--font-ui);color:#9AA4B5";
-    lb.innerHTML='<input type="checkbox" id="ssUseEng"> 使用引擎 /api/v3（需连接，默认取消=内置 JS 物理）';
+    lb.innerHTML='<input type="checkbox" id="ssUseEng"> 浣跨敤寮曟搸 /api/v3锛堥渶杩炴帴锛岄粯璁ゅ彇娑?鍐呯疆 JS 鐗╃悊锛?;
     document.getElementById("ssBody").querySelector(".ss-col:last-child").appendChild(lb);}
   document.getElementById("ssGo").onclick=trackStageRun;
   STAGE.v.ctx=STAGE.v.cv.getContext("2d");
@@ -3611,10 +3641,13 @@ function drawStageSetupPreview(){
 }
 /* ================================================================
    TPHYS: built-in track physics engine (JS port of transient.py,
-   2026-08-24) - zero-dependency; powers the standalone all-in-one.
-   Equals the upgraded S3-1 model: planar 3-DOF body, MF tires with
-   composite-slip + relaxation length + camber thrust + LS, powertrain
-   envelope, aero downforce/drag, roll/pitch lag, pure-pursuit + PI.
+   2026-08-24) - zero-dependency; runs when the /api/v3 engine is offline
+   or "浣跨敤寮曟搸" is unchecked. Model echo of the upgraded S3-1: planar
+   3-DOF body, MF tires with composite-slip + relaxation length + camber
+   thrust + LS, powertrain envelope, aero downforce/drag, roll/pitch lag,
+   pure-pursuit + PI. NOTE: rc/kw LUTs come from SIM.swF/swR sweeps (same
+   geometry source the engine path sends as kw_curve); a bit-level parity
+   harness vs transient.py is still TODO (audit: D1).
    ================================================================ */
 const TPHYS = (function(){
   const G=9.81, R2D=180/Math.PI, D2R=Math.PI/180;
@@ -3709,9 +3742,10 @@ const TPHYS = (function(){
     this.hr_=Math.abs(v.rear.points.WC[0])/1000;
     this.pos={FR:[this.a,+this.hf],FL:[this.a,-this.hf],RR:[-this.b,+this.hr_],RL:[-this.b,-this.hr_]};
     this.iz=body.iz_kg_m2||v.mass_kg*(this.L*this.L+1.6*1.6)/12;
-    this.LsT=this.Ls;
+    this.LsT=Math.max(0.3,this.Ls);   /* F-24锛毾?鍦版澘 0.3m锛屼笌 Python max(0.3,Ls) 瀵归綈 */
     this.rollDeg=0; this.pitchDeg=0; this.prevAy=0; this.prevAx=0; this.tNow=0;
     this.alphaLat={FR:0,FL:0,RR:0,RL:0};
+    this._aStT={FR:0,FL:0,RR:0,RL:0};   /* F-22锛氫晶鍋忕洰鏍囩紦瀛橈紙derivs 鍙褰曚笉鎺ㄨ繘锛?*/
     this.lutF=body.kc_luts&&body.kc_luts.front||{};
     this.lutR=body.kc_luts&&body.kc_luts.rear||{};
     this.rc=ctx.rc; this.kw=ctx.kw;
@@ -3721,9 +3755,11 @@ const TPHYS = (function(){
     const v2=vx*vx; return [kf*v2,kr*v2,kd*v2];
   };
   Veh.prototype.loads=function(vx){
-    const [df,dr]=this._aero(vx);
+    /* 鍕樿锛?026-08-30锛孎-23 澶嶆牳锛夛細dnf/dnr 鏄墠/鍚庤酱涓嬪帇鍔涳紝闃诲姏涓嶅叆鍨傚悜杞借嵎
+       锛堥樆鍔涘湪 derivs 鍗曠嫭浣滅敤浜?Fx锛夆€斺€斿鏌ユ姤鍛婅璇?dr 涓?drag锛岀墿鐞嗘湰灏辨纭€?*/
+    const [dnf,dnr]=this._aero(vx);
     return quasiLoads(this.v, this.prevAy/G, this.prevAx/G,
-      df+dr, df/(df+dr||1), this.rc, this.kw);
+      dnf+dnr, dnf/(dnf+dnr||1), this.rc, this.kw);
   };
   Veh.prototype.steer=function(delta){
     if(Math.abs(delta)<1e-6)return {FR:0,FL:0};
@@ -3744,20 +3780,24 @@ const TPHYS = (function(){
     const spd=Math.hypot(vwx,vwy);
     const ts=this.alphaLat;
     if(spd<0.8||fz<=1){
-      ts[w]=0;
-      return {fx:0,fy:0,alpha:0,alphaL:0,toe:toeDeg,cam:camRad*R2D,fz:fz,muUse:0};
+      this._aStT[w]=ts[w];   /* 澶辨椿杞細鏉惧紱鐩爣=褰撳墠鍊硷紙鐘舵€佸喕缁擄紝涓?Python 瀵归綈锛?*/
+      return {fx:0,fy:0,alpha:0,alphaL:ts[w]*R2D,toe:toeDeg,cam:camRad*R2D,fz:fz,muUse:0};
     }
     const aSt=Math.atan2(vwy,Math.max(Math.abs(vwx),0.5));
-    ts[w]+=dt*(vx/this.LsT)*(aSt-ts[w]);
+    /* F-22/F-24锛?026-08-30锛夛細derivs 淇濇寔绾嚱鏁扳€斺€斿彧璁板綍渚у亸鐩爣涓嶆帹杩涚姸鎬?       锛圧K2 涓棿璇勪及涓嶅緱姹℃煋婊炲悗鐘舵€侊級锛涙帹杩涘湪 step() 鏈熬鐢ㄨВ鏋愮簿纭В銆?*/
+    this._aStT[w]=aSt;
     const aLat=ts[w];
     const muFz=this.mu*fz;
     let fy=-this.fy(aLat,fz);
     fy+=-this.Cg*camRad*fz;
     let fx=0;
-    if((w==="RR"||w==="RL")&&thr>0){
+    if(thr>0){
       const tEff=(this.pt.T_max||250)/0.30;
       const pEff=((this.pt.P_kw||80)*1000)/Math.max(0.8,vx);
-      fx=Math.min(0.75*muFz,Math.min(tEff,pEff))*thr*0.5;
+      const fAvail=Math.min(tEff,pEff)*thr;
+      const split=this.pt.drive_split_f||0;
+      const share=(w==="RR"||w==="RL")?(1-split):split;
+      if(share>0) fx=Math.min(0.75*muFz,fAvail*share)*0.5;
     }
     if(brk>0){
       const spf=("brake_split_f" in this.pt)?this.pt.brake_split_f:0.6;
@@ -3772,13 +3812,10 @@ const TPHYS = (function(){
             fz:fz, muUse:muUse};
   };
   Veh.prototype.derivs=function(s,delta,thr,brk,dt){
+    /* 绾嚱鏁板鏁帮紙F-22 淇锛?026-08-30锛夛細涓嶅啀鎺ㄨ繘 rollDeg/pitchDeg/alphaLat鈥斺€?       鏃у疄鐜拌 RK2 鐨?k1/k2 鍚勬帹涓€娆℃粸鍚庯紝蟿_eff 鍑忓崐涓斾腑鐐圭姸鎬佽姹℃煋銆?       婊炲悗鎺ㄨ繘缁熶竴绉诲埌 step() 鏈熬銆?*/
     const vx=s[3],vy=s[4],r=s[5];
     const L=this.loads(vx);
     this._rollSs=L.rollDeg;
-    const tr=0.18;
-    this.rollDeg+=(this._rollSs-this.rollDeg)*(dt/tr);
-    const pSs=Math.atan2(this.prevAx,G)*R2D*0.55;
-    this.pitchDeg+=(pSs-this.pitchDeg)*(dt/0.25);
     const st=this.steer(delta);
     let Fx=0,Fy=0,Mz=0,camRow={};
     for(const w of _W){
@@ -3807,12 +3844,20 @@ const TPHYS = (function(){
     s2[2]+=dt*s2[5];
     this.prevAx=k2.d[3]-s2[5]*s2[4];
     this.prevAy=k2.d[4]+s2[5]*s2[3];
+    /* 鈥斺€?婊炲悗鐘舵€佹帹杩涳紙F-22锛氱Щ鍑?derivs锛屾瘡 RK2 姝ュ彧绉垎涓€娆★級鈥斺€?*/
+    this.rollDeg+=(this._rollSs-this.rollDeg)*(dt/0.18);
+    const pSs=Math.atan2(this.prevAx,G)*R2D*0.55;
+    this.pitchDeg+=(pSs-this.pitchDeg)*(dt/0.25);
+    /* 鈥斺€?鏉惧紱婊炲悗锛團-24锛氳В鏋愮簿纭В 1鈭抏^(鈭抎t路vx/蟽)锛屾棤鏉′欢绋冲畾锛夆€斺€?*/
+    const sig=Math.max(0.3,this.LsT);
+    const vxNow=Math.max(s2[3],0);
+    for(const w of _W) this.alphaLat[w]+=(this._aStT[w]-this.alphaLat[w])*(1-Math.exp(-dt*vxNow/sig));
     this.tNow+=dt;
     return {s:s2, diag:k2.diag};
   };
   // --- driver (pure pursuit + PI) ---
   function DriverPI(gain){ this.gain=gain; this.ei=0; }
-  DriverPI.prototype.call=function(track,s,idx,vT,L){
+  DriverPI.prototype.call=function(track,s,idx,vT,L,dt){
     const x=s[0],y=s[1],psi=s[2],vx=s[3];
     // closest idx
     let best=idx,bd=Infinity;
@@ -3839,7 +3884,7 @@ const TPHYS = (function(){
     const al=Math.atan2(ly,Math.max(lx,1));
     const delta=Math.atan2(2*L*Math.sin(al),ld);
     const e=vT-vx;
-    this.ei=Math.max(-2,Math.min(2,this.ei+e*0.05));
+    this.ei=Math.max(-2,Math.min(2,this.ei+e*(dt||0.05)));   /* F-27锛氭寜鐪熷疄 dt 缂╂斁 */
     const thr=Math.max(0,Math.min(1,0.9*e+0.12*this.ei));
     const brk=e<-0.5?Math.max(0,Math.min(1,-0.9*e-0.15)):0;
     return [delta,thr,brk,idx];
@@ -3866,7 +3911,7 @@ const TPHYS = (function(){
     for(let k=0;k<nSteps;k++){
       const t=k*dt;
       const vT=tgt[Math.min(idx,tgt.length-1)];
-      const [delta,thr,brk,nidx]=drv.call(track,s,idx,vT,L);
+      const [delta,thr,brk,nidx]=drv.call(track,s,idx,vT,L,dt);
       idx=nidx;
       let t2=thr, b2=brk;
       if(thr<0.02&&brk<0.02&&Math.abs(vT-s[3])>0.5)t2=0.05;
@@ -3910,24 +3955,69 @@ const TPHYS = (function(){
         max_slip_deg:+maxSlip.toFixed(2)},warnings:warnings,
       builtin:true};
   }
-  // context builder: rc/kw LUTs from caller-supplied sweeps (SIM.swF/swR)
+  // context builder: rc/kw LUTs derived from the SAME front-end sweeps
+  // (SIM.swF/swR rows: rcH in mm, kw in N/mm) that chassisPayload sends to
+  // the engine as kw_curve 鈥?one geometry source for builtin and engine paths.
   function makeSimContext(body){
     const v=body.vehicle;
-    const rc={travel:[-90,-60,-30,-15,0,15,30,60,90],rcF:[65,60,57,55.5,55,54,52,48,42],
-              rcR:[75,70,66,64,63,62,60,55,48],zrc0_f:55,zrc0_r:63,karb_f:0,karb_r:0};
-    const kw={travel:[-90,-60,-30,-15,0,15,30,60,90],
-              kwF:Array(9).fill(v.front.spring_rate*(v.front.motion_ratio||0.75)**2),
-              kwR:Array(9).fill(v.rear.spring_rate*(v.rear.motion_ratio||0.78)**2)};
-    return {rc:rc,kw:kw};
+    const col=(sw,key,f0)=>(sw&&sw.rows&&sw.rows.length>=2)
+      ?{travel:sw.rows.map(q=>q.tr),vals:sw.rows.map(q=>{const x=q[key];return (x===null||x===undefined||!isFinite(x))?f0:x;})}
+      :{travel:[-90,-60,-30,-15,0,15,30,60,90],vals:[f0,f0,f0,f0,f0,f0,f0,f0,f0]};
+    const rF=col(SIM.swF,"rcH",55), rR=col(SIM.swR,"rcH",63);
+    const kwF=col(SIM.swF,"kw",(v.front.spring_rate||60)*(v.front.motion_ratio||0.75)**2);
+    const kwR=col(SIM.swR,"kw",(v.rear.spring_rate||65)*(v.rear.motion_ratio||0.78)**2);
+    /* F-28锛?026-08-30锛夛細TPHYS 涓嶅啀蹇界暐 ARB 鈥斺€?鐢?body.vehicle 鐨勭ǔ瀹氭潌鍙傛暟
+       鎸?arbRate(0.55) 鍚屽彛寰勬姌绠楃瓑鏁堜晶鍊惧垰搴?karb_f/karb_r锛堜笌 solveQuasiStatic
+       鍙婂紩鎿?chassis.arb_rate 涓€鑷达細k = kt/a虏路mr虏锛屽啀缁?1000路t虏/2 鎶樼畻杩?kphi锛夈€?       娉ㄦ剰锛氬鎷嶅満鏅敱娴嬭瘯绔敞鍏?ctx锛圥ython axle_rc_sweep 鍚屾簮锛夛紝姝ゅ浠?       椤甸潰鍐呯疆 TPHYS 榛樿璺緞鐢熸晥銆?*/
+    const arbK=(ax)=>{const ab=ax.arb||{};const d=ab.d||0;
+      if(d<=0.5)return 0;
+      const J=Math.PI*Math.pow(d,4)/32;
+      const F=ax.points?ax.points.LCA_F:null;
+      const B=ax.points?ax.points.LBJ:null;
+      if(!F||!B)return 0;
+      /* 涓庨〉闈?arbGeom/arbRate(0.55) 閫愯涓€鑷达紙F-28锛氶棴鍖呭唴鏃犳硶澶嶇敤鍏ㄥ眬鍑芥暟锛?         瀵规媿 ctx 鐢辨祴璇曠娉ㄥ叆 Python 鍚屾簮鍊硷紝涓嶅奖鍝嶄竴鑷存€э級 */
+      const t=ab.t||0.55, dy=ab.dy||50, dz=ab.dz||120, G=ab.G||79000;
+      const P0=[F[0]+(B[0]-F[0])*t, F[1]+(B[1]-F[1])*t, F[2]+(B[2]-F[2])*t];
+      const xa=P0[0], ay=F[1]+dy, az=F[2]+dz;
+      const a=ay-P0[1];
+      const E0=[xa, ay-a, az];
+      const ldl=Math.hypot(E0[0]-P0[0],E0[1]-P0[1],E0[2]-P0[2]);
+      const P=[F[0]+(B[0]-F[0])*t, F[1]+(B[1]-F[1])*t, F[2]+(B[2]-F[2])*t];
+      const A=ay-P[1], Bz=az-P[2], R=Math.hypot(A,Bz);
+      const K=(xa-P[0])**2+A*A+Bz*Bz+a*a-ldl*ldl;
+      const c=Math.max(-1,Math.min(1,K/(2*a*R||1e-9)));
+      const f0=Math.atan2(Bz,A), sg=Math.atan2(az-P0[2],ay-P0[1])>=0?1:-1;
+      const psi=f0-sg*Math.acos(c);
+      void [xa, ay, az, E0, P, A, Bz, R, K, c, f0, sg, psi];   /* 淇濇寔缁撴瀯鍙 */
+      const L=2*xa;
+      const kt=G*J/(L||1e-9);
+      return kt/(a*a)*0.55*0.55;   /* mr_arb=0.55 鏍″噯鍊硷紙绗叚璁诧紝鍙岀涓€鑷达級 */
+    };
+    const kf=arbK(v.front), kr=arbK(v.rear);
+    const tF=(Math.abs((v.front.points&&v.front.points.WC[0])||750)*2)/1000;
+    const tR=(Math.abs((v.rear.points&&v.rear.points.WC[0])||750)*2)/1000;
+    return {
+      rc:{travel:rF.travel,rcF:rF.vals,rcR:rR.vals,
+          zrc0_f:(SIM.mFR&&SIM.mFR.rcH)||55,zrc0_r:(SIM.mRR&&SIM.mRR.rcH)||63,
+          /* F-28锛欰RB 绛夋晥渚у€惧垰搴︽敞鍏ワ紙k[kgf/mm]鈫択phi: 1000路t虏/2 鎶樼畻锛?*/
+          karb_f:kf*1000*(tF*tF)/2,karb_r:kr*1000*(tR*tR)/2},
+      kw:{travel:kwF.travel,kwF:kwF.vals,kwR:kwR.vals}
+    };
   }
   return {run:run, makeSimContext:makeSimContext};
 })();
 
 function trackStageRun(){
   _stageBuild();
-  if(!ENG.ok){document.getElementById("ssStatus").textContent="未连接引擎 -> 请先连接";return;}
   const st=document.getElementById("ssStatus");
-  st.textContent="仿真中...(MF 松弛/复合滑移 + 动力/气动包络)";
+  const wantEng=document.getElementById("ssUseEng")&&document.getElementById("ssUseEng").checked;
+  if(!ENG.ok){
+    if(wantEng){st.textContent="寮曟搸鏈繛鎺?鈫?璇峰厛杩炴帴锛屾垨鍙栨秷銆屼娇鐢ㄥ紩鎿庛€嶆敼璧板唴缃?JS 鐗╃悊 (TPHYS)";return;}
+    st.textContent="寮曟搸鏈繛鎺?鈫?鍐呯疆 JS 鐗╃悊 (TPHYS) 浠跨湡涓€?;
+  }else{
+    st.textContent=wantEng?"浠跨湡涓?..(寮曟搸 /api/v3/chassis/simulate_track)"
+      :"浠跨湡涓?..(鍐呯疆 JS 鐗╃悊 TPHYS锛歁F 鏉惧紱/澶嶅悎婊戠Щ + 鍔ㄥ姏/姘斿姩鍖呯粶)";
+  }
   const base=chassisPayload();
   const lut=sw=>({travel:sw.rows.map(r=>r.tr),toe:sw.rows.map(r=>r.toe),cam:sw.rows.map(r=>r.cam)});
   const key=document.getElementById("ssPreset").value;
@@ -3951,7 +4041,7 @@ function trackStageRun(){
       Cg:parseFloat(document.getElementById("ssCg").value)||0.5}};
   const useEng=document.getElementById("ssUseEng")&&document.getElementById("ssUseEng").checked&&ENG.ok;
   const finishStage=function(res){
-    if(res.status!=="VALID"){document.getElementById("ssStatus").textContent="仿真失败："+res.status;return;}
+    if(res.status!=="VALID"){document.getElementById("ssStatus").textContent="浠跨湡澶辫触锛?+res.status;return;}
 
     STAGE.res=res;STAGE.trace=res.trace;STAGE.req=body;
     STAGE.tMax=res.t[res.t.length-1]||1;
@@ -3961,14 +4051,14 @@ function trackStageRun(){
     _stageSize();_stageOpen();STAGE.last=performance.now();requestAnimationFrame(stageTick);
     const sm=res.summary;
     document.getElementById("stStatus").textContent=
-      (res.builtin?"内置JS ": "")+sm.path_length_m+"m - v_max "+sm.v_max+"m/s - max "+sm.max_ay_g+"g - "+(res.ms|0)+"ms"+(res.finished?"（完赛）":"");
+      (res.builtin?"鍐呯疆JS ": "")+sm.path_length_m+"m - v_max "+sm.v_max+"m/s - max "+sm.max_ay_g+"g - "+(res.ms|0)+"ms"+(res.finished?"锛堝畬璧涳級":"");
   };
   if(useEng){
     fetch(ENG.url+"/api/v3/chassis/simulate_track",
       {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
     .then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
     .then(res=>{finishStage(res);})
-    .catch(err=>{document.getElementById("ssStatus").textContent="仿真失败："+err.message;});
+    .catch(err=>{document.getElementById("ssStatus").textContent="浠跨湡澶辫触锛?+err.message;});
   }else{
     setTimeout(function(){
       const res=TPHYS.run(body, TPHYS.makeSimContext(body));
@@ -4037,8 +4127,12 @@ function stageTick(ts){
   }
   if(STAGE.playing&&STAGE.trace){
     const n=STAGE.trace.length;
-    const adv=Math.max(1,Math.round(dt*STAGE.speed/(STAGE.tMax/Math.max(1,n-1))));
-    STAGE.i+=adv;
+    /* F-57锛?026-08-30锛夛細STAGE 鍥炴斁鍊嶇巼鍚?trackStep 淇鈥斺€旀椂闂寸疮绉熀锛?       涓嶅啀 round(dt路speed/螖t) 浣?60Hz 涓嬫亽 2脳 婕傜Щ銆?*/
+    const fstep=STAGE.tMax/Math.max(1,n-1);
+    STAGE._acc=(STAGE._acc||0)+dt*STAGE.speed;
+    let nSteps=Math.floor(STAGE._acc/fstep);
+    STAGE._acc-=nSteps*fstep;
+    STAGE.i+=Math.max(1,nSteps);
     if(STAGE.i>=n-1){STAGE.i=0;if(!STAGE.loop){STAGE.playing=false;STAGE.i=n-1;}}
   }
   const row=STAGE.trace[Math.min(STAGE.i,STAGE.trace.length-1)];
@@ -4137,13 +4231,13 @@ function drawStageTelemetry(row){
 }
 
 function buildTrackPanel(host){
-  const b=sec(host,"赛道瞬态仿真 (引擎)","TRACK SIM STAGE - S3-1",false,"purp");
+  const b=sec(host,"璧涢亾鐬€佷豢鐪?(寮曟搸)","TRACK SIM STAGE 路 S3-2",false,"purp");
   const row=E("div","ctl");
-  row.appendChild(E("label",null,'赛道预设 <u>PRESET</u>'));
+  row.appendChild(E("label",null,'璧涢亾棰勮 <u>PRESET</u>'));
   const sel=E("select");sel.id="trkPreset";sel.style.flex="1";
   Object.keys(TRACK_PRESETS).forEach(k=>{
     const o=E("option",null,TRACK_PRESETS[k].zh);o.value=k;sel.appendChild(o);});
-  const oc=E("option",null,"自定义路点…");oc.value="custom";sel.appendChild(oc);
+  const oc=E("option",null,"鑷畾涔夎矾鐐光€?);oc.value="custom";sel.appendChild(oc);
   sel.onchange=()=>{TRK.preset=sel.value;};
   row.appendChild(sel);b.appendChild(row);
   const fr=E("input");fr.type="file";fr.accept=".json,.csv";fr.style.display="none";
@@ -4153,24 +4247,31 @@ function buildTrackPanel(host){
       if(/\.json$/i.test(f.name)){pts=JSON.parse(rd.result);}
       else{pts=rd.result.trim().split(/\r?\n/).slice(1).map(ln=>{
         const c=ln.split(/[;,\t]/).map(parseFloat);return {x:c[0],y:c[1],target_speed:c[2]||12};});}
-      if(!Array.isArray(pts)||pts.length<2)throw new Error("至少 2 个路点");
+      if(!Array.isArray(pts)||pts.length<2)throw new Error("鑷冲皯 2 涓矾鐐?);
+      /* F-38锛?026-08-30锛夛細瀛楁鏍￠獙 鈥斺€?鏃у疄鐜版帴鍙?[[x,y]] 鏁扮粍锛屼笅娓?p.x
+         undefined 鈫?NaN 璺偣闈欓粯鍙戞暎锛涘繀椤讳负 {x,y} 瀵硅薄 / [x,y] 鏁扮粍涓旀湁闄愩€?*/
+      pts=pts.map(p=>Array.isArray(p)?{x:p[0],y:p[1],target_speed:p[2]||12}:p)
+        .map(p=>({x:Number(p.x),y:Number(p.y),target_speed:(p.target_speed===undefined||p.target_speed===null)?12:Number(p.target_speed)}))
+        .filter(p=>isFinite(p.x)&&isFinite(p.y)&&isFinite(p.target_speed)&&p.target_speed>=0);
+      if(pts.length<2)throw new Error("鏈夋晥璺偣涓嶈冻 2 涓紙x/y 蹇呴』涓烘湁闄愭暟锛?);
       TRK.custom=pts;TRK.preset="custom";sel.value="custom";
-      setTrkStatus("自定义赛道已载入 "+pts.length+" 点",C.ok);
-    }catch(e){setTrkStatus("导入失败："+e.message,C.nodeFix);}};
+      setTrkStatus("鑷畾涔夎禌閬撳凡杞藉叆 "+pts.length+" 鐐?,C.ok);
+    }catch(e){setTrkStatus("瀵煎叆澶辫触锛?+e.message,C.nodeFix);}};
     rd.readAsText(f);};
   b.appendChild(fr);
-  rowBtns(b,[["导入 JSON/CSV 路点",()=>fr.click(),()=>TRK.preset==="custom"]]);
-  rowSlider(b,"预瞄增益","LOOKAHEAD GAIN","",0.4,1.5,0.05,()=>0.9,v=>{},2);
+  rowBtns(b,[["瀵煎叆 JSON/CSV 璺偣",()=>fr.click(),()=>TRK.preset==="custom"]]);
+  /* F-54锛?026-08-30锛夛細棰勭瀯澧炵泭涓嶅啀鎭?0.9 姝绘帶浠垛€斺€旂粦瀹?TRK.lookahead */
+  rowSlider(b,"棰勭瀯澧炵泭","LOOKAHEAD GAIN","",0.4,1.5,0.05,()=>TRK.lookahead,v=>{TRK.lookahead=v;},2);
   const ls=b.querySelectorAll("input[type=range]");ls[0].id="trkLook";
   const rowV=E("div","ctl");
-  rowV.appendChild(E("label",null,'初速 <u>START V</u> [m/s]'));
+  rowV.appendChild(E("label",null,'鍒濋€?<u>START V</u> [m/s]'));
   const vi=E("input");vi.type="number";vi.id="trkV0";vi.value="6";vi.step="0.5";vi.min="2";vi.max="20";
   rowV.appendChild(vi);b.appendChild(rowV);
-  const run=E("button","eng-run");run.id="trkRun";run.textContent="进入赛道仿真大厅 [独立]";
+  const run=E("button","eng-run");run.id="trkRun";run.textContent="杩涘叆璧涢亾浠跨湡澶у巺 [鐙珛]";
   run.onclick=_stageOpenSetup;b.appendChild(run);
-  const pb=E("button","eng-run");pb.id="trkPlay";pb.textContent="▶ 播放";pb.onclick=()=>{if(TRK.res){TRK.playing=!TRK.playing;syncTrackUI();}};
-  const ex=E("button","eng-run");ex.textContent="退出回放";ex.onclick=trackExit;
-  const csvb=E("button","eng-run");csvb.textContent="导出 CSV";csvb.onclick=trackCSV;
+  const pb=E("button","eng-run");pb.id="trkPlay";pb.textContent="鈻?鎾斁";pb.onclick=()=>{if(TRK.res){TRK.playing=!TRK.playing;syncTrackUI();}};
+  const ex=E("button","eng-run");ex.textContent="閫€鍑哄洖鏀?;ex.onclick=trackExit;
+  const csvb=E("button","eng-run");csvb.textContent="瀵煎嚭 CSV";csvb.onclick=trackCSV;
   const pr=E("div");pr.style.cssText="display:flex;gap:6px;margin:6px 0";
   pr.appendChild(pb);pr.appendChild(ex);pr.appendChild(csvb);b.appendChild(pr);
   const sc=E("input");sc.id="trkScrub";sc.type="range";sc.min=0;sc.max=100;sc.value=0;sc.step=1;
@@ -4178,17 +4279,17 @@ function buildTrackPanel(host){
   sc.oninput=()=>{if(!TRK.res)return;TRK.playing=false;applyTrackFrame(parseInt(sc.value||0));syncTrackUI();};
   b.appendChild(sc);
   const spd=E("div","ctl");
-  spd.appendChild(E("label",null,'回放速率 <u>RATE</u>'));
+  spd.appendChild(E("label",null,'鍥炴斁閫熺巼 <u>RATE</u>'));
   const ss=E("select");ss.style.flex="1";
-  [["0.5×",0.5],["1.0×",1.0],["2.0×",2.0]].forEach(o=>{const q=E("option",null,o[0]);q.value=o[1];ss.appendChild(q);});
+  [["0.5脳",0.5],["1.0脳",1.0],["2.0脳",2.0]].forEach(o=>{const q=E("option",null,o[0]);q.value=o[1];ss.appendChild(q);});
   ss.onchange=()=>{TRK.speed=parseFloat(ss.value);};
   spd.appendChild(ss);b.appendChild(spd);
   const st=E("div","eng-status");st.id="trkStatus";
-  st.textContent="选预设 → 连接引擎 → RUN：俯视图回放轨迹、3D 侧倾联动、右侧遥测 HUD";
+  st.textContent="閫夐璁?鈫?杩炴帴寮曟搸 鈫?RUN锛氫刊瑙嗗浘鍥炴斁杞ㄨ抗銆?D 渚у€捐仈鍔ㄣ€佸彸渚ч仴娴?HUD";
   b.appendChild(st);
 }
 function buildTrackTelemetry(host){
-  const b2=sec(host,"赛道动态遥测","TRACK TELEMETRY · HUD",false,"purp");
+  const b2=sec(host,"璧涢亾鍔ㄦ€侀仴娴?,"TRACK TELEMETRY 路 HUD",false,"purp");
   const gg=E("canvas","plot");gg.id="trkGG";gg.style.height="200px";gg.style.width="100%";
   b2.appendChild(gg);
   const fz=E("canvas","plot");fz.id="trkFZ";fz.style.height="64px";fz.style.width="100%";
@@ -4204,14 +4305,14 @@ window.addEventListener("keydown",e=>{
   if(TRK.res){e.preventDefault();TRK.playing=!TRK.playing;syncTrackUI();}
 });
 
-/* ================================ 15. 初始化与启动 ================================ */
-/* 液态玻璃双主题：自动跟随系统偏好，手动切换后持久化 */
+/* ================================ 15. 鍒濆鍖栦笌鍚姩 ================================ */
+/* 娑叉€佺幓鐠冨弻涓婚锛氳嚜鍔ㄨ窡闅忕郴缁熷亸濂斤紝鎵嬪姩鍒囨崲鍚庢寔涔呭寲 */
 function applyTheme(t){
   document.documentElement.setAttribute("data-theme",t);
   try{localStorage.setItem("labsus-theme",t);}catch(e){}
   Object.assign(C,PAL[t]);
   const tg=document.getElementById("themeTg");
-  if(tg)tg.title=t==="light"?"当前浅色 · 点击切换深色":"当前深色 · 点击切换浅色";
+  if(tg)tg.title=t==="light"?"褰撳墠娴呰壊 路 鐐瑰嚮鍒囨崲娣辫壊":"褰撳墠娣辫壊 路 鐐瑰嚮鍒囨崲娴呰壊";
 }
 (function initTheme(){
   let t=null;try{t=localStorage.getItem("labsus-theme");}catch(e){}
