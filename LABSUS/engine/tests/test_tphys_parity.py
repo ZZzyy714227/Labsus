@@ -93,17 +93,31 @@ def _body(track, **over):
     return b
 
 
-def _run_node(body, ctx, case):
+import os
+
+def _autocross():
+    pts = [
+        [0, 0, 14], [40, 0, 18], [80, 5, 16], [110, 25, 12], [125, 55, 10],
+        [115, 85, 11], [95, 115, 13], [70, 140, 9], [40, 145, 9], [15, 130, 12],
+        [-15, 105, 15], [-45, 85, 14], [-75, 70, 11], [-95, 45, 9], [-85, 20, 11],
+        [-65, 0, 13], [-40, -15, 12], [-15, -15, 11], [0, 0, 14]
+    ]
+    return [{"x": float(p[0]), "y": float(p[1]), "target_speed": float(p[2])} for p in pts]
+
+
+def _run_node(body, ctx, case, html_file="dwb-pro-allinone.html"):
     node = shutil.which("node")
     if not node:
         pytest.skip("node 不可用")
     inp = _LABSUS / "web" / f"_parity_{case}_in.json"
     out = _LABSUS / "web" / f"_parity_{case}_out.json"
     inp.write_text(json.dumps({"body": body, "ctx": ctx}), encoding="utf-8")
+    env = dict(os.environ)
+    env["TPHYS_HTML"] = str(_LABSUS / "web" / html_file)
     try:
         r = subprocess.run([node, str(_MJS), str(inp), str(out)],
                            capture_output=True, text=True, timeout=180,
-                           cwd=str(_LABSUS / "web"))
+                           cwd=str(_LABSUS / "web"), env=env)
         assert r.returncode == 0, f"node failed: {r.stderr}"
         return json.loads(out.read_text(encoding="utf-8"))
     finally:
@@ -132,11 +146,11 @@ def _ctx(vehicle):
     }
 
 
-def _parity(case, track, **over):
+def _parity(case, track, html_file="dwb-pro-allinone.html", **over):
     body = _body(track, **over)
     req = TrackSimRequest(**body)
     py = run_track_sim(req)
-    js = _run_node(body, _ctx(req.vehicle), case)
+    js = _run_node(body, _ctx(req.vehicle), case, html_file=html_file)
     return py, js
 
 
@@ -160,12 +174,25 @@ def _assert_parity(case, py, js):
 
 
 def test_tphys_parity_skidpad():
-    """定圆 R=30 稳态：路径/极速/峰值侧向一致。"""
+    """定圆 R=30 稳态：allinone 路径/极速/峰值侧向一致。"""
     py, js = _parity("skidpad", _skidpad())
     _assert_parity("skidpad", py, js)
 
 
 def test_tphys_parity_straight_line():
-    """直线 60m：加速与速度控制一致。"""
+    """直线 60m：allinone 加速与速度控制一致。"""
     py, js = _parity("straight", _straight(), sim_time=12.0)
     _assert_parity("straight", py, js)
+
+
+def test_tphys_parity_fullchassis_skidpad():
+    """定圆 R=30 稳态：fullchassis 内置 TPHYS 与 Python 引擎对拍。"""
+    py, js = _parity("fc_skidpad", _skidpad(), html_file="dwb-pro-fullchassis.html")
+    _assert_parity("fc_skidpad", py, js)
+
+
+def test_tphys_parity_fsae_autocross():
+    """FSAE Autocross 800m 综合赛道：allinone 与 Python 引擎对拍。"""
+    py, js = _parity("autocross", _autocross(), sim_time=60.0, start_speed=10.0)
+    _assert_parity("autocross", py, js)
+

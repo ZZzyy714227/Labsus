@@ -721,7 +721,8 @@ canvas.plot{display:block;width:100%;height:84px;background:var(--well);border:1
     <div class="cell"><i>车型平台</i>
       <select id="topVehSelect" style="background:transparent;border:none;color:var(--pri);font:600 11px var(--font-ui);cursor:pointer;outline:none;" onchange="loadVehiclePreset(this.value)">
         <option value="formula" style="background:#161B22;color:#fff;">🏎️ Formula SAE (方程式)</option>
-        <option value="gt3" style="background:#161B22;color:#fff;">🏁 FIA GT3 (房车赛车)</option>
+        <option value="gt3" style="background:#161B22;color:#fff;">🏁 FIA GT3 (赛车模式)</option>
+        <option value="gt3_sport" style="background:#161B22;color:#fff;">🚗 FIA GT3 (日常模式)</option>
         <option value="baja" style="background:#161B22;color:#fff;">🏜️ SAE Baja (越野赛车)</option>
       </select>
     </div>
@@ -1105,79 +1106,119 @@ const VEHICLE_PRESETS = {
     }
   },
   gt3: {
-    name: "🏁 FIA GT3 房车 (GT3 Touring)",
-    wb: 2650, hcg: 360, hs: 380, mTotal: 1280, mSprung: 1140,
+    name: "🏁 FIA GT3 赛车 (GT3 Race - 赛道低趴型)",
+    wb: 2600, hcg: 290, hs: 310, mTotal: 1250, mSprung: 1100,
     limF: [-55, 60], limR: [-55, 60],
     qs: { gx: 0.0, gy: 1.8, speed: 220, aeroF: 3600, aeroBias: 0.45 },
     front: {
-      arch: "pushrod",
+      arch: "direct",
       hp: {
-        LCA_F: [310.0, 180.0, 140.0], LCA_R: [310.0, -160.0, 152.0], LBJ: [780.0, 12.0, 160.0],
-        UCA_F: [420.0, 140.0, 420.0], UCA_R: [420.0, -130.0, 430.0], UBJ: [720.0, -16.0, 490.0],
-        WC: [840.0, 0.0, 330.0], TRO: [730.0, -160.0, 205.0], RACK: [260.0, -180.0, 195.0],
-        STRUT_OUT: [720.0, 15.0, 210.0], RCK_AX_A: [360.0, 20.0, 400.0], RCK_AX_B: [360.0, 85.0, 398.0],
-        STRUT_IN: [380.0, 50.0, 480.0], RCK_DMP: [280.0, 55.0, 430.0], DMP_BODY: [50.0, 55.0, 220.0]
+        LCA_F: [200.0, 155.0, 118.0], LCA_R: [200.0, -155.0, 126.0], LBJ: [706.0, 8.0, 132.0],
+        UCA_F: [420.0, 110.0, 392.0], UCA_R: [420.0, -110.0, 396.0], UBJ: [652.0, -20.0, 446.0],
+        WC: [772.0, 0.0, 300.0], TRO: [652.0, -142.0, 196.0], RACK: [248.0, -168.0, 178.0],
+        STRUT_OUT: [540.0, 10.0, 150.0], RCK_AX_A: [340.0, 20.0, 380.0], RCK_AX_B: [340.0, 80.0, 378.0],
+        STRUT_IN: [360.0, 50.0, 450.0], RCK_DMP: [260.0, 55.0, 400.0], DMP_BODY: [338.0, 0.0, 612.0]
       },
       strutOutAttach: "lca",
-      tire: { R: 330, W: 305, rim: 228.6, disc: 190, label: "305/660R18 GT3 SLICK" },
-      cam0: -3.5, toe0: -0.15, mS: 320, mU: 45, kS: 160, kT: 320, cB: 12, cR: 18, tieTrim: 0,
+      tire: { R: 300, W: 265, rim: 228.6, disc: 180, label: "265/35R18 RACE SLICK" },
+      cam0: -3.20, toe0: -0.15, mS: 320, mU: 45, kS: 120, kT: 260, cB: 9, cR: 14, tieTrim: 0,
       damperMode: "table",
       vfTable: [[-1.2,-3200],[-0.5,-2100],[-0.2,-1100],[-0.05,-350],[0.0,0],[0.05,450],[0.2,1600],[0.5,2900],[1.2,4200]],
       bushings: { LCA_F:[8000,8000,8000], LCA_R:[8000,8000,8000], UCA_F:[10000,10000,10000], UCA_R:[10000,10000,10000] },
       arb: { d: 28, dy: 45, dz: 110, t: 0.65, G: 79000 }
     },
     rear: {
-      arch: "pushrod",
+      arch: "direct",
       hp: {
-        LCA_F: [320.0, 170.0, 145.0], LCA_R: [320.0, -170.0, 155.0], LBJ: [800.0, 10.0, 165.0],
-        UCA_F: [430.0, 130.0, 430.0], UCA_R: [430.0, -140.0, 440.0], UBJ: [735.0, -15.0, 500.0],
-        WC: [850.0, 0.0, 340.0], TRO: [740.0, -150.0, 210.0], RACK: [270.0, -170.0, 200.0],
-        STRUT_OUT: [730.0, 12.0, 215.0], RCK_AX_A: [370.0, 20.0, 410.0], RCK_AX_B: [370.0, 85.0, 408.0],
-        STRUT_IN: [390.0, 50.0, 490.0], RCK_DMP: [290.0, 55.0, 440.0], DMP_BODY: [55.0, 55.0, 230.0]
+        LCA_F: [210.0, 150.0, 125.0], LCA_R: [210.0, -160.0, 130.0], LBJ: [716.0, 8.0, 138.0],
+        UCA_F: [430.0, 110.0, 400.0], UCA_R: [430.0, -110.0, 405.0], UBJ: [662.0, -18.0, 452.0],
+        WC: [782.0, 0.0, 310.0], TRO: [662.0, -140.0, 202.0], RACK: [255.0, -165.0, 185.0],
+        STRUT_OUT: [550.0, 10.0, 155.0], RCK_AX_A: [350.0, 20.0, 390.0], RCK_AX_B: [350.0, 80.0, 388.0],
+        STRUT_IN: [370.0, 50.0, 460.0], RCK_DMP: [270.0, 55.0, 410.0], DMP_BODY: [348.0, 0.0, 622.0]
       },
       strutOutAttach: "lca",
-      tire: { R: 340, W: 315, rim: 228.6, disc: 185, label: "315/710R18 GT3 REAR" },
-      cam0: -2.8, toe0: 0.12, mS: 360, mU: 48, kS: 180, kT: 340, cB: 14, cR: 20, tieTrim: 0,
+      tire: { R: 310, W: 285, rim: 228.6, disc: 180, label: "285/35R18 RACE REAR" },
+      cam0: -2.5, toe0: 0.10, mS: 360, mU: 48, kS: 140, kT: 280, cB: 11, cR: 16, tieTrim: 0,
       damperMode: "table",
       vfTable: [[-1.2,-3600],[-0.5,-2400],[-0.2,-1300],[-0.05,-400],[0.0,0],[0.05,500],[0.2,1800],[0.5,3200],[1.2,4600]],
       bushings: { LCA_F:[8000,8000,8000], LCA_R:[8000,8000,8000], UCA_F:[10000,10000,10000], UCA_R:[10000,10000,10000] },
       arb: { d: 26, dy: 40, dz: 105, t: 0.60, G: 79000 }
     }
   },
-  baja: {
-    name: "🏜️ SAE Baja 越野 (Baja Off-Road)",
-    wb: 1750, hcg: 480, hs: 510, mTotal: 340, mSprung: 260,
-    limF: [-85, 90], limR: [-85, 90],
-    qs: { gx: 0.0, gy: 0.95, speed: 65, aeroF: 150, aeroBias: 0.50 },
+  gt3_sport: {
+    name: "🚗 FIA GT3 日常 (GT3 Sport - 街道运动型)",
+    wb: 2600, hcg: 450, hs: 470, mTotal: 1350, mSprung: 1200,
+    limF: [-70, 75], limR: [-70, 75],
+    qs: { gx: 0.0, gy: 1.2, speed: 160, aeroF: 1500, aeroBias: 0.46 },
     front: {
-      arch: "pushrod",
+      arch: "direct",
       hp: {
-        LCA_F: [220.0, 160.0, 220.0], LCA_R: [220.0, -150.0, 235.0], LBJ: [680.0, 10.0, 260.0],
-        UCA_F: [320.0, 130.0, 520.0], UCA_R: [320.0, -120.0, 530.0], UBJ: [620.0, -18.0, 580.0],
-        WC: [760.0, 0.0, 396.0], TRO: [640.0, -150.0, 310.0], RACK: [230.0, -170.0, 290.0],
-        STRUT_OUT: [630.0, 10.0, 300.0], RCK_AX_A: [280.0, 20.0, 500.0], RCK_AX_B: [280.0, 80.0, 498.0],
-        STRUT_IN: [300.0, 50.0, 600.0], RCK_DMP: [200.0, 55.0, 530.0], DMP_BODY: [30.0, 55.0, 270.0]
+        LCA_F: [215.0, 150.0, 152.0], LCA_R: [215.0, -150.0, 162.0], LBJ: [705.0, 8.0, 178.0],
+        UCA_F: [395.0, 120.0, 452.0], UCA_R: [395.0, -120.0, 456.0], UBJ: [655.0, -18.0, 512.0],
+        WC: [762.0, 0.0, 322.0], TRO: [660.0, -150.0, 225.0], RACK: [250.0, -175.0, 205.0],
+        STRUT_OUT: [520.0, 10.0, 205.0], RCK_AX_A: [350.0, 20.0, 420.0], RCK_AX_B: [350.0, 85.0, 418.0],
+        STRUT_IN: [370.0, 50.0, 500.0], RCK_DMP: [270.0, 55.0, 450.0], DMP_BODY: [350.0, 0.0, 660.0]
       },
       strutOutAttach: "lca",
-      tire: { R: 396, W: 265, rim: 216, disc: 170, label: "265/65R17 BAJA ALL-TERRAIN" },
-      cam0: -0.5, toe0: 0.15, mS: 75, mU: 26, kS: 55, kT: 170, cB: 7, cR: 12, tieTrim: 0,
+      tire: { R: 322, W: 235, rim: 228.6, disc: 172, label: "235/40R18 SPORT ROAD" },
+      cam0: -0.75, toe0: 0.10, mS: 340, mU: 45, kS: 80, kT: 200, cB: 6, cR: 10, tieTrim: 0,
+      damperMode: "table",
+      vfTable: [[-1.0,-2200],[-0.5,-1400],[-0.2,-700],[-0.05,-200],[0.0,0],[0.05,250],[0.2,950],[0.5,1800],[1.0,2800]],
+      bushings: { LCA_F:[5000,5000,5000], LCA_R:[5000,5000,5000], UCA_F:[7000,7000,7000], UCA_R:[7000,7000,7000] },
+      arb: { d: 24, dy: 45, dz: 110, t: 0.60, G: 79000 }
+    },
+    rear: {
+      arch: "direct",
+      hp: {
+        LCA_F: [225.0, 145.0, 158.0], LCA_R: [225.0, -155.0, 168.0], LBJ: [715.0, 8.0, 184.0],
+        UCA_F: [405.0, 115.0, 458.0], UCA_R: [405.0, -125.0, 462.0], UBJ: [665.0, -16.0, 518.0],
+        WC: [772.0, 0.0, 332.0], TRO: [670.0, -145.0, 230.0], RACK: [255.0, -170.0, 210.0],
+        STRUT_OUT: [530.0, 10.0, 210.0], RCK_AX_A: [360.0, 20.0, 430.0], RCK_AX_B: [360.0, 85.0, 428.0],
+        STRUT_IN: [380.0, 50.0, 510.0], RCK_DMP: [280.0, 55.0, 460.0], DMP_BODY: [360.0, 0.0, 670.0]
+      },
+      strutOutAttach: "lca",
+      tire: { R: 332, W: 255, rim: 228.6, disc: 175, label: "255/40R18 SPORT REAR" },
+      cam0: -0.50, toe0: 0.15, mS: 380, mU: 48, kS: 90, kT: 220, cB: 7, cR: 12, tieTrim: 0,
+      damperMode: "table",
+      vfTable: [[-1.0,-2400],[-0.5,-1600],[-0.2,-800],[-0.05,-240],[0.0,0],[0.05,300],[0.2,1100],[0.5,2100],[1.0,3200]],
+      bushings: { LCA_F:[5000,5000,5000], LCA_R:[5000,5000,5000], UCA_F:[7000,7000,7000], UCA_R:[7000,7000,7000] },
+      arb: { d: 22, dy: 40, dz: 105, t: 0.55, G: 79000 }
+    }
+  },
+  baja: {
+    name: "🏜️ SAE Baja 越野 (Baja Off-Road - 长行程越野型)",
+    wb: 2790, hcg: 520, hs: 550, mTotal: 360, mSprung: 280,
+    limF: [-90, 100], limR: [-90, 100],
+    qs: { gx: 0.0, gy: 0.95, speed: 65, aeroF: 150, aeroBias: 0.50 },
+    front: {
+      arch: "direct",
+      hp: {
+        LCA_F: [232.0, 168.0, 205.0], LCA_R: [232.0, -168.0, 218.0], LBJ: [724.0, 10.0, 244.0],
+        UCA_F: [392.0, 132.0, 562.0], UCA_R: [392.0, -132.0, 568.0], UBJ: [668.0, -22.0, 642.0],
+        WC: [792.0, 0.0, 396.0], TRO: [676.0, -162.0, 292.0], RACK: [262.0, -188.0, 272.0],
+        STRUT_OUT: [560.0, 12.0, 272.0], RCK_AX_A: [330.0, 20.0, 540.0], RCK_AX_B: [330.0, 80.0, 538.0],
+        STRUT_IN: [350.0, 50.0, 640.0], RCK_DMP: [250.0, 55.0, 570.0], DMP_BODY: [362.0, 0.0, 796.0]
+      },
+      strutOutAttach: "lca",
+      tire: { R: 396, W: 265, rim: 216, disc: 176, label: "265/65R17 BAJA ALL-TERRAIN" },
+      cam0: -0.30, toe0: 0.15, mS: 75, mU: 26, kS: 60, kT: 170, cB: 7, cR: 12, tieTrim: 0,
       damperMode: "table",
       vfTable: [[-1.2,-1400],[-0.5,-900],[-0.2,-450],[-0.05,-120],[0.0,0],[0.05,180],[0.2,650],[0.5,1300],[1.2,2200]],
       bushings: { LCA_F:[1200,1200,1200], LCA_R:[1200,1200,1200], UCA_F:[1500,1500,1500], UCA_R:[1500,1500,1500] },
       arb: { d: 16, dy: 45, dz: 120, t: 0.50, G: 79000 }
     },
     rear: {
-      arch: "pullrod",
+      arch: "direct",
       hp: {
-        LCA_F: [220.0, 150.0, 210.0], LCA_R: [220.0, -150.0, 225.0], LBJ: [670.0, 10.0, 250.0],
-        UCA_F: [310.0, 120.0, 500.0], UCA_R: [310.0, -130.0, 510.0], UBJ: [610.0, -15.0, 570.0],
-        WC: [750.0, 0.0, 396.0], TRO: [630.0, -140.0, 290.0], RACK: [220.0, -150.0, 280.0],
-        STRUT_OUT: [600.0, -15.0, 550.0], RCK_AX_A: [310.0, 25.0, 460.0], RCK_AX_B: [310.0, 75.0, 462.0],
-        STRUT_IN: [340.0, 45.0, 390.0], RCK_DMP: [270.0, 60.0, 420.0], DMP_BODY: [25.0, 62.0, 480.0]
+        LCA_F: [235.0, 160.0, 200.0], LCA_R: [235.0, -160.0, 212.0], LBJ: [720.0, 10.0, 240.0],
+        UCA_F: [390.0, 125.0, 550.0], UCA_R: [390.0, -135.0, 555.0], UBJ: [665.0, -18.0, 630.0],
+        WC: [790.0, 0.0, 396.0], TRO: [670.0, -150.0, 285.0], RACK: [255.0, -175.0, 265.0],
+        STRUT_OUT: [555.0, 10.0, 265.0], RCK_AX_A: [340.0, 25.0, 510.0], RCK_AX_B: [340.0, 75.0, 512.0],
+        STRUT_IN: [370.0, 45.0, 440.0], RCK_DMP: [290.0, 60.0, 470.0], DMP_BODY: [355.0, 0.0, 786.0]
       },
-      strutOutAttach: "uca",
-      tire: { R: 396, W: 265, rim: 216, disc: 170, label: "265/65R17 BAJA REAR" },
-      cam0: -0.3, toe0: 0.10, mS: 85, mU: 28, kS: 65, kT: 170, cB: 8, cR: 14, tieTrim: 0,
+      strutOutAttach: "lca",
+      tire: { R: 396, W: 265, rim: 216, disc: 176, label: "265/65R17 BAJA REAR" },
+      cam0: -0.20, toe0: 0.10, mS: 85, mU: 28, kS: 65, kT: 170, cB: 8, cR: 14, tieTrim: 0,
       damperMode: "table",
       vfTable: [[-1.2,-1600],[-0.5,-1050],[-0.2,-520],[-0.05,-140],[0.0,0],[0.05,200],[0.2,750],[0.5,1500],[1.2,2600]],
       bushings: { LCA_F:[1200,1200,1200], LCA_R:[1200,1200,1200], UCA_F:[1500,1500,1500], UCA_R:[1500,1500,1500] },
@@ -1309,9 +1350,10 @@ window.VEHICLE_PRESETS = VEHICLE_PRESETS;
 /* ================================ 2. 机构构建与多体投影求解 ================================ */
 function buildMech(axis){
   const state = S[axis];
+  const isDirect = state.arch === "direct";
   const n=[], idx={};
   HP_META.forEach((d,k)=>{
-    const p=cpy(state.hp[d[0]]);
+    const p=cpy(state.hp[d[0]] || [0,0,0]);
     n.push({id:d[0],zh:d[1],en:d[2],grp:d[3],fix:!!d[4],m:d[5],
             p:p,p0:cpy(p),pp:cpy(p),v:[0,0,0],w:d[4]?0:(d[5]>0?1/d[5]:0),f:[0,0,0]});
     idx[d[0]]=k;
@@ -1330,13 +1372,11 @@ function buildMech(axis){
     {a:idx.LBJ,b:idx.TRO,id:"KNK_T1",type:"R",grp:"knuckle"},
     {a:idx.UBJ,b:idx.TRO,id:"KNK_T2",type:"R",grp:"knuckle"},
     {a:idx.WC, b:idx.TRO,id:"KNK_T3",type:"R",grp:"knuckle"},
-    {a:idx.RACK,b:idx.TRO,id:"TIEROD",type:"R",grp:"steer"},
-    {a:idx.STRUT_OUT,b:idx.STRUT_IN,id:"STRUT_ROD",type:"R",grp:"strut"},
-    {a:idx.RCK_DMP,b:idx.DMP_BODY,id:"INBOARD_COIL",type:"E",grp:"damper"}
+    {a:idx.RACK,b:idx.TRO,id:"TIEROD",type:"R",grp:"steer"}
   ];
 
   /* 补全核心刚性拓扑网格，构成刚体力学传递路径 */
-  const att = state.strutOutAttach;
+  const att = state.strutOutAttach || "lca";
   const baseF = att==="lca" ? idx.LCA_F : idx.UCA_F;
   const baseR = att==="lca" ? idx.LCA_R : idx.UCA_R;
   const baseB = att==="lca" ? idx.LBJ : idx.UBJ;
@@ -1344,15 +1384,23 @@ function buildMech(axis){
   L.push(
     {a:baseF, b:idx.STRUT_OUT, id:"ATT_F-ST_O", type:"R", grp:att},
     {a:baseR, b:idx.STRUT_OUT, id:"ATT_R-ST_O", type:"R", grp:att},
-    {a:baseB, b:idx.STRUT_OUT, id:"ATT_B-ST_O", type:"R", grp:att},
-    
-    // Rocker 刚体成型
-    {a:idx.RCK_AX_A, b:idx.STRUT_IN, id:"RA-SI", type:"R", grp:"rocker"},
-    {a:idx.RCK_AX_B, b:idx.STRUT_IN, id:"RB-SI", type:"R", grp:"rocker"},
-    {a:idx.RCK_AX_A, b:idx.RCK_DMP,  id:"RA-RD", type:"R", grp:"rocker"},
-    {a:idx.RCK_AX_B, b:idx.RCK_DMP,  id:"RB-RD", type:"R", grp:"rocker"},
-    {a:idx.STRUT_IN, b:idx.RCK_DMP,  id:"SI-RD", type:"R", grp:"rocker"}
+    {a:baseB, b:idx.STRUT_OUT, id:"ATT_B-ST_O", type:"R", grp:att}
   );
+
+  if(isDirect){
+    L.push({a:idx.STRUT_OUT, b:idx.DMP_BODY, id:"DIRECT_COILOVER", type:"E", grp:"damper"});
+  } else {
+    L.push(
+      {a:idx.STRUT_OUT, b:idx.STRUT_IN, id:"STRUT_ROD", type:"R", grp:"strut"},
+      {a:idx.RCK_DMP,  b:idx.DMP_BODY, id:"INBOARD_COIL", type:"E", grp:"damper"},
+      // Rocker 刚体成型
+      {a:idx.RCK_AX_A, b:idx.STRUT_IN, id:"RA-SI", type:"R", grp:"rocker"},
+      {a:idx.RCK_AX_B, b:idx.STRUT_IN, id:"RB-SI", type:"R", grp:"rocker"},
+      {a:idx.RCK_AX_A, b:idx.RCK_DMP,  id:"RA-RD", type:"R", grp:"rocker"},
+      {a:idx.RCK_AX_B, b:idx.RCK_DMP,  id:"RB-RD", type:"R", grp:"rocker"},
+      {a:idx.STRUT_IN, b:idx.RCK_DMP,  id:"SI-RD", type:"R", grp:"rocker"}
+    );
+  }
 
   L.forEach(l=>{ l.L0=dst(n[l.a].p,n[l.b].p); l.Ld=l.L0; });
   const tie=L.find(l=>l.grp==="steer");
@@ -1383,17 +1431,20 @@ function buildMech(axis){
     freeBody("KNUCKLE",["LBJ","UBJ","WC","TRO"])
   ];
 
-  const oRck=n[idx.RCK_AX_A].p0;
-  const relIn=sub(n[idx.STRUT_IN].p0,oRck);
-  const relDmp=sub(n[idx.RCK_DMP].p0,oRck);
-  const strutRod=L.find(l=>l.id==="STRUT_ROD");
+  let rocker = null;
+  if(!isDirect){
+    const oRck=n[idx.RCK_AX_A].p0;
+    const relIn=sub(n[idx.STRUT_IN].p0,oRck);
+    const relDmp=sub(n[idx.RCK_DMP].p0,oRck);
+    const strutRod=L.find(l=>l.id==="STRUT_ROD");
 
-  const rocker={
-    iAxA:idx.RCK_AX_A, iAxB:idx.RCK_AX_B,
-    iInNode:idx.STRUT_IN, iDmpNode:idx.RCK_DMP, iOutNode:idx.STRUT_OUT,
-    relIn:relIn, relDmp:relDmp, rodL0:strutRod.L0, angle:0,
-    lastTheta:null   /* F-04（2026-08-30）：摇臂根分支连续性——记录上一步 θ 选最近根 */
-  };
+    rocker={
+      iAxA:idx.RCK_AX_A, iAxB:idx.RCK_AX_B,
+      iInNode:idx.STRUT_IN, iDmpNode:idx.RCK_DMP, iOutNode:idx.STRUT_OUT,
+      relIn:relIn, relDmp:relDmp, rodL0:strutRod?strutRod.L0:100, angle:0,
+      lastTheta:null   /* F-04（2026-08-30）：摇臂根分支连续性——记录上一步 θ 选最近根 */
+    };
+  }
 
   const camb=state.cam0*D2R, toe=state.toe0*D2R;
   const axW=nrm([cos(toe)*cos(camb),sin(toe),-sin(camb)]);
@@ -1401,7 +1452,7 @@ function buildMech(axis){
 
   const M={
     n:n, idx:idx, L:L, cl:cl, tie:tie, rocker:rocker,
-    damper:damper, damperL0:damper.Ld, axL:axW,
+    damper:damper, damperL0:damper?damper.Ld:0, axL:axW,
     nFree:n.filter(x=>!x.fix).length,
     nRig:L.filter(l=>l.type==="R").length,
     nEla:L.filter(l=>l.type==="E").length,
@@ -1641,8 +1692,8 @@ function metrics(M, axis){
   if(svic){const dy=cp[1]-svic[0],dzz=svic[1]-cp[2];
     if(abs(dy)>1) anti=(dzz/dy)*S.brkF*(S.wb/S.hcg)*100;}
 
-  const curDamperL=dst(rckDmp,dmpB);
-  const rockerDeg=M.rocker?M.rocker.angle*R2D:0;
+  const curDamperL = state.arch === "direct" ? dst(strutOut, dmpB) : dst(rckDmp, dmpB);
+  const rockerDeg = M.rocker ? M.rocker.angle * R2D : 0;
   const ag = arbGeom(lbj, state);
 
   return{
@@ -2156,7 +2207,7 @@ function buildScenePRO(){
   const yF = S.wb/2, yR = -S.wb/2;
 
   // 根据当前车型切换对应的车架与空间架构
-  if(S.vehicleType === "gt3") {
+  if(S.vehicleType === "gt3" || S.vehicleType === "gt3_sport") {
     buildGT3Spaceframe(sc, yF, yR);
   } else if(S.vehicleType === "baja") {
     buildBajaSpaceframe(sc, yF, yR);
@@ -2831,18 +2882,32 @@ function addAxleAssemblyPRO(sc, M, m, sx, yOff, axis){
     PL(sc,[LBJ,UBJ,WC,LBJ],EC("knu",SYSTEM_COLORS.knu),1,null,EC("knuFill",SYSTEM_COLORS.knuF));
   }
 
-  if(S.show.rocker){
-    const rckCenter=lerp3(RK_A,RK_B,0.5);
-    PL(sc,[rckCenter,ST_I,RK_D,rckCenter],EC("rocker",SYSTEM_COLORS.rocker),1.5,null,EC("rockerFill",SYSTEM_COLORS.rockerF));
-    cylinder(sc,RK_A,RK_B,11,EC("rocker",SYSTEM_COLORS.rocker),1.2,12);
-  }
+  if(state.arch === "direct"){
+    if(S.show.elastic){
+      // 传统双叉臂直立外置减振弹簧一体柱 (Direct Coilover Damper Strut)
+      const u = nrm(sub(DMP_B, ST_O)), L = dst(ST_O, DMP_B);
+      const bodyA = add(ST_O, mul(u, L * 0.06)), bodyB = add(ST_O, mul(u, L * 0.54));
+      cylinder(sc, bodyA, bodyB, 22, EC("damper", SYSTEM_COLORS.damper), 1.2, 14);
+      L3(sc, bodyB, DMP_B, EC("damper", SYSTEM_COLORS.damper), 2.2);
+      cylinder(sc, add(ST_O, mul(u, -6)), bodyA, 14, EC("damper", SYSTEM_COLORS.damper), 1, 10);
+      PL(sc, springPts(add(ST_O, mul(u, L * 0.08)), add(DMP_B, mul(u, -L * 0.05)), 46, 7.5, 140), EC("spring", SYSTEM_COLORS.spring), 2.0);
+      PL(sc, circPts(add(ST_O, mul(u, L * 0.08)), u, 54, 20), EC("spring", SYSTEM_COLORS.spring), 1.2);
+      PL(sc, circPts(add(DMP_B, mul(u, -L * 0.05)), u, 54, 20), EC("spring", SYSTEM_COLORS.spring), 1.2);
+    }
+  } else {
+    if(S.show.rocker){
+      const rckCenter=lerp3(RK_A,RK_B,0.5);
+      PL(sc,[rckCenter,ST_I,RK_D,rckCenter],EC("rocker",SYSTEM_COLORS.rocker),1.5,null,EC("rockerFill",SYSTEM_COLORS.rockerF));
+      cylinder(sc,RK_A,RK_B,11,EC("rocker",SYSTEM_COLORS.rocker),1.2,12);
+    }
 
-  cylinder(sc,ST_O,ST_I,8.5,EC("strut",SYSTEM_COLORS.strut),1.5,12);
+    cylinder(sc,ST_O,ST_I,8.5,EC("strut",SYSTEM_COLORS.strut),1.5,12);
 
-  if(S.show.elastic){
-    const u=nrm(sub(DMP_B,RK_D)), L=dst(RK_D,DMP_B);
-    cylinder(sc,add(RK_D,mul(u,L*0.06)),add(RK_D,mul(u,L*0.54)),19,EC("damper",SYSTEM_COLORS.damper),1,12);
-    PL(sc,springPts(add(RK_D,mul(u,L*0.08)),add(DMP_B,mul(u,-L*0.05)),36,7.5,130),EC("spring",SYSTEM_COLORS.spring),1.8);
+    if(S.show.elastic){
+      const u=nrm(sub(DMP_B,RK_D)), L=dst(RK_D,DMP_B);
+      cylinder(sc,add(RK_D,mul(u,L*0.06)),add(RK_D,mul(u,L*0.54)),19,EC("damper",SYSTEM_COLORS.damper),1,12);
+      PL(sc,springPts(add(RK_D,mul(u,L*0.08)),add(DMP_B,mul(u,-L*0.05)),36,7.5,130),EC("spring",SYSTEM_COLORS.spring),1.8);
+    }
   }
 
   if(S.show.halfshaft){
@@ -3350,13 +3415,14 @@ function buildVehiclePresetSection(host){
   
   [
     ["formula", "🏎️ 方程式 (FSC)"],
-    ["gt3", "🏁 房车 (GT3)"],
-    ["baja", "🏜️ 越野 (Baja)"]
+    ["gt3", "🏁 GT3 赛车"],
+    ["gt3_sport", "🚗 GT3 日常"],
+    ["baja", "🏜️ Baja 越野"]
   ].forEach(([k, label]) => {
     const btn = E("button", "eng-btn veh-btn-tab");
     btn.dataset.veh = k;
     btn.textContent = label;
-    btn.style.cssText = "flex:1;min-width:0;font-size:10px;padding:4px 2px;";
+    btn.style.cssText = "flex:1;min-width:0;font-size:9.5px;padding:4px 1px;";
     if(S.vehicleType === k) btn.classList.add("on");
     btn.onclick = () => {
       loadVehiclePreset(k);
@@ -3459,7 +3525,15 @@ function buildLeft(){
       UI.sync.push(()=>{if(document.activeElement!==inp)inp.value=fmt(S[S.axis].hp[d[0]][k],1);});
     }
     tr.onclick=()=>{UI.selHP=d[0];};
-    UI.sync.push(()=>tr.classList.toggle("sel",UI.selHP===d[0]));
+    UI.sync.push(()=>{
+      const isDir = S[S.axis].arch === "direct";
+      const isRck = d[3] === "rocker" || d[0].startsWith("RCK_") || d[0] === "STRUT_IN";
+      tr.style.display = (isDir && isRck) ? "none" : "";
+      if(isDir && d[0] === "STRUT_OUT") td.title = "减振器下支点 SPR_L (" + d[2] + ")";
+      else if(isDir && d[0] === "DMP_BODY") td.title = "减振器塔顶上支点 DMP_T (" + d[2] + ")";
+      else td.title = d[1] + " (" + d[2] + ")";
+      tr.classList.toggle("sel",UI.selHP===d[0]);
+    });
     tbody.appendChild(tr);
   });
   tb.appendChild(tbody);b.appendChild(tb);
@@ -3873,8 +3947,9 @@ function updateReadouts(){
   const wr = state.kS * mr * mr;
   const frq = sqrt(wr * 1000 / state.mS) / (2 * PI);
 
-  setRO("roArch", state.arch==="pushrod"?"推杆 (Pushrod)":"拉杆 (Pullrod)");
-  setRO("roRckDeg", sfmt(m.rockerDeg, 2));
+  const archLabel = state.arch === "direct" ? "直连 (Direct Coilover)" : (state.arch === "pushrod" ? "推杆 (Pushrod)" : "拉杆 (Pullrod)");
+  setRO("roArch", archLabel);
+  setRO("roRckDeg", state.arch === "direct" ? "--" : sfmt(m.rockerDeg, 2));
   setRO("roMR", fmt(mr, 3));
   setRO("roDmpDisp", sfmt(M.damperL0 - m.damperL, 1));
   setRO("roSprF", fmt(M.springF0/FS + state.kS*(M.damperL0 - m.damperL), 0));
@@ -3970,8 +4045,10 @@ function updateReadouts(){
   document.getElementById("tbStateBox").className=S.play?"g":"a";
   document.getElementById("tbStateDot").className="dot "+(S.play?"g":"a");
   
-  document.getElementById("tbArch").textContent = (isF?"前 ":"后 ") + (state.arch==="pushrod"?"推杆 PUSHROD":"拉杆 PULLROD");
-  document.getElementById("sbArchName").textContent = isF?"前悬架 (推杆)":"后悬架 (拉杆)";
+  const archText = state.arch === "direct" ? "直连 DIRECT" : (state.arch === "pushrod" ? "推杆 PUSHROD" : "拉杆 PULLROD");
+  const archName = state.arch === "direct" ? "直连双叉臂" : (state.arch === "pushrod" ? "推杆摇臂" : "拉杆摇臂");
+  document.getElementById("tbArch").textContent = (isF ? "前 " : "后 ") + archText;
+  document.getElementById("sbArchName").textContent = (isF ? "前悬架 (" : "后悬架 (") + archName + ")";
 }
 
 function plotXYOverlay(cv,title,unit,seriesActive,seriesBase,xr,curx){
@@ -4256,9 +4333,358 @@ function loop(ts){
   }
 }
 
+/* ================================================================
+   TPHYS: built-in track physics engine (JS port of transient.py,
+   dual-core parity audited D1).
+   3-DOF body, MF tires with composite-slip + relaxation length + camber
+   thrust + LS, powertrain envelope, aero downforce/drag, roll/pitch lag,
+   pure-pursuit + PI. NOTE: rc/kw LUTs come from SIM.swF/swR sweeps (same
+   geometry source the engine path sends as kw_curve).
+   ================================================================ */
+const TPHYS = (function(){
+  const G=9.81, R2D=180/Math.PI, D2R=Math.PI/180;
+  const _W="FR,FL,RR,RL".split(",");
+  function interp(xs,ys,x,fb){
+    if(!xs||xs.length<2)return fb;
+    if(x<=xs[0]){const v=ys[0];return (v===null||v===undefined)?fb:v;}
+    if(x>=xs[xs.length-1]){const v=ys[ys.length-1];return (v===null||v===undefined)?fb:v;}
+    let i=1; while(i<xs.length&&xs[i]<x)i++;
+    const y0=ys[i-1],y1=ys[i];
+    if(y0===null||y0===undefined||y1===null||y1===undefined)return fb;
+    const t=(x-xs[i-1])/((xs[i]-xs[i-1])||1e-9);
+    return y0+(y1-y0)*t;
+  }
+  function lut(l,key,travel,fb){
+    if(!l||!l.travel||!l[key])return fb;
+    return interp(l.travel,l[key],travel,fb);
+  }
+  function mfSetup(p){
+    const B=(p.By!==undefined?p.By:9), C=(p.Cy!==undefined?p.Cy:1.2),
+          E=(p.Ey!==undefined?p.Ey:-0.5), D0=p.Fy0||8000,
+          LS=(p.LS!==undefined?p.LS:0.0), FzN=p.FzNom||3500,
+          Sh=p.Sh||0, Sv=p.Sv||0;
+    return function fy(aRad,fz){
+      if(fz<=0)return 0;
+      const d=D0*(fz/FzN)*(1-LS*(fz/FzN-1));
+      const x=B*aRad+Sh;
+      const arg=x-E*(x-Math.atan(x));
+      return d*Math.sin(C*Math.atan(arg))+Sv;
+    };
+  }
+  // --- quasi_loads as JS (port of chassis.quasiLoads; rc/kw LUT supplied) ---
+  function kwAt(xs,ys,x,k0){
+    const v=interp(xs,ys,x,NaN);
+    return (v===null||v===undefined||!isFinite(v)||v<=0)?k0:v*1000;
+  }
+  function quasiLoads(v,gy,gx,aeroN,aeroBias,rc,kw){
+    const L=v.wheelbase_mm/1000, mS=v.sprung_mass_kg, mT=v.mass_kg;
+    const mUf=v.front.unsprung_kg*2, mUr=v.rear.unsprung_kg*2;
+    const fms=v.front.spring_mass_kg, rms=v.rear.spring_mass_kg;
+    const b=L*(rms/(fms+rms)), a=L-b;
+    const tf=Math.abs(v.front.points.WC[0])*2/1000;
+    const tr=Math.abs(v.rear.points.WC[0])*2/1000;
+    const huf=v.front.tire_radius/1000, hur=v.rear.tire_radius/1000;
+    const hs=v.hs_mm/1000;
+    const ay=gy*G, ax=gx*G;
+    const zf0=rc.zrc0_f, zr0=rc.zrc0_r;
+    const mrf=v.front.motion_ratio||0.75, mrr=v.rear.motion_ratio||0.78;
+    const kwf0=v.front.spring_rate*1000*mrf*mrf;
+    const kwr0=v.rear.spring_rate*1000*mrr*mrr;
+    let zf=zf0/1000, zr=zr0/1000;
+    let kf=0.5*kwf0*tf*tf+rc.karb_f, kr=0.5*kwr0*tr*tr+rc.karb_r, kt=kf+kr, roll=0;
+    for(let it=0;it<3;it++){
+      const hra=zf+(a/L)*(zr-zf), hArm=Math.max(0.05,hs-hra);
+      const denom=kt-mS*G*hArm;
+      roll=denom>100?(mS*ay*hArm)/denom:0;
+      const dtf=roll*Math.abs(v.front.points.WC[0]);
+      const dtr=roll*Math.abs(v.rear.points.WC[0]);
+      zf=interp(rc.travel,rc.rcF,dtf,zf0)/1000;
+      zr=interp(rc.travel,rc.rcR,dtr,zr0)/1000;
+      const kfw=(kwAt(kw.travel,kw.kwF,dtf,kwf0)+kwAt(kw.travel,kw.kwF,-dtf,kwf0))/2;
+      const krw=(kwAt(kw.travel,kw.kwR,dtr,kwr0)+kwAt(kw.travel,kw.kwR,-dtr,kwr0))/2;
+      kf=0.5*kfw*tf*tf+rc.karb_f; kr=0.5*krw*tr*tr+rc.karb_r; kt=kf+kr;
+    }
+    const hra=zf+(a/L)*(zr-zf), hArm=Math.max(0.05,hs-hra);
+    const denom=kt-mS*G*hArm;
+    roll=denom>100?(mS*ay*hArm)/denom:0;
+    const Fzf0=mS*G*(b/L)+mUf*G+aeroN*aeroBias;
+    const Fzr0=mS*G*(a/L)+mUr*G+aeroN*(1-aeroBias);
+    const dFuF=mUf*ay*(huf/tf), dFuR=mUr*ay*(hur/tr);
+    const dGf=(mS*ay*(b/L))*(zf/tf), dGr=(mS*ay*(a/L))*(zr/tr);
+    const dEf=(kf*roll)/tf, dEr=(kr*roll)/tr;
+    const df=dFuF+dGf+dEf, dr=dFuR+dGr+dEr;
+    const sgn=gy>=0?1:-1;
+    const dLon=(mT*ax*(v.hcg_mm/1000))/L;
+    const fz={FL:Math.max(0,(Fzf0-dLon)/2-df*sgn),FR:Math.max(0,(Fzf0-dLon)/2+df*sgn),
+              RL:Math.max(0,(Fzr0+dLon)/2-dr*sgn),RR:Math.max(0,(Fzr0+dLon)/2+dr*sgn)};
+    return {fz:fz, rollDeg:roll*R2D};
+  }
+  // --- vehicle ---
+  function Veh(body,ctx){
+    const v=body.vehicle, t=body.tire||{}, pt=body.powertrain||{}, ae=body.aero||{};
+    this.v=v; this.pt=pt; this.ae=ae;
+    this.mu=(t.Fy0||8000)/(t.FzNom||3500);
+    this.Cg=(t.Cg!==undefined?t.Cg:0.5);
+    this.Ls=(t.Ls!==undefined?t.Ls:0.35);
+    this.fy=mfSetup(t);
+    this.L=v.wheelbase_mm/1000;
+    const fms=v.front.spring_mass_kg, rms=v.rear.spring_mass_kg;
+    this.b=this.L*(rms/(fms+rms)); this.a=this.L-this.b;
+    this.hf=Math.abs(v.front.points.WC[0])/1000;
+    this.hr_=Math.abs(v.rear.points.WC[0])/1000;
+    this.pos={FR:[this.a,+this.hf],FL:[this.a,-this.hf],RR:[-this.b,+this.hr_],RL:[-this.b,-this.hr_]};
+    this.iz=body.iz_kg_m2||v.mass_kg*(this.L*this.L+1.6*1.6)/12;
+    this.LsT=Math.max(0.3,this.Ls);   /* F-24：σ 地板 0.3m，与 Python max(0.3,Ls) 对齐 */
+    this.rollDeg=0; this.pitchDeg=0; this.prevAy=0; this.prevAx=0; this.tNow=0;
+    this.alphaLat={FR:0,FL:0,RR:0,RL:0};
+    this._aStT={FR:0,FL:0,RR:0,RL:0};   /* F-22：侧偏目标缓存（derivs 只记录不推进） */
+    this.lutF=body.kc_luts&&body.kc_luts.front||{};
+    this.lutR=body.kc_luts&&body.kc_luts.rear||{};
+    this.rc=ctx.rc; this.kw=ctx.kw;
+  }
+  Veh.prototype._aero=function(vx){
+    const kf=this.ae.k_down_f||0.55, kr=this.ae.k_down_r||0.45, kd=this.ae.k_drag||0.35;
+    const v2=vx*vx; return [kf*v2,kr*v2,kd*v2];
+  };
+  Veh.prototype.loads=function(vx){
+    const [dnf,dnr]=this._aero(vx);
+    return quasiLoads(this.v, this.prevAy/G, this.prevAx/G,
+      dnf+dnr, dnf/(dnf+dnr||1), this.rc, this.kw);
+  };
+  Veh.prototype.steer=function(delta){
+    if(Math.abs(delta)<1e-6)return {FR:0,FL:0};
+    let R=this.L/Math.tan(delta);
+    const sgn=R>0?1:-1; R=Math.abs(R);
+    const din=Math.atan(this.L/Math.max(0.5,R-this.hf));
+    const dout=Math.atan(this.L/(R+this.hf));
+    return sgn>0?{FR:sgn*din,FL:sgn*dout}:{FR:sgn*dout,FL:sgn*din};
+  };
+  Veh.prototype.force=function(w,vxw,vyw,delta,fz,thr,brk,vx,dt){
+    const lut=w==="FR"||w==="FL"?this.lutF:this.lutR;
+    const travel=this.rollDeg*D2R*Math.abs(this.pos[w][1])*1000;
+    const toeDeg=(lut.travel&&lut.toe)?interp(lut.travel,lut.toe,travel,0):0;
+    const camRad=(lut.travel&&lut.cam)?interp(lut.travel,lut.cam,travel,0)*D2R:0;
+    const d=delta+toeDeg*D2R;
+    const cd=Math.cos(d), sd=Math.sin(d);
+    const vwx=vxw*cd+vyw*sd, vwy=-vxw*sd+vyw*cd;
+    const spd=Math.hypot(vwx,vwy);
+    const ts=this.alphaLat;
+    if(spd<0.8||fz<=1){
+      this._aStT[w]=ts[w];
+      return {fx:0,fy:0,alpha:0,alphaL:ts[w]*R2D,toe:toeDeg,cam:camRad*R2D,fz:fz,muUse:0};
+    }
+    const aSt=Math.atan2(vwy,Math.max(Math.abs(vwx),0.5));
+    this._aStT[w]=aSt;
+    const aLat=ts[w];
+    const muFz=this.mu*fz;
+    let fy=-this.fy(aLat,fz);
+    fy+=-this.Cg*camRad*fz;
+    let fx=0;
+    if(thr>0){
+      const tEff=(this.pt.T_max||250)/0.30;
+      const pEff=((this.pt.P_kw||80)*1000)/Math.max(0.8,vx);
+      const fAvail=Math.min(tEff,pEff)*thr;
+      const split=this.pt.drive_split_f||0;
+      const share=(w==="RR"||w==="RL")?(1-split):split;
+      if(share>0) fx=Math.min(0.75*muFz,fAvail*share)*0.5;
+    }
+    if(brk>0){
+      const spf=("brake_split_f" in this.pt)?this.pt.brake_split_f:0.6;
+      const share=w==="FR"||w==="FL"?spf/2:(1-spf)/2;
+      fx=-Math.sign(vwx)*Math.min(muFz,brk*share*14000);
+    }
+    const latAvail=Math.sqrt(Math.max(0,muFz*muFz-fx*fx));
+    fy=Math.max(-latAvail,Math.min(latAvail,fy));
+    const muUse=Math.min(1,Math.hypot(fx,fy)/Math.max(muFz,1));
+    return {fx:fx*cd-fy*sd, fy:fx*sd+fy*cd,
+            alpha:aSt*R2D, alphaL:aLat*R2D, toe:toeDeg, cam:camRad*R2D,
+            fz:fz, muUse:muUse};
+  };
+  Veh.prototype.derivs=function(s,delta,thr,brk,dt){
+    const vx=s[3],vy=s[4],r=s[5];
+    const L=this.loads(vx);
+    this._rollSs=L.rollDeg;
+    const st=this.steer(delta);
+    let Fx=0,Fy=0,Mz=0,camRow={};
+    for(const w of _W){
+      const lx=this.pos[w][0], ly=this.pos[w][1];
+      const vxw=vx-r*ly, vyw=vy+r*lx;
+      const fw=this.force(w,vxw,vyw,st[w]||0,L.fz[w],thr,brk,vx,dt);
+      Fx+=fw.fx; Fy+=fw.fy; Mz+=lx*fw.fy-ly*fw.fx;
+      camRow[w]=fw;
+    }
+    const [df,,fdr]=this._aero(vx);
+    Fx-=fdr;
+    const m=this.v.mass_kg;
+    const ax=Fx/m+r*vy, ay=Fy/m-r*vx, ar=Mz/this.iz;
+    return {d:[0,0,0,ax,ay,ar], diag:camRow};
+  };
+  Veh.prototype.step=function(s,dt,delta,thr,brk){
+    const k1=this.derivs(s,delta,thr,brk,dt);
+    const mid=s.slice(); 
+    for(let j=3;j<6;j++) mid[j]=Math.max(-90,Math.min(90,s[j]+0.5*dt*k1.d[j]));
+    const k2=this.derivs(mid,delta,thr,brk,dt);
+    const s2=s.slice();
+    for(let j=3;j<6;j++) s2[j]=Math.max(-90,Math.min(90,s[j]+dt*k2.d[j]));
+    const psi=s2[2];
+    s2[0]+=dt*(s2[3]*Math.cos(psi)-s2[4]*Math.sin(psi));
+    s2[1]+=dt*(s2[3]*Math.sin(psi)+s2[4]*Math.cos(psi));
+    s2[2]+=dt*s2[5];
+    this.prevAx=k2.d[3]-s2[5]*s2[4];
+    this.prevAy=k2.d[4]+s2[5]*s2[3];
+    this.rollDeg+=(this._rollSs-this.rollDeg)*(dt/0.18);
+    const pSs=Math.atan2(this.prevAx,G)*R2D*0.55;
+    this.pitchDeg+=(pSs-this.pitchDeg)*(dt/0.25);
+    const sig=Math.max(0.3,this.LsT);
+    const vxNow=Math.max(s2[3],0);
+    for(const w of _W) this.alphaLat[w]+=(this._aStT[w]-this.alphaLat[w])*(1-Math.exp(-dt*vxNow/sig));
+    this.tNow+=dt;
+    return {s:s2, diag:k2.diag};
+  };
+  // --- driver (pure pursuit + PI) ---
+  function DriverPI(gain){ this.gain=gain; this.ei=0; }
+  DriverPI.prototype.call=function(track,s,idx,vT,L,dt){
+    const x=s[0],y=s[1],psi=s[2],vx=s[3];
+    let best=idx,bd=Infinity;
+    for(let k=idx;k<track.length;k++){
+      const d=(track[k][0]-x)*(track[k][0]-x)+(track[k][1]-y)*(track[k][1]-y);
+      if(d<bd){bd=d;best=k;}
+    }
+    idx=best;
+    const ld=Math.max(4,Math.min(18,3+this.gain*vx));
+    let acc=0,la=track[idx];
+    for(let k=idx;k<track.length-1;k++){
+      const sx=track[k+1][0]-track[k][0], sy=track[k+1][1]-track[k][1];
+      const sl=Math.hypot(sx,sy);
+      if(acc+sl>=ld&&sl>1e-9){
+        const t=(ld-acc)/sl;
+        la=[track[k][0]+sx*t, track[k][1]+sy*t]; break;
+      }
+      acc+=sl; la=track[k+1];
+    }
+    const dx=la[0]-x, dy=la[1]-y;
+    const c=Math.cos(psi), sn=Math.sin(psi);
+    const lx=dx*c+dy*sn, ly=-dx*sn+dy*c;
+    const al=Math.atan2(ly,Math.max(lx,1));
+    const delta=Math.atan2(2*L*Math.sin(al),ld);
+    const e=vT-vx;
+    this.ei=Math.max(-2,Math.min(2,this.ei+e*(dt||0.05)));
+    const thr=Math.max(0,Math.min(1,0.9*e+0.12*this.ei));
+    const brk=e<-0.5?Math.max(0,Math.min(1,-0.9*e-0.15)):0;
+    return [delta,thr,brk,idx];
+  };
+  // --- main ---
+  function run(body, simCtx){
+    const v=body.vehicle;
+    const track=(body.track||[]).map(p=>[p.x,p.y]);
+    const tgt=(body.track||[]).map(p=>p.target_speed||15);
+    if(track.length<2)return {status:"SOLVER_FAILED",warnings:["track < 2 pts"],t:[],trace:[]};
+    const L=v.wheelbase_mm/1000;
+    const ctx=simCtx||makeSimContext(body);
+    const car=new Veh(body,ctx);
+    const drv=new DriverPI(body.lookahead_gain!==undefined?body.lookahead_gain:0.9);
+    const dt=body.dt||0.01, simT=body.sim_time||25;
+    const startV=body.start_speed||5;
+    let s=[0,0,0,startV,0,0];
+    s[2]=Math.atan2(track[1][1]-track[0][1],track[1][0]-track[0][0]);
+    s[0]=track[0][0]; s[1]=track[0][1];
+    const nSteps=Math.min(Math.round(simT/dt),60000);
+    const keep=Math.max(1,Math.floor(nSteps/1500));
+    const ts=[],trace=[];
+    let idx=0, finished=false, warnings=[], maxAy=0;
+    for(let k=0;k<nSteps;k++){
+      const t=k*dt;
+      const vT=tgt[Math.min(idx,tgt.length-1)];
+      const [delta,thr,brk,nidx]=drv.call(track,s,idx,vT,L,dt);
+      idx=nidx;
+      let t2=thr, b2=brk;
+      if(thr<0.02&&brk<0.02&&Math.abs(vT-s[3])>0.5)t2=0.05;
+      const r=car.step(s,dt,delta,t2,b2);
+      s=r.s; const diag=r.diag;
+      maxAy=Math.max(maxAy,Math.abs(car.prevAy));
+      if(k%keep===0||k===nSteps-1){
+        const row={x:+s[0].toFixed(3),y:+s[1].toFixed(3),psi:+s[2].toFixed(4),
+          vx:+s[3].toFixed(3),vy:+s[4].toFixed(3),r:+s[5].toFixed(4),
+          roll:+car.rollDeg.toFixed(3),pitch:+car.pitchDeg.toFixed(3),
+          ay:+car.prevAy.toFixed(2),ax:+car.prevAx.toFixed(2),
+          delta:+delta.toFixed(4),throttle:+t2.toFixed(2),brake:+b2.toFixed(2)};
+        for(const w of _W){
+          row["alpha_"+w]=+ (diag[w]?diag[w].alpha:0).toFixed(3);
+          row["alphaL_"+w]=+ (diag[w]?diag[w].alphaL:0).toFixed(3);
+          row["fz_"+w]=+ (diag[w]?diag[w].fz:0).toFixed(1);
+          row["fy_"+w]=+ (diag[w]?diag[w].fy:0).toFixed(1);
+          row["fx_"+w]=+ (diag[w]?diag[w].fx:0).toFixed(1);
+          row["mu_"+w]=+ (diag[w]?diag[w].muUse:0).toFixed(3);
+          row["cam_"+w]=+ (diag[w]?diag[w].cam:0).toFixed(2);
+        }
+        ts.push(+t.toFixed(4));
+        trace.push(row);
+      }
+      const dxe=s[0]-track[track.length-1][0], dye=s[1]-track[track.length-1][1];
+      if(Math.hypot(dxe,dye)<6&&idx>=track.length-3){finished=true;break;}
+      if(!isFinite(s[0]+s[1]+s[2]+s[3]+s[4]+s[5])){warnings.push("diverged at t="+t.toFixed(2));break;}
+    }
+    const N=trace.length;
+    let seg=0;
+    for(let i=1;i<N;i++)seg+=Math.hypot(trace[i].x-trace[i-1].x,trace[i].y-trace[i-1].y);
+    let vMax=0; for(const p of trace)vMax=Math.max(vMax,p.vx);
+    let maxSlip=0;
+    const npy=Math.min(N,1200);
+    for(let i=N-npy;i<N;i++){if(i<0)continue;for(const w of _W)maxSlip=Math.max(maxSlip,Math.abs(trace[i]["alphaL_"+w]||0));}
+    return {status:(isFinite(s[0]+s[1]+s[2])?"VALID":"SOLVER_FAILED"),ms:0,
+      steps:ts.length,finished:finished,t:ts,trace:trace,
+      summary:{path_length_m:+seg.toFixed(1),v_end:+s[3].toFixed(2),
+        v_max:+vMax.toFixed(2),max_ay_g:+(maxAy/G).toFixed(3),
+        max_slip_deg:+maxSlip.toFixed(2)},warnings:warnings,
+      builtin:true};
+  }
+  function makeSimContext(body){
+    const v=body.vehicle;
+    const col=(sw,key,f0)=>(sw&&sw.rows&&sw.rows.length>=2)
+      ?{travel:sw.rows.map(q=>q.tr),vals:sw.rows.map(q=>{const x=q[key];return (x===null||x===undefined||!isFinite(x))?f0:x;})}
+      :{travel:[-90,-60,-30,-15,0,15,30,60,90],vals:[f0,f0,f0,f0,f0,f0,f0,f0,f0]};
+    const rF=col(SIM.swF,"rcH",55), rR=col(SIM.swR,"rcH",63);
+    const kwF=col(SIM.swF,"kw",(v.front.spring_rate||60)*(v.front.motion_ratio||0.75)**2);
+    const kwR=col(SIM.swR,"kw",(v.rear.spring_rate||65)*(v.rear.motion_ratio||0.78)**2);
+    const arbK=(ax)=>{const ab=ax.arb||{};const d=ab.d||0;
+      if(d<=0.5)return 0;
+      const J=Math.PI*Math.pow(d,4)/32;
+      const F=ax.points?ax.points.LCA_F:null;
+      const B=ax.points?ax.points.LBJ:null;
+      if(!F||!B)return 0;
+      const t=ab.t||0.55, dy=ab.dy||50, dz=ab.dz||120, G=ab.G||79000;
+      const P0=[F[0]+(B[0]-F[0])*t, F[1]+(B[1]-F[1])*t, F[2]+(B[2]-F[2])*t];
+      const xa=P0[0], ay=F[1]+dy, az=F[2]+dz;
+      const a=ay-P0[1];
+      const E0=[xa, ay-a, az];
+      const ldl=Math.hypot(E0[0]-P0[0],E0[1]-P0[1],E0[2]-P0[2]);
+      const P=[F[0]+(B[0]-F[0])*t, F[1]+(B[1]-F[1])*t, F[2]+(B[2]-F[2])*t];
+      const A=ay-P[1], Bz=az-P[2], R=Math.hypot(A,Bz);
+      const K=(xa-P[0])**2+A*A+Bz*Bz+a*a-ldl*ldl;
+      const c=Math.max(-1,Math.min(1,K/(2*a*R||1e-9)));
+      const f0=Math.atan2(Bz,A), sg=Math.atan2(az-P0[2],ay-P0[1])>=0?1:-1;
+      const psi=f0-sg*Math.acos(c);
+      void [xa, ay, az, E0, P, A, Bz, R, K, c, f0, sg, psi];
+      const L=2*xa;
+      const kt=G*J/(L||1e-9);
+      return kt/(a*a)*0.55*0.55;
+    };
+    const kf=arbK(v.front), kr=arbK(v.rear);
+    const tF=(Math.abs((v.front.points&&v.front.points.WC[0])||750)*2)/1000;
+    const tR=(Math.abs((v.rear.points&&v.rear.points.WC[0])||750)*2)/1000;
+    return {
+      rc:{travel:rF.travel,rcF:rF.vals,rcR:rR.vals,
+          zrc0_f:(SIM.mFR&&SIM.mFR.rcH)||55,zrc0_r:(SIM.mRR&&SIM.mRR.rcH)||63,
+          karb_f:kf*1000*(tF*tF)/2,karb_r:kr*1000*(tR*tR)/2},
+      kw:{travel:kwF.travel,kwF:kwF.vals,kwR:kwR.vals}
+    };
+  }
+  return {run:run, makeSimContext:makeSimContext};
+})();
+
 /* ================================ 14b. 赛道瞬态仿真（S3-2 前端闭环） ================================ */
 /* 数据链：本面板调校状态 → trackPayload()（复用整车 vehicle + 前端扫掠 K&C 查表）
-   → POST /api/v3/chassis/simulate_track → trace 时序 → 回放（俯视轨迹 + 3D 侧倾联动
+   → POST /api/v3/chassis/simulate_track (或内置 TPHYS 闭包) → trace 时序 → 回放（俯视轨迹 + 3D 侧倾联动
    + 遥测 HUD）。回放时 simulate() 被 trackStep 接管（roll 来自引擎准静态内核）。 */
 const TRK={
   res:null, req:null, mu:8000/3500,
@@ -4266,9 +4692,20 @@ const TRK={
   preset:"skidpad", custom:null
 };
 const TRACK_PRESETS={
-  skidpad:{zh:"稳态定圆 R=30m",closed:true,v:12.0,pts:(function(){
+  skidpad:{zh:"FSAE 稳态定圆 R=30m",closed:true,v:12.0,pts:(function(){
     const o=[];for(let k=0;k<64;k++){const t=2*PI*k/64;o.push([30*Math.cos(t),30*Math.sin(t)]);}return o;})()},
-  slalom:{zh:"蛇形绕桩 30m 桩距",closed:false,v:13.0,pts:(function(){
+  skidpad8:{zh:"FSAE 官方 8字定圆 (双环 R=15m)",closed:true,v:11.0,pts:(function(){
+    const o=[];
+    for(let k=0;k<48;k++){const t=-PI/2-2*PI*k/48;o.push([+(15+15*Math.cos(t)).toFixed(3),+(15*Math.sin(t)).toFixed(3),11.0]);}
+    for(let k=0;k<48;k++){const t=-PI/2+2*PI*k/48;o.push([+(-15-15*Math.cos(t)).toFixed(3),+(15*Math.sin(t)).toFixed(3),11.0]);}
+    return o;})()},
+  autocross:{zh:"FSAE 官方 Autocross (800m 综合计时)",closed:true,v:0,pts:[
+    [0,0,14],[40,0,18],[80,5,16],[110,25,12],[125,55,10],[115,85,11],[95,115,13],[70,140,9],
+    [40,145,9],[15,130,12],[-15,105,15],[-45,85,14],[-75,70,11],[-95,45,9],[-85,20,11],
+    [-65,0,13],[-40,-15,12],[-15,-15,11]]},
+  accel:{zh:"FSAE 官方 75m 加速与制动区",closed:false,v:0,pts:[
+    [0,0,0],[10,0,10],[25,0,18],[50,0,26],[75,0,32],[90,0,15],[110,0,0]]},
+  slalom:{zh:"FSAE 蛇形绕桩 (30m 桩距)",closed:false,v:13.0,pts:(function(){
     const o=[[0,0]];for(let k=0;k<5;k++)o.push([15+30*k,(k%2?3.6:-3.6)]);o.push([180,0]);return o;})()},
   minigp:{zh:"Mini GP 短道（发卡+S弯）",closed:true,v:0,pts:[
     [0,0,15],[50,0,17],[80,2,13],[95,15,10],[92,35,9],[75,45,10],
@@ -4280,7 +4717,7 @@ function trackPayload(){
   const lut=sw=>({travel:sw.rows.map(r=>r.tr),toe:sw.rows.map(r=>r.toe),cam:sw.rows.map(r=>r.cam)});
   let pts,closed=false;
   if(TRK.preset==="custom"&&TRK.custom){pts=TRK.custom;closed=false;}
-  else{const P=TRACK_PRESETS[TRK.preset];closed=P.closed;
+  else{const P=TRACK_PRESETS[TRK.preset]||TRACK_PRESETS.skidpad;closed=P.closed;
     pts=P.pts.map(p=>({x:p[0],y:p[1],target_speed:(p[2]!==undefined?p[2]:P.v)}));}
   /* F-52（2026-08-30）：trkLook/trkV0 控件可能尚未在 DOM 创建（与 ：4219/:4353 的
      null 防御同款兜底）——此前直接 .value 抛 TypeError 使整条赛道链路死亡。 */
@@ -4293,23 +4730,30 @@ function trackPayload(){
     start_speed:ctlVal("trkV0",6.0), _closed:closed};
 }
 async function trackRun(){
-  if(!ENG.ok){setTrkStatus("未连接引擎 → 先连接（赛道仿真走 /api/v3/chassis/simulate_track）",C.ela);return;}
   const btn=document.getElementById("trkRun");if(btn)btn.textContent="仿真中…";
-  setTrkStatus("赛道瞬态仿真中…（平面 3-DOF + 四轮 MF + 准静态载荷）",C.txt2);
+  setTrkStatus(ENG.ok?"赛道瞬态仿真中…（引擎 /api/v3/chassis/simulate_track）":"赛道瞬态仿真中…（内置 JS 物理 TPHYS）",C.txt2);
   try{
     const body=trackPayload();TRK.req=body;
-    const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),120000);
-    const r=await fetch(ENG.url+"/api/v3/chassis/simulate_track",
-      {method:"POST",headers:{"Content-Type":"application/json"},
-       body:JSON.stringify(body),signal:ctl.signal});
-    clearTimeout(to);
-    if(!r.ok){const t=await r.text();throw new Error("HTTP "+r.status+" "+t.slice(0,140));}
-    TRK.res=await r.json();
-    if(TRK.res.status!=="VALID")throw new Error(TRK.res.status+" "+(TRK.res.warnings||[]).join(";"));
+    let res;
+    if(ENG.ok){
+      const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),120000);
+      const r=await fetch(ENG.url+"/api/v3/chassis/simulate_track",
+        {method:"POST",headers:{"Content-Type":"application/json"},
+         body:JSON.stringify(body),signal:ctl.signal});
+      clearTimeout(to);
+      if(!r.ok){const t=await r.text();throw new Error("HTTP "+r.status+" "+t.slice(0,140));}
+      res=await r.json();
+    }else{
+      await new Promise(r=>setTimeout(r,30));
+      res=TPHYS.run(body, TPHYS.makeSimContext(body));
+      res.ms=0;res.builtin=true;
+    }
+    if(res.status!=="VALID")throw new Error(res.status+" "+(res.warnings||[]).join(";"));
+    TRK.res=res;
     TRK.i=0;TRK.playing=true;TRK.active=true;TRK.ready=true;
     fitTopViewToTrack();
     const sm=TRK.res.summary;
-    setTrkStatus(`完成：${sm.path_length_m}m · v_max ${sm.v_max}m/s · max ${sm.max_ay_g}g · ${TRK.res.ms|0}ms`+
+    setTrkStatus((res.builtin?"[内置JS] ":"")+`完成：${sm.path_length_m}m · v_max ${sm.v_max}m/s · max ${sm.max_ay_g}g · ${TRK.res.ms|0}ms`+
       (TRK.res.finished?"（到达终点）":"（限时截止）"),C.ok);
   }catch(err){setTrkStatus("仿真失败："+err.message,C.nodeFix);}
   finally{if(btn)btn.textContent="运行赛道仿真 RUN";}
@@ -4521,7 +4965,8 @@ function _stageBuild(){
           '<label>外倾系数 /rad</label><input id="ssCg" type="number" value="0.5" step="0.1" min="0" max="2">'+
         '</div>'+
         '<button class="st-btn go" id="ssGo">开始赛道仿真</button>'+
-        '<div class="ss-st" id="ssStatus">选择预设或导入路点 - 设置参数 - 开始仿真（需引擎在线）</div>'+
+        '<label style="margin-left:14px;color:#cbd5e1;cursor:pointer"><input type="checkbox" id="ssUseEng"> 使用引擎 (/api/v3)</label>'+
+        '<div class="ss-st" id="ssStatus">选择预设或导入路点 - 设置参数 - 开始仿真</div>'+
       '</div>'+
     '</div>';
   body.appendChild(st);
@@ -4581,13 +5026,19 @@ function drawStageSetupPreview(){
 }
 function trackStageRun(){
   _stageBuild();
-  if(!ENG.ok){document.getElementById("ssStatus").textContent="未连接引擎 -> 请先连接";return;}
   const st=document.getElementById("ssStatus");
-  st.textContent="仿真中...(MF 松弛/复合滑移 + 动力/气动包络)";
+  const wantEng=document.getElementById("ssUseEng")&&document.getElementById("ssUseEng").checked;
+  if(!ENG.ok){
+    if(wantEng){st.textContent="引擎未连接 → 请先连接，或取消「使用引擎」改走内置 JS 物理 (TPHYS)";return;}
+    st.textContent="引擎未连接 → 内置 JS 物理 (TPHYS) 仿真中…";
+  }else{
+    st.textContent=wantEng?"仿真中...(引擎 /api/v3/chassis/simulate_track)"
+      :"仿真中...(内置 JS 物理 TPHYS：MF 松弛/复合滑移 + 动力/气动包络)";
+  }
   const base=chassisPayload();
   const lut=sw=>({travel:sw.rows.map(r=>r.tr),toe:sw.rows.map(r=>r.toe),cam:sw.rows.map(r=>r.cam)});
   const key=document.getElementById("ssPreset").value;
-  const PP=TRACK_PRESETS[key];
+  const PP=TRACK_PRESETS[key]||TRACK_PRESETS.skidpad;
   const pts=PP.pts.map(p=>({x:p[0],y:p[1],target_speed:(p[2]!==undefined?p[2]:PP.v)}));
   const body={vehicle:base.vehicle,
     kc_luts:{front:lut(SIM.swF),rear:lut(SIM.swR)},
@@ -4605,23 +5056,32 @@ function trackStageRun(){
       FzNom:parseFloat(document.getElementById("ssFzN").value)||3500,
       Ls:parseFloat(document.getElementById("ssLs").value)||0.35,
       Cg:parseFloat(document.getElementById("ssCg").value)||0.5}};
-  fetch(ENG.url+"/api/v3/chassis/simulate_track",
-    {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
-  .then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
-  .then(res=>{
-    if(res.status!=="VALID")throw new Error(res.status+" "+(res.warnings||[]).join(";"));
+  const useEng=document.getElementById("ssUseEng")&&document.getElementById("ssUseEng").checked&&ENG.ok;
+  const finishStage=function(res){
+    if(res.status!=="VALID"){document.getElementById("ssStatus").textContent="仿真失败："+res.status;return;}
     STAGE.res=res;STAGE.trace=res.trace;STAGE.req=body;
     STAGE.tMax=res.t[res.t.length-1]||1;
-    console.log("STAGE-READY", document.getElementById("fcGrid")?"both":document.getElementById("stCams")?"part":"none", res.trace.length, res.summary.v_max, res.summary.max_ay_g);
     STAGE.open=true;STAGE.i=0;STAGE.playing=true;STAGE.scene=null;STAGE.mf=0;
     document.getElementById("stageSetup").style.display="none";
     document.getElementById("stageWrap").style.display="block";
     _stageSize();_stageOpen();STAGE.last=performance.now();requestAnimationFrame(stageTick);
     const sm=res.summary;
     document.getElementById("stStatus").textContent=
-      sm.path_length_m+"m - v_max "+sm.v_max+"m/s - max "+sm.max_ay_g+"g - "+(res.ms|0)+"ms"+(res.finished?" (完赛)":"");
-  })
-  .catch(err=>{document.getElementById("ssStatus").textContent="仿真失败："+err.message;});
+      (res.builtin?"[内置JS] ":"")+sm.path_length_m+"m - v_max "+sm.v_max+"m/s - max "+sm.max_ay_g+"g - "+(res.ms|0)+"ms"+(res.finished?" (完赛)":"");
+  };
+  if(useEng){
+    fetch(ENG.url+"/api/v3/chassis/simulate_track",
+      {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+    .then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
+    .then(res=>{finishStage(res);})
+    .catch(err=>{document.getElementById("ssStatus").textContent="仿真失败："+err.message;});
+  }else{
+    setTimeout(function(){
+      const res=TPHYS.run(body, TPHYS.makeSimContext(body));
+      res.ms=0;res.builtin=true;
+      finishStage(res);
+    },30);
+  }
 }
 function _stageUpdateModel(row){
   const rDeg=row.roll||0;
@@ -5259,7 +5719,7 @@ class CircuitPath extends TrackPath {
       curr.ny = Math.sin(curr.heading);
     }
     
-    // 3. Curvature & Max Grip Speed
+    // 3. Curvature & Max Grip Speed (Pacejka lateral acceleration envelope with safety margin)
     for(let i = 0; i < P; i++){
       const prev = this.pts[(i - 1 + P) % P];
       const curr = this.pts[i];
@@ -5271,27 +5731,42 @@ class CircuitPath extends TrackPath {
       while(dpsi < -Math.PI) dpsi += 2 * Math.PI;
       
       curr.curvature = dpsi / (ds + 1e-6);
-      curr.v_max = Math.min(48.0, Math.sqrt((this.mu * 9.81) / (Math.abs(curr.curvature) + 1e-6)));
+      const a_lat_max = Math.max(3.0, this.mu * 9.81 * 0.72); // 0.72mu safe lateral limit
+      curr.v_max = Math.min(45.0, Math.sqrt(a_lat_max / (Math.abs(curr.curvature) + 1e-5)));
     }
     
-    // 4. Backward & Forward Speed Passes (Race Engineering Trail-Braking Profile)
-    const a_brake = 6.5; // 0.65g safe decel
-    const a_accel = 3.5; // 0.35g safe accel
+    // 4. Backward & Forward Speed Passes (Fully-Converged Trail-Braking Profile)
+    const a_brake = 5.2; // 0.53g safe braking deceleration
+    const a_accel = 3.2; // 0.33g safe acceleration
     
-    for(let pass = 0; pass < 3; pass++) {
+    // Backward braking propagation until full circuit convergence (reaches 150-200m upstream)
+    for(let pass = 0; pass < 35; pass++) {
+      let maxDiff = 0;
       for(let i = P - 1; i >= 0; i--){
         const nextIdx = (i + 1) % P;
         const ds = Math.hypot(this.pts[nextIdx].x - this.pts[i].x, this.pts[nextIdx].y - this.pts[i].y);
-        this.pts[i].v_max = Math.min(this.pts[i].v_max, Math.sqrt(this.pts[nextIdx].v_max**2 + 2 * a_brake * ds));
+        const v_limit = Math.sqrt(this.pts[nextIdx].v_max**2 + 2 * a_brake * ds);
+        if(v_limit < this.pts[i].v_max){
+          maxDiff = Math.max(maxDiff, this.pts[i].v_max - v_limit);
+          this.pts[i].v_max = v_limit;
+        }
       }
+      if(maxDiff < 0.01) break;
     }
 
-    for(let pass = 0; pass < 3; pass++) {
+    // Forward acceleration propagation
+    for(let pass = 0; pass < 35; pass++) {
+      let maxDiff = 0;
       for(let i = 0; i < P; i++){
         const prevIdx = (i - 1 + P) % P;
         const ds = Math.hypot(this.pts[i].x - this.pts[prevIdx].x, this.pts[i].y - this.pts[prevIdx].y);
-        this.pts[i].v_max = Math.min(this.pts[i].v_max, Math.sqrt(this.pts[prevIdx].v_max**2 + 2 * a_accel * ds));
+        const v_limit = Math.sqrt(this.pts[prevIdx].v_max**2 + 2 * a_accel * ds);
+        if(v_limit < this.pts[i].v_max){
+          maxDiff = Math.max(maxDiff, this.pts[i].v_max - v_limit);
+          this.pts[i].v_max = v_limit;
+        }
       }
+      if(maxDiff < 0.01) break;
     }
     
     this.totalPoints = P;
@@ -5314,35 +5789,41 @@ class CircuitPath extends TrackPath {
       targetHeading: pt.heading,
       targetCurvature: pt.curvature,
       targetSpeed: pt.v_max,
-      crossTrackError: crossTrackError
+      crossTrackError: crossTrackError,
+      nx: pt.nx,
+      ny: pt.ny,
+      x: pt.x,
+      y: pt.y,
+      idx: closestIdx
     };
   }
 }
 
 function buildShanghaiCircuit() {
   const wp = [
-    {x: 0, y: 0},       // 0: Start / Finish Line
-    {x: 0, y: 140},     // 1: End of Main Straight
-    {x: 25, y: 185},    // 2: T1 Entry (Right)
-    {x: 65, y: 200},    // 3: T1 Apex
-    {x: 100, y: 175},   // 4: T2 Exit
-    {x: 105, y: 130},   // 5: T3 Entry (Left)
-    {x: 75, y: 105},    // 6: T3 Apex
-    {x: 35, y: 120},    // 7: T4 Exit
-    {x: 20, y: 170},    // 8: S-Bend Transition
-    {x: 50, y: 240},    // 9: T5 Fast Left
-    {x: 110, y: 280},   // 10: T6 Fast Sweeper
-    {x: 180, y: 280},   // 11: T7 Right Hand Entry
-    {x: 240, y: 230},   // 12: T8 Exit onto Long Straight
-    {x: 240, y: 100},   // 13: Mid Long Straight
-    {x: 240, y: -50},   // 14: End of Long Straight
-    {x: 230, y: -120},  // 15: T14 Hairpin Heavy Braking Zone
-    {x: 190, y: -150},  // 16: T14 Hairpin Apex
-    {x: 140, y: -120},  // 17: T14 Hairpin Exit
-    {x: 120, y: -40},   // 18: T15 Fast Kink
-    {x: 60, y: -20}     // 19: T16 Final Corner onto Main Straight
+    {x: 0, y: 0},        // 0: Start / Finish Line
+    {x: 0, y: 140},      // 1: Main Straight
+    {x: 25, y: 175},     // 2: T1 Right entry
+    {x: 60, y: 180},     // 3: T1-T2 Right curve
+    {x: 80, y: 160},     // 4: T2 Right apex
+    {x: 75, y: 130},     // 5: T3 Inner tightening spiral
+    {x: 55, y: 115},     // 6: T3 Inner apex
+    {x: 50, y: 90},      // 7: T4 Left transition (exits southeast)
+    {x: 75, y: 75},      // 8: T4 Eastbound exit
+    {x: 115, y: 80},     // 9: T5 Acceleration zone
+    {x: 150, y: 110},    // 10: T6 Fast Left
+    {x: 170, y: 160},    // 11: T7 Sweeper
+    {x: 190, y: 220},    // 12: T8 Fast curve
+    {x: 230, y: 220},    // 13: T9 Turn onto back straight
+    {x: 240, y: 100},    // 14: Back Straight
+    {x: 240, y: -40},    // 15: Back Straight End
+    {x: 230, y: -120},   // 16: T14 Hairpin entry
+    {x: 180, y: -150},   // 17: T14 Hairpin apex
+    {x: 130, y: -130},   // 18: T14 Hairpin exit
+    {x: 90, y: -70},     // 19: T15 Kink
+    {x: 40, y: -25}      // 20: T16 Final Corner onto Main Straight
   ];
-  return new CircuitPath(wp, 1.0); // lowered for safer cornering
+  return new CircuitPath(wp, 1.1);
 }
 
 class UniversalAutoPilot {
@@ -5350,10 +5831,8 @@ class UniversalAutoPilot {
     this.wb = (S_config.wb || 2600) / 1000.0; 
     this.a = this.wb * 0.48; // Dist from CG to Front Axle
     
-    this.k_stanley = 2.5;
-    this.k_soft = 2.0;    
-    
-    this.pid_speed = { p: 0.8, i: 0.15, d: 0.05, integral: 0, last_err: 0 };
+    this.pid_speed = { p: 0.9, i: 0.12, d: 0.06, integral: 0, last_err: 0 };
+    this.last_steer = 0;
     this.active = false;
     this.path = null;
   }
@@ -5362,33 +5841,45 @@ class UniversalAutoPilot {
     this.path = newPath;
     this.pid_speed.integral = 0;
     this.pid_speed.last_err = 0;
+    this.last_steer = 0;
   }
 
   drive(state, dt) {
     if (!this.path || !this.active) return { steer: 0, throttle: 0, brake: 0 };
     
+    const u = Math.max(0.1, state.u || 0);
     // Front Axle coordinates (World Frame)
     const fx = state.X - this.a * Math.sin(state.psi);
     const fy = state.Y + this.a * Math.cos(state.psi);
     
-    const target = this.path.getLookahead(fx, fy, state.u);
+    const target = this.path.getLookahead(fx, fy, u);
     
     let e_heading = target.targetHeading - state.psi;
     while(e_heading > Math.PI) e_heading -= 2 * Math.PI;
     while(e_heading < -Math.PI) e_heading += 2 * Math.PI;
     
     let safe_ey = target.crossTrackError;
-    if (safe_ey > 4.8) safe_ey = 4.8;
-    if (safe_ey < -4.8) safe_ey = -4.8;
-    const steer_fb = -e_heading - Math.atan2(this.k_stanley * safe_ey, this.k_soft + Math.max(0.01, state.u));
+    if (safe_ey > 5.0) safe_ey = 5.0;
+    if (safe_ey < -5.0) safe_ey = -5.0;
+    
+    // Adaptive Stanley gain: softer at high speed, firmer at low speed
+    const k_st = 1.8 / (1.0 + 0.03 * u);
+    const k_soft = 1.5;
+    const steer_fb = -e_heading - Math.atan2(k_st * safe_ey, k_soft + u);
     const steer_ff = -Math.atan2(this.wb * target.targetCurvature, 1.0);
     
-    let ctrl_steer = (steer_fb + steer_ff) * (180.0 / Math.PI);
-    ctrl_steer = Math.max(-28, Math.min(28, ctrl_steer));
+    let raw_steer = (steer_fb + steer_ff) * (180.0 / Math.PI);
+    raw_steer = Math.max(-28, Math.min(28, raw_steer));
     
-    let e_v = target.targetSpeed - state.u;
+    // Rate limit steering to avoid sudden snap-oversteer
+    const max_steer_rate = 120.0; // deg/s
+    const d_steer = Math.max(-max_steer_rate * dt, Math.min(max_steer_rate * dt, raw_steer - this.last_steer));
+    let ctrl_steer = this.last_steer + d_steer;
+    this.last_steer = ctrl_steer;
+    
+    let e_v = target.targetSpeed - u;
     this.pid_speed.integral += e_v * dt;
-    this.pid_speed.integral = Math.max(-10, Math.min(10, this.pid_speed.integral));
+    this.pid_speed.integral = Math.max(-8, Math.min(8, this.pid_speed.integral));
     
     const d_err = (e_v - this.pid_speed.last_err) / (dt + 1e-6);
     this.pid_speed.last_err = e_v;
@@ -5396,10 +5887,14 @@ class UniversalAutoPilot {
     const accel_cmd = this.pid_speed.p * e_v + this.pid_speed.i * this.pid_speed.integral + this.pid_speed.d * d_err;
     
     let ctrl_throttle = 0, ctrl_brake = 0;
+    // G-G Friction circle allocation: reduce brake/throttle if steering heavily
+    const steer_ratio = Math.abs(ctrl_steer) / 28.0;
+    const long_avail = Math.max(0.25, 1.0 - 0.65 * steer_ratio);
+    
     if (accel_cmd > 0) {
-      ctrl_throttle = Math.min(1.0, accel_cmd * 0.25); 
+      ctrl_throttle = Math.min(1.0, accel_cmd * 0.28) * long_avail; 
     } else {
-      ctrl_brake = Math.min(1.0, -accel_cmd * 0.5); 
+      ctrl_brake = Math.min(1.0, -accel_cmd * 0.65) * long_avail; 
     }
     
     return { steer: ctrl_steer, throttle: ctrl_throttle, brake: ctrl_brake };
@@ -5789,17 +6284,24 @@ function slopeStageLoop(now){
     // 2. 悬架多体杆系运动学更新 (每 3 帧更新一次几何骨架，极度轻量)
     SLOPE_STAGE.rebuildCadence++;
     if(SLOPE_STAGE.rebuildCadence % 3 === 0 || !SLOPE_STAGE.cachedScene) {
-      const tr = tel.tr || { FL:0, FR:0, RL:0, RR:0 };
-      const z0F = (SIM.FR && SIM.FR.n && SIM.FR.idx) ? SIM.FR.n[SIM.FR.idx.WC].p0[2] : 250;
-      const z0R = (SIM.RR && SIM.RR.n && SIM.RR.idx) ? SIM.RR.n[SIM.RR.idx.WC].p0[2] : 250;
+      const isFormula = S.vehicleType === "formula";
+      const rackRatio = isFormula ? -0.55 : -1.5;
+      const rackMax = isFormula ? 18 : 38;
+      const rackDisplacement = Math.max(-rackMax, Math.min(rackMax, (ctrl.steer || 0) * rackRatio));
       
-      // Map steering angle (degrees) to approximate rack displacement (mm) for 3D visual
-      const rackDisplacement = ctrl.steer * -1.8; // Negative because positive steer (right) usually means rack pulls left
-      if(SIM.FR) driveTo(SIM.FR, z0F + (tr.FR || 0) * 1000, rackDisplacement, 'front');
-      if(SIM.RR) driveTo(SIM.RR, z0R + (tr.RR || 0) * 1000, 0, 'rear');
+      const limF = (VEHICLE_PRESETS[S.vehicleType]||{}).limF || [-60, 65];
+      const limR = (VEHICLE_PRESETS[S.vehicleType]||{}).limR || [-60, 65];
+      const tr = tel.tr || { FL:0, FR:0, RL:0, RR:0 };
+      const trFR = Math.max(limF[0], Math.min(limF[1], (tr.FR || 0) * 1000));
+      const trRR = Math.max(limR[0], Math.min(limR[1], (tr.RR || 0) * 1000));
+      const trFL = Math.max(limF[0], Math.min(limF[1], (tr.FL || 0) * 1000));
+      const trRL = Math.max(limR[0], Math.min(limR[1], (tr.RL || 0) * 1000));
+
+      if(SIM.FR) driveTo(SIM.FR, z0F + trFR, rackDisplacement, 'front');
+      if(SIM.RR) driveTo(SIM.RR, z0R + trRR, 0, 'rear');
       if(S.show.mirror){
-        if(SIM.FL) driveTo(SIM.FL, z0F + (tr.FL || 0) * 1000, -rackDisplacement, 'front');
-        if(SIM.RL) driveTo(SIM.RL, z0R + (tr.RL || 0) * 1000, 0, 'rear');
+        if(SIM.FL) driveTo(SIM.FL, z0F + trFL, -rackDisplacement, 'front');
+        if(SIM.RL) driveTo(SIM.RL, z0R + trRL, 0, 'rear');
       }
       SLOPE_STAGE.cachedScene = buildScenePRO();
     }
@@ -7016,7 +7518,7 @@ function openCircuitStage() {
   CIRCUIT_STAGE.rebuildCadence = 0;
   
   const startState = {
-    X: 0, Y: 0, Z: 0.3,
+    X: 0, Y: 0, Z: 0.0,
     phi: 0, theta: 0, psi: 0,
     u: 0.1, v: 0, w: 0,
     p: 0, q: 0, r: 0,
@@ -7105,18 +7607,60 @@ function closeCircuitStage() {
   rebuild();
 }
 
+function respawnCircuitVehicle(eng, path, closestIdx) {
+  if(!eng || !path || !path.pts || !path.pts.length) return;
+  const P = path.pts.length;
+  // Respawn 22 waypoints upstream (~44 meters back)
+  const respawnIdx = (closestIdx - 22 + P) % P;
+  const rp = path.pts[respawnIdx];
+  const safeSpeed = Math.min(10.0, (rp.v_max || 10.0) * 0.7);
+  
+  eng.state.X = rp.x;
+  eng.state.Y = rp.y;
+  eng.state.Z = 0.0;
+  eng.state.phi = 0;
+  eng.state.theta = 0;
+  eng.state.psi = rp.heading;
+  eng.state.u = safeSpeed;
+  eng.state.v = 0;
+  eng.state.w = 0;
+  eng.state.p = 0;
+  eng.state.q = 0;
+  eng.state.r = 0;
+  
+  const wRe = eng.ReF || 0.33;
+  eng.state.omega = {
+    FL: safeSpeed / wRe,
+    FR: safeSpeed / wRe,
+    RL: safeSpeed / (eng.ReR || wRe),
+    RR: safeSpeed / (eng.ReR || wRe)
+  };
+  
+  if(window.circuitPilot) {
+    window.circuitPilot.pid_speed.integral = 0;
+    window.circuitPilot.pid_speed.last_err = 0;
+    window.circuitPilot.last_steer = 0;
+  }
+  
+  CIRCUIT_STAGE.respawnNoticeTime = performance.now() + 2500;
+}
+
 function circuitStageLoop(now) {
   if (!CIRCUIT_STAGE.active) return;
 
   const eng = window.physicsEngine;
-  /* F-33（2026-08-30）：固定 dt=1/60 在 120Hz 屏上仿真时间被拉慢一倍——
-     改为真实帧间隔（钳 0.033s 上限防卡顿跳步，与 slope/skidpad 同款）。 */
+  /* F-33（2026-08-30）：真实帧间隔（钳 0.033s 上限防卡顿跳步） */
   let dt = Math.min(0.033, (now - (CIRCUIT_STAGE.lastTime || now)) / 1000);
   CIRCUIT_STAGE.lastTime = now;
   let ctrl = { steer: 0, throttle: 0, brake: 0 };
   let e_y = 0, v_tar = 0;
 
   if (eng && CIRCUIT_STAGE.path) {
+    // 🛡️ NaN 自愈卫哨：若状态出现非有限数，立即安全复位
+    if(!isFinite(eng.state.X) || !isFinite(eng.state.Y) || !isFinite(eng.state.u)){
+      respawnCircuitVehicle(eng, CIRCUIT_STAGE.path, 0);
+    }
+    
     const isUserManual = (CIRCUIT_STAGE.keys.w || CIRCUIT_STAGE.keys.s || CIRCUIT_STAGE.keys.a || CIRCUIT_STAGE.keys.d || CIRCUIT_STAGE.keys.space);
     if(isUserManual) {
       if(window.circuitPilot) window.circuitPilot.active = false;
@@ -7124,6 +7668,16 @@ function circuitStageLoop(now) {
       if(CIRCUIT_STAGE.keys.d) ctrl.steer += 8;
       if(CIRCUIT_STAGE.keys.w) ctrl.throttle = 1.0;
       if(CIRCUIT_STAGE.keys.s || CIRCUIT_STAGE.keys.space) ctrl.brake = 1.0;
+      
+      const pt = CIRCUIT_STAGE.path.getLookahead(eng.state.X, eng.state.Y, eng.state.u);
+      e_y = pt.crossTrackError;
+      v_tar = pt.targetSpeed;
+      
+      // 手动驾驶冲出赛道脱轨保险：横向偏离 > 6.0m 则自动在安全前置点重置
+      if(Math.abs(e_y) > 6.2) {
+        respawnCircuitVehicle(eng, CIRCUIT_STAGE.path, pt.idx || 0);
+        e_y = 0;
+      }
     } else {
       if(window.circuitPilot) {
         window.circuitPilot.active = true;
@@ -7132,18 +7686,10 @@ function circuitStageLoop(now) {
         e_y = pt.crossTrackError;
         v_tar = pt.targetSpeed;
         
-        // 🔒 INVISIBLE GUARDRAILS: Hard physical constraint to NEVER leave the track
-        const maxDev = 4.8; // Track is 11m wide (5.5m half-width)
-        if (Math.abs(e_y) > maxDev) {
-            const pen = Math.abs(e_y) - maxDev;
-            const sign = Math.sign(e_y);
-            // Push vehicle position back inside boundary
-            eng.state.X -= sign * pt.nx * pen;
-            eng.state.Y -= sign * pt.ny * pen;
-            // Dampen velocities to prevent bouncing
-            eng.state.v *= 0.7;
-            eng.state.r *= 0.7;
-            e_y = sign * maxDev; // clamp reading for HUD
+        // 🔒 AUTO-RESPAWN INSURANCE: 脱轨保险机制（偏离 > 5.8m 自动回退 40 米重新启动）
+        if (Math.abs(e_y) > 5.8) {
+          respawnCircuitVehicle(eng, CIRCUIT_STAGE.path, pt.idx || 0);
+          e_y = 0;
         }
       }
     }
@@ -7161,13 +7707,25 @@ function circuitStageLoop(now) {
     if(CIRCUIT_STAGE.rebuildCadence % 3 === 0 || !CIRCUIT_STAGE.cachedScene) {
       const z0F = (SIM.FR && SIM.FR.n && SIM.FR.idx) ? SIM.FR.n[SIM.FR.idx.WC].p0[2] : 250;
       const z0R = (SIM.RR && SIM.RR.n && SIM.RR.idx) ? SIM.RR.n[SIM.RR.idx.WC].p0[2] : 250;
-      const rackDisplacement = ctrl.steer * -1.8;
+      
+      const isFormula = S.vehicleType === "formula";
+      const rackRatio = isFormula ? -0.55 : -1.5;
+      const rackMax = isFormula ? 18 : 38;
+      const rackDisplacement = Math.max(-rackMax, Math.min(rackMax, (ctrl.steer || 0) * rackRatio));
+      
+      const limF = (VEHICLE_PRESETS[S.vehicleType]||{}).limF || [-60, 65];
+      const limR = (VEHICLE_PRESETS[S.vehicleType]||{}).limR || [-60, 65];
       const tr = tel.tr || { FL:0, FR:0, RL:0, RR:0 };
-      if(SIM.FR) driveTo(SIM.FR, z0F + (tr.FR || 0) * 1000, rackDisplacement, 'front');
-      if(SIM.RR) driveTo(SIM.RR, z0R + (tr.RR || 0) * 1000, 0, 'rear');
+      const trFR = Math.max(limF[0], Math.min(limF[1], (tr.FR || 0) * 1000));
+      const trRR = Math.max(limR[0], Math.min(limR[1], (tr.RR || 0) * 1000));
+      const trFL = Math.max(limF[0], Math.min(limF[1], (tr.FL || 0) * 1000));
+      const trRL = Math.max(limR[0], Math.min(limR[1], (tr.RL || 0) * 1000));
+
+      if(SIM.FR) driveTo(SIM.FR, z0F + trFR, rackDisplacement, 'front');
+      if(SIM.RR) driveTo(SIM.RR, z0R + trRR, 0, 'rear');
       if(S.show.mirror){
-        if(SIM.FL) driveTo(SIM.FL, z0F + (tr.FL || 0) * 1000, -rackDisplacement, 'front');
-        if(SIM.RL) driveTo(SIM.RL, z0R + (tr.RL || 0) * 1000, 0, 'rear');
+        if(SIM.FL) driveTo(SIM.FL, z0F + trFL, -rackDisplacement, 'front');
+        if(SIM.RL) driveTo(SIM.RL, z0R + trRL, 0, 'rear');
       }
       CIRCUIT_STAGE.cachedScene = buildScenePRO();
     }
@@ -7203,6 +7761,7 @@ function circuitStageLoop(now) {
 }
 
 function renderCircuitScene(st, tel, ctrl) {
+  if (!st || !isFinite(st.X) || !isFinite(st.Y) || !isFinite(st.psi)) return;
   const cv = document.getElementById("circuitCanvas");
   if(!cv) return;
   const ctx = cv.getContext("2d");
@@ -7506,6 +8065,27 @@ function renderCircuitScene(st, tel, ctrl) {
     ctx.arc(carPx, carPy, 6, 0, 2*Math.PI);
     ctx.fillStyle = "#7ee787"; ctx.fill();
     ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.stroke();
+  }
+
+  // 5. Draw Respawn Insurance Banner
+  if (CIRCUIT_STAGE.respawnNoticeTime && performance.now() < CIRCUIT_STAGE.respawnNoticeTime) {
+    ctx.save();
+    const bannerW = 430, bannerH = 36;
+    const bx = (w - bannerW) / 2, by = 22;
+    ctx.fillStyle = "rgba(239, 68, 68, 0.90)";
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bannerW, bannerH, 8);
+    ctx.fill();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 13px 'Segoe UI', -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("⚠️ 触发赛道脱轨保护 · 已自动重置至前序安全路点继续仿真", w / 2, by + bannerH / 2);
+    ctx.restore();
   }
 }
 
