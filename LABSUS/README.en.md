@@ -32,6 +32,6 @@ Full engine: python server.py on :8001, then open web/dwb-pro-fullchassis.html a
 
 ## Tests
 
-    python -m pytest engine/tests -q     # 86 passing including physics assertions
+    python -m pytest engine/tests -q     # 100 passing including physics assertions
 
 Targets FSAE / student endurance platforms; honest simulation-grade approximations are annotated in-source. See DEVLOG.md for history.

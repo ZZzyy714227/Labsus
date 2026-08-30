@@ -62,7 +62,7 @@
 ### 运行测试
 
     cd engine
-    python -m pytest tests/ -q      # 当前 86 项全部通过
+    python -m pytest tests/ -q      # 当前 100 项全部通过
 
 ---
 
@@ -109,7 +109,7 @@
     │   │   ├── tire_mf.py             Pacejka MF 子集
     │   │   ├── metrics/               K&C 增益 / P2 指标族
     │   │   └── core/                  数据模型与符号规范（单一真源）
-    │   └── tests/                     pytest 86 项（物理断言/门禁/对拍）
+    │   └── tests/                     pytest 100 项（物理断言/门禁/对拍）
     └── 开发日志见 ../docs/DEVLOG.md（含研究/修复记录；本仓库 README 曾误称其位于 LABSUS/ 内——实为仓库根 docs/ 下，F-62 勘误）
 
 ## 说明
