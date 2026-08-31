@@ -1,7 +1,8 @@
 # 开发用静态服务：禁用浏览器缓存，确保每次刷新拿到最新文件
 import http.server, functools, os, sys
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+# G10（2026-08-31）：自 web/ 迁入 scripts/，服务根改为 ../web
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "web")
 
 class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
     # F-72（2026-08-30）：HTTP/1.1 持久连接（旧默认 1.0 每请求重建连接，浏览器

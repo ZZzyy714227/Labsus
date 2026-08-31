@@ -12,6 +12,7 @@ import json
 import math
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -23,7 +24,7 @@ from src.solver.transient import run_track_sim
 
 _LABSUS = Path(__file__).resolve().parents[2]
 _HTML = _LABSUS / "web" / "dwb-pro-allinone.html"
-_MJS = _LABSUS / "web" / "tphys_parity.cjs"
+_MJS = _LABSUS / "web" / "test" / "tphys_parity.cjs"   # G10 迁入 web/test/
 
 _FRONT = {
     "LCA_F": [260, 140, 130], "LCA_R": [260, -120, 140], "UCA_F": [350, 110, 340],
@@ -114,6 +115,10 @@ def _run_node(body, ctx, case, html_file="dwb-pro-allinone.html"):
     inp.write_text(json.dumps({"body": body, "ctx": ctx}), encoding="utf-8")
     env = dict(os.environ)
     env["TPHYS_HTML"] = str(_LABSUS / "web" / html_file)
+    # G10 健壮性（2026-08-31）：cjs 参考端默认用 PATH 上的裸 `python`，在托管
+    # Python 环境下会缺 pydantic/numpy 而炸（与迁移无关的环境问题）。强制继承
+    # pytest 自身解释器，保证对拍两端跑在同一依赖环境。
+    env["LABSUS_PY"] = sys.executable
     try:
         r = subprocess.run([node, str(_MJS), str(inp), str(out)],
                            capture_output=True, text=True, timeout=180,

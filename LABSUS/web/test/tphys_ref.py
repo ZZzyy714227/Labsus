@@ -10,7 +10,9 @@ import json
 import os
 import sys
 
-_LABSUS_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# G10（2026-08-31）：自 web/ 迁入 web/test/，根目录改为向上三层（web/test -> web -> LABSUS）
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_LABSUS_ROOT = os.path.dirname(os.path.dirname(_HERE))
 _ENGINE = os.path.join(_LABSUS_ROOT, "engine")
 _SRC = os.path.join(_ENGINE, "src")
 # 与 server.py / scripts/kandc_run.py 同款双路径注入：engine/（from src.xxx）
