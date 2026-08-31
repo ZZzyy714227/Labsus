@@ -302,12 +302,11 @@ function buildBajaSpaceframe(sc, yF, yR){
     D(RR_TL, RR_BR); D(RR_TR, RR_BL);
   }
 
+  /* G15.7（2026-08-31）：去除 Baja 的三个灰白色覆盖面（前鼻 + 左/右侧面围）。
+     真实 Baja SAE 是纯管架结构（参考图 U18），没有任何覆盖板面；
+     保留原座舱底板（黑色，与管架形成对比，标识驾驶员位置）。
+     GT3 一字未动。 */
   if(S.show.frame_side){
-    const panelCol = "rgba(220, 225, 230, 0.95)";
-    const noseCol = "rgba(30, 35, 40, 0.95)";
-    PL(sc, [FBM_TL, FBM_TR, FHO_MR, FHO_ML, FBM_TL], noseCol, 1, null, noseCol);
-    PL(sc, [FHO_BL, FHO_ML, RHO_ML, RHO_BL, FHO_BL], panelCol, 1, null, panelCol);
-    PL(sc, [FHO_BR, FHO_MR, RHO_MR, RHO_BR, FHO_BR], panelCol, 1, null, panelCol);
     PL(sc, [FHO_BL, FHO_BR, RHO_BR, RHO_BL, FHO_BL], "rgba(25,25,25,0.95)", 1, null, "rgba(25,25,25,0.95)");
   }
 
