@@ -233,22 +233,26 @@ function buildBajaSpaceframe(sc, yF, yR){
   const T = (a, b, r, col) => cylinder(sc, a, b, r||16, col||"#d23535", 1.3, 12); 
   const D = (a, b, r, col) => cylinder(sc, a, b, r||14, col||"#a82a2a", 1.1, 10);
 
-  const Y_front_bulk = yF + 350;
-  const Y_front_hoop = yF - 300;
-  const Y_main_hoop = yR + 700;
-  const Y_rear_bulk = yR - 400;
+  /* G15.5（2026-08-31）：Baja 比例修正。
+     旧版"太长太窄"——Y 向前后悬过大、X 向宽度过小，俯视下车身比轮距还窄。
+     缩短前后悬与座舱、大幅加宽、降低主环高度，做出短粗敦实的巴哈越野车比例。
+     注：本修改独立于 G15 整体回滚（backup/g15-gt3-carbody 仍有该提交），仅动 Baja。 */
+  const Y_front_bulk = yF + 120;   // 前悬缩短
+  const Y_front_hoop = yF - 150;   // 前环靠近前轮
+  const Y_main_hoop = yR + 200;    // 主环靠近后轮，座舱紧凑
+  const Y_rear_bulk = yR - 120;    // 后悬缩短
 
   const Z_bottom = 180;
-  const Z_sim = 550;
-  const Z_front_hoop = 900;
-  const Z_main_hoop = 1450;
-  const Z_nose = 450;
-  const Z_rear = 750;
+  const Z_sim = 520;
+  const Z_front_hoop = 850;
+  const Z_main_hoop = 1150;        // 主环降低，避免瘦高
+  const Z_nose = 420;
+  const Z_rear = 650;
 
-  const W_bottom = 200; 
-  const W_shoulder = 280;
-  const W_roof = 200;
-  const W_nose = 160;
+  const W_bottom = 360;            // 底部加宽
+  const W_shoulder = 460;          // 肩部加宽
+  const W_roof = 340;              // 车顶加宽
+  const W_nose = 300;              // 前鼻加宽
 
   const FBM_TL = [-W_nose, Y_front_bulk, Z_nose], FBM_TR = [W_nose, Y_front_bulk, Z_nose];
   const FBM_BL = [-W_nose, Y_front_bulk, Z_bottom], FBM_BR = [W_nose, Y_front_bulk, Z_bottom];
