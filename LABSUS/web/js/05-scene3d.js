@@ -233,26 +233,35 @@ function buildBajaSpaceframe(sc, yF, yR){
   const T = (a, b, r, col) => cylinder(sc, a, b, r||16, col||"#d23535", 1.3, 12); 
   const D = (a, b, r, col) => cylinder(sc, a, b, r||14, col||"#a82a2a", 1.1, 10);
 
-  /* G15.5（2026-08-31）：Baja 比例修正。
-     旧版"太长太窄"——Y 向前后悬过大、X 向宽度过小，俯视下车身比轮距还窄。
-     缩短前后悬与座舱、大幅加宽、降低主环高度，做出短粗敦实的巴哈越野车比例。
-     注：本修改独立于 G15 整体回滚（backup/g15-gt3-carbody 仍有该提交），仅动 Baja。 */
-  const Y_front_bulk = yF + 120;   // 前悬缩短
-  const Y_front_hoop = yF - 150;   // 前环靠近前轮
-  const Y_main_hoop = yR + 200;    // 主环靠近后轮，座舱紧凑
-  const Y_rear_bulk = yR - 120;    // 后悬缩短
+  /* G15.6（2026-08-31）：Baja 比例再次修正——基于真实设计哲学。
+     关键事实（02-presets.js baja 预设）：
+       wb  = 2790 mm（轴距）
+       WC  = [792, 0, 396] → 前轮中心 X=792 → 半轮距 792 mm，总轮距 1584 mm
+     前两版（G15-fix/G15.5）犯的错：只把"长条"改"短条"但还是窄条——
+     W_shoulder=460 → 车身总宽 920 mm ≪ 轮距 1584 mm，俯视下仍被轮距包夹。
+     前环 Y_front_hoop = yF-150 还在前轮**后方**，没有"前环在轮正前"的真实感。
 
-  const Z_bottom = 180;
-  const Z_sim = 520;
-  const Z_front_hoop = 850;
-  const Z_main_hoop = 1150;        // 主环降低，避免瘦高
-  const Z_nose = 420;
-  const Z_rear = 650;
+     本次设计哲学：
+       ① 车身宽度接近轮距（肩宽 ≈ 80% 轮距，敞轮结构合理）
+       ② 前环/主环就在前后轮正前/正后方，座舱跨度 ≈ 轴距
+       ③ 前后悬仅给机器舱/后舱留 ~200mm，不向轮外悬伸
+       ④ 塔顶高度与车手头部相当（Baja 塔顶不需要拉很高） */
+  const Y_front_bulk = yF + 200;   // 前舱横隔：前轮正前方约 200mm（机器舱）
+  const Y_front_hoop = yF - 30;    // 前环：紧贴前轮正前方
+  const Y_main_hoop  = yR + 30;    // 主环：紧贴后轮正后方
+  const Y_rear_bulk  = yR - 250;   // 后舱横隔：主环后方约 250mm
 
-  const W_bottom = 360;            // 底部加宽
-  const W_shoulder = 460;          // 肩部加宽
-  const W_roof = 340;              // 车顶加宽
-  const W_nose = 300;              // 前鼻加宽
+  const Z_bottom    = 200;
+  const Z_sim       = 560;
+  const Z_front_hoop = 830;
+  const Z_main_hoop = 960;         // 塔顶不需太高
+  const Z_nose      = 500;
+  const Z_rear      = 640;
+
+  const W_bottom    = 580;         // 车身底半宽（约 73% 半轮距）
+  const W_shoulder  = 760;         // 肩半宽 ≈ 96% 半轮距——接近真实轮距
+  const W_roof      = 680;         // 车顶半宽
+  const W_nose      = 500;         // 前舱半宽
 
   const FBM_TL = [-W_nose, Y_front_bulk, Z_nose], FBM_TR = [W_nose, Y_front_bulk, Z_nose];
   const FBM_BL = [-W_nose, Y_front_bulk, Z_bottom], FBM_BR = [W_nose, Y_front_bulk, Z_bottom];
