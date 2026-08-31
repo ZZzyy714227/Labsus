@@ -914,38 +914,41 @@ function drawStageTelemetry(row){
 }
 
 function buildTrackPanel(host){
-  const b = sec(host, "动态驾驶测试 🏎️", "DYNAMIC TESTS", false, "blu");
+  const b = sec(host, "动态驾驶测试 🏎️", "DYNAMIC TESTS", true, "blu");
   
   const d = E("div");
   d.style.display = "flex"; 
   d.style.flexDirection = "column"; 
-  d.style.gap = "8px";
-  d.style.padding = "8px 10px 12px 10px";
+  d.style.gap = "6px";
+  d.style.padding = "6px 8px 8px 8px";
   
   const b1 = E("button"); 
   b1.innerHTML = "🛣️ 直线爬坡动力学测试 (SLOPE)"; 
   b1.onclick = () => { openSlopeStage(); };
-  b1.style.padding = "10px"; b1.style.background = "rgba(46,160,67,0.15)"; b1.style.border = "1px solid #2ea043"; 
-  b1.style.color = "#fff"; b1.style.borderRadius = "6px"; b1.style.cursor = "pointer"; b1.style.fontWeight = "bold"; b1.style.letterSpacing = "1px";
+  b1.style.padding = "7px 8px"; b1.style.background = "rgba(46,160,67,0.12)"; b1.style.border = "1px solid rgba(46,160,67,0.35)"; 
+  b1.style.color = "#7ee787"; b1.style.borderRadius = "var(--r-sm)"; b1.style.cursor = "pointer"; b1.style.fontWeight = "600"; b1.style.fontSize = "10.5px"; b1.style.letterSpacing = "0.04em";
+  b1.style.transition = "background .18s, border-color .18s, transform .1s";
   
   const b2 = E("button"); 
   b2.innerHTML = "⭕ 定圆绕环稳态测试 (SKIDPAD)"; 
   b2.onclick = () => { openSkidpadStage(); };
-  b2.style.padding = "10px"; b2.style.background = "rgba(210,153,34,0.15)"; b2.style.border = "1px solid #d29922"; 
-  b2.style.color = "#fff"; b2.style.borderRadius = "6px"; b2.style.cursor = "pointer"; b2.style.fontWeight = "bold"; b2.style.letterSpacing = "1px";
+  b2.style.padding = "7px 8px"; b2.style.background = "rgba(210,153,34,0.12)"; b2.style.border = "1px solid rgba(210,153,34,0.35)"; 
+  b2.style.color = "#e3b341"; b2.style.borderRadius = "var(--r-sm)"; b2.style.cursor = "pointer"; b2.style.fontWeight = "600"; b2.style.fontSize = "10.5px"; b2.style.letterSpacing = "0.04em";
+  b2.style.transition = "background .18s, border-color .18s, transform .1s";
   
   const b3 = E("button"); 
   b3.innerHTML = "🏁 综合赛道自动驾驶 (CIRCUIT)"; 
   b3.onclick = () => { openCircuitStage(); };
-  b3.style.padding = "10px"; b3.style.background = "rgba(88,166,255,0.15)"; b3.style.border = "1px solid #58a6ff"; 
-  b3.style.color = "#fff"; b3.style.borderRadius = "6px"; b3.style.cursor = "pointer"; b3.style.fontWeight = "bold"; b3.style.letterSpacing = "1px";
+  b3.style.padding = "7px 8px"; b3.style.background = "rgba(88,166,255,0.12)"; b3.style.border = "1px solid rgba(88,166,255,0.35)"; 
+  b3.style.color = "#79c0ff"; b3.style.borderRadius = "var(--r-sm)"; b3.style.cursor = "pointer"; b3.style.fontWeight = "600"; b3.style.fontSize = "10.5px"; b3.style.letterSpacing = "0.04em";
+  b3.style.transition = "background .18s, border-color .18s, transform .1s";
   
-  b1.onmouseover = () => b1.style.background = "rgba(46,160,67,0.3)";
-  b1.onmouseout = () => b1.style.background = "rgba(46,160,67,0.15)";
-  b2.onmouseover = () => b2.style.background = "rgba(210,153,34,0.3)";
-  b2.onmouseout = () => b2.style.background = "rgba(210,153,34,0.15)";
-  b3.onmouseover = () => b3.style.background = "rgba(88,166,255,0.3)";
-  b3.onmouseout = () => b3.style.background = "rgba(88,166,255,0.15)";
+  b1.onmouseover = () => { b1.style.background = "rgba(46,160,67,0.25)"; b1.style.borderColor = "#2ea043"; };
+  b1.onmouseout = () => { b1.style.background = "rgba(46,160,67,0.12)"; b1.style.borderColor = "rgba(46,160,67,0.35)"; };
+  b2.onmouseover = () => { b2.style.background = "rgba(210,153,34,0.25)"; b2.style.borderColor = "#d29922"; };
+  b2.onmouseout = () => { b2.style.background = "rgba(210,153,34,0.12)"; b2.style.borderColor = "rgba(210,153,34,0.35)"; };
+  b3.onmouseover = () => { b3.style.background = "rgba(88,166,255,0.25)"; b3.style.borderColor = "#58a6ff"; };
+  b3.onmouseout = () => { b3.style.background = "rgba(88,166,255,0.12)"; b3.style.borderColor = "rgba(88,166,255,0.35)"; };
   
   d.appendChild(b1);
   d.appendChild(b2);
