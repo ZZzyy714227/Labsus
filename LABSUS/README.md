@@ -53,16 +53,19 @@
 
 ### 方式 B：完整引擎（体验全部 K&C）
 
+双击根目录 `start.bat`：自动拉起 Python 引擎（:8001，已在运行则跳过）+ 无缓存前端服务（**:714**），并打开 `http://127.0.0.1:714/dwb-pro-fullchassis.html`。页面加载后自动连接引擎；引擎不在线时回落内置 JS 求解器。
+引擎侧手动启动：
+
     cd engine
     pip install fastapi uvicorn pydantic numpy scipy
     python server.py           # 服务 http://127.0.0.1:8001
 
-打开 web/dwb-pro-fullchassis.html（或 allinone 并勾选「使用引擎」）→ 左上角「连接引擎」。
-
 ### 运行测试
 
     cd engine
-    python -m pytest tests/ -q      # 当前 100 项全部通过
+    python -m pytest tests/ -q      # 当前 102 项全部通过（物理断言/门禁/对拍）
+    node web/test/test_dom.js       # 前端结构防线 136 项断言（在仓库根执行）
+    node web/test/stage_boot_check.js   # 模块加载顺序 + 舞台可启动 40 项（可单独运行，彩色诊断）
 
 ---
 
@@ -86,15 +89,21 @@
     Python 引擎（参考实现 · 权威数值：机构 TRF 收敛 · K&C 两层 · quasi · transient）
 
 - 引擎与前端对同一物理保持两套实现：engine/src/solver/transient.py 与前端 TPHYS（JS 直译，数值逐位对标）；其余模块由前端 JS 平行实现并持续黄金对拍
-- 前端为单文件演进（约 7500 行），所有 UI 与交互均在 dwb-pro-fullchassis.html
+- 前端按功能域模块化（G9，2026-08-31）：fullchassis 为薄壳（~340 行）+ css/fullchassis.css + js/ 11 个按序加载的普通 `<script>` 模块（非 ES module，保 file:// 双击可用）；分片拼接与拆分前源码逐字节一致；allinone 仍为单文件交付物
+- ⚠️ 多 `<script>` 拆分与单块切割**不等价**（F-61，G14）：`function` 声明只在**同一脚本内**提升，跨文件前向引用会在拆分后变 `ReferenceError`；`class`/`let`/`const` 更危险——顶层 throw 会让该文件**后续声明永不初始化**（卡 TDZ，症状静默）。新增模块时，任何 `window.X = X` 式的导出必须与定义同文件（或放在定义之后）。防线：`node web/test/stage_boot_check.js`
 
 ## 目录
 
     LABSUS/
+    ├── start.bat                      双击启动 fullchassis（file:// 直开，零依赖）
     ├── web/
-    │   ├── dwb-pro-fullchassis.html   完整版前端（主力开发入口）
-    │   ├── dwb-pro-allinone.html      综合版单文件（内置赛道物理）
-    │   └── serve_nocache.py           开发静态服务 (:8921)
+    │   ├── dwb-pro-fullchassis.html   完整版前端薄壳（主力开发入口，按序引用 js/）
+    │   ├── css/fullchassis.css        fullchassis 全部样式
+    │   ├── js/                        11 个功能域模块（01-core … 11-stages，文件名前缀即加载顺序）
+    │   ├── dwb-pro-allinone.html      综合版单文件（内置赛道物理，零依赖交付）
+    │   └── test/                      前端结构防线 + TPHYS 对拍（test_dom.js / stage_boot_check.js / tphys_parity.cjs / tphys_ref.py）
+    ├── scripts/
+    │   └── serve_nocache.py           开发静态服务 (:8921，服务 web/)
     ├── engine/
     │   ├── server.py                  FastAPI 入口 (:8001)
     │   ├── scripts/kandc_run.py       K&C CLI 演示

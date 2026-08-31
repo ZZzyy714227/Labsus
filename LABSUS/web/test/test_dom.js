@@ -3,13 +3,14 @@
  * 旧版：无断言、恒 exit 0、且只测 fullchassis——防线形同虚设。
  * 新版：对两个前端入口做真断言（语法可编译 + 关键函数存在 + 已知 bug 模式回访），
  *      任何失败 exit 1。不依赖 jsdom（无 node_modules 依赖，CI 可直接跑）。
- * usage: node test_dom.js
+ * usage: node web/test/test_dom.js
  */
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const webDir = __dirname;
+/* G10（2026-08-31）：本文件自 web/ 迁入 web/test/，webDir 改指上级目录 */
+const webDir = path.join(__dirname, '..');
 const failures = [];
 let checks = 0;
 
@@ -22,6 +23,25 @@ function readHtml(name) {
   const p = path.join(webDir, name);
   ok(fs.existsSync(p), `${name} 存在`);
   return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : '';
+}
+
+/** G9 拆分适配（2026-08-31）：fullchassis 已拆为薄壳 + css/ + js/ 按序 <script src> 加载。
+ *  为复用全部既有源码断言，将 js/css 合成回"虚拟单文件源码"后再喂给原有检查。 */
+function readFullchassisCombined() {
+  let html = readHtml('dwb-pro-fullchassis.html');
+  const cssPath = path.join(webDir, 'css', 'fullchassis.css');
+  if (fs.existsSync(cssPath)) {
+    const css = fs.readFileSync(cssPath, 'utf8');
+    html = html.replace('<link rel="stylesheet" href="css/fullchassis.css">',
+                        '<style>' + css + '</style>');
+  }
+  const jsDir = path.join(webDir, 'js');
+  const files = fs.readdirSync(jsDir).filter(f => f.endsWith('.js')).sort();
+  ok(files.length >= 11, `fullchassis: js/ 模块数 ≥ 11（实际 ${files.length}）`);
+  const inject = files.map(f =>
+    `<script>\n/* === js/${f} === */\n` + fs.readFileSync(path.join(jsDir, f), 'utf8') + '\n</script>'
+  ).join('\n');
+  return html.replace('</body>', inject + '\n</body>');
 }
 
 /** 提取 <script> 内联块并逐块做语法编译检查（不执行）。 */
@@ -45,7 +65,20 @@ function scriptBlocks(html, name) {
 }
 
 // ── A. fullchassis ─────────────────────────────────────────────
-const fc = readHtml('dwb-pro-fullchassis.html');
+/* G9 拆分新增：薄壳结构断言（对真实磁盘文件） */
+const fcRaw = fs.readFileSync(path.join(webDir, 'dwb-pro-fullchassis.html'), 'utf8');
+ok(/<script src="js\/01-core.js"><\/script>/.test(fcRaw) &&
+   /<script src="js\/11-stages.js"><\/script>/.test(fcRaw) &&
+   fcRaw.indexOf('js/01-core.js') < fcRaw.indexOf('js/11-stages.js'),
+  'G9: 薄壳按序引用 js/ 模块（01 首位、11 末位）');
+ok(/<link rel="stylesheet" href="css\/fullchassis.css">/.test(fcRaw), 'G9: 薄壳外链 css/fullchassis.css');
+ok(!/<script>/.test(fcRaw), 'G9: 薄壳已无内联大块脚本');
+const fc = readFullchassisCombined();
+/* G12（2026-08-31）：F-44 textContent 化的配套断言——静态标签必须走 EH()，禁止 E() 直传 HTML 字符串 */
+ok(/function EH\(t,c,html\)/.test(fc), 'G12: EH 静态结构 helper 在位');
+ok(!/E\("div","chk",'<i>/.test(fc), 'G12: chkList 不再经 textContent 字面渲染标签');
+ok(!/E\("span",null,zh\+' <u>/.test(fc), 'G12: ro 读数标签不再字面渲染 <u>');
+ok(!/E\("label",null,zh\+' <u>/.test(fc), 'G12: rowSlider 标签不再字面渲染 <u>');
 scriptBlocks(fc, 'fullchassis');
 ok(fc.includes('function solveKin'), 'fullchassis: solveKin 存在');
 ok(fc.includes('function residual'), 'fullchassis: residual 存在');
@@ -110,13 +143,21 @@ ok(fc.includes('const TPHYS'), 'fullchassis: TPHYS 闭包存在');
 ok(/autocross:\{zh:"FSAE 官方 Autocross/.test(fc), 'fullchassis: FSAE Autocross 预设在位');
 ok(/skidpad8:\{zh:"FSAE 官方 8字定圆/.test(fc), 'fullchassis: FSAE 8字定圆 预设在位');
 ok(/accel:\{zh:"FSAE 官方 75m 加速/.test(fc), 'fullchassis: FSAE 75m加速 预设在位');
+ok(/shanghai:\{zh:"上海国际赛车场/.test(fc), 'fullchassis: Shanghai 5.45km 全赛道预设在位');
 ok(/respawnCircuitVehicle/.test(fc), 'fullchassis: 脱轨保险函数 respawnCircuitVehicle 在位');
 ok(/nx:\s*pt\.nx,\s*ny:\s*pt\.ny/.test(fc), 'fullchassis: CircuitPath.getLookahead 导出 nx/ny 法向矢');
 ok(/gt3_sport:/.test(fc), 'fullchassis: GT3 日常运动型 (gt3_sport) 预设在位');
 ok(/baja:\s*\{[\s\S]*?Baja Off-Road - 长行程越野型/.test(fc), 'fullchassis: Baja 长行程越野型预设在位');
+ok(/initCircuitStageEvents/.test(fc), 'fullchassis: initCircuitStageEvents 独立机位切换事件在位');
+ok(/data-cam="nose"/.test(fc) && /data-cam="wheel"/.test(fc) && /data-cam="rear"/.test(fc) && /data-cam="heli"/.test(fc),
+  'fullchassis: 8 种赛道动力学与悬架特写机位在位');
 
 // ── B. allinone ────────────────────────────────────────────────
 const ai = readHtml('dwb-pro-allinone.html');
+/* G12：allinone 同套断言 */
+ok(/function EH\(t,c,html\)/.test(ai), 'allinone: EH 静态结构 helper 在位');
+ok(!/E\("div","chk",'<i>/.test(ai), 'allinone: chkList 不再字面渲染标签');
+ok(!/E\("span",null,zh\+' <u>/.test(ai), 'allinone: ro 读数标签不再字面渲染 <u>');
 scriptBlocks(ai, 'allinone');
 ok(ai.includes('const TPHYS'), 'allinone: TPHYS 闭包存在');
 /* TPHYS 闭包可在沙箱中求值，且导出 run/makeSimContext */
@@ -157,6 +198,18 @@ ok(/F-04|rck\.lastTheta/.test(ai), 'allinone: F-04 摇臂分支最近根连续�
 ok(/autocross:\{zh:"FSAE 官方 Autocross/.test(ai), 'allinone: FSAE Autocross 预设在位');
 ok(/skidpad8:\{zh:"FSAE 官方 8字定圆/.test(ai), 'allinone: FSAE 8字定圆 预设在位');
 ok(/accel:\{zh:"FSAE 官方 75m 加速/.test(ai), 'allinone: FSAE 75m加速 预设在位');
+ok(/shanghai:\{zh:"上海国际赛车场/.test(ai), 'allinone: Shanghai 5.45km 全赛道预设在位');
+
+/* ══════════════════════════════════════════════════════════════════
+ * G14（2026-08-31）F-61：模块加载顺序 / 跨模块前向引用 / 舞台可启动检查
+ *
+ * 起因：G9 把单个 <script> 块字节级拆成 11 个 <script src> 后，
+ * 10-eval.js 顶层一条越界的 openSlopeStage 导出抛 ReferenceError，
+ * 导致该文件剩余部分静默不执行 → class StraightPath 等卡在 TDZ →
+ * 三个舞台初始化抛错、rAF 循环从未注册 → 打开即黑屏（画布一片空白）。
+ * 完整根因与检查项见 web/test/stage_boot_check.js 顶部注释。
+ ══════════════════════════════════════════════════════════════════ */
+require('./stage_boot_check')(webDir, ok, failures.push.bind(failures), { log(){} });
 
 // ── 结果 ───────────────────────────────────────────────────────
 if (failures.length) {

@@ -4,7 +4,7 @@
 > 是**刻意架构**——允许合理分叉（坐标系、模型简化层级、实现语言），禁止
 > 意外漂移。本清单是"允许的差异"的登记真源；不在本清单内的同源物理量
 > 必须一致，由 tests/test_w4_consistency.py、tests/test_tphys_parity.py 与
-> node test_dom.js 对拍钉死。
+> node web/test/test_dom.js 对拍钉死。
 
 ## 坐标系双血脉（F-71 降级为文档问题）
 
@@ -74,4 +74,4 @@
 1. 任何同源增益/角度/载荷量不得同时存在第二份独立实现（_slope 已收敛）。
 2. TPHYS ↔ transient.py：summary 五字段相对差 <5%（test_tphys_parity）。
 3. v3 设计位自洽：travel=0 必须精确返回设计 cam/toe（test_w4_consistency）。
-4. 前端 F-01..F-57 已修复项：node test_dom.js 56 项断言回访。
+4. 前端 F-01..F-57 已修复项：node web/test/test_dom.js 断言回访。

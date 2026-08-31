@@ -9,7 +9,8 @@ const path = require('path');
 const vm = require('vm');
 const { execFileSync } = require('child_process');
 
-const htmlPath = process.env.TPHYS_HTML || path.join(__dirname, 'dwb-pro-allinone.html');
+// G10（2026-08-31）：自 web/ 迁入 web/test/，被测 HTML 改指上级目录
+const htmlPath = process.env.TPHYS_HTML || path.join(__dirname, '..', 'dwb-pro-allinone.html');
 const pyBin = process.env.LABSUS_PY || 'python';
 const inPath = process.argv[2] || path.join(__dirname, 'parity_input.example.json');
 const TOL = 0.05;   // 第十一讲钦定：TPHYS Parity 相对差 < 5%
@@ -17,16 +18,30 @@ const TOL = 0.05;   // 第十一讲钦定：TPHYS Parity 相对差 < 5%
 function fail(msg) { console.error('PARITY FAIL: ' + msg); process.exit(1); }
 
 // ── 1. 抽取并执行 JS TPHYS ─────────────────────────────────────
+// G9/G10（2026-08-31）：fullchassis 已拆为薄壳 + js/ 模块，TPHYS 在 js/09-track.js。
+// 先找 HTML 内联（allinone 仍为单文件），找不到再按薄壳 <script src> 清单逐模块找。
 const html = fs.readFileSync(htmlPath, 'utf8');
 const marker = 'const TPHYS = (function(){';
-const start = html.indexOf(marker);
+let src = html;
+let start = src.indexOf(marker);
+if (start < 0) {
+  const htmlDir = path.dirname(htmlPath);
+  const srcTags = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1]);
+  for (const rel of srcTags) {
+    const p = path.join(htmlDir, rel);
+    if (!fs.existsSync(p)) continue;
+    const t = fs.readFileSync(p, 'utf8');
+    const s = t.indexOf(marker);
+    if (s >= 0) { src = t; start = s; break; }
+  }
+}
 if (start < 0) fail('TPHYS closure not found');
-let end = html.indexOf('\n})();', start);
+let end = src.indexOf('\n})();', start);
 if (end < 0) fail('TPHYS close not found');
 end += '\n})();'.length;
 const sandbox = { console: { log() {}, warn() {}, error() {} }, Math, JSON, isFinite, NaN, Infinity, Number };
 vm.createContext(sandbox);
-vm.runInContext(html.slice(start, end) + '\nthis.__TPHYS = TPHYS;', sandbox);
+vm.runInContext(src.slice(start, end) + '\nthis.__TPHYS = TPHYS;', sandbox);
 const TPHYS = sandbox.__TPHYS;
 if (!TPHYS || typeof TPHYS.run !== 'function') fail('TPHYS.run missing');
 
