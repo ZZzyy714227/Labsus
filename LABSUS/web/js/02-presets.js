@@ -5,36 +5,36 @@ const VEHICLE_PRESETS = {
     name: "🏎️ FSC 方程式 (Formula SAE)",
     wb: 1550, hcg: 270, hs: 285, mTotal: 235, mSprung: 185,
     limF: [-45, 50], limR: [-45, 50],
-    qs: { gx: 0.0, gy: 1.65, speed: 110, aeroF: 1200, aeroBias: 0.48 },
+    qs: { gx: 0.0, gy: 1.65, speed: 110, aeroF: 0, aeroBias: 0.48 },
     front: {
       arch: "pushrod",
       hp: {
         LCA_F: [175.0, 120.0, 105.0], LCA_R: [175.0, -120.0, 115.0], LBJ: [545.0, 8.0, 120.0],
         UCA_F: [225.0, 95.0, 280.0],  UCA_R: [225.0, -90.0, 285.0],  UBJ: [515.0, -14.0, 335.0],
         WC: [600.0, 0.0, 230.0],     TRO: [520.0, -100.0, 155.0],   RACK: [180.0, -110.0, 150.0],
-        STRUT_OUT: [520.0, 8.0, 150.0], RCK_AX_A: [195.0, 15.0, 285.0], RCK_AX_B: [195.0, 65.0, 283.0],
-        STRUT_IN: [215.0, 40.0, 345.0], RCK_DMP: [160.0, 42.0, 305.0], DMP_BODY: [65.0, 42.0, 160.0]
+        STRUT_OUT: [515.0, 8.0, 120.0], RCK_AX_A: [195.0, 20.0, 280.0], RCK_AX_B: [195.0, 70.0, 278.0],
+        STRUT_IN: [235.0, 42.0, 320.0], RCK_DMP: [135.0, 45.0, 300.0], DMP_BODY: [55.0, 45.0, 150.0]
       },
       strutOutAttach: "lca",
       tire: { R: 230, W: 175, rim: 127, disc: 95, label: "18.0x6.0-10 HOOSIER FSAE" },
-      cam0: -2.5, toe0: -0.10, mS: 48, mU: 12, kS: 90, kT: 180, cB: 6.5, cR: 10.5, tieTrim: 0,
+      cam0: -2.0, toe0: -0.05, mS: 48, mU: 12, kS: 105, kT: 180, cB: 6.0, cR: 11.0, tieTrim: 0,
       damperMode: "table",
       vfTable: [[-1.0,-1600],[-0.5,-950],[-0.2,-450],[-0.05,-120],[0.0,0],[0.05,150],[0.2,550],[0.5,1200],[1.0,2100]],
       bushings: { LCA_F:[2500,2500,2500], LCA_R:[2500,2500,2500], UCA_F:[3500,3500,3500], UCA_R:[3500,3500,3500] },
       arb: { d: 0, dy: 35, dz: 85, t: 0.60, G: 79000 }
     },
     rear: {
-      arch: "pullrod",
+      arch: "pushrod",
       hp: {
         LCA_F: [170.0, 120.0, 100.0], LCA_R: [170.0, -115.0, 110.0], LBJ: [530.0, 8.0, 115.0],
         UCA_F: [220.0, 95.0, 275.0],  UCA_R: [220.0, -90.0, 280.0],  UBJ: [500.0, -12.0, 325.0],
         WC: [580.0, 0.0, 235.0],     TRO: [505.0, -100.0, 150.0],   RACK: [175.0, -105.0, 145.0],
-        STRUT_OUT: [490.0, -10.0, 315.0], RCK_AX_A: [210.0, 20.0, 220.0], RCK_AX_B: [210.0, 65.0, 222.0],
-        STRUT_IN: [235.0, 40.0, 185.0], RCK_DMP: [180.0, 45.0, 205.0], DMP_BODY: [60.0, 48.0, 240.0]
+        STRUT_OUT: [500.0, 8.0, 115.0], RCK_AX_A: [190.0, 15.0, 280.0], RCK_AX_B: [190.0, 65.0, 278.0],
+        STRUT_IN: [230.0, 40.0, 320.0], RCK_DMP: [130.0, 42.0, 300.0], DMP_BODY: [50.0, 42.0, 150.0]
       },
-      strutOutAttach: "uca",
+      strutOutAttach: "lca",
       tire: { R: 235, W: 205, rim: 127, disc: 95, label: "18.0x7.5-10 HOOSIER FSAE" },
-      cam0: -1.8, toe0: 0.08, mS: 58, mU: 14, kS: 110, kT: 200, cB: 7.5, cR: 12.0, tieTrim: 0,
+      cam0: -1.5, toe0: 0.20, mS: 58, mU: 14, kS: 125, kT: 200, cB: 7.0, cR: 12.5, tieTrim: 0,
       damperMode: "table",
       vfTable: [[-1.0,-1800],[-0.5,-1100],[-0.2,-520],[-0.05,-150],[0.0,0],[0.05,180],[0.2,650],[0.5,1400],[1.0,2400]],
       bushings: { LCA_F:[2500,2500,2500], LCA_R:[2500,2500,2500], UCA_F:[3500,3500,3500], UCA_R:[3500,3500,3500] },
@@ -125,7 +125,7 @@ const VEHICLE_PRESETS = {
     name: "🏜️ SAE Baja 越野 (Baja Off-Road - 长行程越野型)",
     wb: 1400, hcg: 360, hs: 390, mTotal: 230, mSprung: 175,
     limF: [-75, 90], limR: [-75, 90],
-    qs: { gx: 0.0, gy: 1.15, speed: 65, aeroF: 80, aeroBias: 0.48 },
+    qs: { gx: 0.0, gy: 1.15, speed: 65, aeroF: 0, aeroBias: 0.48 },
     front: {
       arch: "direct",
       hp: {
@@ -137,7 +137,7 @@ const VEHICLE_PRESETS = {
       },
       strutOutAttach: "lca",
       tire: { R: 290, W: 180, rim: 127, disc: 95, label: "23x7-10 BAJA ALL-TERRAIN" },
-      cam0: -0.50, toe0: 0.15, mS: 44, mU: 18, kS: 32, kT: 120, cB: 4.5, cR: 8.5, tieTrim: 0,
+      cam0: -0.50, toe0: 0.05, mS: 44, mU: 18, kS: 36, kT: 120, cB: 5.5, cR: 9.5, tieTrim: 0,
       damperMode: "table",
       vfTable: [[-1.2,-1400],[-0.5,-900],[-0.2,-450],[-0.05,-120],[0.0,0],[0.05,180],[0.2,650],[0.5,1300],[1.2,2200]],
       bushings: { LCA_F:[1200,1200,1200], LCA_R:[1200,1200,1200], UCA_F:[1500,1500,1500], UCA_R:[1500,1500,1500] },
@@ -154,7 +154,7 @@ const VEHICLE_PRESETS = {
       },
       strutOutAttach: "lca",
       tire: { R: 290, W: 180, rim: 127, disc: 95, label: "23x7-10 BAJA ALL-TERRAIN" },
-      cam0: -0.30, toe0: 0.10, mS: 50, mU: 19, kS: 36, kT: 120, cB: 5.0, cR: 9.5, tieTrim: 0,
+      cam0: -0.30, toe0: 0.25, mS: 50, mU: 19, kS: 42, kT: 120, cB: 6.0, cR: 10.5, tieTrim: 0,
       damperMode: "table",
       vfTable: [[-1.2,-1600],[-0.5,-1050],[-0.2,-520],[-0.05,-140],[0.0,0],[0.05,200],[0.2,750],[0.5,1500],[1.2,2600]],
       bushings: { LCA_F:[1200,1200,1200], LCA_R:[1200,1200,1200], UCA_F:[1500,1500,1500], UCA_R:[1500,1500,1500] },
@@ -224,6 +224,8 @@ function loadVehiclePreset(type) {
   if(p.limF) {
     S.trMin = p.limF[0];
     S.trMax = p.limF[1];
+    S.bsD = Math.abs(p.limF[0]);
+    S.bsU = p.limF[1];
   }
   if(p.qs) {
     S.qs.gx = p.qs.gx || 0;

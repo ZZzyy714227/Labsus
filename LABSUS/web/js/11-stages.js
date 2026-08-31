@@ -162,6 +162,11 @@ class UniversalAutoPilot {
     
     if (accel_cmd > 0) {
       ctrl_throttle = Math.min(1.0, accel_cmd * 0.32) * long_avail; 
+      // Cornering Traction Control (TCS): reduce drive torque if lateral slip or turning load is high
+      const v_lat = Math.abs(state.v || 0);
+      if (v_lat > 0.5) {
+        ctrl_throttle = Math.max(0, ctrl_throttle - (v_lat - 0.5) * 1.0);
+      }
     } else {
       ctrl_brake = Math.min(1.0, -accel_cmd * 0.75) * long_avail; 
     }
@@ -194,14 +199,11 @@ class VehicleDynamics15DOF {
     this.I_pitch = this.m * (this.wb * 0.42) ** 2; 
     this.I_roll = this.m * ((this.tF + this.tR) * 0.22) ** 2;
     this.I_yaw = this.I_pitch + this.I_roll;
-    this.Iw = 1.2; // Wheel rotational inertia (kg*m^2)
+    this.Iw = Math.max(0.35, 1.2 * (this.m / 1250)); // Wheel rotational inertia (kg*m^2)
     
     this.Fz0_F = (this.m * 9.81 * (this.b / this.wb)) / 2.0;
     this.Fz0_R = (this.m * 9.81 * (this.a / this.wb)) / 2.0;
     
-    // F-32（2026-08-30）：MR 从 SIM_data.mrRefF/R（内核扫掠的真实值）取，
-    // 旧代码只读 S_config.front.mr —— 该字段在 VEHICLE_PRESETS 中不存在，
-    // 恒走 0.75/0.78 默认，Kw/Cw 与准静态求解口径脱节。
     const mrF = Math.abs(SIM_data && SIM_data.mrRefF) || Math.abs(S_config.front.mr || 0.75);
     const mrR = Math.abs(SIM_data && SIM_data.mrRefR) || Math.abs(S_config.rear.mr || 0.78);
     const kS_F = S_config.front ? S_config.front.kS : 60;
@@ -213,6 +215,12 @@ class VehicleDynamics15DOF {
     this.Kw_R = (kS_R * 1000) * (mrR * mrR);
     this.Cw_F = (cR_F * 1000) * (mrF * mrF);
     this.Cw_R = (cR_R * 1000) * (mrR * mrR);
+
+    // Roll Moment Arm: distance from sprung CG to physical roll axis
+    const h_rc_f = (SIM_data && SIM_data.rcH_F !== null && SIM_data.rcH_F !== undefined ? SIM_data.rcH_F : 50) / 1000;
+    const h_rc_r = (SIM_data && SIM_data.rcH_R !== null && SIM_data.rcH_R !== undefined ? SIM_data.rcH_R : 65) / 1000;
+    const h_roll_axis = (h_rc_f + h_rc_r) / 2;
+    this.h_roll_arm = Math.max(0.06, this.h_cg - h_roll_axis);
     
     this.state = {
       X: 0, Y: 0, Z: 0,           // World Position (m): X (Right), Y (Forward), Z (Up)
@@ -253,6 +261,7 @@ class VehicleDynamics15DOF {
     
     const Fx = (s_x / s) * (mu_x * Fz);
     const Fy = -(s_y / s) * (mu_y * Fz); // Lateral cornering force opposes lateral slip velocity
+    
     return { Fx, Fy };
   }
 
@@ -262,14 +271,16 @@ class VehicleDynamics15DOF {
     const alpha_slope = env.grade || 0;
     const cosA = Math.cos(alpha_slope);
     const sinA = Math.sin(alpha_slope);
+
+    const maxBrakeTorqueF = this.Fz0_F * 1.45 * this.ReF;
+    const maxBrakeTorqueR = this.Fz0_R * 1.45 * this.ReR;
+    const drivePowerFactor = Math.min(1.0, (this.m / 1250) * 1.2);
     
     while(t_remain > 0) {
       const dt = Math.min(MAX_SUB_DT, t_remain);
       const st = this.state;
       
       // 1. Suspension Corner Displacements (Pitch theta > 0: nose up; Roll phi > 0: right down, left up)
-      // FL: x = -tF/2, y = +a;  FR: x = +tF/2, y = +a;
-      // RL: x = -tR/2, y = -b;  RR: x = +tR/2, y = -b;
       const z_FL = st.Z + this.a * st.theta + (this.tF / 2.0) * st.phi;
       const z_FR = st.Z + this.a * st.theta - (this.tF / 2.0) * st.phi;
       const z_RL = st.Z - this.b * st.theta + (this.tR / 2.0) * st.phi;
@@ -302,8 +313,8 @@ class VehicleDynamics15DOF {
       const Fz_RR = Math.max(10.0, Fz0_R_slope + this.Kw_R * tr_RR + ((this.S.rear.damperMode==="table"&&this.S.rear.vfTable)?vfDamper(this.S.rear.vfTable,dtr_RR,this.Cw_R*dtr_RR):this.Cw_R*dtr_RR));
       
       // Anti-roll bar torque (Opposes differential wheel displacement)
-      const K_arb_F = (this.S.front && this.S.front.arb && this.S.front.arb.d > 0) ? 32000.0 : 0.0;
-      const K_arb_R = (this.S.rear && this.S.rear.arb && this.S.rear.arb.d > 0) ? 22000.0 : 0.0;
+      const K_arb_F = (this.S.front && this.S.front.arb && this.S.front.arb.d > 0) ? (this.S.front.arb.d**4 * 0.05) : 0.0;
+      const K_arb_R = (this.S.rear && this.S.rear.arb && this.S.rear.arb.d > 0) ? (this.S.rear.arb.d**4 * 0.05) : 0.0;
       const F_arb_F = K_arb_F * (tr_FL - tr_FR);
       const F_arb_R = K_arb_R * (tr_RL - tr_RR);
       
@@ -353,8 +364,8 @@ class VehicleDynamics15DOF {
         SumMz_tire += w.x * Fy_body - w.y * Fx_body;
         
         // Wheel spin acceleration
-        const T_drive = (w.axle === 'rear' ? (ctrl.throttle * 480.0) : (ctrl.throttle * 120.0));
-        const T_brake = (ctrl.brake * 1400.0) * (w.axle === 'front' ? 0.6 : 0.4);
+        const T_drive = (w.axle === 'rear' ? (ctrl.throttle * 480.0 * drivePowerFactor) : (ctrl.throttle * 120.0 * drivePowerFactor));
+        const T_brake = (ctrl.brake * (w.axle === 'front' ? maxBrakeTorqueF : maxBrakeTorqueR));
         const sgn_w = st.omega[w.id] >= 0 ? 1.0 : -1.0;
         const T_net = T_drive - T_brake * sgn_w - Fx_t * w.Re;
         const d_omega = T_net / this.Iw;
@@ -370,8 +381,11 @@ class VehicleDynamics15DOF {
       
       // Gravity component and Aero
       const v2 = st.u * st.u;
-      const F_drag = 0.5 * 1.225 * 0.35 * 1.8 * v2 * (st.u >= 0 ? 1.0 : -1.0);
-      const F_down = 0.5 * 1.225 * 1.2 * 1.8 * v2;
+      const aeroF = (this.S.qs && this.S.qs.aeroF !== undefined) ? this.S.qs.aeroF : 500;
+      const aeroRefSpeed = ((this.S.qs && this.S.qs.speed) || 160) * (1000/3600);
+      const aeroScale = v2 / (aeroRefSpeed * aeroRefSpeed + 1e-5);
+      const F_drag = 0.5 * 1.225 * 0.35 * (this.m < 400 ? 0.9 : 1.8) * v2 * (st.u >= 0 ? 1.0 : -1.0);
+      const F_down = aeroF * aeroScale;
       const F_gravity_slope = this.m * 9.81 * sinA;
       
       // Accelerations in body frame (+Y Forward, +X Right, +Z Up)
@@ -380,18 +394,12 @@ class VehicleDynamics15DOF {
       const SumFz = (F_susp.FL + F_susp.FR + F_susp.RL + F_susp.RR) - (this.m * 9.81 * cosA + F_down);
       
       // Restoring Pitch moment: front pushing up (+), rear pushing up (-), gravity on CG pushes nose up (+)
-      // F-30（2026-08-30）：制动阻力项符号修正——F_drag 是减速力，作用于质心高度
-      // 时力矩方向为**点头**（减速→车头下沉），旧公式 `(F_gravity_slope + F_drag)*h_cg`
-      // 把阻力也当作抬头项，刹车时俯仰符号错反。重力坡道分量（助力/减速都是沿
-      // 坡方向的加速度源）仍按抬头计入。
       const SumM_pitch = (F_susp.FL + F_susp.FR) * this.a - (F_susp.RL + F_susp.RR) * this.b
                        + F_gravity_slope * this.h_cg - F_drag * this.h_cg;
-      // Restoring Roll moment: left pushing up (+), right pushing up (-)
-      // F-30（2026-08-30）：侧倾力臂按轴取 tF/tR——旧公式前后都乘 tF/2，
-      // 混合胎布局（前窄后宽）后轴力臂被错算成前轴。
+      // Restoring Roll moment: left pushing up (+), right pushing up (-), overturning moment uses roll moment arm
       const SumM_roll  = (F_susp.FL - F_susp.FR) * (this.tF / 2.0)
                        + (F_susp.RL - F_susp.RR) * (this.tR / 2.0)
-                       - SumFx * this.h_cg;
+                       - SumFx * this.h_roll_arm;
       const SumM_yaw   = SumMz_tire;
       
       const d_u = SumFy / this.m - st.v * st.r - st.w * st.q;

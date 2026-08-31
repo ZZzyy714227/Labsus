@@ -437,11 +437,14 @@ class CircuitPath extends TrackPath {
       curr.ny = Math.sin(curr.heading);
     }
     
-    // 3. Curvature & Max Grip Speed (Pacejka lateral acceleration envelope with safety margin)
+    // 3. Curvature & Max Grip Speed (7-point sliding window for smooth continuous curvature)
+    const v_top_veh = (typeof window !== "undefined" && window.S && window.S.qs && window.S.qs.speed) ? (window.S.qs.speed * (1000/3600)) : 92.0;
+    const a_lat_max = Math.max(4.0, this.mu * 9.81 * 0.68); // 0.68mu safe cornering grip
+
     for(let i = 0; i < P; i++){
-      const prev = this.pts[(i - 1 + P) % P];
+      const prev = this.pts[(i - 4 + P) % P];
       const curr = this.pts[i];
-      const next = this.pts[(i + 1) % P];
+      const next = this.pts[(i + 4) % P];
       
       const ds = Math.hypot(next.x - prev.x, next.y - prev.y);
       let dpsi = next.heading - prev.heading;
@@ -449,17 +452,16 @@ class CircuitPath extends TrackPath {
       while(dpsi < -Math.PI) dpsi += 2 * Math.PI;
       
       curr.curvature = dpsi / (ds + 1e-6);
-      const a_lat_max = Math.max(4.0, this.mu * 9.81 * 0.76); // 0.76mu safe lateral grip
       const curv_v = Math.sqrt(a_lat_max / (Math.abs(curr.curvature) + 1e-5));
-      curr.v_max = Math.min(curr.v_max, curv_v);
+      curr.v_max = Math.min(v_top_veh, Math.min(curr.v_max, curv_v));
     }
     
     // 4. Backward & Forward Speed Passes (Fully-Converged Trail-Braking Profile)
-    const a_brake = 8.2; // 0.84g safe braking deceleration
+    const a_brake = 6.2; // 0.63g safe trail braking deceleration
     const a_accel = 5.0; // 0.51g acceleration
     
-    // Backward braking propagation until full circuit convergence (reaches 350m upstream before T14)
-    for(let pass = 0; pass < 45; pass++) {
+    // Backward braking propagation until full circuit convergence (60 iterations)
+    for(let pass = 0; pass < 60; pass++) {
       let maxDiff = 0;
       for(let i = P - 1; i >= 0; i--){
         const nextIdx = (i + 1) % P;
@@ -473,8 +475,8 @@ class CircuitPath extends TrackPath {
       if(maxDiff < 0.01) break;
     }
 
-    // Forward acceleration propagation
-    for(let pass = 0; pass < 45; pass++) {
+    // Forward acceleration propagation (60 iterations)
+    for(let pass = 0; pass < 60; pass++) {
       let maxDiff = 0;
       for(let i = 0; i < P; i++){
         const prevIdx = (i - 1 + P) % P;
