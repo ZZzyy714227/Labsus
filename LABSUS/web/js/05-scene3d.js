@@ -1,7 +1,7 @@
 "use strict";
 function EC(key, fallback){
   if(!S.show.entityColor) return fallback;
-  return ENTITY_COLORS[key] || fallback;
+  return (typeof ENTITY_COLORS !== 'undefined' && ENTITY_COLORS[key]) || fallback;
 }
 
 function circPts(c,ax,r,n,e1,e2){
@@ -189,6 +189,21 @@ function buildGT3Spaceframe(sc, yF, yR){
     T(R_LCA_F, N_BR, 16, sfC); T(L_LCA_F, N_BL, 16, sfC);
     T(R_UCA_R, B_FR, 14, sfC); T(L_UCA_R, B_FL, 14, sfC);
     T(R_LCA_R, F_FR, 16, sfC); T(L_LCA_R, F_FL, 16, sfC);
+
+    // GT3 前横向防倾杆主扭杆及副车架安装支座 (Front Anti-Roll Torsion Bar & Mounts)
+    if(S.show.arb && S.front.arb && S.front.arb.d > 0.5){
+      const gF = arbGeom(hF.LBJ, S.front);
+      const arbR = S.front.arb.d / 2;
+      const arbCol = EC("arb", SYSTEM_COLORS.arb);
+      const A0_R = [gF.xa, gF.ay + yF, gF.az], A0_L = [-gF.xa, gF.ay + yF, gF.az];
+      cylinder(sc, A0_L, A0_R, arbR, arbCol, 1.4, 14);
+      // 左右固定衬套与安装卡箍 (Bushing Blocks)
+      [-1, 1].forEach(s => {
+        const bMid = [s * (gF.xa - 35), gF.ay + yF, gF.az];
+        cylinder(sc, [bMid[0] - s*16, bMid[1], bMid[2]], [bMid[0] + s*16, bMid[1], bMid[2]], arbR + 6, "#2c3e50", 1.2, 10);
+        L3(sc, bMid, [bMid[0], bMid[1], Z_floor + 30], "#7a8a9e", 2.2);
+      });
+    }
   }
 
   const hR = S.rear.hp;
@@ -208,6 +223,21 @@ function buildGT3Spaceframe(sc, yF, yR){
     T(R_LCA_F, F_RR, 16, sfC); T(L_LCA_F, F_RL, 16, sfC);
     T(R_UCA_R, T_TR, 14, sfC); T(L_UCA_R, T_TL, 14, sfC);
     T(R_LCA_R, T_BR, 16, sfC); T(L_LCA_R, T_BL, 16, sfC);
+
+    // GT3 后横向防倾杆主扭杆及副车架安装支座 (Rear Anti-Roll Torsion Bar & Mounts)
+    if(S.show.arb && S.rear.arb && S.rear.arb.d > 0.5){
+      const gR = arbGeom(hR.LBJ, S.rear);
+      const arbR = S.rear.arb.d / 2;
+      const arbCol = EC("arb", SYSTEM_COLORS.arb);
+      const A0_R = [gR.xa, gR.ay + yR, gR.az], A0_L = [-gR.xa, gR.ay + yR, gR.az];
+      cylinder(sc, A0_L, A0_R, arbR, arbCol, 1.4, 14);
+      // 左右固定衬套与安装卡箍 (Bushing Blocks)
+      [-1, 1].forEach(s => {
+        const bMid = [s * (gR.xa - 35), gR.ay + yR, gR.az];
+        cylinder(sc, [bMid[0] - s*16, bMid[1], bMid[2]], [bMid[0] + s*16, bMid[1], bMid[2]], arbR + 6, "#2c3e50", 1.2, 10);
+        L3(sc, bMid, [bMid[0], bMid[1], Z_floor + 50], "#7a8a9e", 2.2);
+      });
+    }
 
     const Pylon_Y = Y_tail + 100, Pylon_Z = Z_roof + 80, Pylon_W = 280;
     const Pylon_L_Base = [-Pylon_W, Pylon_Y, Z_tail], Pylon_R_Base = [Pylon_W, Pylon_Y, Z_tail];
@@ -230,118 +260,134 @@ function buildGT3Spaceframe(sc, yF, yR){
 /* ================================ C. SAE Baja 巴哈越野赛车管架 ================================ */
 function buildBajaSpaceframe(sc, yF, yR){
   const hF = S.front.hp, hR = S.rear.hp;
-  const T = (a, b, r, col) => cylinder(sc, a, b, r||16, col||"#d23535", 1.3, 12); 
-  const D = (a, b, r, col) => cylinder(sc, a, b, r||14, col||"#a82a2a", 1.1, 10);
+  const T = (a, b, r, col) => cylinder(sc, a, b, r||14, col||"#d23535", 1.3, 12); 
+  const D = (a, b, r, col) => cylinder(sc, a, b, r||11, col||"#a82a2a", 1.1, 10);
 
-  /* G15.6（2026-08-31）：Baja 比例再次修正——基于真实设计哲学。
-     关键事实（02-presets.js baja 预设）：
-       wb  = 2790 mm（轴距）
-       WC  = [792, 0, 396] → 前轮中心 X=792 → 半轮距 792 mm，总轮距 1584 mm
-     前两版（G15-fix/G15.5）犯的错：只把"长条"改"短条"但还是窄条——
-     W_shoulder=460 → 车身总宽 920 mm ≪ 轮距 1584 mm，俯视下仍被轮距包夹。
-     前环 Y_front_hoop = yF-150 还在前轮**后方**，没有"前环在轮正前"的真实感。
+  /* 真实大学生 SAE Baja 越野车紧凑管架模型：
+     轴距 wb = 1400 mm (yF = +700, yR = -700)
+     轮心半轮距 WC.X = 620 mm (总轮距 1240 mm)
+     纯轻量化越野空间桁架，无任何多余封闭底板 */
+  const Y_front_bulk = yF + 220;   // 前舱鼻锥横隔 (机舱/前防撞盒)
+  const Y_front_hoop = yF - 240;   // 前防滚环 (方向机与踏板上方)
+  const Y_main_hoop  = yR + 240;   // 主防滚环 (车手头枕/防滚架最高点)
+  const Y_rear_bulk  = yR - 220;   // 后机舱隔框 (动力总成支架)
 
-     本次设计哲学：
-       ① 车身宽度接近轮距（肩宽 ≈ 80% 轮距，敞轮结构合理）
-       ② 前环/主环就在前后轮正前/正后方，座舱跨度 ≈ 轴距
-       ③ 前后悬仅给机器舱/后舱留 ~200mm，不向轮外悬伸
-       ④ 塔顶高度与车手头部相当（Baja 塔顶不需要拉很高） */
-  const Y_front_bulk = yF + 200;   // 前舱横隔：前轮正前方约 200mm（机器舱）
-  const Y_front_hoop = yF - 30;    // 前环：紧贴前轮正前方
-  const Y_main_hoop  = yR + 30;    // 主环：紧贴后轮正后方
-  const Y_rear_bulk  = yR - 250;   // 后舱横隔：主环后方约 250mm
+  const Z_bottom     = 150;        // 底盘纵梁基线
+  const Z_shoulder   = 450;        // 侧防撞腰线横梁 (车手手肘侧护栏)
+  const Z_nose       = 380;        // 前鼻梁高度
+  const Z_front_hoop = 920;        // 前防滚环高度
+  const Z_main_hoop  = 1040;       // 主防滚环最高点
+  const Z_rear       = 420;        // 后机架高度
 
-  const Z_bottom    = 200;
-  const Z_sim       = 560;
-  const Z_front_hoop = 830;
-  const Z_main_hoop = 960;         // 塔顶不需太高
-  const Z_nose      = 500;
-  const Z_rear      = 640;
+  const W_nose       = 140;        // 前鼻半宽 140mm (总宽 280mm)
+  const W_bottom     = 220;        // 底盘半宽 220mm (总宽 440mm)
+  const W_shoulder   = 280;        // 侧防撞肩半宽 280mm (总宽 560mm)
+  const W_roof       = 240;        // 车顶半宽 240mm (总宽 480mm)
+  const W_rear       = 180;        // 后舱半宽 180mm (总宽 360mm)
 
-  const W_bottom    = 580;         // 车身底半宽（约 73% 半轮距）
-  const W_shoulder  = 760;         // 肩半宽 ≈ 96% 半轮距——接近真实轮距
-  const W_roof      = 680;         // 车顶半宽
-  const W_nose      = 500;         // 前舱半宽
-
-  const FBM_TL = [-W_nose, Y_front_bulk, Z_nose], FBM_TR = [W_nose, Y_front_bulk, Z_nose];
-  const FBM_BL = [-W_nose, Y_front_bulk, Z_bottom], FBM_BR = [W_nose, Y_front_bulk, Z_bottom];
+  // 关键节点定义
+  const FBM_TL = [-W_nose, Y_front_bulk, Z_nose],       FBM_TR = [W_nose, Y_front_bulk, Z_nose];
+  const FBM_BL = [-W_nose, Y_front_bulk, Z_bottom],     FBM_BR = [W_nose, Y_front_bulk, Z_bottom];
   const FHO_TL = [-W_roof, Y_front_hoop, Z_front_hoop], FHO_TR = [W_roof, Y_front_hoop, Z_front_hoop];
-  const FHO_ML = [-W_shoulder, Y_front_hoop, Z_sim], FHO_MR = [W_shoulder, Y_front_hoop, Z_sim];
-  const FHO_BL = [-W_bottom, Y_front_hoop, Z_bottom], FHO_BR = [W_bottom, Y_front_hoop, Z_bottom];
-  const RHO_TL = [-W_roof, Y_main_hoop, Z_main_hoop], RHO_TR = [W_roof, Y_main_hoop, Z_main_hoop];
-  const RHO_ML = [-W_shoulder, Y_main_hoop, Z_sim], RHO_MR = [W_shoulder, Y_main_hoop, Z_sim];
-  const RHO_BL = [-W_bottom, Y_main_hoop, Z_bottom], RHO_BR = [W_bottom, Y_main_hoop, Z_bottom];
-  const RR_TL = [-W_shoulder, Y_rear_bulk, Z_rear], RR_TR = [W_shoulder, Y_rear_bulk, Z_rear];
-  const RR_BL = [-W_bottom, Y_rear_bulk, Z_bottom], RR_BR = [W_bottom, Y_rear_bulk, Z_bottom];
+  const FHO_ML = [-W_shoulder, Y_front_hoop, Z_shoulder], FHO_MR = [W_shoulder, Y_front_hoop, Z_shoulder];
+  const FHO_BL = [-W_bottom, Y_front_hoop, Z_bottom],   FHO_BR = [W_bottom, Y_front_hoop, Z_bottom];
+  const RHO_TL = [-W_roof, Y_main_hoop, Z_main_hoop],   RHO_TR = [W_roof, Y_main_hoop, Z_main_hoop];
+  const RHO_ML = [-W_shoulder, Y_main_hoop, Z_shoulder], RHO_MR = [W_shoulder, Y_main_hoop, Z_shoulder];
+  const RHO_BL = [-W_bottom, Y_main_hoop, Z_bottom],   RHO_BR = [W_bottom, Y_main_hoop, Z_bottom];
+  const RR_TL  = [-W_rear, Y_rear_bulk, Z_rear],        RR_TR  = [W_rear, Y_rear_bulk, Z_rear];
+  const RR_BL  = [-W_rear, Y_rear_bulk, Z_bottom],      RR_BR  = [W_rear, Y_rear_bulk, Z_bottom];
 
+  // 1. 主防滚环与前防滚环及车顶桁架 (Main & Front Roll Hoops + Roof)
   if(S.show.frame_main){
+    // 主防滚环 (Main Roll Hoop - RHO)
     T(RHO_BL, RHO_ML); T(RHO_BR, RHO_MR); T(RHO_ML, RHO_TL); T(RHO_MR, RHO_TR); T(RHO_TL, RHO_TR);
     D(RHO_TL, RHO_MR); D(RHO_TR, RHO_ML);
-    T(RHO_ML, RHO_MR);
+    T(RHO_ML, RHO_MR); T(RHO_BL, RHO_BR);
+
+    // 前防滚环 (Front Roll Hoop - FHO)
     T(FHO_BL, FHO_ML); T(FHO_BR, FHO_MR); T(FHO_ML, FHO_TL); T(FHO_MR, FHO_TR); T(FHO_TL, FHO_TR);
-    T(FHO_ML, FHO_MR);
+    T(FHO_ML, FHO_MR); T(FHO_BL, FHO_BR);
+
+    // 车顶纵梁与交叉斜撑 (Roof Members & Diagonals)
     T(FHO_TL, RHO_TL); T(FHO_TR, RHO_TR);
     D(FHO_TL, RHO_TR); D(FHO_TR, RHO_TL);
   }
 
+  // 2. 侧面防撞与座舱桁架 (Side Impact Structure & Lower Rails)
   if(S.show.frame_side){
+    // 前舱连接
     T(FBM_BL, FHO_BL); T(FBM_BR, FHO_BR);
     T(FBM_TL, FHO_ML); T(FBM_TR, FHO_MR);
+    D(FBM_TL, FHO_BL); D(FBM_TR, FHO_BR);
+
+    // 侧面腰梁与底梁
     T(FHO_BL, RHO_BL); T(FHO_BR, RHO_BR);
     T(FHO_ML, RHO_ML); T(FHO_MR, RHO_MR);
+
+    // 侧面 X 交叉支撑 (Side Impact Diagonals)
     D(FHO_ML, RHO_BL); D(FHO_BL, RHO_ML);
     D(FHO_MR, RHO_BR); D(FHO_BR, RHO_MR);
   }
 
+  // 3. 后防滚架斜撑与后机舱 (Rear Roll Hoop Bracing & Engine Bay)
   if(S.show.frame_rear){
+    // 后舱底梁与腰梁
     T(RHO_BL, RR_BL); T(RHO_BR, RR_BR);
     T(RHO_ML, RR_TL); T(RHO_MR, RR_TR);
+
+    // 后防滚环标准斜撑 (Rear Roll Hoop Bracing Stays)
     T(RHO_TL, RR_TL); T(RHO_TR, RR_TR);
+    D(RHO_TL, RR_BL); D(RHO_TR, RR_BR);
+
+    // 后端封闭隔框
     T(RR_TL, RR_TR); T(RR_BL, RR_BR); 
     T(RR_TL, RR_BL); T(RR_TR, RR_BR);
     D(RR_TL, RR_BR); D(RR_TR, RR_BL);
   }
 
-  /* G15.7（2026-08-31）：去除 Baja 的三个灰白色覆盖面（前鼻 + 左/右侧面围）。
-     真实 Baja SAE 是纯管架结构（参考图 U18），没有任何覆盖板面；
-     保留原座舱底板（黑色，与管架形成对比，标识驾驶员位置）。
-     GT3 一字未动。 */
-  if(S.show.frame_side){
-    PL(sc, [FHO_BL, FHO_BR, RHO_BR, RHO_BL, FHO_BL], "rgba(25,25,25,0.95)", 1, null, "rgba(25,25,25,0.95)");
-  }
-
+  // 4. 前悬架与前舱悬架安装支柱 (Front Suspension Integration)
   if(S.show.frame_front){
     const sfC = "#4a5a6a";
     T(FBM_TL, FBM_TR); T(FBM_BL, FBM_BR); T(FBM_TL, FBM_BL); T(FBM_TR, FBM_BR);
     D(FBM_TL, FBM_BR); D(FBM_TR, FBM_BL);
+
     const R_UCA_F = [hF.UCA_F[0], hF.UCA_F[1] + yF, hF.UCA_F[2]], L_UCA_F = [-hF.UCA_F[0], hF.UCA_F[1] + yF, hF.UCA_F[2]];
     const R_LCA_F = [hF.LCA_F[0], hF.LCA_F[1] + yF, hF.LCA_F[2]], L_LCA_F = [-hF.LCA_F[0], hF.LCA_F[1] + yF, hF.LCA_F[2]];
     const R_UCA_R = [hF.UCA_R[0], hF.UCA_R[1] + yF, hF.UCA_R[2]], L_UCA_R = [-hF.UCA_R[0], hF.UCA_R[1] + yF, hF.UCA_R[2]];
     const R_LCA_R = [hF.LCA_R[0], hF.LCA_R[1] + yF, hF.LCA_R[2]], L_LCA_R = [-hF.LCA_R[0], hF.LCA_R[1] + yF, hF.LCA_R[2]];
-    T(R_UCA_F, FBM_TR, 14, sfC); T(L_UCA_F, FBM_TL, 14, sfC);
-    T(R_LCA_F, FBM_BR, 16, sfC); T(L_LCA_F, FBM_BL, 16, sfC);
-    T(R_UCA_R, FHO_MR, 14, sfC); T(L_UCA_R, FHO_ML, 14, sfC);
-    T(R_LCA_R, FHO_BR, 16, sfC); T(L_LCA_R, FHO_BL, 16, sfC);
+
+    T(R_UCA_F, FBM_TR, 12, sfC); T(L_UCA_F, FBM_TL, 12, sfC);
+    T(R_LCA_F, FBM_BR, 14, sfC); T(L_LCA_F, FBM_BL, 14, sfC);
+    T(R_UCA_R, FHO_MR, 12, sfC); T(L_UCA_R, FHO_ML, 12, sfC);
+    T(R_LCA_R, FHO_BR, 14, sfC); T(L_LCA_R, FHO_BL, 14, sfC);
+
+    // 直立减振器顶部塔顶支架 (Front Shock Towers)
     const R_DMP_F = [hF.DMP_BODY[0], hF.DMP_BODY[1] + yF, hF.DMP_BODY[2]];
     const L_DMP_F = [-hF.DMP_BODY[0], hF.DMP_BODY[1] + yF, hF.DMP_BODY[2]];
-    T(R_DMP_F, FHO_TR, 16, sfC); T(L_DMP_F, FHO_TL, 16, sfC);
-    T(R_DMP_F, L_DMP_F, 18, sfC);
+    T(R_DMP_F, FHO_TR, 14, sfC); T(L_DMP_F, FHO_TL, 14, sfC);
+    T(R_DMP_F, FBM_TR, 14, sfC); T(L_DMP_F, FBM_TL, 14, sfC);
+    T(R_DMP_F, L_DMP_F, 16, sfC);
   }
 
+  // 5. 后悬架与后机舱悬架安装支柱 (Rear Suspension Integration)
   if(S.show.frame_rear){
     const sfC = "#4a5a6a";
     const R_UCA_F = [hR.UCA_F[0], hR.UCA_F[1] + yR, hR.UCA_F[2]], L_UCA_F = [-hR.UCA_F[0], hR.UCA_F[1] + yR, hR.UCA_F[2]];
     const R_LCA_F = [hR.LCA_F[0], hR.LCA_F[1] + yR, hR.LCA_F[2]], L_LCA_F = [-hR.LCA_F[0], hR.LCA_F[1] + yR, hR.LCA_F[2]];
     const R_UCA_R = [hR.UCA_R[0], hR.UCA_R[1] + yR, hR.UCA_R[2]], L_UCA_R = [-hR.UCA_R[0], hR.UCA_R[1] + yR, hR.UCA_R[2]];
     const R_LCA_R = [hR.LCA_R[0], hR.LCA_R[1] + yR, hR.LCA_R[2]], L_LCA_R = [-hR.LCA_R[0], hR.LCA_R[1] + yR, hR.LCA_R[2]];
-    T(R_UCA_F, RHO_MR, 14, sfC); T(L_UCA_F, RHO_ML, 14, sfC);
-    T(R_LCA_F, RHO_BR, 16, sfC); T(L_LCA_F, RHO_BL, 16, sfC);
-    T(R_UCA_R, RR_TR, 14, sfC); T(L_UCA_R, RR_TL, 14, sfC);
-    T(R_LCA_R, RR_BR, 16, sfC); T(L_LCA_R, RR_BL, 16, sfC);
+
+    T(R_UCA_F, RHO_MR, 12, sfC); T(L_UCA_F, RHO_ML, 12, sfC);
+    T(R_LCA_F, RHO_BL, 14, sfC); T(L_LCA_F, RHO_BL, 14, sfC);
+    T(R_UCA_R, RR_TR, 12, sfC);  T(L_UCA_R, RR_TL, 12, sfC);
+    T(R_LCA_R, RR_BR, 14, sfC);  T(L_LCA_R, RR_BL, 14, sfC);
+
+    // 后直立减振器顶部塔顶支架 (Rear Shock Towers)
     const R_DMP_R = [hR.DMP_BODY[0], hR.DMP_BODY[1] + yR, hR.DMP_BODY[2]];
     const L_DMP_R = [-hR.DMP_BODY[0], hR.DMP_BODY[1] + yR, hR.DMP_BODY[2]];
-    T(R_DMP_R, RHO_TR, 16, sfC); T(L_DMP_R, RHO_TL, 16, sfC);
-    T(R_DMP_R, L_DMP_R, 18, sfC);
+    T(R_DMP_R, RHO_TR, 14, sfC); T(L_DMP_R, RHO_TL, 14, sfC);
+    T(R_DMP_R, RR_TR, 14, sfC);  T(L_DMP_R, RR_TL, 14, sfC);
+    T(R_DMP_R, L_DMP_R, 16, sfC);
   }
 }
 
@@ -351,23 +397,23 @@ function buildDecoupledImpactSpaceframe(sc, yF, yR){
 
   const T = (a, b, r, col) => cylinder(sc, a, b, r||13, EC(col===SYSTEM_COLORS.frameSec?"frameSec":(col===SYSTEM_COLORS.frameDiag?"frameDiag":"frameMain"), col||SYSTEM_COLORS.frameMain), 1.2, 10);
   const D = (a, b, r, col) => cylinder(sc, a, b, r||10, EC("frameDiag", col||SYSTEM_COLORS.frameDiag), 1.1, 8);
+  const WING = (a, b, r, col) => cylinder(sc, a, b, r||12, col||"#2c3e50", 1.3, 10);
 
   // =========================================================================
-  // 1. 前防撞区与前隔框 (Decoupled & Fixed Front Impact Cell)
-  // 尺寸与位置绝对固定，完全解耦，不随任何悬架硬点改变！
+  // 1. 前防撞区与前隔框 (Decoupled & Fixed Front Impact Cell - FSC 真实比例)
   // =========================================================================
-  const FBH_Y = yF + 270;
-  const FBH_W_Top = 155;
-  const FBH_W_Bot = 170;
-  const FBH_Z_Top = 310;
-  const FBH_Z_Bot = 95;
+  const FBH_Y = yF + 250;
+  const FBH_W_Top = 130;
+  const FBH_W_Bot = 145;
+  const FBH_Z_Top = 280;
+  const FBH_Z_Bot = 75;
 
   const FBH_TL = [-FBH_W_Top, FBH_Y, FBH_Z_Top], FBH_TR = [FBH_W_Top, FBH_Y, FBH_Z_Top];
   const FBH_BL = [-FBH_W_Bot, FBH_Y, FBH_Z_Bot], FBH_BR = [FBH_W_Bot, FBH_Y, FBH_Z_Bot];
 
-  const IA_Y = FBH_Y + 140;
-  const IA_W_Top = 110, IA_W_Bot = 120;
-  const IA_Z_Top = 270, IA_Z_Bot = 115;
+  const IA_Y = FBH_Y + 200;
+  const IA_W_Top = 90, IA_W_Bot = 100;
+  const IA_Z_Top = 230, IA_Z_Bot = 90;
   const IA_TL = [-IA_W_Top, IA_Y, IA_Z_Top], IA_TR = [IA_W_Top, IA_Y, IA_Z_Top];
   const IA_BL = [-IA_W_Bot, IA_Y, IA_Z_Bot], IA_BR = [IA_W_Bot, IA_Y, IA_Z_Bot];
 
@@ -385,35 +431,35 @@ function buildDecoupledImpactSpaceframe(sc, yF, yR){
   }
 
   // =========================================================================
-  // 2. 定形独立乘员舱 (Fixed Cockpit Cell - 侧向高度提升 10%)
+  // 2. 定形独立乘员舱 (Fixed Cockpit Cell - 紧凑方程式单座布局)
   // =========================================================================
-  const FH_Y = yF - 260;
-  const FH_Z_Top = 640;
-  const FH_Z_Mid = 400;
-  const FH_Z_Bot = 80;
-  const FH_W = 260;
+  const FH_Y = yF - 220;
+  const FH_Z_Top = 620;
+  const FH_Z_Mid = 340;
+  const FH_Z_Bot = 65;
+  const FH_W = 200;
 
-  const FH_TopL = [-190, FH_Y, FH_Z_Top], FH_TopR = [190, FH_Y, FH_Z_Top];
+  const FH_TopL = [-150, FH_Y, FH_Z_Top], FH_TopR = [150, FH_Y, FH_Z_Top];
   const FH_ML   = [-FH_W, FH_Y, FH_Z_Mid], FH_MR   = [FH_W, FH_Y, FH_Z_Mid];
   const FH_BL   = [-FH_W, FH_Y, FH_Z_Bot], FH_BR   = [FH_W, FH_Y, FH_Z_Bot];
 
-  const CC_Y = (yF + yR)/2 + 50;
-  const CC_Z_Top = 420;
-  const CC_Z_Bot = 75;
-  const CC_W = 320;
+  const CC_Y = (yF + yR)/2 + 40;
+  const CC_Z_Top = 360;
+  const CC_Z_Bot = 60;
+  const CC_W = 250;
 
   const CC_TL = [-CC_W, CC_Y, CC_Z_Top], CC_TR = [CC_W, CC_Y, CC_Z_Top];
   const CC_BL = [-CC_W, CC_Y, CC_Z_Bot], CC_BR = [CC_W, CC_Y, CC_Z_Bot];
 
-  const MH_Y = yR + 580;
-  const MH_Z_Apex = 1200;
-  const MH_Z_Top = 1140;
-  const MH_Z_Mid = 440;
-  const MH_Z_Bot = 70;
-  const MH_W = 340;
+  const MH_Y = yR + 520;
+  const MH_Z_Apex = 1020;
+  const MH_Z_Top = 970;
+  const MH_Z_Mid = 380;
+  const MH_Z_Bot = 55;
+  const MH_W = 260;
 
   const MH_Apex = [0, MH_Y, MH_Z_Apex];
-  const MH_TopL = [-180, MH_Y, MH_Z_Top], MH_TopR = [180, MH_Y, MH_Z_Top];
+  const MH_TopL = [-150, MH_Y, MH_Z_Top], MH_TopR = [150, MH_Y, MH_Z_Top];
   const MH_ML   = [-MH_W, MH_Y, MH_Z_Mid], MH_MR   = [MH_W, MH_Y, MH_Z_Mid];
   const MH_BL   = [-MH_W, MH_Y, MH_Z_Bot], MH_BR   = [MH_W, MH_Y, MH_Z_Bot];
 
@@ -447,17 +493,17 @@ function buildDecoupledImpactSpaceframe(sc, yF, yR){
   }
 
   // =========================================================================
-  // 3. 后防撞尾框 (Decoupled & Fixed Rear Impact Structure) - 完全固定
+  // 3. 后防撞尾框与后机舱 (Decoupled & Fixed Rear Impact Structure)
   // =========================================================================
-  const RSB2_Y = yR - 180;
-  const RSB2_W_Top = 160, RSB2_W_Bot = 175;
-  const RSB2_Z_Top = 320, RSB2_Z_Bot = 90;
+  const RSB2_Y = yR - 160;
+  const RSB2_W_Top = 135, RSB2_W_Bot = 145;
+  const RSB2_Z_Top = 280, RSB2_Z_Bot = 70;
   const RSB2_TL = [-RSB2_W_Top, RSB2_Y, RSB2_Z_Top], RSB2_TR = [RSB2_W_Top, RSB2_Y, RSB2_Z_Top];
   const RSB2_BL = [-RSB2_W_Bot, RSB2_Y, RSB2_Z_Bot], RSB2_BR = [RSB2_W_Bot, RSB2_Y, RSB2_Z_Bot];
 
-  const REF_Y = RSB2_Y - 130;
-  const REF_W_Top = 110, REF_W_Bot = 120;
-  const REF_Z_Top = 280, REF_Z_Bot = 115;
+  const REF_Y = RSB2_Y - 120;
+  const REF_W_Top = 95, REF_W_Bot = 105;
+  const REF_Z_Top = 240, REF_Z_Bot = 85;
   const REF_TL = [-REF_W_Top, REF_Y, REF_Z_Top], REF_TR = [REF_W_Top, REF_Y, REF_Z_Top];
   const REF_BL = [-REF_W_Bot, REF_Y, REF_Z_Bot], REF_BR = [REF_W_Bot, REF_Y, REF_Z_Bot];
 
@@ -622,8 +668,8 @@ function buildFormulaCentralSteering(sc, yF){
   }
 
   const pPinionTop = [0, rackY + 25, rackZ + 45];
-  const pUJoint = [0, yF - 260, rackZ + 200];
-  const pWheelCenter = [0, yF - 460, rackZ + 360];
+  const pUJoint = [0, yF - 220, rackZ + 160];
+  const pWheelCenter = [0, yF - 380, rackZ + 260];
 
   cylinder(sc, pPinionTop, pUJoint, 11, EC("cols",SYSTEM_COLORS.colShaft), 1.3, 10);
   box3D(sc, pUJoint, [22, 22, 22], EC("ujoint",SYSTEM_COLORS.uJointGold), 1.5, "rgba(241,196,15,0.45)");
@@ -693,19 +739,19 @@ function buildFormulaCentralSteering(sc, yF){
 
 /* 4. 制动系：中置双回路总泵、踏板平衡杆与管网 */
 function buildBrakeHydraulicSystem(sc, yF, yR){
-  const pMC_L = [-40, yF + 120, S.front.hp.LCA_F[2] + 45];
-  const pMC_R = [40,  yF + 120, S.front.hp.LCA_F[2] + 45];
-  const pBalanceBar = [0, yF + 190, S.front.hp.LCA_F[2] + 45];
+  const pMC_L = [-35, yF + 100, S.front.hp.LCA_F[2] + 40];
+  const pMC_R = [35,  yF + 100, S.front.hp.LCA_F[2] + 40];
+  const pBalanceBar = [0, yF + 160, S.front.hp.LCA_F[2] + 40];
 
-  cylinder(sc, [-60, yF + 190, S.front.hp.LCA_F[2] + 45], [60, yF + 190, S.front.hp.LCA_F[2] + 45], 10, EC("pedal",SYSTEM_COLORS.colShaft), 1.2, 8);
-  cylinder(sc, pBalanceBar, [0, yF + 190, S.front.hp.LCA_F[2] + 160], 12, EC("pedal",SYSTEM_COLORS.colShaft), 1.3, 10);
-  box3D(sc, [0, yF + 190, S.front.hp.LCA_F[2] + 160], [45, 20, 55], EC("pedal",SYSTEM_COLORS.swGrip), 1.2, "rgba(20,25,30,0.8)");
+  cylinder(sc, [-50, yF + 160, S.front.hp.LCA_F[2] + 40], [50, yF + 160, S.front.hp.LCA_F[2] + 40], 10, EC("pedal",SYSTEM_COLORS.colShaft), 1.2, 8);
+  cylinder(sc, pBalanceBar, [0, yF + 160, S.front.hp.LCA_F[2] + 140], 12, EC("pedal",SYSTEM_COLORS.colShaft), 1.3, 10);
+  box3D(sc, [0, yF + 160, S.front.hp.LCA_F[2] + 140], [40, 18, 50], EC("pedal",SYSTEM_COLORS.swGrip), 1.2, "rgba(20,25,30,0.8)");
 
-  cylinder(sc, add(pBalanceBar,[-40,0,0]), pMC_L, 16, EC("masterCyl",SYSTEM_COLORS.masterCyl), 1.2, 10, "rgba(217,162,56,0.4)");
-  cylinder(sc, add(pBalanceBar,[40,0,0]),  pMC_R, 16, EC("masterCyl",SYSTEM_COLORS.masterCyl), 1.2, 10, "rgba(217,162,56,0.4)");
+  cylinder(sc, add(pBalanceBar,[-35,0,0]), pMC_L, 15, EC("masterCyl",SYSTEM_COLORS.masterCyl), 1.2, 10, "rgba(217,162,56,0.4)");
+  cylinder(sc, add(pBalanceBar,[35,0,0]),  pMC_R, 15, EC("masterCyl",SYSTEM_COLORS.masterCyl), 1.2, 10, "rgba(217,162,56,0.4)");
   
-  box3D(sc, add(pMC_L, [0, -30, 45]), [36, 48, 32], EC("masterCyl",SYSTEM_COLORS.masterCyl), 1.1, "rgba(217,162,56,0.45)");
-  box3D(sc, add(pMC_R, [0, -30, 45]), [36, 48, 32], EC("masterCyl",SYSTEM_COLORS.masterCyl), 1.1, "rgba(217,162,56,0.45)");
+  box3D(sc, add(pMC_L, [0, -25, 40]), [32, 42, 28], EC("masterCyl",SYSTEM_COLORS.masterCyl), 1.1, "rgba(217,162,56,0.45)");
+  box3D(sc, add(pMC_R, [0, -25, 40]), [32, 42, 28], EC("masterCyl",SYSTEM_COLORS.masterCyl), 1.1, "rgba(217,162,56,0.45)");
 
   if(S.show.brake_hyd){
     const hF = S.front.hp, hR = S.rear.hp;
@@ -756,13 +802,17 @@ function addAxleAssemblyPRO(sc, M, m, sx, yOff, axis){
     if(S.show.elastic){
       // 传统双叉臂直立外置减振弹簧一体柱 (Direct Coilover Damper Strut)
       const u = nrm(sub(DMP_B, ST_O)), L = dst(ST_O, DMP_B);
+      const isBaja = S.vehicleType === "baja";
+      const sprR = isBaja ? 25 : 36;
+      const bodyR = isBaja ? 15 : 20;
+      const sprTurns = isBaja ? 8.5 : 7.5;
       const bodyA = add(ST_O, mul(u, L * 0.06)), bodyB = add(ST_O, mul(u, L * 0.54));
-      cylinder(sc, bodyA, bodyB, 22, EC("damper", SYSTEM_COLORS.damper), 1.2, 14);
+      cylinder(sc, bodyA, bodyB, bodyR, EC("damper", SYSTEM_COLORS.damper), 1.2, 14);
       L3(sc, bodyB, DMP_B, EC("damper", SYSTEM_COLORS.damper), 2.2);
-      cylinder(sc, add(ST_O, mul(u, -6)), bodyA, 14, EC("damper", SYSTEM_COLORS.damper), 1, 10);
-      PL(sc, springPts(add(ST_O, mul(u, L * 0.08)), add(DMP_B, mul(u, -L * 0.05)), 46, 7.5, 140), EC("spring", SYSTEM_COLORS.spring), 2.0);
-      PL(sc, circPts(add(ST_O, mul(u, L * 0.08)), u, 54, 20), EC("spring", SYSTEM_COLORS.spring), 1.2);
-      PL(sc, circPts(add(DMP_B, mul(u, -L * 0.05)), u, 54, 20), EC("spring", SYSTEM_COLORS.spring), 1.2);
+      cylinder(sc, add(ST_O, mul(u, -6)), bodyA, bodyR * 0.65, EC("damper", SYSTEM_COLORS.damper), 1, 10);
+      PL(sc, springPts(add(ST_O, mul(u, L * 0.08)), add(DMP_B, mul(u, -L * 0.05)), sprR, sprTurns, 140), EC("spring", SYSTEM_COLORS.spring), 2.0);
+      PL(sc, circPts(add(ST_O, mul(u, L * 0.08)), u, sprR + 5, 20), EC("spring", SYSTEM_COLORS.spring), 1.2);
+      PL(sc, circPts(add(DMP_B, mul(u, -L * 0.05)), u, sprR + 5, 20), EC("spring", SYSTEM_COLORS.spring), 1.2);
     }
   } else {
     if(S.show.rocker){
@@ -775,8 +825,11 @@ function addAxleAssemblyPRO(sc, M, m, sx, yOff, axis){
 
     if(S.show.elastic){
       const u=nrm(sub(DMP_B,RK_D)), L=dst(RK_D,DMP_B);
-      cylinder(sc,add(RK_D,mul(u,L*0.06)),add(RK_D,mul(u,L*0.54)),19,EC("damper",SYSTEM_COLORS.damper),1,12);
-      PL(sc,springPts(add(RK_D,mul(u,L*0.08)),add(DMP_B,mul(u,-L*0.05)),36,7.5,130),EC("spring",SYSTEM_COLORS.spring),1.8);
+      const isFormula = S.vehicleType === "formula";
+      const sprR = isFormula ? 21 : 32;
+      const bodyR = isFormula ? 14 : 19;
+      cylinder(sc,add(RK_D,mul(u,L*0.06)),add(RK_D,mul(u,L*0.54)),bodyR,EC("damper",SYSTEM_COLORS.damper),1,12);
+      PL(sc,springPts(add(RK_D,mul(u,L*0.08)),add(DMP_B,mul(u,-L*0.05)),sprR,7.5,130),EC("spring",SYSTEM_COLORS.spring),1.8);
     }
   }
 
@@ -830,14 +883,15 @@ function addAxleAssemblyPRO(sc, M, m, sx, yOff, axis){
       L3(sc,add(ro,mul(ax,-6)),add(ro,o),EC("rim",SYSTEM_COLORS.rim),1.5);}
   }
 
-  // ARB merged from legacy addInstance
-  if(S.show.arb && state.arb.d > 0.5){
-    const g = arbGeom(state.hp.LBJ, state);
+  // 防倾杆力臂与端部连杆 (Anti-Roll Bar Arm & Drop Link)
+  if(S.show.arb && state.arb && state.arb.d > 0.5){
+    const lbjPos = m ? m.lbj : state.hp.LBJ;
+    const g = arbGeom(lbjPos, state);
     const A0 = T([g.xa, g.ay, g.az]), E = T(g.E), Pd = T(g.P);
-    L3(sc, A0, E, EC("arb",SYSTEM_COLORS.arb), 3.0);
-    cylinder(sc, E, Pd, 7, EC("arb",SYSTEM_COLORS.arb), 1, 8);
-    PL(sc, circPts(Pd, [1,0,0], 9, 10), EC("arb",SYSTEM_COLORS.arb), 1);
-    PL(sc, circPts(E, [1,0,0], 9, 10), EC("arb",SYSTEM_COLORS.arb), 1);
+    L3(sc, A0, E, EC("arb", SYSTEM_COLORS.arb), 3.2);
+    cylinder(sc, E, Pd, 7.5, EC("arb", SYSTEM_COLORS.arb), 1.2, 10);
+    PL(sc, circPts(Pd, [1, 0, 0], 9.5, 12), EC("arb", SYSTEM_COLORS.arb), 1.2);
+    PL(sc, circPts(E, [1, 0, 0], 9.5, 12), EC("arb", SYSTEM_COLORS.arb), 1.2);
   }
 
   if(axis==='front'){

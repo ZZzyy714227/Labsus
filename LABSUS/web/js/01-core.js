@@ -1,5 +1,4 @@
 "use strict";
-"use strict";
 
 /* ================================ 0. 基础数学库 ================================ */
 const abs=Math.abs, sqrt=Math.sqrt, sin=Math.sin, cos=Math.cos, atan2=Math.atan2, acos=Math.acos, PI=Math.PI;
