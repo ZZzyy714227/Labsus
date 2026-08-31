@@ -5,6 +5,15 @@ const UI={hover:null,selHP:null,drag:null,ro:{},sync:[],plots:[],syncBase:null};
 
 function E(t,c,h){const e=document.createElement(t);if(c)e.className=c;if(h!==undefined)e.textContent=h;return e;} /* F-44（2026-08-30）：innerHTML→textContent，引擎响应入 DOM 不再有 XSS 面 */
 function EH(t,c,html){const e=document.createElement(t);if(c)e.className=c;if(html!==undefined)e.innerHTML=html;return e;} /* G12（2026-08-31）：静态 UI 结构专用 innerHTML（代码内常量，非引擎数据）。F-44 的 E() 已改 textContent，含 <b>/<u>/<i> 静态标签的调用点必须走本函数，否则标签字面渲染成"乱码"。 */
+/* G12：分组分隔线——用灰色小号字 + hairline 隔开面板内的逻辑组 */
+function groupDiv(host,label){
+  const d=E("div");
+  d.style.cssText="display:flex;align-items:center;gap:8px;padding:6px 12px 2px;color:var(--ink-3);font:500 8px/1 var(--font-ui);letter-spacing:.16em;text-transform:uppercase;user-select:none";
+  const l=E("span"); l.style.cssText="flex:1;height:1px;background:var(--hairline)";
+  const r=E("span"); r.style.cssText="flex:1;height:1px;background:var(--hairline)";
+  d.appendChild(l);d.appendChild(document.createTextNode(label));d.appendChild(r);
+  host.appendChild(d);
+}
 function sec(host,zh,en,col,cls){
   const s=E("div","sec"+(col?" col":""));
   /* F-44/F-56：标题含语义 span（zh 高亮 + 折叠箭头 tg）——E() 已改 textContent，
@@ -96,27 +105,16 @@ function buildVehiclePresetSection(host){
 function buildLeft(){
   const host=document.getElementById("lp");
   host.innerHTML="";
-  buildVehiclePresetSection(host);
-  buildEnginePanel(host);
-  buildChassisPanel(host);
-  buildTrackPanel(host);
-  buildPersistencePanel(host);
-  buildSystemShowPanel(host);
 
-  let b=sec(host,"悬架底盘模块编辑","CHASSIS EDITOR",true);
+  /* ═══════════════ GROUP 1: CORE — 车型 · 轴选择 · 几何输入 ═══════════════ */
+  groupDiv(host,"CORE");
+  buildVehiclePresetSection(host);
+
+  let b=sec(host,"悬架底盘模块编辑","CHASSIS EDITOR");
   rowBtns(b,[["编辑前悬架 (FRONT)",()=>{S.axis='front'; UI.sync.forEach(f=>f());},()=>S.axis==='front'],
              ["编辑后悬架 (REAR)",()=>{S.axis='rear'; UI.sync.forEach(f=>f());},()=>S.axis==='rear']]);
 
-  b=sec(host,"多体求解模式控制","SOLVER CONTROLS",true,"grn");
-  rowBtns(b,[["运动学 KIN",()=>{S.mode="kin";},()=>S.mode==="kin"],
-             ["4-Post 台架 RIG",()=>{S.mode="rig";S.simT=0;},()=>S.mode==="rig"],
-             ["准静态操稳 QS",()=>{S.mode="quasi";},()=>S.mode==="quasi"]]);
-  rowBtns(b,[["运行 / 暂停",()=>{S.play=!S.play;},()=>S.play],
-             ["复位 RESET",()=>{S.travel=0;S.roll=0;S.rack=0;rebuild();}]]);
-  rowSlider(b,"轮跳幅值","TRAVEL AMP","mm",0,75,1,()=>S.excA,v=>S.excA=v,0);
-  rowSlider(b,"轮跳频率","FREQ","Hz",0.05,1.5,0.01,()=>S.excF,v=>S.excF=v,2);
-
-  b=sec(host,"几何与转向输入 (整车关联)","INPUT DRIVERS");
+  b=sec(host,"几何与转向输入","INPUT DRIVERS");
   rowSlider(b,"轮心垂向行程","WHEEL TRAVEL","mm",()=>S.trMin,()=>S.trMax,0.5,()=>S.travel,
     v=>{S.travel=v;S.exc="off";},1);
   rowSlider(b,"车身侧倾角","BODY ROLL","°",-5,5,0.1,()=>S.roll,v=>S.roll=v,2);
@@ -125,19 +123,19 @@ function buildLeft(){
   rowSlider(b,"单侧前束微调","TOE TRIM","mm",-15,15,0.1,()=>S[S.axis].tieTrim,
     v=>{S[S.axis].tieTrim=v;rebuild();},2);
 
-  b=sec(host,"Baseline 基准快照比对","BASELINE SNAPSHOT",true,"amb");
-  rowBtns(b,[["快照基准线 SAVE",()=>{takeBaselineSnapshot();buildRight();},null,"hl"],
-             ["清除基准线 CLEAR",()=>{clearBaselineSnapshot();buildRight();},null,"danger"]]);
+  /* ═══════════════ GROUP 2: TUNING — 求解 · 弹簧 · 阻尼 · ARB · 操稳 ═══════════════ */
+  groupDiv(host,"TUNING");
 
-  b=sec(host,"准静态操稳工况输入","QUASI-STATIC CONDITIONS",true,"amb");
-  rowSlider(b,"侧向加速度","LATERAL ACC","g",-1.8,1.8,0.05,()=>S.qs.gy,v=>{S.qs.gy=v;simulate(0.016);},2);
-  rowSlider(b,"纵向加速度","LONG ACC","g",-1.5,1.5,0.05,()=>S.qs.gx,v=>{S.qs.gx=v;simulate(0.016);},2);
-  rowSlider(b,"气动总下压力","AERO DOWNFORCE","N",0,5000,50,()=>S.qs.aeroF,v=>{S.qs.aeroF=v;simulate(0.016);},0);
-  rowSlider(b,"气动前轴分配比","AERO FRONT BIAS","-",0.2,0.8,0.01,()=>S.qs.aeroBias,v=>{S.qs.aeroBias=v;simulate(0.016);},2);
-  rowSlider(b,"整车总质量","TOTAL MASS","kg",800,2200,10,()=>S.mTotal,v=>{S.mTotal=v;refreshDerived(false);},0);
-  rowSlider(b,"簧载总质量","SPRUNG MASS","kg",700,2000,10,()=>S.mSprung,v=>{S.mSprung=v;refreshDerived(false);},0);
+  b=sec(host,"多体求解模式","SOLVER CONTROLS",false,"grn");
+  rowBtns(b,[["运动学 KIN",()=>{S.mode="kin";},()=>S.mode==="kin"],
+             ["4-Post 台架 RIG",()=>{S.mode="rig";S.simT=0;},()=>S.mode==="rig"],
+             ["准静态操稳 QS",()=>{S.mode="quasi";},()=>S.mode==="quasi"]]);
+  rowBtns(b,[["运行 / 暂停",()=>{S.play=!S.play;},()=>S.play],
+             ["复位 RESET",()=>{S.travel=0;S.roll=0;S.rack=0;rebuild();}]]);
+  rowSlider(b,"轮跳幅值","TRAVEL AMP","mm",0,75,1,()=>S.excA,v=>S.excA=v,0);
+  rowSlider(b,"轮跳频率","FREQ","Hz",0.05,1.5,0.01,()=>S.excF,v=>S.excF=v,2);
 
-  b=sec(host,"内置弹性与阻尼元件","INBOARD SPRINGS & DAMPERS",true);
+  b=sec(host,"内置弹性与阻尼元件","SPRINGS & DAMPERS",false);
   rowSlider(b,"主弹簧刚度","SPRING RATE","N/mm",40,300,5,()=>S[S.axis].kS,v=>{S[S.axis].kS=v;refreshDerived(false);},0);
   rowSlider(b,"压缩阻尼系数","BUMP DAMP","N·s/mm",1,30,0.5,()=>S[S.axis].cB,v=>S[S.axis].cB=v,1);
   rowSlider(b,"复原阻尼系数","REB DAMP","N·s/mm",1,40,0.5,()=>S[S.axis].cR,v=>S[S.axis].cR=v,1);
@@ -150,7 +148,28 @@ function buildLeft(){
   rowSlider(b,"稳定杆纵向偏置","ARB OFFSET Y","mm",-60,180,2,()=>S[S.axis].arb.dy,v=>{S[S.axis].arb.dy=v;SIM.dirtySweep=true;},0);
   rowSlider(b,"稳定杆高度偏置","ARB OFFSET Z","mm",40,300,2,()=>S[S.axis].arb.dz,v=>{S[S.axis].arb.dz=v;SIM.dirtySweep=true;},0);
 
-  b=sec(host,"4-Post 台架路面激励","4-POST RIG ROAD PROFILE",true);
+  b=sec(host,"准静态操稳工况输入","QUASI-STATIC",true,"amb");
+  rowSlider(b,"侧向加速度","LATERAL ACC","g",-1.8,1.8,0.05,()=>S.qs.gy,v=>{S.qs.gy=v;simulate(0.016);},2);
+  rowSlider(b,"纵向加速度","LONG ACC","g",-1.5,1.5,0.05,()=>S.qs.gx,v=>{S.qs.gx=v;simulate(0.016);},2);
+  rowSlider(b,"气动总下压力","AERO DOWNFORCE","N",0,5000,50,()=>S.qs.aeroF,v=>{S.qs.aeroF=v;simulate(0.016);},0);
+  rowSlider(b,"气动前轴分配比","AERO FRONT BIAS","-",0.2,0.8,0.01,()=>S.qs.aeroBias,v=>{S.qs.aeroBias=v;simulate(0.016);},2);
+  rowSlider(b,"整车总质量","TOTAL MASS","kg",800,2200,10,()=>S.mTotal,v=>{S.mTotal=v;refreshDerived(false);},0);
+  rowSlider(b,"簧载总质量","SPRUNG MASS","kg",700,2000,10,()=>S.mSprung,v=>{S.mSprung=v;refreshDerived(false);},0);
+
+  b=sec(host,"Baseline 基准快照","BASELINE SNAPSHOT",true,"amb");
+  rowBtns(b,[["快照基准线 SAVE",()=>{takeBaselineSnapshot();buildRight();},null,"hl"],
+             ["清除基准线 CLEAR",()=>{clearBaselineSnapshot();buildRight();},null,"danger"]]);
+
+  /* ═══════════════ GROUP 3: ADVANCED — 引擎 · 台架 · 硬点 · 图层 ═══════════════ */
+  groupDiv(host,"ADVANCED");
+
+  buildEnginePanel(host);
+  buildChassisPanel(host);
+  buildTrackPanel(host);
+  buildPersistencePanel(host);
+  buildSystemShowPanel(host);
+
+  b=sec(host,"4-Post 台架路面激励","4-POST RIG PROFILE",true);
   const roadSel=E("div","ctl");
   roadSel.innerHTML='<label>路面输入信号 <u>ROAD INPUT</u></label>';
   const sel=E("select");
@@ -163,7 +182,7 @@ function buildLeft(){
   rowSlider(b,"路面位移幅值","ROAD AMP","mm",1,40,1,()=>S.rA,v=>S.rA=v,0);
   rowSlider(b,"路面输入频率","ROAD FREQ","Hz",0.2,8.0,0.1,()=>S.rF,v=>S.rF=v,1);
 
-  b=sec(host,"3D 空间硬点表 (右侧)","3D HARDPOINTS [mm]",true);
+  b=sec(host,"3D 空间硬点表","HARDPOINTS [mm]",true);
   const tb=E("table","hp");
   tb.innerHTML="<thead><tr><th>硬点 ID</th><th>X 横向</th><th>Y 纵向</th><th>Z 垂向</th></tr></thead>";
   const tbody=E("tbody");
@@ -212,30 +231,20 @@ function buildRight(){
   host.innerHTML="";
   UI.plots.length=0;
 
-  let b=sec(host,"推拉杆与摇臂高阶读数","PUSH/PULL & ROCKER METRICS",true);
-  ro(b,"构型模式","ARCH MODE","","roArch","k");
-  ro(b,"摇臂转角","ROCKER ANGLE","°","roRckDeg","hl");
-  ro(b,"瞬态运动速比","MOTION RATIO","-","roMR","k hero");
-  ro(b,"减振器行程","DAMPER DISP","mm","roDmpDisp");
-  ro(b,"内置弹簧弹力","SPRING FORCE","N","roSprF","hl");
-  ro(b,"轮端等效刚度","WHEEL RATE","N/mm","roWR","k hero");
-
-  b=sec(host,"车轮定位参数","WHEEL ALIGNMENT");
+  let b=sec(host,"车轮定位参数","WHEEL ALIGNMENT");
   ro(b,"车轮外倾角","CAMBER","°","roCam","k hero");
-  ro(b,"车轮前束角","TOE","°","roToe","k hero");
+  ro(b,"车轮前束角","TOE","°","roToe","k");
   ro(b,"主销内倾角","KPI / SAI","°","roKpi");
-  ro(b,"主销后倾角","CASTER","°","roCast","hero");
+  ro(b,"主销后倾角","CASTER","°","roCast");
   ro(b,"主销接地偏移距","SCRUB RADIUS","mm","roScrub","hl");
   ro(b,"主销后倾拖距","CASTER TRAIL","mm","roTrail");
 
-  b=sec(host,"转向与侧倾刚度 (ARB)","STEERING & ROLL STIFFNESS",true);
-  ro(b,"阿克曼率 (前桥)","ACKERMANN","%","roAck","hl");
-  ro(b,"转弯半径","TURN RADIUS","m","roTrad");
-  ro(b,"扭杆扭转角","ARB TWIST","°","roArbTw");
-  ro(b,"扭杆扭转刚度","ARB TORSION","N·m/°","roArbKt");
-  ro(b,"稳定杆侧倾刚度","ARB ROLL K","N·m/°","roArbKr");
-  ro(b,"轴总侧倾刚度","AXLE ROLL K","N·m/°","roArbTot","k");
-  ro(b,"稳定杆占比","ARB SHARE","%","roArbSh","hl");
+  b=sec(host,"运动学导数与动态","KINEMATICS DERIVATIVES");
+  ro(b,"外倾角增益","CAMBER GAIN","°/25","roCG","hl");
+  ro(b,"跳动转向","BUMP STEER","°/25","roBS");
+  ro(b,"侧倾中心高度","ROLL CTR H","mm","roRC","k hero");
+  ro(b,"抗俯仰率","ANTI-DIVE","%","roAnti");
+  ro(b,"簧载固有频率","RIDE FREQ","Hz","roFreq");
 
   b=sec(host,"准静态载荷转移分析","LOAD TRANSFER BREAKDOWN",false,"amb");
   ro(b,"稳态车身侧倾角","ROLL ANGLE","°","roQsRoll","hl");
@@ -251,6 +260,23 @@ function buildRight(){
   b.appendChild(bb);
   ro(b,"操稳倾向判断","HANDLING BIAS","","roHandling","g");
 
+  b=sec(host,"推拉杆与摇臂高阶读数","PUSH/PULL & ROCKER METRICS",true);
+  ro(b,"构型模式","ARCH MODE","","roArch","k");
+  ro(b,"摇臂转角","ROCKER ANGLE","°","roRckDeg","hl");
+  ro(b,"瞬态运动速比","MOTION RATIO","-","roMR","k");
+  ro(b,"减振器行程","DAMPER DISP","mm","roDmpDisp");
+  ro(b,"内置弹簧弹力","SPRING FORCE","N","roSprF","hl");
+  ro(b,"轮端等效刚度","WHEEL RATE","N/mm","roWR","k");
+
+  b=sec(host,"转向与侧倾刚度 (ARB)","STEERING & ROLL STIFFNESS",true);
+  ro(b,"阿克曼率 (前桥)","ACKERMANN","%","roAck","hl");
+  ro(b,"转弯半径","TURN RADIUS","m","roTrad");
+  ro(b,"扭杆扭转角","ARB TWIST","°","roArbTw");
+  ro(b,"扭杆扭转刚度","ARB TORSION","N·m/°","roArbKt");
+  ro(b,"稳定杆侧倾刚度","ARB ROLL K","N·m/°","roArbKr");
+  ro(b,"轴总侧倾刚度","AXLE ROLL K","N·m/°","roArbTot","k");
+  ro(b,"稳定杆占比","ARB SHARE","%","roArbSh","hl");
+
   if(S.hasBaseline){
     b=sec(host,"基准线差异分析 (Delta Diff)","BASELINE DELTA",false,"purp");
     const db=E("div",null);
@@ -263,13 +289,6 @@ function buildRight(){
     });
     b.appendChild(db);
   }
-
-  b=sec(host,"运动学导数与动态","KINEMATICS DERIVATIVES");
-  ro(b,"外倾角增益","CAMBER GAIN","°/25","roCG","hl hero");
-  ro(b,"跳动转向","BUMP STEER","°/25","roBS","hero");
-  ro(b,"侧倾中心高度","ROLL CTR H","mm","roRC","k hero");
-  ro(b,"抗俯仰率","ANTI-DIVE","%","roAnti");
-  ro(b,"簧载固有频率","RIDE FREQ","Hz","roFreq");
 
   b=sec(host,"运动学特性曲线扫掠 (含双线对比)","CHARACTERISTIC CURVES");
   const pb=E("div","plotbox");
