@@ -239,7 +239,7 @@ const SYSTEM_COLORS={
   tie:"#43c9c0", bellows:"#15191d",
   rig:"#808e9d", rigArm:"#98abbd", arm:"rgba(140,165,190,0.06)",
   strut:"#2fa9d6", rocker:"#d9a238", rockerF:"rgba(217,162,56,0.25)",
-  spring:"#f39c12", damper:"#5c6b77",
+  spring:"#f39c12", damper:"#5c6b77", arb:"#7cae8f",
   knu:"#36bca8", knuF:"rgba(54,188,168,0.10)",
   tire:"#404852", tread:"#22272e", rim:"#6d7987", kp:"#e0603f",
   motor:"#22425d", motorBody:"#15293a", diff:"#3c566e", shaft:"#e67e22", cvBoot:"#15191d",
