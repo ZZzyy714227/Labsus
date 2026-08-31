@@ -174,14 +174,10 @@ function projRockerStrut(M, rck){
      RCK_DMP 突跳）。改为记录上一步 θ，从 θ=φ±ψ 两根中选**最近根**。
      rck.lastTheta 初始化为 null（首帧用旧相位规则）。 */
   const thA=phi-psi, thB=phi+psi;
-  let theta;
-  if(rck.lastTheta===null||rck.lastTheta===undefined){
-    theta=(phi>=0?thA:thB);
-  }else{
-    const dA=Math.abs(((thA-rck.lastTheta+PI)%(2*PI)+2*PI)%(2*PI)-PI);
-    const dB=Math.abs(((thB-rck.lastTheta+PI)%(2*PI)+2*PI)%(2*PI)-PI);
-    theta=(dA<=dB?thA:thB);
-  }
+  const refTheta = (rck.lastTheta !== null && rck.lastTheta !== undefined) ? rck.lastTheta : 0.0;
+  const dA=Math.abs(((thA-refTheta+PI)%(2*PI)+2*PI)%(2*PI)-PI);
+  const dB=Math.abs(((thB-refTheta+PI)%(2*PI)+2*PI)%(2*PI)-PI);
+  const theta=(dA<=dB?thA:thB);
   rck.lastTheta=theta;
   rck.angle=theta;
   const ct=cos(theta), st=sin(theta);
@@ -240,6 +236,7 @@ function setChassis(M,rack,axis){
 function resetMech(M){
   M.n.forEach(N=>{N.p=cpy(N.p0);N.pp=cpy(N.p0);N.v=[0,0,0];});
   M.cl.forEach(c=>{if(c.kind==="body")c.q=qId();});
+  if(M.rocker){ M.rocker.angle = 0.0; M.rocker.lastTheta = 0.0; }
 }
 
 function driveTo(M,targetZ,rack,axis){
@@ -373,12 +370,16 @@ function findLimits(M,rack,axis){
 
 function saveState(M){
   return{p:M.n.map(N=>cpy(N.p)),v:M.n.map(N=>cpy(N.v)),pp:M.n.map(N=>cpy(N.pp)),
-         q:M.cl.map(c=>c.q?c.q.slice():null),rAngle:M.rocker?M.rocker.angle:0};
+         q:M.cl.map(c=>c.q?c.q.slice():null),rAngle:M.rocker?M.rocker.angle:0,
+         rLastTheta:M.rocker?M.rocker.lastTheta:0};
 }
 function loadState(M,st){
   M.n.forEach((N,j)=>{N.p=cpy(st.p[j]);N.v=cpy(st.v[j]);N.pp=cpy(st.pp[j]);});
   M.cl.forEach((c,j)=>{if(st.q[j])c.q=st.q[j].slice();});
-  if(M.rocker&&st.rAngle!==undefined) M.rocker.angle=st.rAngle;
+  if(M.rocker){
+    if(st.rAngle!==undefined) M.rocker.angle=st.rAngle;
+    if(st.rLastTheta!==undefined) M.rocker.lastTheta=st.rLastTheta;
+  }
 }
 
 function runSweep(M,rack,lim,nS,axis){

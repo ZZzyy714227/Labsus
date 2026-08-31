@@ -89,8 +89,8 @@ function refreshDerived(full){
   if(full||!SIM.geoF) SIM.geoF = findLimits(SIM.FR, 0, 'front');
   if(full||!SIM.geoR) SIM.geoR = findLimits(SIM.RR, 0, 'rear');
   
-  S.trMax = Math.min(SIM.geoF[1], SIM.geoR[1], S.bsU+10);
-  S.trMin = Math.max(SIM.geoF[0], SIM.geoR[0], -(S.bsD+10));
+  S.trMax = Math.min(SIM.geoF[1], SIM.geoR[1], S.bsU || 50);
+  S.trMin = Math.max(SIM.geoF[0], SIM.geoR[0], -(S.bsD || 45));
   SIM.limF = [S.trMin, S.trMax]; SIM.limR = [S.trMin, S.trMax];
   S.travel = clamp(S.travel, S.trMin, S.trMax);
   
