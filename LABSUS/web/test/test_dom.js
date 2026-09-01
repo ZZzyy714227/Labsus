@@ -209,6 +209,61 @@ ok(/shanghai:\{zh:"上海国际赛车场/.test(ai), 'allinone: Shanghai 5.45km �
  * 三个舞台初始化抛错、rAF 循环从未注册 → 打开即黑屏（画布一片空白）。
  * 完整根因与检查项见 web/test/stage_boot_check.js 顶部注释。
  ══════════════════════════════════════════════════════════════════ */
+/* ── 稳态不足转向梯度 + Jacking（底盘开发 KPI，双端同构防线）──
+ * US Gradient / 前后侧偏角 / Jacking 抬升：前端 solveQuasiStatic 与引擎
+ * chassis.quasi_loads 逐字同构；TIRE_MF_QS 与引擎 TireParams 缺省值同源，
+ * 改一侧必须同步另一侧，否则双内核对拍漂移。 */
+ok(/usGradient:\s*\{\s*name: "稳态不足转向梯度/.test(fc), 'fullchassis: US Gradient 评价基准在位');
+ok(/let TIRE_MF_QS = \{ Fy0: 8000, FzNom: 3500, By: 9, Cy: 1\.2, LS: 0\.10 \}/.test(fc),
+  'fullchassis: 准静态 MF 参数集与引擎 TireParams 缺省同源（模块级可变，标定可覆写）');
+ok(/usGrad: usGrad, alphaF: alphaFDeg/.test(fc) && /jackingN: jackingN/.test(fc),
+  'fullchassis: solveQuasiStatic 输出 usGrad/α/Jacking');
+ok(/roUsGrad/.test(fc) && /roJacking/.test(fc), 'fullchassis: 右面板 US Gradient / Jacking 读数在位');
+ok(/setRO\("roUsGrad"/.test(fc), 'fullchassis: 07-plots 绑定 US Gradient 读数');
+/* 轮胎实测标定链（讲义 EP08 数据链）：面板 + 辨识入口 + 应用函数 + 舞台接入 */
+ok(/buildTireCalibPanel\(host\)/.test(fc), 'fullchassis: 轮胎实测标定面板已挂入左坞站');
+ok(/\/api\/v3\/tire\/fit/.test(fc), 'fullchassis: 辨识走引擎 /api/v3/tire/fit');
+ok(/function applyTireCalib/.test(fc) && /SIM\.qsRes = solveQuasiStatic\(\);/.test(fc),
+  'fullchassis: applyTireCalib 覆写实胎后重算准静态');
+ok(/SIM\.tireCalib/.test(fc) && /body\.tire,\{Fy0:tc\.Fy0/.test(fc),
+  'fullchassis: 赛道舞台轮胎参数接入标定结果');
+/* K&C 台架对拍链（仿真预测↔台架验证闭环）：导入面板 + RMS + 轮跳图第三条线 */
+ok(/buildKcMeasuredPanel\(host\)/.test(fc), 'fullchassis: K&C 台架对拍面板已挂入左坞站');
+ok(/function kcMeasuredRMS/.test(fc) && /function kcMeasuredParse/.test(fc),
+  'fullchassis: 实测解析 + RMS 偏差函数在位');
+ok(/plotXYOverlay\(UI\.plots\[i\][^)]*, msr\)/.test(fc),
+  'fullchassis: 轮跳图叠画实测曲线（第三条点划线）');
+/* 不足转向特性 δ-ay（US Curve，底盘开发汇报核心图）：双端同构 + 引擎 us_curve */
+ok(/function usSweepCompute/.test(fc) && /function plotUsCurve/.test(fc)
+   && /usCurvePlot/.test(fc), 'fullchassis: δ-ay 特性图链路在位（扫掠/绘制/画布）');
+ok(/function rollSteerRate/.test(fc) && /usTire:usTire/.test(fc),
+  'fullchassis: δ-ay 完整版含侧倾转向分量（双线叠画）');
+ok(/function buildBushingCalibPanel/.test(fc) && /SIM\.bushCalib/.test(fc),
+  'fullchassis: 衬套刚度标定面板 + presetBushings 标定优先通道');
+ok(/gyOverride!==undefined\?gyOverride:S\.qs\.gy/.test(fc),
+  'fullchassis: solveQuasiStatic 支持 gy 覆写（扫掠扫描基础）');
+/* 双端对拍锚：JS 准静态 MF 参数必须与引擎 v3models TireParams 缺省逐字一致 */
+const engModels = fs.readFileSync(path.join(webDir, '..', 'engine', 'src', 'api', 'v3models.py'), 'utf8');
+ok(/Fy0: float = 8000\.0/.test(engModels) && /FzNom: float = 3500\.0/.test(engModels)
+   && /LS: float = 0\.10/.test(engModels), 'engine: TireParams 缺省值未变（双端对拍锚）');
+const engChassis = fs.readFileSync(path.join(webDir, '..', 'engine', 'src', 'api', 'chassis.py'), 'utf8');
+ok(/us_grad_deg_per_g/.test(engChassis) && /jacking_heave_mm/.test(engChassis),
+  'engine: chassis solve 输出 US Gradient / Jacking');
+ok(/us_curve: dict\[str, list\]/.test(engModels), 'engine: ChassisPoseResponse.us_curve 字段在位');
+ok(/_us_curve\(req\.vehicle/.test(engChassis), 'engine: solve_chassis 输出 us_curve 扫掠');
+ok(/let TIRE_MF_QS/.test(ai) && /usGrad: usGrad/.test(ai) && /jackingN: jackingN/.test(ai),
+  'allinone: 准静态 US Gradient / Jacking 同构同步');
+ok(/roUsGrad/.test(ai) && /roJacking/.test(ai), 'allinone: US Gradient / Jacking 读数在位');
+ok(/function applyTireCalib/.test(ai) && /buildTireCalibPanel\(host\)/.test(ai),
+  'allinone: 轮胎实测标定链同构（面板 + 应用函数）');
+ok(/buildKcMeasuredPanel\(host\)/.test(ai) && /function kcMeasuredRMS/.test(ai),
+  'allinone: K&C 台架对拍链同构');
+ok(/function usSweepCompute/.test(ai) && /function plotUsCurve/.test(ai)
+   && /usCurvePlot/.test(ai), 'allinone: δ-ay 特性图链路同构');
+ok(/function rollSteerRate/.test(ai) && /function bushPayload/.test(ai)
+   && /buildBushingCalibPanel\(host\)/.test(ai),
+  'allinone: δ-ay 完整版 + 衬套标定链同构');
+
 require('./stage_boot_check')(webDir, ok, failures.push.bind(failures), { log(){} });
 
 // ── 结果 ───────────────────────────────────────────────────────

@@ -727,6 +727,10 @@ function trackStageRun(){
       FzNom:parseFloat(document.getElementById("ssFzN").value)||3500,
       Ls:parseFloat(document.getElementById("ssLs").value)||0.35,
       Cg:parseFloat(document.getElementById("ssCg").value)||0.5}};
+  /* 轮胎实测标定优先（讲义 EP08 数据链）：辨识成功后覆写舞台胎参数 */
+  if(SIM.tireCalib){const tc=SIM.tireCalib;
+    Object.assign(body.tire,{Fy0:tc.Fy0,FzNom:tc.FzNom,LS:tc.LS,By:tc.By,Cy:tc.Cy});
+    if(isFinite(SIM.tireCalibEy))body.tire.Ey=SIM.tireCalibEy;}
   const useEng=document.getElementById("ssUseEng")&&document.getElementById("ssUseEng").checked&&ENG.ok;
   const finishStage=function(res){
     if(res.status!=="VALID"){document.getElementById("ssStatus").textContent="仿真失败："+res.status;return;}

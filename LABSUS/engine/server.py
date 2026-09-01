@@ -38,9 +38,12 @@ from src.api.v3models import (  # noqa: E402
     ChassisRequest,
     KandcRequest,
     PoseRequest,
+    TireFitRequest,
+    TireFitResponse,
     TrackSimRequest,
 )
 from src.solver.transient import run_track_sim  # noqa: E402
+from src.solver.tire_fit import fit_tire_params  # noqa: E402
 
 ENGINE_VERSION = "0.3.0"          # 引擎（S1 内核 + S2 服务层）
 API_VERSION = "v3"
@@ -169,6 +172,33 @@ def simulate_track(req: TrackSimRequest) -> dict:
         _tb.print_exc()   # F-46：detail 脱敏（完整异常进日志）
         raise HTTPException(status_code=422,
                             detail=f"transient sim error ({type(exc).__name__})") from exc
+
+
+@app.post("/api/v3/tire/fit", response_model=TireFitResponse)
+def tire_fit(req: TireFitRequest) -> TireFitResponse:
+    """轮胎实测曲线 → Pacejka MF 子集参数辨识（讲义 EP08 数据链）。
+
+    辨识出的 params 可直接作为 chassis/solve 的 tire 字段或赛道仿真轮胎参数回传。
+    """
+    import time as _time
+    t0 = _time.perf_counter()
+    try:
+        r = fit_tire_params([c.model_dump() for c in req.curves],
+                            fit_ls=req.fit_ls)
+    except Exception as exc:  # noqa: BLE001
+        import traceback as _tb
+        _tb.print_exc()   # F-46 同款脱敏纪律
+        raise HTTPException(status_code=422,
+                            detail=f"tire fit error ({type(exc).__name__})") from exc
+    from src.api.v3models import TireParams
+    params = TireParams(**{**r["params"], "Sh": 0.0, "Sv": 0.0,
+                           "Cg": 0.5, "Ls": 0.35}) if r["params"] else None
+    return TireFitResponse(
+        status=r["status"], ms=(_time.perf_counter() - t0) * 1000.0,
+        params=params, rms_pct=r["rms_pct"],
+        per_load_rms_pct=r["per_load_rms_pct"],
+        n_points=r["n_points"], n_loads=r["n_loads"], note=r["note"],
+    )
 
 
 if __name__ == "__main__":

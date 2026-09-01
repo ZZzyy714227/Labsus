@@ -99,6 +99,11 @@ function updateReadouts(){
     setRO("roFzFR", fmt(qs.fz.FR, 0));
     setRO("roFzRL", fmt(qs.fz.RL, 0));
     setRO("roFzRR", fmt(qs.fz.RR, 0));
+    /* US Gradient / 前后侧偏角 / Jacking（准静态新增，镜像引擎） */
+    setRO("roUsGrad", Math.abs(qs.usGrad) > 1e-9 ? fmt(qs.usGrad, 2) : "—");
+    setRO("roAlphaF", fmt(qs.alphaF, 2));
+    setRO("roAlphaR", fmt(qs.alphaR, 2));
+    setRO("roJacking", fmt(qs.jackingMm, 2));
 
     const tb=document.getElementById("tlltdBar");
     if(tb){
@@ -157,7 +162,7 @@ function updateReadouts(){
   document.getElementById("sbArchName").textContent = (isF ? "前悬架 (" : "后悬架 (") + archName + ")";
 }
 
-function plotXYOverlay(cv,title,unit,seriesActive,seriesBase,xr,curx){
+function plotXYOverlay(cv,title,unit,seriesActive,seriesBase,xr,curx,seriesMeas){
   const dpr=Math.min(2,window.devicePixelRatio||1);
   const w=cv.clientWidth||300,h=cv.clientHeight||84;
   if(cv.width!==w*dpr||cv.height!==h*dpr){cv.width=w*dpr;cv.height=h*dpr;}
@@ -166,7 +171,7 @@ function plotXYOverlay(cv,title,unit,seriesActive,seriesBase,xr,curx){
   const ml=34,mr=6,mt=13,mb=11,pw=w-ml-mr,ph=h-mt-mb;
   
   let y0=1e9,y1=-1e9;
-  const allPts = [].concat(seriesActive.pts).concat(seriesBase?seriesBase.pts:[]);
+  const allPts = [].concat(seriesActive.pts, seriesBase?seriesBase.pts:[], seriesMeas?seriesMeas.pts:[]);
   allPts.forEach(p=>{if(p[1]===null||!isFinite(p[1]))return;
     if(p[1]<y0)y0=p[1];if(p[1]>y1)y1=p[1];});
   if(y0>y1){y0=0;y1=1;}
@@ -186,6 +191,15 @@ function plotXYOverlay(cv,title,unit,seriesActive,seriesBase,xr,curx){
     seriesBase.pts.forEach(p=>{if(p[1]===null||!isFinite(p[1])){st=false;return;}
       const x=X(p[0]),y=Y(p[1]);if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y);});
     ctx.stroke();
+  }
+
+  // 1.5 绘制台架实测曲线 (点划线，K&C 对拍，讲义 EP02“仿真预测↔台架验证”闭环)
+  if(seriesMeas && seriesMeas.pts.length){
+    ctx.strokeStyle=seriesMeas.c||C.frc;ctx.lineWidth=1.2;ctx.setLineDash([6,2,1.5,2]);
+    ctx.beginPath();let stm=false;
+    seriesMeas.pts.forEach(p=>{if(p[1]===null||!isFinite(p[1])){stm=false;return;}
+      const x=X(p[0]),y=Y(p[1]);if(!stm){ctx.moveTo(x,y);stm=true;}else ctx.lineTo(x,y);});
+    ctx.stroke();ctx.setLineDash([]);
   }
 
   // 2. 绘制 Active 活动曲线 (实线)
@@ -208,6 +222,71 @@ function plotXYOverlay(cv,title,unit,seriesActive,seriesBase,xr,curx){
   ctx.textAlign="left";
 }
 
+/* K&C 台架对拍：实测 vs 仿真 RMS 偏差（°，重叠行程区间，线性插值到仿真网格） */
+function kcMeasuredRMS(axis,key){
+  const meas = SIM.kcMeasured ? SIM.kcMeasured[axis] : null;
+  const sw = axis==="front" ? SIM.swF : SIM.swR;
+  if(!meas||!sw||!sw.rows||!meas.travel||meas.travel.length<2)return null;
+  const lo=Math.max(sw.rows[0].tr, Math.min(meas.travel[0],meas.travel[meas.travel.length-1]));
+  const hi=Math.min(sw.rows[sw.rows.length-1].tr, Math.max(meas.travel[0],meas.travel[meas.travel.length-1]));
+  if(!(hi>lo))return null;
+  const interp=(xs,ys,x)=>{
+    if(x<=xs[0])return ys[0];if(x>=xs[xs.length-1])return ys[ys.length-1];
+    let i=1;while(i<xs.length&&xs[i]<x)i++;
+    const t=(x-xs[i-1])/((xs[i]-xs[i-1])||1e-9);return ys[i-1]+(ys[i]-ys[i-1])*t;};
+  let s2=0,n=0;
+  for(const r of sw.rows){ if(r.tr<lo||r.tr>hi)continue;
+    const mv=interp(meas.travel,meas[key],r.tr);
+    const sv=interp(sw.rows.map(q=>q.tr),sw.rows.map(q=>q[key]),r.tr);
+    if(isFinite(mv)&&isFinite(sv)){s2+=(mv-sv)*(mv-sv);n++;}}
+  return n>1?Math.sqrt(s2/n):null;
+}
+
+/* 不足转向特性 δ-ay 图（底盘开发汇报核心图；当前工况点红点标记） */
+function plotUsCurve(cv){
+  const c=SIM.usCurve;if(!c||!c.gy||c.gy.length<3)return;
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const w=cv.clientWidth||300,h=cv.clientHeight||110;
+  if(cv.width!==w*dpr||cv.height!==h*dpr){cv.width=w*dpr;cv.height=h*dpr;}
+  const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);ctx.fillStyle=C.bg;ctx.fillRect(0,0,w,h);
+  const ml=30,mr=6,mt=13,mb=13,pw=w-ml-mr,ph=h-mt-mb;
+  let y0=0,y1=0.1;
+  c.us.forEach(v=>{if(isFinite(v)){if(v<y0)y0=v;if(v>y1)y1=v;}});
+  const pad=(y1-y0)*0.15+0.05;y0-=pad;y1+=pad;
+  const X=x=>ml+(x/2.0)*pw, Y=y=>mt+ph-(y-y0)/((y1-y0)||1)*ph;
+  ctx.strokeStyle=C.grid;ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){const y=mt+ph*i/4;ctx.beginPath();ctx.moveTo(ml,y);ctx.lineTo(ml+pw,y);ctx.stroke();}
+  if(y0<0&&y1>0){ctx.strokeStyle=C.dim;ctx.setLineDash([2,2]);ctx.beginPath();ctx.moveTo(ml,Y(0));ctx.lineTo(ml+pw,Y(0));ctx.stroke();ctx.setLineDash([]);}
+  // 轮胎分量（虚线）——完整版 δ-ay = 轮胎 + 侧倾转向
+  if(c.usTire){
+    ctx.strokeStyle=C.base;ctx.lineWidth=1.2;ctx.setLineDash([4,3]);ctx.beginPath();let stt=false;
+    c.gy.forEach((gv,i)=>{const v=c.usTire[i];if(!isFinite(v))return;
+      const x=X(gv),y=Y(v);if(!stt){ctx.moveTo(x,y);stt=true;}else ctx.lineTo(x,y);});
+    ctx.stroke();ctx.setLineDash([]);
+  }
+  // 总线（实线）：轮胎 + 侧倾转向
+  ctx.strokeStyle=C.strut;ctx.lineWidth=1.6;ctx.setLineDash([]);ctx.beginPath();let st=false;
+  c.gy.forEach((gv,i)=>{const v=c.us[i];if(!isFinite(v))return;
+    const x=X(gv),y=Y(v);if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y);});
+  ctx.stroke();
+  const gyNow=S.qs.gy;
+  if(Math.abs(gyNow)<=2.0){
+    const idx=Math.round(Math.abs(gyNow)/2.0*(c.gy.length-1));
+    if(c.us[idx]!==undefined&&isFinite(c.us[idx])){
+      ctx.fillStyle=C.frc;ctx.beginPath();
+      ctx.arc(X(Math.abs(gyNow)),Y(c.us[idx]),3,0,7);ctx.fill();
+    }
+  }
+  ctx.strokeStyle=C.axis;ctx.lineWidth=1;ctx.strokeRect(ml+.5,mt+.5,pw,ph);
+  ctx.fillStyle=C.txt2;ctx.font="8.5px ui-monospace,monospace";
+  ctx.fillText("不足转向特性 US CHARACTERISTIC · 实线=总 δ（轮胎+侧倾转向） · 虚线=轮胎项 · 红点=当前工况",ml+1,mt-3.5);
+  ctx.fillStyle=C.txt3;ctx.textAlign="right";
+  ctx.fillText(fmt(y1,1),ml-3,mt+7);ctx.fillText(fmt(y0,1),ml-3,mt+ph-1);
+  ctx.fillText("0",ml,mt+ph+9);ctx.fillText("2g",ml+pw-8,mt+ph+9);
+  ctx.textAlign="left";
+}
+
 function drawPlots(){
   const isF = S.axis === 'front';
   const sw = isF ? SIM.swF : SIM.swR;
@@ -224,11 +303,23 @@ function drawPlots(){
     ["前束角变化 (跳动转向) TOE","°","toe",C.tie]
   ];
 
+  const meas = SIM.kcMeasured ? (isF ? SIM.kcMeasured.front : SIM.kcMeasured.rear) : null;
   P.forEach((p,i)=>{
     if(!UI.plots[i]) return;
     const act = S1(sw, p[2], p[3]);
     const bas = S1(b_sw, p[2], C.base);
-    plotXYOverlay(UI.plots[i], p[0]+"  ← 轮跳行程 [mm] →", p[1], act, bas, xr, cur);
+    const msr = (meas && meas.travel && meas[p[2]] && (p[2]==="cam"||p[2]==="toe"))
+      ? {pts:meas.travel.map((t,k)=>[t,meas[p[2]][k]]), c:C.frc} : null;
+    plotXYOverlay(UI.plots[i], p[0]+"  ← 轮跳行程 [mm] →", p[1], act, bas, xr, cur, msr);
   });
+
+  /* 不足转向特性 δ-ay（节流：参数 dirty 或每 800ms 重算一次） */
+  const nowT=performance.now();
+  if(SIM.usCurveDirty!==false||!SIM.usCurve||nowT-(SIM.usCurveT||0)>800){
+    if(typeof usSweepCompute==="function")usSweepCompute();
+    SIM.usCurveT=nowT;SIM.usCurveDirty=false;
+  }
+  const uc=document.getElementById("usCurvePlot");
+  if(uc)plotUsCurve(uc);
 }
 

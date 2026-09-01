@@ -252,6 +252,8 @@ class ChassisRequest(BaseModel):
     travel: CornerTravel = Field(default_factory=CornerTravel)
     rack: float = 0.0
     sweep: SweepSpec = Field(default_factory=lambda: SweepSpec(min=-50, max=50, n=21))
+    # 轮胎 MF 参数：稳态不足转向梯度（US Gradient）用（前向引用，文件末尾 rebuild）
+    tire: "TireParams" = Field(default_factory=lambda: TireParams())
 
     @model_validator(mode="after")
     def _check(self):
@@ -286,6 +288,13 @@ class ChassisLoads(BaseModel):
     dFz_long: float = 0.0                    # 纵向转移
     tlltd_pct: float = 50.0
     fz: dict[str, float] = Field(default_factory=dict)   # FL/FR/RL/RR
+    # 稳态不足转向梯度（线性区，含载荷敏感性：真实四轮载荷下的侧偏刚度）
+    us_grad_deg_per_g: float = 0.0           # (αf−αr)/ay；|gy|<0.02 时不可信，置 0
+    alpha_f_deg: float = 0.0                 # 前轴侧偏角 @当前工况（线性近似）
+    alpha_r_deg: float = 0.0
+    # Jacking 效应：侧向力经 RC 传递的垂向分量（正 = 抬升簧载）
+    jacking_f_n: float = 0.0
+    jacking_heave_mm: float = 0.0
 
 
 class ChassisPoseResponse(BaseModel):
@@ -295,6 +304,8 @@ class ChassisPoseResponse(BaseModel):
     attitude: dict[str, float] = Field(default_factory=dict)  # heave/roll/pitch
     loads: ChassisLoads = Field(default_factory=ChassisLoads)
     mr: dict[str, float] = Field(default_factory=dict)
+    # 不足转向特性 δ-ay 扫掠（gy 0→2g 均匀 21 点；与 loads.us_grad 同口径）
+    us_curve: dict[str, list] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -408,3 +419,43 @@ class TrackSimResponse(BaseModel):
     trace: list[dict] = Field(default_factory=list)
     summary: dict[str, float] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
+
+
+# ── 轮胎实测数据 → MF 参数辨识（真实开发数据链，讲义 EP08）──
+
+class TireCurve(BaseModel):
+    """单一载荷层级的侧偏扫掠实测曲线：α[°] 与 |Fy|[N]（对称，取绝对值拟合）。"""
+    fz: float = Field(gt=0)                      # 该层级法向载荷 N
+    alpha_deg: list[float] = Field(min_length=5)
+    fy: list[float] = Field(min_length=5)
+
+    @model_validator(mode="after")
+    def _check(self):
+        if len(self.alpha_deg) != len(self.fy):
+            raise ValueError("alpha_deg/fy length must match")
+        if not all(math.isfinite(v) for v in self.alpha_deg):
+            raise ValueError("alpha_deg must be finite")
+        if not all(math.isfinite(v) for v in self.fy):
+            raise ValueError("fy must be finite")
+        return self
+
+
+class TireFitRequest(BaseModel):
+    """MF 辨识请求：≥1 个载荷层级；LS 辨识需 ≥2 个不同层级。"""
+    curves: list[TireCurve] = Field(min_length=1)
+    fit_ls: bool = True
+
+
+class TireFitResponse(BaseModel):
+    status: str                                   # VALID / SOLVER_FAILED / NOT_APPLICABLE
+    ms: float = 0.0
+    params: TireParams | None = None              # 辨识出的 MF 子集参数（可直接回传仿真）
+    rms_pct: float | None = None                  # 归一残差 RMS（% of 各层级峰值）
+    per_load_rms_pct: dict[str, float] = Field(default_factory=dict)
+    n_points: int = 0
+    n_loads: int = 0
+    note: str = ""
+
+
+# ChassisRequest.tire 前向引用解析（TireParams 定义在本文件后部）
+ChassisRequest.model_rebuild()

@@ -532,14 +532,16 @@ canvas.plot{display:block;width:100%;height:96px;background:var(--well);border:1
   display: flex;
 }
 .skidpad-stage-topbar {
-  height: 46px;
+  min-height: 46px;
   background: #161b22;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 20px;
+  padding: 5px 20px;
   z-index: 10;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 .skidpad-top-left { display: flex; align-items: center; gap: 16px; }
 .skidpad-stage-logo { font-size: 13px; font-weight: 800; color: #f39c12; letter-spacing: 0.5px; }
@@ -588,7 +590,31 @@ canvas.plot{display:block;width:100%;height:96px;background:var(--well);border:1
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
-.skidpad-top-right { display: flex; align-items: center; gap: 14px; font-size: 11px; }
+.skidpad-top-right { display: flex; align-items: center; gap: 12px; font-size: 11px; flex-wrap: wrap; }
+
+/* 面板显示/隐藏控制组（顶栏按钮分组容器） */
+.circuit-panel-toggles {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 4px;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  padding-left: 12px;
+}
+.circuit-panel-toggles > .c-toggle-label {
+  font-size: 11px;
+  color: #8b949e;
+  margin-right: 2px;
+  white-space: nowrap;
+}
+/* 组内功能分隔线（面板开关 / 遥测LOG / 全屏 之间） */
+.circuit-panel-toggles .c-toggle-sep {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.14);
+  margin: 0 2px;
+  flex: none;
+}
 .skidpad-control-item { display: flex; align-items: center; gap: 8px; color: #8b949e; }
 .skidpad-control-item input[type=range] { width: 85px; }
 .skidpad-control-item b { color: #f39c12; width: 50px; font-family: ui-monospace, monospace; }
@@ -1021,7 +1047,7 @@ canvas.plot{display:block;width:100%;height:96px;background:var(--well);border:1
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: #8b949e;
   border-radius: 4px;
-  padding: 3px 8px;
+  padding: 4px 10px;
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
@@ -1029,7 +1055,10 @@ canvas.plot{display:block;width:100%;height:96px;background:var(--well);border:1
   user-select: none;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
+  height: 26px;
+  white-space: nowrap;
+  flex: none;
 }
 .c-toggle-panel-btn:hover {
   background: rgba(255, 255, 255, 0.15);
@@ -1051,8 +1080,8 @@ canvas.plot{display:block;width:100%;height:96px;background:var(--well);border:1
 .circuit-stage-workspace {
   display: flex;
   flex: 1;
+  min-height: 0;
   width: 100%;
-  height: calc(100% - 46px);
   overflow: hidden;
   background: #090d13;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1286,14 +1315,29 @@ canvas.plot{display:block;width:100%;height:96px;background:var(--well);border:1
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: #c9d1d9;
   border-radius: 4px;
-  padding: 5px 8px;
-  font-size: 10.5px;
+  padding: 7px 10px;
+  font-size: 11px;
   cursor: pointer;
   font-weight: bold;
   transition: all 0.15s ease;
+  width: 100%;
+  white-space: nowrap;
 }
 .c-ctrl-btn:hover {
   background: rgba(255, 255, 255, 0.15);
+}
+/* 控制按钮纵向堆叠（AutoPilot / 重置发车），消除并排挤压 */
+.c-ctrl-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* 窄幅控制分组：不再与其它分组等分拉伸，杜绝大块留白 */
+.c-tune-group.compact {
+  flex: 0 1 230px;
+  min-width: 200px;
+  max-width: 260px;
+  gap: 8px;
 }
 
 /* Right Column (32% width) - Telemetry Panel */

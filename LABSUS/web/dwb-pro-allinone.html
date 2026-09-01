@@ -1341,7 +1341,19 @@ function sampleSweep(sw,tr,key){
 }
 
 /* ================================ 5. 准静态载荷转移代数解算 ================================ */
-function solveQuasiStatic(){
+/* —— 稳态不足转向梯度（线性区，镜像引擎 chassis.quasi_loads）——
+   TIRE_MF_QS 与引擎 TireParams 缺省同源；轮胎实测标定成功后由
+   applyTireCalib() 覆写（讲义 EP08 数据链，与 03-mechanism.js 同构）。 */
+let TIRE_MF_QS = { Fy0: 8000, FzNom: 3500, By: 9, Cy: 1.2, LS: 0.10 };
+function applyTireCalib(p){
+  if(!p || typeof p !== "object") return;
+  ["Fy0","FzNom","By","Cy","LS"].forEach(k=>{ if(isFinite(p[k])) TIRE_MF_QS[k]=p[k]; });
+  if(isFinite(p.Ey)) SIM.tireCalibEy = p.Ey;
+  SIM.tireCalib = Object.assign({}, TIRE_MF_QS);
+  SIM.qsRes = solveQuasiStatic();
+  if(typeof updateReadouts === "function") updateReadouts();
+}
+function solveQuasiStatic(gyOverride){
   const g = 9.81;
   const L = S.wb / 1000;
   const mS = S.mSprung, mT = S.mTotal;
@@ -1368,7 +1380,7 @@ function solveQuasiStatic(){
   const Fzf0 = mS * g * (b / L) + mU_f * g + F_aero * S.qs.aeroBias;
   const Fzr0 = mS * g * (a / L) + mU_r * g + F_aero * (1 - S.qs.aeroBias);
 
-  const Gy = S.qs.gy, Gx = S.qs.gx;
+  const Gy = gyOverride!==undefined?gyOverride:S.qs.gy, Gx = S.qs.gx;
   const ay = Gy * g, ax = Gx * g;
 
   // —— 侧倾耦合迭代：RC 高度(zrc)取外侧压缩轮、侧倾刚度(kphi)取左右 kw 均值，均随行程迁移 ——
@@ -1425,7 +1437,30 @@ function solveQuasiStatic(){
   const fzFR = Math.max(0, (Fzf0 - dFz_long) / 2 + dFz_f_tot * sgnY);
   const fzRL = Math.max(0, (Fzr0 + dFz_long) / 2 - dFz_r_tot * sgnY);
   const fzRR = Math.max(0, (Fzr0 + dFz_long) / 2 + dFz_r_tot * sgnY);
-  
+
+  /* —— 稳态不足转向梯度（线性区，镜像引擎 chassis.quasi_loads）——
+     α轴 = Fy轴 / ΣCα(各轮真实载荷)；Cα = B·C·D(Fz) 含 LS 载荷敏感性。 */
+  const caMF = (fzW) => { if (fzW <= 0) return 0;
+    const r = fzW / TIRE_MF_QS.FzNom;
+    const d = TIRE_MF_QS.Fy0 * r * Math.max(0.1, 1 - TIRE_MF_QS.LS * (r - 1));
+    return TIRE_MF_QS.By * TIRE_MF_QS.Cy * d; };
+  let usGrad = 0, alphaFDeg = 0, alphaRDeg = 0;
+  if (Math.abs(Gy) >= 0.02) {
+    const fyF = mT * ay * (b / L), fyR = mT * ay * (a / L);
+    const caF = caMF(fzFL) + caMF(fzFR), caR = caMF(fzRL) + caMF(fzRR);
+    if (caF > 1e-6 && caR > 1e-6) {
+      alphaFDeg = (fyF / caF) * R2D;
+      alphaRDeg = (fyR / caR) * R2D;
+      usGrad = (alphaFDeg - alphaRDeg) / Gy;   /* deg/g */
+    }
+  }
+
+  /* —— Jacking 效应：侧向力经 RC 的垂向分量（镜像引擎，讲义 EP10）—— */
+  const fJackF = (mS * ay * (b / L)) * (2 * zrc_f / tf);
+  const fJackR = (mS * ay * (a / L)) * (2 * zrc_r / tr);
+  const jackingN = fJackF + fJackR;
+  const jackingMm = jackingN / ((kwF0 + kwR0) / 1000);
+
   return {
     rollDeg: rollAngleDeg, rollGrad: rollGrad,
     kphi_f: kphi_f * D2R, kphi_r: kphi_r * D2R, kphi_tot: kphi_tot * D2R,
@@ -1434,8 +1469,42 @@ function solveQuasiStatic(){
     dFz_u_f: dFz_u_f, dFz_geo_f: dFz_geo_f, dFz_elas_f: dFz_elas_f, dFz_f_tot: dFz_f_tot,
     dFz_u_r: dFz_u_r, dFz_geo_r: dFz_geo_r, dFz_elas_r: dFz_elas_r, dFz_r_tot: dFz_r_tot,
     tlltd: tlltd,
+    usGrad: usGrad, alphaF: alphaFDeg, alphaR: alphaRDeg,
+    jackingN: jackingN, jackingMm: jackingMm,
     fz:{ FL: fzFL, FR: fzFR, RL: fzRL, RR: fzRR }
   };
+}
+
+/* —— 侧倾转向率 @0（°toe/mm，镜像引擎 _roll_steer_rate，与 03-mechanism.js 同构）—— */
+function rollSteerRate(sw){
+  if(!sw||!sw.rows||sw.rows.length<3)return 0;
+  const xs=sw.rows.map(r=>r.tr), ys=sw.rows.map(r=>r.toe);
+  const at=t=>{
+    if(t<=xs[0])return ys[0];if(t>=xs[xs.length-1])return ys[ys.length-1];
+    let i=1;while(i<xs.length&&xs[i]<t)i++;
+    const k=(t-xs[i-1])/((xs[i]-xs[i-1])||1e-9);return ys[i-1]+(ys[i]-ys[i-1])*k;
+  };
+  return (at(10)-at(-10))/20;
+}
+
+/* —— 不足转向特性 δ-ay 扫掠（完整版：轮胎 + 侧倾转向，与引擎同口径）—— */
+function usSweepCompute(){
+  const N=21, GYMAX=2.0;
+  const halfF=abs(S.front.hp.WC[0]), halfR=abs(S.rear.hp.WC[0]);
+  const rsF=rollSteerRate(SIM.swF), rsR=rollSteerRate(SIM.swR);
+  const gy=[],alphaF=[],alphaR=[],usTire=[],usRoll=[],us=[],roll=[];
+  for(let i=0;i<N;i++){
+    const g=+(GYMAX*i/(N-1)).toFixed(4);
+    const q=solveQuasiStatic(g);
+    const rollRad=q.rollDeg*D2R;
+    const rs=(rsF*rollRad*halfF)-(rsR*rollRad*halfR);
+    const tire=g>=0.02?+(q.alphaF-q.alphaR).toFixed(4):0;
+    gy.push(g); alphaF.push(q.alphaF); alphaR.push(q.alphaR);
+    usTire.push(tire); usRoll.push(+rs.toFixed(4));
+    us.push(+(tire+rs).toFixed(4));
+    roll.push(q.rollDeg);
+  }
+  SIM.usCurve={gy:gy,alphaF:alphaF,alphaR:alphaR,usTire:usTire,usRoll:usRoll,us:us,roll:roll};
 }
 
 /* ================================ 6. 动力学 (4-Post Rig 显式积分) ================================ */
@@ -2919,6 +2988,9 @@ function buildLeft(){
   host.innerHTML="";
   buildEnginePanel(host);
   buildChassisPanel(host);
+  buildTireCalibPanel(host);
+  buildKcMeasuredPanel(host);
+  buildBushingCalibPanel(host);
   buildTrackPanel(host);
   buildPersistencePanel(host);
   buildSystemShowPanel(host);
@@ -3053,7 +3125,15 @@ function buildRight(){
   const bb=E("div","bar-box");
   bb.innerHTML='<div class="bar-fill-f" id="tlltdBar" style="width:52%"></div><div class="bar-lbl" style="left:6px" id="tlltdLblF">前: 52%</div><div class="bar-lbl" style="right:6px" id="tlltdLblR">后: 48%</div>';
   b.appendChild(bb);
+  ro(b,"不足转向梯度","US GRADIENT","°/g","roUsGrad","k hero");
+  ro(b,"前轴侧偏角","SLIP ANG F","°","roAlphaF");
+  ro(b,"后轴侧偏角","SLIP ANG R","°","roAlphaR");
+  ro(b,"Jacking 抬升","JACKING","mm","roJacking");
   ro(b,"操稳倾向判断","HANDLING BIAS","","roHandling","g");
+  /* 不足转向特性 δ-ay 曲线（usSweepCompute 节流重算，drawPlots 绘制） */
+  const uc=E("canvas","plot");uc.id="usCurvePlot";
+  uc.style.cssText="height:110px;width:100%;margin-top:4px";
+  b.appendChild(uc);
 
   if(S.hasBaseline){
     b=sec(host,"基准线差异分析 (Delta Diff)","BASELINE DELTA",false,"purp");
@@ -3127,8 +3207,19 @@ function enginePayload(){
     sweep:{min:ENG.sweep.min,max:ENG.sweep.max,n:ENG.sweep.n},
     case:{fx:0,fy:0,fz:ENG.fz,mx:0,my:0,mz:0},
     track_width:2*st.hp.WC[0],
-    bushings:ENG.useBush?[{name:"bLCA_F",node:"LCA_F",kT:[500,500,500],kR:[8e4,8e4,8e4],preload:[0,0,0,0,0,0]}]:[]
+    bushings:ENG.useBush?bushPayload():[]
   };
+}
+/* 衬套 payload：供应商实测标定（SIM.bushCalib）优先，回退 bLCA_F 500N/mm（与 presetBushings 同构） */
+function bushPayload(){
+  const cal=SIM.bushCalib&&SIM.bushCalib[S.axis];
+  if(cal&&Object.keys(cal).length){
+    return Object.keys(cal).map(n=>({name:"b_"+n,node:n,
+      kT:cal[n].kT.slice(0,3),
+      kR:(Array.isArray(cal[n].kR)?cal[n].kR:[8e4,8e4,8e4]).slice(0,3),
+      preload:[0,0,0,0,0,0]}));
+  }
+  return [{name:"bLCA_F",node:"LCA_F",kT:[500,500,500],kR:[8e4,8e4,8e4],preload:[0,0,0,0,0,0]}];
 }
 async function engineRun(){
   if(!ENG.ok){setKcStatus("未连接引擎 → 请先连接（或继续使用内置 JS）",C.ela);return;}
@@ -3169,6 +3260,56 @@ function engineRender(){
     steer:"前束/外倾/后倾 ← 齿条 [mm]",compliance:"前束/外倾/后倾 ← 力 [N]"}[d.case]||d.case;
   plotXYMulti(cv,title,"°",ser,[xs[0],xs[xs.length-1]],null);
   setKcStatus(d.case+" 完成 · status="+d.status+" · "+d.ms.toFixed(1)+"ms"+(d.warnings&&d.warnings.length?"\n⚠ "+d.warnings.join("；"):""),C.pathC);
+}
+/* ── 衬套刚度标定（真实柔度数据链：供应商实测 → K&C compliance 工况，与 06-ui-panels.js 同构） ── */
+function bushCalibParse(text){
+  try{
+    const j=JSON.parse(text);
+    if(!j||typeof j!=="object"||Array.isArray(j))return null;
+    const out={};
+    for(const n in j){
+      const e=j[n];
+      if(!e||!Array.isArray(e.kT)||e.kT.length!==3||!e.kT.every(isFinite))return null;
+      out[n]={kT:e.kT.map(Number),
+        kR:(Array.isArray(e.kR)&&e.kR.length===3&&e.kR.every(isFinite))?e.kR.map(Number):[8e4,8e4,8e4]};
+    }
+    return Object.keys(out).length?out:null;
+  }catch(err){return null;}
+}
+function bushCalibApply(){
+  const st=document.getElementById("bushCalibStatus");
+  const setSt=(t,col)=>{if(st){st.textContent=t;st.style.color=col||"";}};
+  const ta=document.getElementById("bushCalibData");
+  const d=bushCalibParse(ta?ta.value:"");
+  if(!d){setSt("解析失败：JSON 形如 {\"LCA_F\":{\"kT\":[x,y,z],\"kR\":[..]}}，kT 必须为 3 个平移刚度 N/mm",C.nodeFix);return;}
+  if(!SIM.bushCalib)SIM.bushCalib={};
+  SIM.bushCalib[S.axis||"front"]=d;
+  const nodes=Object.keys(d).join("、");
+  setSt("✓ 已应用"+(S.axis==="rear"?"后轴":"前轴")+"实测衬套（"+nodes+"）→ 重跑“力偏移 COMPLIANCE”工况生效",C.pathC);
+}
+function bushCalibReset(){
+  const st=document.getElementById("bushCalibStatus");
+  if(SIM.bushCalib)delete SIM.bushCalib[S.axis||"front"];
+  if(st)st.textContent="已恢复车型预设衬套刚度。",st.style.color="";
+}
+function buildBushingCalibPanel(host){
+  const b=sec(host,"衬套刚度标定","BUSHING CALIBRATION",true);
+  const hint=E("div","eng-status");
+  hint.textContent="供应商实测衬套刚度（平移 kT N/mm×3，可选旋转 kR N·mm/°×3）→ 覆盖车型预设，用于引擎 K&C 力偏移 (COMPLIANCE) 工况——真实悬架柔度数据链（当前轴随左侧轴选择切换）。";
+  b.appendChild(hint);
+  const ta=E("textarea");ta.id="bushCalibData";ta.rows=5;
+  ta.placeholder='JSON: {"LCA_F":{"kT":[2500,2500,2500],"kR":[80000,80000,80000]},\n        "UCA_F":{"kT":[3500,3500,3500]}}';
+  ta.style.cssText="width:calc(100% - 16px);margin:2px 8px;font:10px/1.4 ui-monospace,monospace;background:var(--well);color:var(--ink-2);border:1px solid var(--glass-bd);padding:4px;box-sizing:border-box";
+  b.appendChild(ta);
+  const row=E("div");row.style.cssText="display:flex;gap:3px;padding:3px 8px";
+  const apBtn=E("button","eng-run");apBtn.id="bushCalibApply";apBtn.textContent="应用实测刚度 APPLY";apBtn.style.flex="2";
+  apBtn.onclick=bushCalibApply;
+  const rsBtn=E("button","eng-btn");rsBtn.textContent="恢复预设 RESET";rsBtn.style.flex="1";
+  rsBtn.onclick=bushCalibReset;
+  row.appendChild(apBtn);row.appendChild(rsBtn);b.appendChild(row);
+  const st=E("div","eng-status");st.id="bushCalibStatus";
+  st.textContent="当前生效：车型预设衬套（在前轴 LCA/UCA 2500~3500 N/mm 量级）。";
+  b.appendChild(st);
 }
 function buildEnginePanel(host){
   let b=sec(host,"引擎连接与 K&C 分析","ENGINE /api/v3");
@@ -3211,6 +3352,151 @@ function buildEngineResults(host){
 }
 /* ── 整车底盘分析（S2-5：四角+整车参数 → /api/v3/chassis/*，双模） ── */
 const CH={busy:false,kcCase:"solve",sweep:{min:-50,max:50,n:21},result:null};
+/* ── 轮胎实测标定（讲义 EP08 数据链，与 06-ui-panels.js 同构） ── */
+function tireCalibParse(text){
+  const t=(text||"").trim();
+  if(!t)return null;
+  if(t[0]==="["||t[0]==="{"){
+    try{
+      const j=JSON.parse(t);
+      const arr=Array.isArray(j)?j:(j.curves||[]);
+      return arr.map(c=>({fz:+c.fz,
+        alpha_deg:(c.alpha_deg||[]).map(Number),
+        fy:(c.fy||[]).map(Number)}));
+    }catch(e){return null;}
+  }
+  const byFz={};
+  for(const line of t.split(/\r?\n/)){
+    const p=line.split(/[,;\t]+/).map(s=>parseFloat(s));
+    if(p.length>=3&&isFinite(p[0])&&isFinite(p[1])&&isFinite(p[2])){
+      if(!byFz[p[0]])byFz[p[0]]={a:[],f:[]};
+      byFz[p[0]].a.push(p[1]);byFz[p[0]].f.push(p[2]);
+    }
+  }
+  const out=Object.keys(byFz).map(k=>({fz:+k,alpha_deg:byFz[k].a,fy:byFz[k].f}));
+  return out.length?out:null;
+}
+function tireCalibSample(){
+  const P={Fy0:8000,By:9,Cy:1.2,Ey:-0.5,LS:0.10,FzNom:3500};
+  const al=[];for(let a=0;a<=20;a+=0.5)al.push(a);
+  return [2000,3500,5000].map(fz=>{
+    const r=fz/P.FzNom, d=P.Fy0*r*Math.max(0.1,1-P.LS*(r-1));
+    return {fz:fz,alpha_deg:al,fy:al.map(a=>{
+      const x=P.By*a*Math.PI/180;
+      return + (d*Math.sin(P.Cy*Math.atan(x-P.Ey*(x-Math.atan(x))))).toFixed(1);})};
+  });
+}
+async function tireCalibRun(){
+  const st=document.getElementById("tireCalibStatus");
+  const setSt=(t,col)=>{if(st){st.textContent=t;st.style.color=col||"";}};
+  if(!ENG.ok){setSt("引擎未连接 → 先在“引擎连接”面板连接（辨识走 /api/v3/tire/fit）",C.nodeFix);return;}
+  const ta=document.getElementById("tireCalibData");
+  const curves=tireCalibParse(ta?ta.value:"");
+  if(!curves){setSt("解析失败：请填 JSON 数组或 CSV（每行 fz,alpha,fy）",C.nodeFix);return;}
+  const btn=document.getElementById("tireCalibRun");if(btn)btn.textContent="辨识中…";
+  setSt("辨识中（"+curves.length+" 个载荷层级）…",C.txt2);
+  try{
+    const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),30000);
+    const r=await fetch(ENG.url+"/api/v3/tire/fit",
+      {method:"POST",headers:{"Content-Type":"application/json"},
+       body:JSON.stringify({curves:curves,fit_ls:true}),signal:ctl.signal});
+    clearTimeout(to);
+    if(!r.ok){const t=await r.text();throw new Error("HTTP "+r.status+" "+t.slice(0,120));}
+    const d=await r.json();
+    if(d.status!=="VALID"||!d.params)throw new Error(d.note||d.status);
+    applyTireCalib(d.params);
+    const p=d.params;
+    setSt("✓ 已应用实胎特性：Fy0 "+p.Fy0+"N · By "+p.By+" · Cy "+p.Cy+" · Ey "+p.Ey+
+      " · LS "+p.LS+" · RMS "+d.rms_pct+"%（"+d.n_loads+" 层级 · "+d.n_points+" 点）"+
+      (d.note?"\n⚠ "+d.note:""),C.pathC);
+  }catch(err){setSt("辨识失败："+err.message,C.nodeFix);}
+  finally{if(btn)btn.textContent="辨识 MF 参数 FIT";}
+}
+function buildTireCalibPanel(host){
+  const b=sec(host,"轮胎实测标定","TIRE CALIBRATION",true);
+  const hint=E("div","eng-status");
+  hint.textContent="实测 Fy-α 曲线（≥2 个载荷层级可辨识载荷敏感性 LS）→ 引擎辨识 Pacejka MF 参数，即时应用于准静态操稳指标与赛道仿真（讲义 EP08）。";
+  b.appendChild(hint);
+  const ta=E("textarea");ta.id="tireCalibData";ta.rows=5;
+  ta.placeholder='JSON: [{"fz":2000,"alpha_deg":[0,1,2,...],"fy":[0,500,...]},...]\n或 CSV：每行 fz,alpha,fy（一行一点）';
+  ta.style.cssText="width:calc(100% - 16px);margin:2px 8px;font:10px/1.4 ui-monospace,monospace;background:var(--well);color:var(--ink-2);border:1px solid var(--glass-bd);padding:4px;box-sizing:border-box";
+  b.appendChild(ta);
+  const row=E("div");row.style.cssText="display:flex;gap:3px;padding:3px 8px";
+  const exBtn=E("button","eng-btn");exBtn.textContent="示例 SAMPLE";exBtn.style.flex="1";
+  exBtn.onclick=()=>{ta.value=JSON.stringify(tireCalibSample());};
+  const runBtn=E("button","eng-run");runBtn.id="tireCalibRun";
+  runBtn.textContent="辨识 MF 参数 FIT";runBtn.style.flex="2";
+  runBtn.onclick=tireCalibRun;
+  row.appendChild(exBtn);row.appendChild(runBtn);b.appendChild(row);
+  const st=E("div","eng-status");st.id="tireCalibStatus";
+  st.textContent="当前缺省胎（引擎 TireParams）：Fy0 8000 N · μ 2.29 · LS 0.10；辨识成功后此处显示实胎参数。";
+  b.appendChild(st);
+}
+/* ── K&C 台架对拍（真实开发闭环：仿真预测 ↔ 台架验证，与 06-ui-panels.js 同构） ── */
+function kcMeasuredParse(text){
+  const lines=(text||"").split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(!lines.length)return null;
+  let ci={travel:0,cam:1,toe:2};
+  let start=0;
+  const head=lines[0].toLowerCase();
+  if(/[a-z\u4e00-\u9fa5]/.test(head.replace(/[\d.,;\t -]/g,""))){
+    const cols=lines[0].split(/[,;\t]+/).map(s=>s.trim().toLowerCase());
+    const find=(re,d)=>{const i=cols.findIndex(c=>re.test(c));return i>=0?i:d;};
+    ci={travel:find(/travel|^tr$|行程/,0),cam:find(/camber|^cam$|外倾/,1),toe:find(/toe|前束/,2)};
+    start=1;
+    if(ci.cam<0&&ci.toe<0)return null;
+  }
+  const d={travel:[],cam:[],toe:[]};
+  for(let i=start;i<lines.length;i++){
+    const p=lines[i].split(/[,;\t ]+/).map(parseFloat);
+    if(!isFinite(p[ci.travel]))continue;
+    d.travel.push(p[ci.travel]);
+    d.cam.push(isFinite(p[ci.cam])?p[ci.cam]:null);
+    d.toe.push(isFinite(p[ci.toe])?p[ci.toe]:null);
+  }
+  return (d.travel.length>=3)?d:null;
+}
+function kcMeasuredApply(){
+  const st=document.getElementById("kcMeasStatus");
+  const setSt=(t,col)=>{if(st){st.textContent=t;st.style.color=col||"";}};
+  const ta=document.getElementById("kcMeasData");
+  const d=kcMeasuredParse(ta?ta.value:"");
+  if(!d){setSt("解析失败：需 ≥3 行数据；表头行自动识别 travel/camber/toe 列（或按此顺序无表头）",C.nodeFix);return;}
+  const axis=S.axis||"front";
+  if(!SIM.kcMeasured)SIM.kcMeasured={};
+  SIM.kcMeasured[axis]=d;
+  const rc=kcMeasuredRMS(axis,"cam"), rt=kcMeasuredRMS(axis,"toe");
+  setSt("✓ 已载入"+(axis==="front"?"前轴":"后轴")+"实测曲线（"+d.travel.length+" 点） · "
+    +"Camber RMS "+(rc===null?"—":rc.toFixed(3)+"°")
+    +" · Toe RMS "+(rt===null?"—":rt.toFixed(3)+"°")
+    +" → 轮跳图已叠画点划线（红色）",C.pathC);
+  if(typeof drawPlots==="function")drawPlots();
+}
+function kcMeasuredClear(){
+  const st=document.getElementById("kcMeasStatus");
+  if(SIM.kcMeasured)delete SIM.kcMeasured[S.axis||"front"];
+  if(st)st.textContent="已清除当前轴实测曲线 → 轮跳图恢复仿真/基准双线。",st.style.color="";
+  if(typeof drawPlots==="function")drawPlots();
+}
+function buildKcMeasuredPanel(host){
+  const b=sec(host,"K&C 台架对拍","RIG CORRELATION",true);
+  const hint=E("div","eng-status");
+  hint.textContent="导入台架实测轮跳曲线（travel, camber, toe），与仿真曲线同图叠画点划线，并给出重叠区间 RMS 偏差——仿真预测↔台架验证闭环（当前轴随左侧轴选择切换）。";
+  b.appendChild(hint);
+  const ta=E("textarea");ta.id="kcMeasData";ta.rows=5;
+  ta.placeholder="CSV（可带表头）：\ntravel,camber,toe\n-40,-3.9,-0.2\n-20,-3.4,-0.1\n0,-2.0,0.05\n20,-0.6,0.2 ...";
+  ta.style.cssText="width:calc(100% - 16px);margin:2px 8px;font:10px/1.4 ui-monospace,monospace;background:var(--well);color:var(--ink-2);border:1px solid var(--glass-bd);padding:4px;box-sizing:border-box";
+  b.appendChild(ta);
+  const row=E("div");row.style.cssText="display:flex;gap:3px;padding:3px 8px";
+  const impBtn=E("button","eng-run");impBtn.id="kcMeasApply";impBtn.textContent="导入并叠画 IMPORT";impBtn.style.flex="2";
+  impBtn.onclick=kcMeasuredApply;
+  const clrBtn=E("button","eng-btn");clrBtn.textContent="清除 CLEAR";clrBtn.style.flex="1";
+  clrBtn.onclick=kcMeasuredClear;
+  row.appendChild(impBtn);row.appendChild(clrBtn);b.appendChild(row);
+  const st=E("div","eng-status");st.id="kcMeasStatus";
+  st.textContent="尚无实测曲线：粘入台架导出 CSV 后点导入。";
+  b.appendChild(st);
+}
 function buildChassisPanel(host){
   let b=sec(host,"整车底盘分析 (引擎)","FULL-CHASSIS ENGINE");
   const ck=E("div");ck.style.cssText="display:flex;gap:3px;padding:3px 8px;flex-wrap:wrap";
@@ -3439,6 +3725,11 @@ function updateReadouts(){
     setRO("roFzFR", fmt(qs.fz.FR, 0));
     setRO("roFzRL", fmt(qs.fz.RL, 0));
     setRO("roFzRR", fmt(qs.fz.RR, 0));
+    /* US Gradient / 前后侧偏角 / Jacking（准静态新增，镜像引擎） */
+    setRO("roUsGrad", Math.abs(qs.usGrad) > 1e-9 ? fmt(qs.usGrad, 2) : "—");
+    setRO("roAlphaF", fmt(qs.alphaF, 2));
+    setRO("roAlphaR", fmt(qs.alphaR, 2));
+    setRO("roJacking", fmt(qs.jackingMm, 2));
 
     const tb=document.getElementById("tlltdBar");
     if(tb){
@@ -3495,7 +3786,7 @@ function updateReadouts(){
   document.getElementById("sbArchName").textContent = isF?"前悬架 (推杆)":"后悬架 (拉杆)";
 }
 
-function plotXYOverlay(cv,title,unit,seriesActive,seriesBase,xr,curx){
+function plotXYOverlay(cv,title,unit,seriesActive,seriesBase,xr,curx,seriesMeas){
   const dpr=Math.min(2,window.devicePixelRatio||1);
   const w=cv.clientWidth||300,h=cv.clientHeight||84;
   if(cv.width!==w*dpr||cv.height!==h*dpr){cv.width=w*dpr;cv.height=h*dpr;}
@@ -3504,7 +3795,7 @@ function plotXYOverlay(cv,title,unit,seriesActive,seriesBase,xr,curx){
   const ml=34,mr=6,mt=13,mb=11,pw=w-ml-mr,ph=h-mt-mb;
   
   let y0=1e9,y1=-1e9;
-  const allPts = [].concat(seriesActive.pts).concat(seriesBase?seriesBase.pts:[]);
+  const allPts = [].concat(seriesActive.pts, seriesBase?seriesBase.pts:[], seriesMeas?seriesMeas.pts:[]);
   allPts.forEach(p=>{if(p[1]===null||!isFinite(p[1]))return;
     if(p[1]<y0)y0=p[1];if(p[1]>y1)y1=p[1];});
   if(y0>y1){y0=0;y1=1;}
@@ -3524,6 +3815,15 @@ function plotXYOverlay(cv,title,unit,seriesActive,seriesBase,xr,curx){
     seriesBase.pts.forEach(p=>{if(p[1]===null||!isFinite(p[1])){st=false;return;}
       const x=X(p[0]),y=Y(p[1]);if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y);});
     ctx.stroke();
+  }
+
+  // 1.5 绘制台架实测曲线 (点划线，K&C 对拍：仿真预测↔台架验证闭环)
+  if(seriesMeas && seriesMeas.pts.length){
+    ctx.strokeStyle=seriesMeas.c||C.frc;ctx.lineWidth=1.2;ctx.setLineDash([6,2,1.5,2]);
+    ctx.beginPath();let stm=false;
+    seriesMeas.pts.forEach(p=>{if(p[1]===null||!isFinite(p[1])){stm=false;return;}
+      const x=X(p[0]),y=Y(p[1]);if(!stm){ctx.moveTo(x,y);stm=true;}else ctx.lineTo(x,y);});
+    ctx.stroke();ctx.setLineDash([]);
   }
 
   // 2. 绘制 Active 活动曲线 (实线)
@@ -3546,6 +3846,71 @@ function plotXYOverlay(cv,title,unit,seriesActive,seriesBase,xr,curx){
   ctx.textAlign="left";
 }
 
+/* K&C 台架对拍：实测 vs 仿真 RMS 偏差（°，重叠行程区间，线性插值到仿真网格） */
+function kcMeasuredRMS(axis,key){
+  const meas = SIM.kcMeasured ? SIM.kcMeasured[axis] : null;
+  const sw = axis==="front" ? SIM.swF : SIM.swR;
+  if(!meas||!sw||!sw.rows||!meas.travel||meas.travel.length<2)return null;
+  const lo=Math.max(sw.rows[0].tr, Math.min(meas.travel[0],meas.travel[meas.travel.length-1]));
+  const hi=Math.min(sw.rows[sw.rows.length-1].tr, Math.max(meas.travel[0],meas.travel[meas.travel.length-1]));
+  if(!(hi>lo))return null;
+  const interp=(xs,ys,x)=>{
+    if(x<=xs[0])return ys[0];if(x>=xs[xs.length-1])return ys[ys.length-1];
+    let i=1;while(i<xs.length&&xs[i]<x)i++;
+    const t=(x-xs[i-1])/((xs[i]-xs[i-1])||1e-9);return ys[i-1]+(ys[i]-ys[i-1])*t;};
+  let s2=0,n=0;
+  for(const r of sw.rows){ if(r.tr<lo||r.tr>hi)continue;
+    const mv=interp(meas.travel,meas[key],r.tr);
+    const sv=interp(sw.rows.map(q=>q.tr),sw.rows.map(q=>q[key]),r.tr);
+    if(isFinite(mv)&&isFinite(sv)){s2+=(mv-sv)*(mv-sv);n++;}}
+  return n>1?Math.sqrt(s2/n):null;
+}
+
+/* 不足转向特性 δ-ay 图（底盘开发汇报核心图；当前工况点红点标记，与 07-plots.js 同构） */
+function plotUsCurve(cv){
+  const c=SIM.usCurve;if(!c||!c.gy||c.gy.length<3)return;
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const w=cv.clientWidth||300,h=cv.clientHeight||110;
+  if(cv.width!==w*dpr||cv.height!==h*dpr){cv.width=w*dpr;cv.height=h*dpr;}
+  const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);ctx.fillStyle=C.bg;ctx.fillRect(0,0,w,h);
+  const ml=30,mr=6,mt=13,mb=13,pw=w-ml-mr,ph=h-mt-mb;
+  let y0=0,y1=0.1;
+  c.us.forEach(v=>{if(isFinite(v)){if(v<y0)y0=v;if(v>y1)y1=v;}});
+  const pad=(y1-y0)*0.15+0.05;y0-=pad;y1+=pad;
+  const X=x=>ml+(x/2.0)*pw, Y=y=>mt+ph-(y-y0)/((y1-y0)||1)*ph;
+  ctx.strokeStyle=C.grid;ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){const y=mt+ph*i/4;ctx.beginPath();ctx.moveTo(ml,y);ctx.lineTo(ml+pw,y);ctx.stroke();}
+  if(y0<0&&y1>0){ctx.strokeStyle=C.dim;ctx.setLineDash([2,2]);ctx.beginPath();ctx.moveTo(ml,Y(0));ctx.lineTo(ml+pw,Y(0));ctx.stroke();ctx.setLineDash([]);}
+  // 轮胎分量（虚线）——完整版 δ-ay = 轮胎 + 侧倾转向
+  if(c.usTire){
+    ctx.strokeStyle=C.base;ctx.lineWidth=1.2;ctx.setLineDash([4,3]);ctx.beginPath();let stt=false;
+    c.gy.forEach((gv,i)=>{const v=c.usTire[i];if(!isFinite(v))return;
+      const x=X(gv),y=Y(v);if(!stt){ctx.moveTo(x,y);stt=true;}else ctx.lineTo(x,y);});
+    ctx.stroke();ctx.setLineDash([]);
+  }
+  // 总线（实线）：轮胎 + 侧倾转向
+  ctx.strokeStyle=C.strut;ctx.lineWidth=1.6;ctx.setLineDash([]);ctx.beginPath();let st=false;
+  c.gy.forEach((gv,i)=>{const v=c.us[i];if(!isFinite(v))return;
+    const x=X(gv),y=Y(v);if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y);});
+  ctx.stroke();
+  const gyNow=S.qs.gy;
+  if(Math.abs(gyNow)<=2.0){
+    const idx=Math.round(Math.abs(gyNow)/2.0*(c.gy.length-1));
+    if(c.us[idx]!==undefined&&isFinite(c.us[idx])){
+      ctx.fillStyle=C.frc;ctx.beginPath();
+      ctx.arc(X(Math.abs(gyNow)),Y(c.us[idx]),3,0,7);ctx.fill();
+    }
+  }
+  ctx.strokeStyle=C.axis;ctx.lineWidth=1;ctx.strokeRect(ml+.5,mt+.5,pw,ph);
+  ctx.fillStyle=C.txt2;ctx.font="8.5px ui-monospace,monospace";
+  ctx.fillText("不足转向特性 US CHARACTERISTIC · 实线=总 δ（轮胎+侧倾转向） · 虚线=轮胎项 · 红点=当前工况",ml+1,mt-3.5);
+  ctx.fillStyle=C.txt3;ctx.textAlign="right";
+  ctx.fillText(fmt(y1,1),ml-3,mt+7);ctx.fillText(fmt(y0,1),ml-3,mt+ph-1);
+  ctx.fillText("0",ml,mt+ph+9);ctx.fillText("2g",ml+pw-8,mt+ph+9);
+  ctx.textAlign="left";
+}
+
 function drawPlots(){
   const isF = S.axis === 'front';
   const sw = isF ? SIM.swF : SIM.swR;
@@ -3562,12 +3927,24 @@ function drawPlots(){
     ["前束角变化 (跳动转向) TOE","°","toe",C.tie]
   ];
 
+  const meas = SIM.kcMeasured ? (isF ? SIM.kcMeasured.front : SIM.kcMeasured.rear) : null;
   P.forEach((p,i)=>{
     if(!UI.plots[i]) return;
     const act = S1(sw, p[2], p[3]);
     const bas = S1(b_sw, p[2], C.base);
-    plotXYOverlay(UI.plots[i], p[0]+"  ← 轮跳行程 [mm] →", p[1], act, bas, xr, cur);
+    const msr = (meas && meas.travel && meas[p[2]] && (p[2]==="cam"||p[2]==="toe"))
+      ? {pts:meas.travel.map((t,k)=>[t,meas[p[2]][k]]), c:C.frc} : null;
+    plotXYOverlay(UI.plots[i], p[0]+"  ← 轮跳行程 [mm] →", p[1], act, bas, xr, cur, msr);
   });
+
+  /* 不足转向特性 δ-ay（节流：参数 dirty 或每 800ms 重算一次） */
+  const nowT=performance.now();
+  if(SIM.usCurveDirty!==false||!SIM.usCurve||nowT-(SIM.usCurveT||0)>800){
+    if(typeof usSweepCompute==="function")usSweepCompute();
+    SIM.usCurveT=nowT;SIM.usCurveDirty=false;
+  }
+  const uc=document.getElementById("usCurvePlot");
+  if(uc)plotUsCurve(uc);
 }
 
 /* ================================ 12b. 硬点永久保存（2026-08-23 移植新增） ================================ */
@@ -4509,6 +4886,10 @@ function trackStageRun(){
       FzNom:parseFloat(document.getElementById("ssFzN").value)||3500,
       Ls:parseFloat(document.getElementById("ssLs").value)||0.35,
       Cg:parseFloat(document.getElementById("ssCg").value)||0.5}};
+  /* 轮胎实测标定优先（讲义 EP08 数据链）：辨识成功后覆写舞台胎参数 */
+  if(SIM.tireCalib){const tc=SIM.tireCalib;
+    Object.assign(body.tire,{Fy0:tc.Fy0,FzNom:tc.FzNom,LS:tc.LS,By:tc.By,Cy:tc.Cy});
+    if(isFinite(SIM.tireCalibEy))body.tire.Ey=SIM.tireCalibEy;}
   const useEng=document.getElementById("ssUseEng")&&document.getElementById("ssUseEng").checked&&ENG.ok;
   const finishStage=function(res){
     if(res.status!=="VALID"){document.getElementById("ssStatus").textContent="仿真失败："+res.status;return;}

@@ -421,7 +421,20 @@ function sampleSweep(sw,tr,key){
 }
 
 /* ================================ 5. 准静态载荷转移代数解算 ================================ */
-function solveQuasiStatic(){
+/* —— 稳态不足转向梯度（线性区，镜像引擎 chassis.quasi_loads）——
+   α轴 = Fy轴 / ΣCα(各轮真实载荷)；Cα = B·C·D(Fz) 含 LS 载荷敏感性。
+   TIRE_MF_QS 与引擎 TireParams 缺省值逐字同源（test_dom 钉死）；
+   轮胎实测标定（左坞站 TIRE CALIBRATION）成功后由 applyTireCalib() 覆写。 */
+let TIRE_MF_QS = { Fy0: 8000, FzNom: 3500, By: 9, Cy: 1.2, LS: 0.10 };
+function applyTireCalib(p){
+  if(!p || typeof p !== "object") return;
+  ["Fy0","FzNom","By","Cy","LS"].forEach(k=>{ if(isFinite(p[k])) TIRE_MF_QS[k]=p[k]; });
+  if(isFinite(p.Ey)) SIM.tireCalibEy = p.Ey;   /* Ey 仅赛道瞬态用 */
+  SIM.tireCalib = Object.assign({}, TIRE_MF_QS);
+  SIM.qsRes = solveQuasiStatic();              /* 立即用实胎特性重算操稳指标 */
+  if(typeof updateReadouts === "function") updateReadouts();
+}
+function solveQuasiStatic(gyOverride){
   const g = 9.81;
   const L = S.wb / 1000;
   const mS = S.mSprung, mT = S.mTotal;
@@ -448,7 +461,7 @@ function solveQuasiStatic(){
   const Fzf0 = mS * g * (b / L) + mU_f * g + F_aero * S.qs.aeroBias;
   const Fzr0 = mS * g * (a / L) + mU_r * g + F_aero * (1 - S.qs.aeroBias);
 
-  const Gy = S.qs.gy, Gx = S.qs.gx;
+  const Gy = gyOverride!==undefined?gyOverride:S.qs.gy, Gx = S.qs.gx;
   const ay = Gy * g, ax = Gx * g;
 
   // —— 侧倾耦合迭代：RC 高度(zrc)取外侧压缩轮、侧倾刚度(kphi)取左右 kw 均值，均随行程迁移 ——
@@ -507,7 +520,30 @@ function solveQuasiStatic(){
   const fzFR = Math.max(0, (Fzf0 - dFz_long) / 2 + dFz_f_tot * sgnY);
   const fzRL = Math.max(0, (Fzr0 + dFz_long) / 2 - dFz_r_tot * sgnY);
   const fzRR = Math.max(0, (Fzr0 + dFz_long) / 2 + dFz_r_tot * sgnY);
-  
+
+  /* —— 稳态不足转向梯度（线性区，镜像引擎 chassis.quasi_loads）——
+     α轴 = Fy轴 / ΣCα(各轮真实载荷)；Cα = B·C·D(Fz) 含 LS 载荷敏感性。 */
+  const caMF = (fzW) => { if (fzW <= 0) return 0;
+    const r = fzW / TIRE_MF_QS.FzNom;
+    const d = TIRE_MF_QS.Fy0 * r * Math.max(0.1, 1 - TIRE_MF_QS.LS * (r - 1));
+    return TIRE_MF_QS.By * TIRE_MF_QS.Cy * d; };
+  let usGrad = 0, alphaFDeg = 0, alphaRDeg = 0;
+  if (Math.abs(Gy) >= 0.02) {
+    const fyF = mT * ay * (b / L), fyR = mT * ay * (a / L);
+    const caF = caMF(fzFL) + caMF(fzFR), caR = caMF(fzRL) + caMF(fzRR);
+    if (caF > 1e-6 && caR > 1e-6) {
+      alphaFDeg = (fyF / caF) * R2D;
+      alphaRDeg = (fyR / caR) * R2D;
+      usGrad = (alphaFDeg - alphaRDeg) / Gy;   /* deg/g */
+    }
+  }
+
+  /* —— Jacking 效应：侧向力经 RC 的垂向分量（镜像引擎，讲义 EP10）—— */
+  const fJackF = (mS * ay * (b / L)) * (2 * zrc_f / tf);
+  const fJackR = (mS * ay * (a / L)) * (2 * zrc_r / tr);
+  const jackingN = fJackF + fJackR;
+  const jackingMm = jackingN / ((kwF0 + kwR0) / 1000);
+
   return {
     rollDeg: rollAngleDeg, rollGrad: rollGrad,
     kphi_f: kphi_f * D2R, kphi_r: kphi_r * D2R, kphi_tot: kphi_tot * D2R,
@@ -516,8 +552,46 @@ function solveQuasiStatic(){
     dFz_u_f: dFz_u_f, dFz_geo_f: dFz_geo_f, dFz_elas_f: dFz_elas_f, dFz_f_tot: dFz_f_tot,
     dFz_u_r: dFz_u_r, dFz_geo_r: dFz_geo_r, dFz_elas_r: dFz_elas_r, dFz_r_tot: dFz_r_tot,
     tlltd: tlltd,
+    usGrad: usGrad, alphaF: alphaFDeg, alphaR: alphaRDeg,
+    jackingN: jackingN, jackingMm: jackingMm,
     fz:{ FL: fzFL, FR: fzFR, RL: fzRL, RR: fzRR }
   };
+}
+
+/* —— 侧倾转向率 @0（°toe/mm，外轮，±10mm 轮跳插值差分，镜像引擎 _roll_steer_rate）—— */
+function rollSteerRate(sw){
+  if(!sw||!sw.rows||sw.rows.length<3)return 0;
+  const xs=sw.rows.map(r=>r.tr), ys=sw.rows.map(r=>r.toe);
+  const at=t=>{
+    if(t<=xs[0])return ys[0];if(t>=xs[xs.length-1])return ys[ys.length-1];
+    let i=1;while(i<xs.length&&xs[i]<t)i++;
+    const k=(t-xs[i-1])/((xs[i]-xs[i-1])||1e-9);return ys[i-1]+(ys[i]-ys[i-1])*k;
+  };
+  return (at(10)-at(-10))/20;
+}
+
+/* —— 不足转向特性 δ-ay 扫掠（底盘开发汇报核心图，讲义 EP11/EP12）——
+   完整版：δ_us = (αf−αr) [轮胎] + (δrs,f − δrs,r) [侧倾转向]；
+   与引擎 chassis.solve 的 us_curve 严格同口径。分量分列供双线叠画；
+   compliance 项在 K&C 力偏移工况另查，不在此伪造。
+   节流重算由 drawPlots 驱动（SIM.usCurveDirty / 800ms）。 */
+function usSweepCompute(){
+  const N=21, GYMAX=2.0;
+  const halfF=abs(S.front.hp.WC[0]), halfR=abs(S.rear.hp.WC[0]);
+  const rsF=rollSteerRate(SIM.swF), rsR=rollSteerRate(SIM.swR);
+  const gy=[],alphaF=[],alphaR=[],usTire=[],usRoll=[],us=[],roll=[];
+  for(let i=0;i<N;i++){
+    const g=+(GYMAX*i/(N-1)).toFixed(4);
+    const q=solveQuasiStatic(g);
+    const rollRad=q.rollDeg*D2R;
+    const rs=(rsF*rollRad*halfF)-(rsR*rollRad*halfR);
+    const tire=g>=0.02?+(q.alphaF-q.alphaR).toFixed(4):0;
+    gy.push(g); alphaF.push(q.alphaF); alphaR.push(q.alphaR);
+    usTire.push(tire); usRoll.push(+rs.toFixed(4));
+    us.push(+(tire+rs).toFixed(4));
+    roll.push(q.rollDeg);
+  }
+  SIM.usCurve={gy:gy,alphaF:alphaF,alphaR:alphaR,usTire:usTire,usRoll:usRoll,us:us,roll:roll};
 }
 
 /* ================================ 6. 动力学 (4-Post Rig 显式积分) ================================ */

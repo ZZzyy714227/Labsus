@@ -14,7 +14,7 @@ import math
 
 import numpy as np
 
-from core.metrics import MetricResult, not_applicable, not_implemented, ok, solver_failed
+from core.metrics import MetricResult, not_applicable, ok, solver_failed
 
 R2D = 180.0 / math.pi
 D2R = math.pi / 180.0
@@ -265,10 +265,20 @@ def motion_ratio(damper_travel_curve, travel_curve, at_travel: float) -> MetricR
     return ok(abs(slope[0]), "-")
 
 
-def jacking(roll_deg: float) -> MetricResult:
-    """Jacking 抬升：依赖侧向载荷经 IC 的垂向分力（P3 载荷阶段实现）。
+def jacking(fy_sprung_n: float, rc_h_mm: float, track_mm: float) -> MetricResult:
+    """Jacking 垂向力：侧向力经悬架连杆传至侧倾中心（RC）时的垂向分量。
 
-    P2-2 不伪造数值：显式 NOT_IMPLEMENTED。
+    侧视：每侧接地印迹的侧向力沿 接地点→IC 连线传递，双侧合成后作用在
+    RC；等效垂向分量（对称轴，RC 在中线上）：
+        F_jack = F_y · 2·z_RC / T
+    正 RC → 抬升簧载（千斤顶效应）；负 RC → 下拉。抬升量由调用方除以
+    轴垂向刚度得到（quasi_loads 已集成）。与讲义 EP10 拓展同源。
     """
-    return not_implemented("jacking", "mm",
-                           "需要 P3 四轮载荷（Fy 经 IC 的垂向分量）")
+    if not math.isfinite(fy_sprung_n):
+        return solver_failed("jacking", "N", "Fy 非有限")
+    if track_mm <= 0 or not math.isfinite(track_mm):
+        return solver_failed("jacking", "N", "轮距无效")
+    if not math.isfinite(rc_h_mm):
+        return not_applicable("jacking", "N", "RC 高度不可用")
+    return ok(fy_sprung_n * (2.0 * rc_h_mm / track_mm), "N",
+              note="正=抬升簧载；抬升量需除以轴垂向刚度")
