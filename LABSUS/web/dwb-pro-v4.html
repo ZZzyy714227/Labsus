@@ -1,60 +1,115 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LABSUS 悬架实验室 · 全车底盘多体运动学、4-Post动力学与准静态操稳分析平台</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/fullchassis.css">
+<title>LABSUS v4 · 悬架实验室新版工作台（舞台 + 坞站布局）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/v4.css">
 </head>
 <body>
 <div id="app">
+  <!-- ═══════════ 顶部工具栏：决策与执行（保留全部旧 id 供 JS 写入） ═══════════ -->
   <div id="tb">
     <div class="brand"><b>LABSUS</b></div>
-    <div class="tt"><span>全车底盘 高性能悬架 · 运动学 / 动力学 / 准静态操稳分析台</span><span>Full Chassis Inboard Suspension K&C, Rig Dynamics & Quasi-Static Handling</span></div>
+    <div class="tt"><span>悬架实验室 · v4 新版工作台</span><span>Suspension Lab · Stage + Dock Layout</span></div>
     <div class="sp"></div>
-    <div style="display:flex;align-items:center;gap:6px;margin-right:8px;">
-      <!-- Dynamic Test Stages moved to Left Panel -->
-      <button id="evalModalBtn" class="header-action-btn eval-btn" title="查看全维度悬架工程评价与AI调校建议">📊 综合评价报告</button>
-      <button id="pureSuspTg" class="header-action-btn" title="切换纯悬架透视 (隐藏车架与外围附件)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:var(--text);">纯悬架透视</button>
-    </div>
-    <div id="themeTg" class="theme-tg" title="切换浅色 / 深色模式"><i></i></div>
-    <div class="cell"><i>车型平台</i>
+
+    <!-- 车型平台 -->
+    <div class="cell slim"><i>车型平台</i>
       <select id="topVehSelect" style="background:transparent;border:none;color:var(--pri);font:600 11px var(--font-ui);cursor:pointer;outline:none;" onchange="loadVehiclePreset(this.value)">
-        <option value="formula" style="background:#161B22;color:#fff;">🏎️ Formula SAE (方程式)</option>
-        <option value="gt3" style="background:#161B22;color:#fff;">🏁 FIA GT3 (赛车模式)</option>
-        <option value="gt3_sport" style="background:#161B22;color:#fff;">🚗 FIA GT3 (日常模式)</option>
-        <option value="baja" style="background:#161B22;color:#fff;">🏜️ SAE Baja (越野赛车)</option>
+        <option value="formula">🏎️ Formula SAE (方程式)</option>
+        <option value="gt3">🏁 FIA GT3 (赛车模式)</option>
+        <option value="gt3_sport">🚗 FIA GT3 (日常模式)</option>
+        <option value="baja">🏜️ SAE Baja (越野赛车)</option>
       </select>
     </div>
-    <div class="cell"><i>正在调校</i><b class="a" id="tbArch">前悬架 PUSHROD</b></div>
-    <div class="cell"><i>Baseline 快照</i><b id="tbBase">未锁定 (无比对)</b></div>
-    <div class="cell"><i>求解内核</i><b class="c" id="tbSolver">闭式几何 + 静力平衡</b></div>
-    <div class="cell"><i>仿真状态</i><b class="g" id="tbStateBox"><i class="dot g" id="tbStateDot"></i><span id="tbState">运行</span></b></div>
-    <div class="cell"><i>引擎 /api/v3</i><b id="tbEng">内置 JS</b></div>
-    <div class="cell"><i>fps</i><b id="tbFps">--</b></div>
+
+    <!-- 前轴 / 后轴 -->
+    <div class="v4-seg v4-axis" title="切换调校轴（写入 S.axis）">
+      <button id="v4AxisF" class="on">前轴 F</button>
+      <button id="v4AxisR">后轴 R</button>
+    </div>
+
+    <!-- 工作模式（12 号脚本路由运行按钮） -->
+    <div class="v4-seg" id="v4ModeSeg">
+      <button data-mode="geo" class="on">几何</button>
+      <button data-mode="kc">K&amp;C</button>
+      <button data-mode="chassis">整车</button>
+      <button data-mode="track">赛道</button>
+    </div>
+
+    <!-- ▶ 运行：全界面唯一主按钮 -->
+    <button class="v4-run" id="v4RunBtn">▶ 运行</button>
+
+    <!-- 状态胶囊 -->
+    <button class="v4-pill warn" id="engPillV4" title="点击 连接 / 断开 引擎">
+      <span class="dot"></span><span id="tbEng">内置 JS</span></button>
+    <div class="v4-pill ro ok" title="仿真状态">
+      <b class="g" id="tbStateBox" style="display:flex;align-items:center;gap:6px;font-weight:inherit"><span class="dot" id="tbStateDot" style="background:var(--ok)"></span><span id="tbState">运行</span></b></div>
+    <div class="v4-pill ro" title="正在调校对象"><span id="tbArch">前悬架 PUSHROD</span></div>
+    <div class="v4-pill ro" title="Baseline 快照状态"><span id="tbBase">未锁定</span></div>
+    <div class="v4-pill ro" title="求解内核"><span id="tbSolver">闭式几何 + 静力平衡</span></div>
+
+    <button id="evalModalBtn" class="v4-mini" title="查看全维度悬架工程评价与AI调校建议">📊 评价报告</button>
+    <button id="pureSuspTg" class="v4-mini" title="切换纯悬架透视 (隐藏车架与外围附件)">透视</button>
+    <button id="v4ThemeBtn" title="配色方案选择">🎨</button>
+    <div id="themeTg" class="theme-tg" title="切换浅色 / 深色模式"><i></i></div>
+    <div class="cell slim"><i>fps</i><b id="tbFps">--</b></div>
   </div>
+
+  <!-- ═══════════ 主区：左坞站 + 中央舞台 + 右坞站 ═══════════ -->
   <div id="main">
+    <!-- 左坞站：Tab 与分区由 12 号脚本在 buildLeft() 产物上重组 -->
     <aside class="pnl" id="lp"></aside>
-    <section id="vp"></section>
-    <aside class="pnl" id="rp"></aside>
+
+    <!-- 中央舞台：视口工具条 + #vp（initViews 向其中生成四个 .vw） -->
+    <section id="v4stage">
+      <div class="v4-vpbar">
+        <div class="v4-seg" id="v4ViewSeg">
+          <button data-vi="0" class="on">1 正视</button>
+          <button data-vi="1">2 俯视</button>
+          <button data-vi="2">3 侧视</button>
+          <button data-vi="3">4 轴测</button>
+        </div>
+        <button class="v4-mini" id="v4QuadBtn" title="四宫格 / 单视口切换">▦ 四宫格</button>
+        <div class="v4-sp"></div>
+        <span id="v4VpTitle" style="font:500 10px var(--font-ui);color:var(--ink-2)">正视图 FRONT VIEW</span>
+        <button class="v4-mini" id="v4FullBtn" title="舞台全屏">⛶ 全屏</button>
+      </div>
+      <div id="vp"></div>
+    </section>
+
+    <!-- 右坞站：核心结论卡(#v4Hero) → 明细(#rp, buildRight 产物) → 诊断卡 -->
+    <aside class="pnl" id="v4right">
+      <div id="v4scroll">
+        <div id="v4Hero"></div>
+        <div id="rp"></div>
+        <div id="v4Diag"></div>
+      </div>
+    </aside>
   </div>
+
+  <!-- ═══════════ 底部状态栏：只留系统心跳（保留全部旧 id） ═══════════ -->
   <div id="sb">
     <div class="c"><u>构型</u><b id="sbArchName">前悬架 (推杆)</b></div>
     <div class="c"><u>节点</u><b id="sbNode">-</b></div>
     <div class="c"><u>刚性线约束</u><b id="sbRig">-</b></div>
-    <div class="c"><u>系统自由度</u><b id="sbDof">-</b></div>
+    <div class="c v4-hide"><u>系统自由度</u><b id="sbDof">-</b></div>
     <div class="c ok" id="sbResC"><u>残差 RESIDUAL</u><b id="sbRes">-</b></div>
     <div class="c"><u>前轴 TLLTD</u><b class="hl" id="sbTLLTD">52.4%</b></div>
     <div class="c"><u>侧倾梯度</u><b id="sbRollGrad">1.68 °/g</b></div>
     <div class="c"><u>求解耗时</u><b id="sbMs">-</b></div>
     <div class="sp"></div>
     <div class="c"><u>坐标拾取</u><b id="sbCur">-</b></div>
-    <div class="c hl"><u>提示</u><b id="sbHint">正交视图左键拖拽硬点 · 随时快照基准线(Save Baseline)进行多曲线比对</b></div>
+    <div class="c hl"><u>提示</u><b id="sbHint">Space 运行 · 1-4 切视图 · 正交视图左键拖拽硬点</b></div>
   </div>
 </div>
+
+<!-- 主题选择浮层（12 号脚本填充内容） -->
+<div id="v4ThemePop" style="display:none"></div>
 
 <!-- ================================ 综合悬架工程评价与诊断模态窗口 ================================ -->
 <div id="suspEvalModal" class="susp-eval-modal-backdrop">
@@ -961,5 +1016,6 @@
 <script src="js/09-track.js"></script>
 <script src="js/10-eval.js"></script>
 <script src="js/11-stages.js"></script>
+<script src="js/12-v4-arrange.js"></script>
 </body>
 </html>

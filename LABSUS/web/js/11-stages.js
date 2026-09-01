@@ -1,6 +1,6 @@
 "use strict";
 
-function buildShanghaiCircuit() {
+function buildShanghaiCircuit(mu = 1.35, aggressiveness = 1.0) {
   // 69 High-Precision Waypoints strictly matching FIA Shanghai International Circuit official layout (0 intersections)
   const wp = [
     // Main Start/Finish Straight (Heading NNE, DRS Zone 1)
@@ -89,7 +89,7 @@ function buildShanghaiCircuit() {
     {x: -45.0, y: -130.0, v_target: 46.0, turn: "T16", turnZh: "T16 90°左弯弯心 (165 km/h)", sector: 3, gear: 3, kerbSide: "left", runoff: "gravel"},
     {x: -25.0, y: -70.0, v_target: 55.0, turn: "T16", turnZh: "T16 出弯冲刺进入主直道", sector: 3, gear: 4, kerbSide: "right", isDRS: true}
   ];
-  return new CircuitPath(wp, 1.35);
+  return new CircuitPath(wp, mu, aggressiveness);
 }
 
 class UniversalAutoPilot {
@@ -97,8 +97,10 @@ class UniversalAutoPilot {
     this.wb = (S_config.wb || 2600) / 1000.0; 
     this.a = this.wb * 0.48; // Dist from CG to Front Axle
     
-    this.pid_speed = { p: 1.1, i: 0.15, d: 0.08, integral: 0, last_err: 0 };
+    this.pid_speed = { p: 0.95, i: 0.08, d: 0.04, integral: 0, last_err: 0 };
     this.last_steer = 0;
+    this.last_throttle = 0;
+    this.last_brake = 0;
     this.active = false;
     this.path = null;
   }
@@ -108,14 +110,16 @@ class UniversalAutoPilot {
     this.pid_speed.integral = 0;
     this.pid_speed.last_err = 0;
     this.last_steer = 0;
+    this.last_throttle = 0;
+    this.last_brake = 0;
   }
 
   drive(state, dt) {
     if (!this.path || !this.active) return { steer: 0, throttle: 0, brake: 0, target: null };
     
     const u = Math.max(0.1, state.u || 0);
-    // Dynamic lookahead distance adapting to speed (4m in hairpins, up to 35m at 320km/h)
-    const lookDist = Math.max(3.8, Math.min(38.0, 0.40 * u * this.wb));
+    // Dynamic lookahead distance adapting to speed (4m in hairpins, up to 45m at 330km/h)
+    const lookDist = Math.max(3.8, Math.min(45.0, 0.42 * u * this.wb));
     
     // Front Axle coordinates (World Frame) with speed-adaptive lookahead lead
     const fx = state.X - this.a * Math.sin(state.psi) + (-Math.sin(state.psi)) * (lookDist * 0.22);
@@ -131,8 +135,8 @@ class UniversalAutoPilot {
     if (safe_ey > 6.0) safe_ey = 6.0;
     if (safe_ey < -6.0) safe_ey = -6.0;
     
-    // Adaptive Stanley gain: softer at high speed (320km/h), responsive in hairpins
-    const k_st = 1.6 / (1.0 + 0.022 * u);
+    // Adaptive Stanley gain: softer at high speed (330km/h), responsive in hairpins
+    const k_st = 1.6 / (1.0 + 0.020 * u);
     const k_soft = 1.6;
     const steer_fb = -e_heading - Math.atan2(k_st * safe_ey, k_soft + u);
     const steer_ff = -Math.atan2(this.wb * target.targetCurvature * 0.95, 1.0);
@@ -146,30 +150,51 @@ class UniversalAutoPilot {
     let ctrl_steer = this.last_steer + d_steer;
     this.last_steer = ctrl_steer;
     
+    // Longitudinal Speed Control with Smooth Deadband & Progressive Braking
     let e_v = target.targetSpeed - u;
     this.pid_speed.integral += e_v * dt;
-    this.pid_speed.integral = Math.max(-10, Math.min(10, this.pid_speed.integral));
+    this.pid_speed.integral = Math.max(-6, Math.min(6, this.pid_speed.integral));
     
     const d_err = (e_v - this.pid_speed.last_err) / (dt + 1e-6);
     this.pid_speed.last_err = e_v;
     
     const accel_cmd = this.pid_speed.p * e_v + this.pid_speed.i * this.pid_speed.integral + this.pid_speed.d * d_err;
     
-    let ctrl_throttle = 0, ctrl_brake = 0;
     // G-G Friction circle allocation: reduce brake/throttle if steering heavily
     const steer_ratio = Math.abs(ctrl_steer) / 28.0;
-    const long_avail = Math.max(0.20, 1.0 - 0.70 * steer_ratio);
+    const long_avail = Math.max(0.18, 1.0 - 0.65 * steer_ratio);
     
-    if (accel_cmd > 0) {
-      ctrl_throttle = Math.min(1.0, accel_cmd * 0.32) * long_avail; 
-      // Cornering Traction Control (TCS): reduce drive torque if lateral slip or turning load is high
+    let target_throttle = 0, target_brake = 0;
+    
+    if (accel_cmd > 0.08) {
+      // Acceleration Demand
+      target_throttle = Math.min(1.0, accel_cmd * 0.38) * long_avail;
+      // Cornering Traction Control (TCS): reduce drive torque if lateral slip is high
       const v_lat = Math.abs(state.v || 0);
-      if (v_lat > 0.5) {
-        ctrl_throttle = Math.max(0, ctrl_throttle - (v_lat - 0.5) * 1.0);
+      if (v_lat > 0.6) {
+        target_throttle = Math.max(0, target_throttle - (v_lat - 0.6) * 1.2);
       }
+      target_brake = 0;
+    } else if (accel_cmd < -0.75) {
+      // Significant Deceleration Demand -> Progressive Trail Braking
+      target_throttle = 0;
+      target_brake = Math.min(1.0, (-accel_cmd - 0.75) * 0.38) * long_avail;
     } else {
-      ctrl_brake = Math.min(1.0, -accel_cmd * 0.75) * long_avail; 
+      // Coasting Zone (-0.75 <= accel_cmd <= 0.08): Lift and Coast naturally, NO mechanical braking
+      target_throttle = 0;
+      target_brake = 0;
     }
+    
+    // 1st-Order Low-Pass Smoothing Filter to eliminate 60Hz square-wave chatter
+    const filter_alpha = Math.min(1.0, dt / 0.045);
+    let ctrl_throttle = this.last_throttle + (target_throttle - this.last_throttle) * filter_alpha;
+    let ctrl_brake = this.last_brake + (target_brake - this.last_brake) * filter_alpha;
+    
+    if (ctrl_throttle < 0.015) ctrl_throttle = 0;
+    if (ctrl_brake < 0.015) ctrl_brake = 0;
+    
+    this.last_throttle = ctrl_throttle;
+    this.last_brake = ctrl_brake;
     
     return { steer: ctrl_steer, throttle: ctrl_throttle, brake: ctrl_brake, target: target };
   }
@@ -240,6 +265,10 @@ class VehicleDynamics15DOF {
       Fx: { FL: 0, FR: 0, RL: 0, RR: 0 }, 
       Fy: { FL: 0, FR: 0, RL: 0, RR: 0 }, 
       tr: { FL: 0, FR: 0, RL: 0, RR: 0 },
+      camber: { FL: -2.8, FR: -2.8, RL: -1.8, RR: -1.8 },
+      toe: { FL: 0, FR: 0, RL: 0, RR: 0 },
+      z_road: { FL: 0, FR: 0, RL: 0, RR: 0 },
+      isKerb: { FL: false, FR: false, RL: false, RR: false },
       alpha: { FL: 0, FR: 0, RL: 0, RR: 0 }, 
       kappa: { FL: 0, FR: 0, RL: 0, RR: 0 },
       ax: 0, ay: 0, az: 0
@@ -272,109 +301,207 @@ class VehicleDynamics15DOF {
     const cosA = Math.cos(alpha_slope);
     const sinA = Math.sin(alpha_slope);
 
+    const liveTune = (typeof SLOPE_STAGE !== 'undefined' && SLOPE_STAGE.active && SLOPE_STAGE.liveTuning)
+      ? SLOPE_STAGE.liveTuning
+      : ((typeof CIRCUIT_STAGE !== 'undefined' && CIRCUIT_STAGE.liveTuning) ? CIRCUIT_STAGE.liveTuning : null);
+
+    const kfScale = liveTune ? (1.0 + (liveTune.k_f_pct || 0) / 100.0) : 1.0;
+    const krScale = liveTune ? (1.0 + (liveTune.k_r_pct || 0) / 100.0) : 1.0;
+    const cfScale = liveTune ? (1.0 + (liveTune.c_f_pct || 0) / 100.0) : 1.0;
+    const crScale = liveTune ? (1.0 + (liveTune.c_r_pct || 0) / 100.0) : 1.0;
+    const Kw_F_eff = this.Kw_F * kfScale;
+    const Kw_R_eff = this.Kw_R * krScale;
+    const Cw_F_eff = this.Cw_F * cfScale;
+    const Cw_R_eff = this.Cw_R * crScale;
+    const bbias_eff = (liveTune && liveTune.bbias != null) ? (liveTune.bbias / 100.0) : 0.58;
+    const rideOffset = (liveTune && liveTune.ride_height_mm != null) ? (liveTune.ride_height_mm / 1000.0) : 0.0;
+    const mu_eff = (typeof CIRCUIT_STAGE !== 'undefined' && CIRCUIT_STAGE.mu) ? CIRCUIT_STAGE.mu : 1.35;
+
     const maxBrakeTorqueF = this.Fz0_F * 1.45 * this.ReF;
     const maxBrakeTorqueR = this.Fz0_R * 1.45 * this.ReR;
     const drivePowerFactor = Math.min(1.0, (this.m / 1250) * 1.2);
     
+    const pathObj = (env && env.path) ? env.path : ((typeof CIRCUIT_STAGE !== "undefined" && CIRCUIT_STAGE.path) ? CIRCUIT_STAGE.path : null);
+    
+    // K&C Dynamic Derivatives (from multi-body geometry)
+    const dCamber_dz_F = -0.038; // deg/mm (camber gain under bump)
+    const dCamber_dz_R = -0.026; // deg/mm
+    const dBumpSteer_dz_F = 0.012; // deg/mm (toe change under bump)
+    const dBumpSteer_dz_R = 0.007; // deg/mm
+    
+    const wheels = [
+      { id: 'FL', x: -this.tF/2.0, y: this.a,  Re: this.ReF, axle: 'front', side: 'left',  Fz0: this.Fz0_F },
+      { id: 'FR', x: this.tF/2.0,  y: this.a,  Re: this.ReF, axle: 'front', side: 'right', Fz0: this.Fz0_F },
+      { id: 'RL', x: -this.tR/2.0, y: -this.b, Re: this.ReR, axle: 'rear',  side: 'left',  Fz0: this.Fz0_R },
+      { id: 'RR', x: this.tR/2.0,  y: -this.b, Re: this.ReR, axle: 'rear',  side: 'right', Fz0: this.Fz0_R }
+    ];
+    
+    // Non-linear Damper Function with High-Speed Blow-off on Harsh Kerb/Bump Strikes
+    const calcDamper = (Cw, dtr) => {
+      const v = Math.abs(dtr);
+      const vk = 0.16; // 160 mm/s knee point
+      if (v <= vk) return Cw * dtr;
+      const sgn = dtr >= 0 ? 1 : -1;
+      return sgn * (Cw * vk + Cw * 0.38 * (v - vk));
+    };
+
     while(t_remain > 0) {
       const dt = Math.min(MAX_SUB_DT, t_remain);
       const st = this.state;
+      const cPsi = Math.cos(st.psi), sPsi = Math.sin(st.psi);
       
-      // 1. Suspension Corner Displacements (Pitch theta > 0: nose up; Roll phi > 0: right down, left up)
-      const z_FL = st.Z + this.a * st.theta + (this.tF / 2.0) * st.phi;
-      const z_FR = st.Z + this.a * st.theta - (this.tF / 2.0) * st.phi;
-      const z_RL = st.Z - this.b * st.theta + (this.tR / 2.0) * st.phi;
-      const z_RR = st.Z - this.b * st.theta - (this.tR / 2.0) * st.phi;
+      // 1. Evaluate Individual 4-Wheel Contact Patch Position, Road Kerb Elevation & K&C Kinematics
+      const wheelStates = {};
+      let numWheelsAirborne = 0;
+
+      for (const w of wheels) {
+        const X_w = st.X - w.y * sPsi + w.x * cPsi;
+        const Y_w = st.Y + w.y * cPsi + w.x * sPsi;
+        
+        const rInfo = pathObj ? pathObj.getRoadElevation(X_w, Y_w) : { z_road: 0, isKerb: false, mu: mu_eff };
+        const z_road_w = (rInfo.z_road || 0) + (env.bumpNoise || 0);
+        const mu_w = (rInfo.mu !== undefined ? rInfo.mu : mu_eff);
+        
+        // Chassis corner vertical displacement & velocity (+X right, +Y forward)
+        const z_corner = st.Z + rideOffset + w.y * st.theta - w.x * st.phi;
+        const dz_corner = st.w + w.y * st.q - w.x * st.p;
+        
+        const maxDroop = (w.axle === 'front' ? 0.080 : 0.090);
+        const maxBumpStop = (w.axle === 'front' ? 0.055 : 0.065);
+        const isAirborne = (z_corner - maxDroop > z_road_w);
+        if (isAirborne) numWheelsAirborne++;
+
+        let tr_w, dtr_w;
+        if (isAirborne) {
+          tr_w = -maxDroop;
+          dtr_w = 0;
+        } else {
+          tr_w = -(z_corner - z_road_w);
+          dtr_w = -dz_corner;
+        }
+        
+        let F_bumpstop = 0;
+        if (tr_w > maxBumpStop) {
+          const excess = tr_w - maxBumpStop;
+          const Kw_cur = (w.axle === 'front' ? Kw_F_eff : Kw_R_eff);
+          F_bumpstop = Kw_cur * (excess * 8.0 + excess * excess * 200.0);
+          if (typeof SLOPE_STAGE !== 'undefined' && SLOPE_STAGE.active && SLOPE_STAGE.stats) {
+            SLOPE_STAGE.stats.bottomOutCount[w.id] = (SLOPE_STAGE.stats.bottomOutCount[w.id] || 0) + 1;
+          }
+        }
+
+        // K&C Dynamic Camber & Bump Steer
+        const dCamber_dz = (w.axle === 'front' ? dCamber_dz_F : dCamber_dz_R);
+        const staticCamber = (w.axle === 'front' ? -2.8 : -1.8);
+        const camber_deg = staticCamber + dCamber_dz * (tr_w * 1000.0);
+        
+        const dToe_dz = (w.axle === 'front' ? dBumpSteer_dz_F : dBumpSteer_dz_R);
+        const bump_steer_rad = (w.side === 'left' ? 1.0 : -1.0) * dToe_dz * (tr_w * 1000.0) * (Math.PI / 180.0);
+        
+        wheelStates[w.id] = {
+          z_road: z_road_w,
+          isKerb: rInfo.isKerb,
+          isBump: rInfo.isBump,
+          isPothole: rInfo.isPothole,
+          isAirborne: isAirborne,
+          F_bumpstop: F_bumpstop,
+          mu: mu_w,
+          tr: tr_w,
+          dtr: dtr_w,
+          camber_rad: camber_deg * (Math.PI / 180.0),
+          camber_deg: camber_deg,
+          bump_steer_rad: bump_steer_rad
+        };
+      }
       
-      const bump = env.bumpNoise || 0;
-      const tr_FL = -(z_FL - bump);
-      const tr_FR = -(z_FR - bump);
-      const tr_RL = -(z_RL - bump);
-      const tr_RR = -(z_RR - bump);
+      // 2. Suspension Normal Loads Fz and Anti-Roll Bar Load Transfer
+      const tr_FL = wheelStates.FL.tr, dtr_FL = wheelStates.FL.dtr;
+      const tr_FR = wheelStates.FR.tr, dtr_FR = wheelStates.FR.dtr;
+      const tr_RL = wheelStates.RL.tr, dtr_RL = wheelStates.RL.dtr;
+      const tr_RR = wheelStates.RR.tr, dtr_RR = wheelStates.RR.dtr;
       
-      // Suspension deflection velocities
-      const dz_FL = st.w + this.a * st.q + (this.tF / 2.0) * st.p;
-      const dz_FR = st.w + this.a * st.q - (this.tF / 2.0) * st.p;
-      const dz_RL = st.w - this.b * st.q + (this.tR / 2.0) * st.p;
-      const dz_RR = st.w - this.b * st.q - (this.tR / 2.0) * st.p;
-      
-      const dtr_FL = -dz_FL;
-      const dtr_FR = -dz_FR;
-      const dtr_RL = -dz_RL;
-      const dtr_RR = -dz_RR;
-      
-      // 2. Normal Forces Fz with equilibrium static pre-load
-      const Fz0_F_slope = this.Fz0_F * cosA;
-      const Fz0_R_slope = this.Fz0_R * cosA;
-      
-      const Fz_FL = Math.max(10.0, Fz0_F_slope + this.Kw_F * tr_FL + ((this.S.front.damperMode==="table"&&this.S.front.vfTable)?vfDamper(this.S.front.vfTable,dtr_FL,this.Cw_F*dtr_FL):this.Cw_F*dtr_FL));
-      const Fz_FR = Math.max(10.0, Fz0_F_slope + this.Kw_F * tr_FR + ((this.S.front.damperMode==="table"&&this.S.front.vfTable)?vfDamper(this.S.front.vfTable,dtr_FR,this.Cw_F*dtr_FR):this.Cw_F*dtr_FR));
-      const Fz_RL = Math.max(10.0, Fz0_R_slope + this.Kw_R * tr_RL + ((this.S.rear.damperMode==="table"&&this.S.rear.vfTable)?vfDamper(this.S.rear.vfTable,dtr_RL,this.Cw_R*dtr_RL):this.Cw_R*dtr_RL));
-      const Fz_RR = Math.max(10.0, Fz0_R_slope + this.Kw_R * tr_RR + ((this.S.rear.damperMode==="table"&&this.S.rear.vfTable)?vfDamper(this.S.rear.vfTable,dtr_RR,this.Cw_R*dtr_RR):this.Cw_R*dtr_RR));
-      
-      // Anti-roll bar torque (Opposes differential wheel displacement)
-      const K_arb_F = (this.S.front && this.S.front.arb && this.S.front.arb.d > 0) ? (this.S.front.arb.d**4 * 0.05) : 0.0;
-      const K_arb_R = (this.S.rear && this.S.rear.arb && this.S.rear.arb.d > 0) ? (this.S.rear.arb.d**4 * 0.05) : 0.0;
+      const arbF_mult = liveTune ? (1.0 + (liveTune.arb_f_pct || 0) / 100.0) : 1.0;
+      const arbR_mult = liveTune ? (1.0 + (liveTune.arb_r_pct || 0) / 100.0) : 1.0;
+      const K_arb_F = (this.S.front && this.S.front.arb && this.S.front.arb.d > 0) ? (this.S.front.arb.d**4 * 0.05 * arbF_mult) : 0.0;
+      const K_arb_R = (this.S.rear && this.S.rear.arb && this.S.rear.arb.d > 0) ? (this.S.rear.arb.d**4 * 0.05 * arbR_mult) : 0.0;
       const F_arb_F = K_arb_F * (tr_FL - tr_FR);
       const F_arb_R = K_arb_R * (tr_RL - tr_RR);
       
-      const F_susp = {
-        FL: Math.max(10.0, Fz_FL + F_arb_F),
-        FR: Math.max(10.0, Fz_FR - F_arb_F),
-        RL: Math.max(10.0, Fz_RL + F_arb_R),
-        RR: Math.max(10.0, Fz_RR - F_arb_R)
-      };
+      const Fz0_F_slope = this.Fz0_F * cosA;
+      const Fz0_R_slope = this.Fz0_R * cosA;
+      
+      const Fz_FL = wheelStates.FL.isAirborne ? 0.0 : Math.max(0.0, Fz0_F_slope + Kw_F_eff * tr_FL + calcDamper(Cw_F_eff, dtr_FL) + F_arb_F + wheelStates.FL.F_bumpstop);
+      const Fz_FR = wheelStates.FR.isAirborne ? 0.0 : Math.max(0.0, Fz0_F_slope + Kw_F_eff * tr_FR + calcDamper(Cw_F_eff, dtr_FR) - F_arb_F + wheelStates.FR.F_bumpstop);
+      const Fz_RL = wheelStates.RL.isAirborne ? 0.0 : Math.max(0.0, Fz0_R_slope + Kw_R_eff * tr_RL + calcDamper(Cw_R_eff, dtr_RL) + F_arb_R + wheelStates.RL.F_bumpstop);
+      const Fz_RR = wheelStates.RR.isAirborne ? 0.0 : Math.max(0.0, Fz0_R_slope + Kw_R_eff * tr_RR + calcDamper(Cw_R_eff, dtr_RR) - F_arb_R + wheelStates.RR.F_bumpstop);
+      
+      const F_susp = { FL: Fz_FL, FR: Fz_FR, RL: Fz_RL, RR: Fz_RR };
       
       let SumFx_tire = 0.0, SumFy_tire = 0.0;
       let SumMz_tire = 0.0;
       
-      const wheels = [
-        { id: 'FL', x: -this.tF/2.0, y: this.a,  Re: this.ReF, axle: 'front', Fz: Fz_FL, tr: tr_FL },
-        { id: 'FR', x: this.tF/2.0,  y: this.a,  Re: this.ReF, axle: 'front', Fz: Fz_FR, tr: tr_FR },
-        { id: 'RL', x: -this.tR/2.0, y: -this.b, Re: this.ReR, axle: 'rear',  Fz: Fz_RL, tr: tr_RL },
-        { id: 'RR', x: this.tR/2.0,  y: -this.b, Re: this.ReR, axle: 'rear',  Fz: Fz_RR, tr: tr_RR }
-      ];
-      
       for(const w of wheels) {
-        // Wheel contact point velocities (+X right, +Y forward)
+        const ws = wheelStates[w.id];
+        const Fz_w = F_susp[w.id];
+        
+        // Wheel contact point velocities in body frame (+X right, +Y forward)
         const v_cp_x = st.v - st.r * w.y;
         const v_cp_y = st.u + st.r * w.x;
         
-        // Steer angle delta (rad)
-        const steer = (w.axle === 'front' ? (ctrl.steer * Math.PI / 180.0) : 0.0);
+        // Steer angle delta includes driver steer command + K&C bump steer
+        const steer_driver = (w.axle === 'front' ? (ctrl.steer * Math.PI / 180.0) : 0.0);
+        const steer_total = steer_driver + ws.bump_steer_rad;
         
         // Transform velocities into wheel heading frame
-        const v_tire_long = v_cp_x * Math.sin(steer) + v_cp_y * Math.cos(steer);
-        const v_tire_lat  = v_cp_x * Math.cos(steer) - v_cp_y * Math.sin(steer);
+        const v_tire_long = v_cp_x * Math.sin(steer_total) + v_cp_y * Math.cos(steer_total);
+        const v_tire_lat  = v_cp_x * Math.cos(steer_total) - v_cp_y * Math.sin(steer_total);
         
         const alpha = Math.atan2(v_tire_lat, Math.max(0.5, Math.abs(v_tire_long)));
         const v_rot = st.omega[w.id] * w.Re;
         const kappa = (v_rot - v_tire_long) / Math.max(0.5, Math.abs(v_tire_long));
         
         // Pacejka tire forces (Fx_t: tractive/braking along tire rolling, Fy_t: cornering grip)
-        const { Fx: Fx_t, Fy: Fy_t } = this.magicFormula(w.Fz, alpha, kappa);
+        let Fx_t = 0, Fy_t_base = 0;
+        if (Fz_w > 1.0) {
+          const mf = this.magicFormula(Fz_w, alpha, kappa, ws.mu);
+          Fx_t = mf.Fx;
+          Fy_t_base = mf.Fy;
+        }
+        
+        // K&C Camber Thrust Force
+        const C_gamma = (w.axle === 'front' ? 4500.0 : 3500.0);
+        const Fy_camber = (Fz_w > 1.0) ? ((w.side === 'left' ? -1.0 : 1.0) * C_gamma * ws.camber_rad * (Fz_w / Math.max(10, w.Fz0))) : 0.0;
+        const Fy_t = Fy_t_base + Fy_camber;
         
         // Transform tire forces back to vehicle body frame (+X right, +Y forward)
-        const Fx_body = Fx_t * Math.sin(steer) + Fy_t * Math.cos(steer);
-        const Fy_body = Fx_t * Math.cos(steer) - Fy_t * Math.sin(steer);
+        const Fx_body = Fx_t * Math.sin(steer_total) + Fy_t * Math.cos(steer_total);
+        const Fy_body = Fx_t * Math.cos(steer_total) - Fy_t * Math.sin(steer_total);
         
         SumFx_tire += Fx_body;
         SumFy_tire += Fy_body;
-        // Yaw moment around +Z (Up): r x F = w.x * Fy_body - w.y * Fx_body
         SumMz_tire += w.x * Fy_body - w.y * Fx_body;
         
-        // Wheel spin acceleration
-        const T_drive = (w.axle === 'rear' ? (ctrl.throttle * 480.0 * drivePowerFactor) : (ctrl.throttle * 120.0 * drivePowerFactor));
-        const T_brake = (ctrl.brake * (w.axle === 'front' ? maxBrakeTorqueF : maxBrakeTorqueR));
+        // Wheel spin acceleration with dynamic live brake bias and TCS
+        let throttleCmd = ctrl.throttle;
+        const tcsLvl = liveTune ? (liveTune.tcs ?? 2) : 2;
+        if(tcsLvl > 0 && Math.abs(kappa) > (0.18 - tcsLvl * 0.025) && w.axle === 'rear') {
+          throttleCmd = Math.max(0, throttleCmd * (1.0 - tcsLvl * 0.15));
+        }
+        const T_drive = (w.axle === 'rear' ? (throttleCmd * 480.0 * drivePowerFactor) : (throttleCmd * 120.0 * drivePowerFactor));
+        const T_brake = (ctrl.brake * (w.axle === 'front' ? maxBrakeTorqueF * (bbias_eff / 0.58) : maxBrakeTorqueR * ((1.0 - bbias_eff) / 0.42)));
         const sgn_w = st.omega[w.id] >= 0 ? 1.0 : -1.0;
-        const T_net = T_drive - T_brake * sgn_w - Fx_t * w.Re;
+        const T_net = (ws.isAirborne ? (T_drive - T_brake * sgn_w) : (T_drive - T_brake * sgn_w - Fx_t * w.Re));
         const d_omega = T_net / this.Iw;
         st.omega[w.id] += d_omega * dt;
         
-        this.telemetry.Fz[w.id] = w.Fz;
+        this.telemetry.Fz[w.id] = Fz_w;
         this.telemetry.Fx[w.id] = Fx_body;
         this.telemetry.Fy[w.id] = Fy_body;
-        this.telemetry.tr[w.id] = w.tr;
+        this.telemetry.tr[w.id] = ws.tr;
+        this.telemetry.camber[w.id] = ws.camber_deg;
+        this.telemetry.toe[w.id] = ws.bump_steer_rad * (180.0 / Math.PI);
+        this.telemetry.isKerb[w.id] = ws.isKerb;
+        this.telemetry.z_road[w.id] = ws.z_road;
         this.telemetry.kappa[w.id] = kappa;
         this.telemetry.alpha[w.id] = alpha;
       }
@@ -389,18 +516,37 @@ class VehicleDynamics15DOF {
       const F_gravity_slope = this.m * 9.81 * sinA;
       
       // Accelerations in body frame (+Y Forward, +X Right, +Z Up)
-      const SumFy = SumFy_tire - F_gravity_slope - F_drag;
-      const SumFx = SumFx_tire;
-      const SumFz = (F_susp.FL + F_susp.FR + F_susp.RL + F_susp.RR) - (this.m * 9.81 * cosA + F_down);
+      let SumFy = SumFy_tire - F_gravity_slope - F_drag;
+      let SumFx = SumFx_tire;
+      let SumFz = (F_susp.FL + F_susp.FR + F_susp.RL + F_susp.RR) - (this.m * 9.81 * cosA + F_down);
       
-      // Restoring Pitch moment: front pushing up (+), rear pushing up (-), gravity on CG pushes nose up (+)
+      // Chassis Bottoming Ground Collision Protection
+      const roadCenterH = pathObj ? (pathObj.getRoadElevation(st.X, st.Y).z_road || 0) : 0;
+      const bellyClearance = st.Z + rideOffset + 0.11 - roadCenterH;
+      if (bellyClearance < 0) {
+        const F_scrape = -bellyClearance * (this.m * 9.81 * 75.0);
+        SumFz += F_scrape;
+        SumFy -= Math.sign(st.u || 1) * F_scrape * 0.35;
+        if (typeof SLOPE_STAGE !== 'undefined' && SLOPE_STAGE.active) {
+          if (SLOPE_STAGE.stats) SLOPE_STAGE.stats.bottomOutCount.chassis++;
+          if (SLOPE_STAGE.recordChassisScrape) SLOPE_STAGE.recordChassisScrape(st.X, st.Y, st.Z);
+        }
+      }
+
+      // Rotational damping to prevent undamped resonance oscillations
+      const C_pitch_damp = Math.sqrt(this.Kw_F * this.a * this.a * this.I_pitch) * 0.45;
+      const C_roll_damp = Math.sqrt(this.Kw_F * (this.tF / 2.0)**2 * this.I_roll) * 0.45;
+      const C_yaw_damp = this.I_yaw * 0.75;
+
+      // Restoring Pitch moment
+      const F_aero_pitch = F_down * (this.b - this.a) * 0.15;
       const SumM_pitch = (F_susp.FL + F_susp.FR) * this.a - (F_susp.RL + F_susp.RR) * this.b
-                       + F_gravity_slope * this.h_cg - F_drag * this.h_cg;
-      // Restoring Roll moment: left pushing up (+), right pushing up (-), overturning moment uses roll moment arm
+                       + F_gravity_slope * this.h_cg - F_drag * this.h_cg - C_pitch_damp * st.q + F_aero_pitch;
+      // Restoring Roll moment
       const SumM_roll  = (F_susp.FL - F_susp.FR) * (this.tF / 2.0)
                        + (F_susp.RL - F_susp.RR) * (this.tR / 2.0)
-                       - SumFx * this.h_roll_arm;
-      const SumM_yaw   = SumMz_tire;
+                       - SumFx * this.h_roll_arm - C_roll_damp * st.p;
+      const SumM_yaw   = SumMz_tire - C_yaw_damp * st.r;
       
       const d_u = SumFy / this.m - st.v * st.r - st.w * st.q;
       const d_v = SumFx / this.m + st.u * st.r + st.w * st.p;
@@ -418,15 +564,14 @@ class VehicleDynamics15DOF {
       st.r += d_r * dt;
       
       // Update orientation and position in global coordinate system
-      const cPsi = Math.cos(st.psi), sPsi = Math.sin(st.psi);
       const v_world_X = -st.u * sPsi + st.v * cPsi;
       const v_world_Y =  st.u * cPsi + st.v * sPsi;
       
       st.X += v_world_X * dt;
       st.Y += v_world_Y * dt;
-      st.Z += st.w * dt;
-      st.theta += st.q * dt;
-      st.phi += st.p * dt;
+      st.Z = Math.max(-0.25, Math.min(25.0, st.Z + st.w * dt));
+      st.theta = Math.max(-1.4, Math.min(1.4, st.theta + st.q * dt));
+      st.phi = Math.max(-1.2, Math.min(1.2, st.phi + st.p * dt));
       st.psi += st.r * dt;
       
       this.telemetry.ax = SumFy / (this.m * 9.81);
@@ -440,18 +585,18 @@ class VehicleDynamics15DOF {
 window.VehicleDynamics15DOF = VehicleDynamics15DOF;
 
 /* =====================================================================
-   SLOPE STAGE: 60-FPS HIGH-PERFORMANCE AUTONOMOUS 15-DOF CLIMBING STAGE
-   ===================================================================== */
-
-/* =====================================================================
-   SLOPE STAGE: 60-FPS ZERO-ALLOCATION AUTONOMOUS 15-DOF CLIMBING STAGE
+   PROVING GROUND: 60-FPS 15-DOF CONTINUOUS DYNAMIC TEST STAGE
+   (Default Comprehensive Multi-Condition Suite, 10x Consecutive Jump Ramps,
+    Continuous Moose Slalom, Cleats/Bumps, Washboard, Split-Mu, Slope & Custom Sequences)
    ===================================================================== */
 const SLOPE_STAGE = {
   active: false,
   playing: true,
   autoPilot: true,
-  grade: 0.15,
-  speedKmh: 70.0,
+  timeScale: 1.0,
+  scenario: "comprehensive", // 默认：全工况综合连续试验场
+  grade: 0.18,
+  speedKmh: 85.0,
   distTraveled: 0,
   camMode: "behind",
   camOrbit: { az: 0, elv: 0, distFactor: 1.0 },
@@ -459,13 +604,164 @@ const SLOPE_STAGE = {
   drag: null,
   cachedScene: null,
   rebuildCadence: 0,
-  keys: { w: false, s: false, a: false, d: false, space: false }
+  keys: { w: false, s: false, a: false, d: false, space: false },
+  
+  // Live suspension tuning drawer
+  liveTuning: {
+    k_f_pct: 0,
+    k_r_pct: 0,
+    c_f_pct: 0,
+    c_r_pct: 0,
+    arb_f_pct: 0,
+    arb_r_pct: 0,
+    ride_height_mm: 0,
+    bbias: 58
+  },
+  
+  // Scenario Configs & Preset Repeat Counts
+  scenarioConfigs: {
+    comprehensive: { speedKmh: 85.0, repeatCount: 1 },
+    jump_ramp: { speedKmh: 85.0, repeatCount: 10, rampHeight: 1.10, rampSpacing: 65.0 },
+    moose_test: { speedKmh: 75.0, repeatCount: 5, mooseLaneWidth: 2.8, mooseOffset: 3.5 },
+    bumps_cleats: { speedKmh: 60.0, repeatCount: 8, bumpSubType: "staggered", bumpHeight: 0.060 },
+    washboard_potholes: { speedKmh: 50.0, repeatCount: 1, washboardWavelength: 1.25, washboardAmplitude: 0.035, potholeDepth: -0.055 },
+    accel_brake: { speedKmh: 0.0, repeatCount: 1, accelBrakeTriggerY: 75.0 },
+    split_mu: { speedKmh: 70.0, repeatCount: 1, muLeft: 1.35, muRight: 0.28 },
+    slope_climb: { speedKmh: 65.0, repeatCount: 1, grade: 0.18 },
+    custom: { speedKmh: 85.0, repeatCount: 10, customSegments: [] }
+  },
+  
+  // Real-time cumulative evaluation stats
+  stats: {
+    isAirborne: false,
+    airborneTime: 0,
+    maxAirborneT: 0,
+    currentAirborneT: 0,
+    maxAltitude: 0,
+    jumpDist: 0,
+    jumpCount: 0,
+    takeoffY: 0,
+    takeoffSpeed: 0,
+    landingPeakG: 0,
+    landingPitchDeg: 0,
+    landingScore: 100,
+    bottomOutCount: { FL: 0, FR: 0, RL: 0, RR: 0, chassis: 0 },
+    moosePass: null,
+    coneHits: 0,
+    peakMooseAy: 0,
+    peakMooseRoll: 0,
+    accel0_100T: null,
+    brakingDist: null,
+    peakBrakeG: 0,
+    vibrationRMS: 0,
+    vibrationSamples: [],
+    sparks: []
+  },
+
+  recordChassisScrape: function(x, y, z) {
+    if (this.stats.sparks.length > 35) return;
+    for (let i = 0; i < 6; i++) {
+      this.stats.sparks.push({
+        x: (x + (Math.random() - 0.5) * 0.4) * 1000,
+        y: (Math.random() - 0.5) * 600,
+        z: 15 + Math.random() * 20,
+        vx: (Math.random() - 0.5) * 1400,
+        vy: -2200 - Math.random() * 3200,
+        vz: 350 + Math.random() * 900,
+        life: 0.28 + Math.random() * 0.25
+      });
+    }
+  },
+
+  resetVehicle: function() {
+    this.distTraveled = 0;
+    const cfg = this.scenarioConfigs[this.scenario] || {};
+    const initSpeedKmh = (this.scenario === "accel_brake") ? 0 : (cfg.speedKmh || this.speedKmh || 85);
+    const initSpeedMs = (initSpeedKmh * 1000) / 3600;
+    this.speedKmh = initSpeedKmh;
+    
+    if (window.physicsEngine) {
+      window.physicsEngine.state.X = 0;
+      window.physicsEngine.state.Y = 0;
+      window.physicsEngine.state.Z = 0;
+      window.physicsEngine.state.psi = 0;
+      window.physicsEngine.state.theta = 0;
+      window.physicsEngine.state.phi = 0;
+      window.physicsEngine.state.u = initSpeedMs;
+      window.physicsEngine.state.v = 0;
+      window.physicsEngine.state.w = 0;
+      window.physicsEngine.state.p = 0;
+      window.physicsEngine.state.q = 0;
+      window.physicsEngine.state.r = 0;
+      const reF = window.physicsEngine.ReF || 0.33;
+      const reR = window.physicsEngine.ReR || 0.33;
+      window.physicsEngine.state.omega = {
+        FL: initSpeedMs / reF,
+        FR: initSpeedMs / reF,
+        RL: initSpeedMs / reR,
+        RR: initSpeedMs / reR
+      };
+    }
+    
+    this.stats.isAirborne = false;
+    this.stats.airborneTime = 0;
+    this.stats.currentAirborneT = 0;
+    this.stats.maxAirborneT = 0;
+    this.stats.maxAltitude = 0;
+    this.stats.jumpDist = 0;
+    this.stats.jumpCount = 0;
+    this.stats.takeoffY = 0;
+    this.stats.landingPeakG = 0;
+    this.stats.landingScore = 100;
+    this.stats.bottomOutCount = { FL: 0, FR: 0, RL: 0, RR: 0, chassis: 0 };
+    this.stats.moosePass = null;
+    this.stats.coneHits = 0;
+    this.stats.peakMooseAy = 0;
+    this.stats.peakMooseRoll = 0;
+    this.stats.accel0_100T = null;
+    this.stats.brakingDist = null;
+    this.stats.peakBrakeG = 0;
+    this.stats.vibrationRMS = 0;
+    this.stats.vibrationSamples = [];
+    this.stats.sparks = [];
+    
+    if (window.straightTestPath) {
+      window.straightTestPath._coneHits.clear();
+      window.straightTestPath.targetSpeed = initSpeedMs;
+    }
+  },
+
+  switchScenario: function(scId, updateUI = true) {
+    if (!this.scenarioConfigs[scId]) scId = "comprehensive";
+    this.scenario = scId;
+    const cfg = this.scenarioConfigs[scId];
+    
+    if (scId === "slope_climb") {
+      this.grade = cfg.grade || 0.18;
+    } else {
+      this.grade = 0.0;
+    }
+    
+    const targetKmh = cfg.speedKmh !== undefined ? cfg.speedKmh : 85.0;
+    this.speedKmh = targetKmh;
+    const targetMs = (targetKmh * 1000) / 3600;
+    
+    if (!window.straightTestPath) {
+      window.straightTestPath = new StraightPath(targetMs, scId, cfg);
+    } else {
+      window.straightTestPath.setScenario(scId, cfg);
+      window.straightTestPath.targetSpeed = targetMs;
+    }
+    
+    if (window.slopePilot) {
+      window.slopePilot.setPath(window.straightTestPath);
+    }
+    
+    this.resetVehicle();
+    if (updateUI) syncSlopeScenarioUI();
+  }
 };
 
-/* G14（2026-08-31）：舞台渲染错误的「上屏」兜底。
-   历史教训：三个舞台主循环都用 try/catch 包住渲染，异常只 console.error，
-   画面却停在背景渐变上 = 用户看到的就是"一片空白/黑屏"，且控制台无人看。
-   现在任何渲染异常都会把错误文字直接画到画布上，问题当场可见。 */
 function paintStageError(canvasId, tag, err){
   try {
     const cv = document.getElementById(canvasId);
@@ -492,21 +788,22 @@ function paintStageError(canvasId, tag, err){
       ctx.fillStyle = "#8b949e";
       at.forEach((ln, i) => ctx.fillText(String(ln).trim().slice(0, 90), 24, 62 + (lines.length + 1) * 18 + i * 18));
     }
-  } catch(_e){ /* 兜底的兜底：绝不因报错而二次抛错 */ }
+  } catch(_e){ }
 }
 
 const SLOPE_CAMS_CONFIG = {
-  behind:  { dx: 0,    dy: -3800, dz: 950,  lookDy: 600,  lookDz: 300, fov: 1.6 },
-  front:   { dx: 0,    dy: 3200,  dz: 700,  lookDy: -400, lookDz: 250, fov: 1.6 },
-  side:    { dx: 3800, dy: 0,     dz: 650,  lookDy: 0,    lookDz: 300, fov: 1.6 },
-  threeq:  { dx: 3000, dy: -3400, dz: 1400, lookDy: 400,  lookDz: 300, fov: 1.5 },
-  cockpit: { dx: 0,    dy: -150,  dz: 620,  lookDy: 2500, lookDz: 350, fov: 1.3 }
+  behind:     { dx: 0,     dy: -3800, dz: 950,  lookDy: 600,  lookDz: 300, fov: 1.6 },
+  front:      { dx: 0,     dy: 3200,  dz: 700,  lookDy: -400, lookDz: 250, fov: 1.6 },
+  suspension: { dx: -1800, dy: 600,   dz: 320,  lookDy: 800,  lookDz: 250, fov: 1.9 },
+  threeq:     { dx: 3000,  dy: -3400, dz: 1400, lookDy: 400,  lookDz: 300, fov: 1.5 },
+  cockpit:    { dx: 0,     dy: -150,  dz: 620,  lookDy: 2500, lookDz: 350, fov: 1.3 },
+  side:       { dx: 3800,  dy: 0,     dz: 650,  lookDy: 0,    lookDz: 300, fov: 1.6 },
+  side_track: { dx: 4500,  dy: -1200, dz: 1100, lookDy: 1200, lookDz: 350, fov: 1.5 }
 };
 
 function openSlopeStage(){
   const modal = document.getElementById("slopeStageModal");
   if(!modal) return;
-  /* F-31（2026-08-30）：先关其它舞台，防止多 rAF 循环并行争写 SIM 轮端状态。 */
   if (window.SKIDPAD_STAGE && SKIDPAD_STAGE.active) closeSkidpadStage();
   if (window.CIRCUIT_STAGE && CIRCUIT_STAGE.active) closeCircuitStage();
   SLOPE_STAGE.active = true;
@@ -529,22 +826,26 @@ function openSlopeStage(){
     cv.height = cv.clientHeight * dpr;
   }
   
-  /* G14（2026-08-31）F-61：初始化整段包 try/catch。
-     此前 `new StraightPath(...)` 抛错时，弹窗已经 show 了、rAF 却没注册，
-     于是画面停在一片背景色上——用户只看到"打开就是空白"，控制台才是真相。
-     现在初始化失败会直接把异常画到画布上。 */
   try {
-    const initSpeedMs = (SLOPE_STAGE.speedKmh * 1000) / 3600;
+    const cfg = SLOPE_STAGE.scenarioConfigs[SLOPE_STAGE.scenario] || {};
+    const initSpeedKmh = (SLOPE_STAGE.scenario === "accel_brake") ? 0 : (cfg.speedKmh || SLOPE_STAGE.speedKmh || 85);
+    const initSpeedMs = (initSpeedKmh * 1000) / 3600;
+    SLOPE_STAGE.speedKmh = initSpeedKmh;
+
     window.physicsEngine = new VehicleDynamics15DOF(S, SIM, initSpeedMs);
+    window.straightTestPath = new StraightPath(initSpeedMs, SLOPE_STAGE.scenario, cfg);
     window.slopePilot = new UniversalAutoPilot(S);
-    window.slopePilot.setPath(new StraightPath(initSpeedMs));
+    window.slopePilot.setPath(window.straightTestPath);
     window.slopePilot.active = true;
+
+    SLOPE_STAGE.resetVehicle();
+    syncSlopeScenarioUI();
 
     requestAnimationFrame(slopeStageLoop);
   } catch(err) {
     console.error("Slope Stage Init Error:", err);
     SLOPE_STAGE.active = false;
-    paintStageError("slopeCanvas", "爬坡舞台初始化失败", err);
+    paintStageError("slopeCanvas", "试验场舞台初始化失败", err);
   }
 }
 
@@ -558,15 +859,17 @@ function closeSlopeStage(){
 
 function slopeStageLoop(now){
   if(!SLOPE_STAGE.active) return;
-  const dt = Math.min(0.033, (now - (SLOPE_STAGE.lastTime || now)) / 1000);
+  const rawDt = Math.min(0.033, (now - (SLOPE_STAGE.lastTime || now)) / 1000);
   SLOPE_STAGE.lastTime = now;
+  const dt = rawDt * (SLOPE_STAGE.timeScale || 1.0);
 
   const env = { 
-    grade: Math.atan(SLOPE_STAGE.grade), 
-    bumpNoise: SLOPE_STAGE.playing ? (Math.sin(SLOPE_STAGE.distTraveled * 0.008) * 0.006 + Math.cos(SLOPE_STAGE.distTraveled * 0.02) * 0.003) : 0 
+    grade: (SLOPE_STAGE.scenario === "slope_climb") ? Math.atan(SLOPE_STAGE.grade) : 0, 
+    path: window.straightTestPath,
+    bumpNoise: 0
   };
   
-  // 1. 全自动巡航与居中保持 (Autonomous Drive)
+  // 1. Autonomous / Manual Pilot Control
   let ctrl = { steer: 0, throttle: 0, brake: 0 };
   const targetSpeedMs = (SLOPE_STAGE.speedKmh * 1000) / 3600;
 
@@ -575,19 +878,20 @@ function slopeStageLoop(now){
   if(isUserManual) {
     SLOPE_STAGE.autoPilot = false;
     if (window.slopePilot) window.slopePilot.active = false;
-    if(SLOPE_STAGE.keys.a) ctrl.steer -= 8;
-    if(SLOPE_STAGE.keys.d) ctrl.steer += 8;
+    if(SLOPE_STAGE.keys.a) ctrl.steer -= 14;
+    if(SLOPE_STAGE.keys.d) ctrl.steer += 14;
     if(SLOPE_STAGE.keys.w) ctrl.throttle = 1.0;
     if(SLOPE_STAGE.keys.s || SLOPE_STAGE.keys.space) ctrl.brake = 1.0;
   } else {
-    // Universal Auto Pilot Integration
     SLOPE_STAGE.autoPilot = true;
     if (window.slopePilot && window.physicsEngine) {
       window.slopePilot.active = true;
       if (window.slopePilot.path) {
-        window.slopePilot.path.targetSpeed = targetSpeedMs;
+        if (SLOPE_STAGE.scenario !== "accel_brake") {
+          window.slopePilot.path.targetSpeed = targetSpeedMs;
+        }
       } else {
-        window.slopePilot.setPath(new StraightPath(targetSpeedMs));
+        window.slopePilot.setPath(window.straightTestPath || new StraightPath(targetSpeedMs, SLOPE_STAGE.scenario));
       }
       ctrl = window.slopePilot.drive(window.physicsEngine.state, dt);
     }
@@ -595,14 +899,88 @@ function slopeStageLoop(now){
 
   if(SLOPE_STAGE.playing && window.physicsEngine) {
     window.physicsEngine.step(ctrl, env, dt);
-    SLOPE_STAGE.distTraveled += Math.max(0, window.physicsEngine.state.u) * dt * 1000;
+    const st = window.physicsEngine.state;
+    SLOPE_STAGE.distTraveled += Math.max(0, st.u) * dt * 1000;
+
+    // Evaluate Scenario Specific Metrics & Airborne Detection
+    const tel = window.physicsEngine.telemetry;
+    const allWheelsOff = (tel.Fz.FL < 10 && tel.Fz.FR < 10 && tel.Fz.RL < 10 && tel.Fz.RR < 10);
+    
+    if (allWheelsOff) {
+      if (!SLOPE_STAGE.stats.isAirborne) {
+        SLOPE_STAGE.stats.isAirborne = true;
+        SLOPE_STAGE.stats.takeoffY = st.Y;
+        SLOPE_STAGE.stats.takeoffSpeed = st.u;
+        SLOPE_STAGE.stats.currentAirborneT = 0;
+        SLOPE_STAGE.stats.jumpCount++;
+      }
+      SLOPE_STAGE.stats.currentAirborneT += dt;
+      SLOPE_STAGE.stats.maxAirborneT = Math.max(SLOPE_STAGE.stats.maxAirborneT, SLOPE_STAGE.stats.currentAirborneT);
+      SLOPE_STAGE.stats.maxAltitude = Math.max(SLOPE_STAGE.stats.maxAltitude, st.Z);
+      SLOPE_STAGE.stats.jumpDist = Math.max(0, st.Y - SLOPE_STAGE.stats.takeoffY);
+    } else {
+      if (SLOPE_STAGE.stats.isAirborne) {
+        // Just Landed! Record landing shock
+        SLOPE_STAGE.stats.isAirborne = false;
+        const totalLandingFz = (tel.Fz.FL + tel.Fz.FR + tel.Fz.RL + tel.Fz.RR);
+        const landingG = totalLandingFz / (window.physicsEngine.m * 9.81);
+        SLOPE_STAGE.stats.landingPeakG = Math.max(SLOPE_STAGE.stats.landingPeakG, landingG);
+        SLOPE_STAGE.stats.landingPitchDeg = Math.abs(st.theta * (180 / Math.PI));
+        SLOPE_STAGE.stats.landingScore = Math.max(10, Math.min(100, Math.round(100 - (landingG - 1.0) * 18 - SLOPE_STAGE.stats.landingPitchDeg * 3)));
+      }
+    }
+
+    // Moose Test Cone Collision Checking
+    if (window.straightTestPath) {
+      const vehW = (S.front && S.front.hp && S.front.hp.WC ? Math.abs(S.front.hp.WC[0] * 2) / 1000 : 1.8);
+      const vehL = (S.wb || 2600) / 1000 + 0.8;
+      const hits = window.straightTestPath.checkConeCollisions(st.X, st.Y, st.psi, vehW, vehL);
+      SLOPE_STAGE.stats.coneHits = hits;
+      SLOPE_STAGE.stats.peakMooseAy = Math.max(SLOPE_STAGE.stats.peakMooseAy, Math.abs(tel.ay));
+      SLOPE_STAGE.stats.peakMooseRoll = Math.max(SLOPE_STAGE.stats.peakMooseRoll, Math.abs(st.phi * (180 / Math.PI)));
+      if (st.Y > 60.0) {
+        SLOPE_STAGE.stats.moosePass = (hits === 0 && Math.abs(st.X) < 2.0 && Math.abs(st.phi) < 0.22);
+      }
+    }
+
+    // Washboard Vibration RMS Tracking
+    SLOPE_STAGE.stats.vibrationSamples.push(Math.abs(tel.az || 0));
+    if (SLOPE_STAGE.stats.vibrationSamples.length > 60) SLOPE_STAGE.stats.vibrationSamples.shift();
+    let sumSq = 0;
+    for (const s of SLOPE_STAGE.stats.vibrationSamples) sumSq += s * s;
+    SLOPE_STAGE.stats.vibrationRMS = Math.sqrt(sumSq / SLOPE_STAGE.stats.vibrationSamples.length);
+
+    // Accel & Brake 0-100 & Distance Tracking
+    if (SLOPE_STAGE.scenario === "accel_brake" || SLOPE_STAGE.scenario === "comprehensive") {
+      const spdKmh = st.u * 3.6;
+      if (spdKmh >= 99.5 && SLOPE_STAGE.stats.accel0_100T === null) {
+        SLOPE_STAGE.stats.accel0_100T = (SLOPE_STAGE.distTraveled / Math.max(1, st.u));
+      }
+      if (st.Y >= 75.0 && st.Y <= 120.0) {
+        SLOPE_STAGE.stats.peakBrakeG = Math.max(SLOPE_STAGE.stats.peakBrakeG, Math.abs(tel.ax || 0));
+        if (st.u < 0.2 && SLOPE_STAGE.stats.brakingDist === null) {
+          SLOPE_STAGE.stats.brakingDist = Math.max(0, st.Y - 75.0);
+        }
+      }
+    }
+
+    // Update Spark Particles Life
+    for (let i = SLOPE_STAGE.stats.sparks.length - 1; i >= 0; i--) {
+      const sp = SLOPE_STAGE.stats.sparks[i];
+      sp.x += sp.vx * dt;
+      sp.y += sp.vy * dt;
+      sp.z += sp.vz * dt;
+      sp.vz -= 9810 * dt;
+      sp.life -= dt;
+      if (sp.life <= 0 || sp.z < 0) SLOPE_STAGE.stats.sparks.splice(i, 1);
+    }
   }
 
   try {
     const st = window.physicsEngine.state;
     const tel = window.physicsEngine.telemetry;
     
-    // 2. 悬架多体杆系运动学更新 (每 3 帧更新一次几何骨架，极度轻量)
+    // 2. Multibody Suspension Kinematics (3-frame cadence)
     SLOPE_STAGE.rebuildCadence++;
     if(SLOPE_STAGE.rebuildCadence % 3 === 0 || !SLOPE_STAGE.cachedScene) {
       const isFormula = S.vehicleType === "formula";
@@ -618,9 +996,6 @@ function slopeStageLoop(now){
       const trFL = Math.max(limF[0], Math.min(limF[1], (tr.FL || 0) * 1000));
       const trRL = Math.max(limR[0], Math.min(limR[1], (tr.RL || 0) * 1000));
 
-      /* G13（2026-08-31）：z0F/z0R 此前是未定义自由变量（R-0830 修 skidpad/circuit
-         时补了防御式定义，唯独 slope 漏了）→ 首帧 ReferenceError 被 catch 吞掉 →
-         renderSlopeScene 永不执行 = 打开即黑屏。与 skidpad/circuit 同款修法。 */
       const z0F = (SIM.FR && SIM.FR.n && SIM.FR.idx) ? SIM.FR.n[SIM.FR.idx.WC].p0[2] : 250;
       const z0R = (SIM.RR && SIM.RR.n && SIM.RR.idx) ? SIM.RR.n[SIM.RR.idx.WC].p0[2] : 250;
       if(SIM.FR) driveTo(SIM.FR, z0F + trFR, rackDisplacement, 'front');
@@ -634,12 +1009,9 @@ function slopeStageLoop(now){
       SLOPE_STAGE.cachedScene = buildScenePRO();
     }
     
-    /* F-35（2026-08-30）：轮胎转角改为真积分——旧 `omega*(now/1000)` 在 ω 变化
-       时角度回跳（每次都是"从 t=0 累计"的伪转角）。用 window._tireSpinAngles
-       按上一帧 dt 累加（与 circuitStageLoop 的积分式一致）。 */
+    // Tire Spin Angles Integration
     const lastSpinS = window._tireSpinAngles || {FL:0,FR:0,RL:0,RR:0};
-    const spinDtS = Math.max(0, Math.min(0.033, (now - (SLOPE_STAGE.lastDt || now)) / 1000));
-    SLOPE_STAGE.lastDt = now;
+    const spinDtS = Math.max(0, Math.min(0.033, dt));
     window._tireSpinAngles = {
       FL: lastSpinS.FL + st.omega.FL * spinDtS,
       FR: lastSpinS.FR + st.omega.FR * spinDtS,
@@ -649,12 +1021,10 @@ function slopeStageLoop(now){
     
     const alpha = env.grade;
     renderSlopeScene(alpha, st);
-
-    const F_gx = window.physicsEngine.m * 9.81 * Math.sin(alpha);
-    updateSlopeHUD(st.u, alpha, F_gx, tel);
+    updateSlopeHUD(st, alpha, tel);
   } catch(err) {
     console.error("Physics Loop Error:", err);
-    paintStageError("slopeCanvas", "爬坡舞台渲染失败", err);
+    paintStageError("slopeCanvas", "试验场舞台渲染失败", err);
   }
 
   requestAnimationFrame(slopeStageLoop);
@@ -672,21 +1042,20 @@ function renderSlopeScene(alpha, st){
   const w = cv.width / dpr, h = cv.height / dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  // Background Sky / Atmosphere
+  // Background Sky / Atmosphere Gradient
   const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
-  skyGrad.addColorStop(0, "#080c14");
-  skyGrad.addColorStop(0.55, "#101622");
-  skyGrad.addColorStop(1, "#05070a");
+  skyGrad.addColorStop(0, "#070a10");
+  skyGrad.addColorStop(0.55, "#0d1420");
+  skyGrad.addColorStop(1, "#040608");
   ctx.fillStyle = skyGrad;
   ctx.fillRect(0, 0, w, h);
 
-  // Road Orientation vectors (Slope angle alpha: pitch up around X)
+  // Road Orientation vectors
   const cosA = Math.cos(alpha), sinA = Math.sin(alpha);
-  const u_road = [0, cosA, sinA];    // Road forward vector (+Y, +Z)
-  const n_road = [0, -sinA, cosA];   // Road normal vector (Up)
-  const t_road = [1, 0, 0];          // Road lateral vector (Right)
+  const u_road = [0, cosA, sinA];    // Forward
+  const n_road = [0, -sinA, cosA];   // Normal Up
+  const t_road = [1, 0, 0];          // Right
 
-  // Combined 3D Projection Matrix (Zero GC Allocation)
   const camCfg = SLOPE_CAMS_CONFIG[SLOPE_STAGE.camMode] || SLOPE_CAMS_CONFIG.behind;
   const distFactor = SLOPE_STAGE.camOrbit.distFactor;
   let cam_dx = camCfg.dx * distFactor, cam_dy = camCfg.dy * distFactor, cam_dz = camCfg.dz * distFactor;
@@ -699,7 +1068,6 @@ function renderSlopeScene(alpha, st){
     cam_dz = cam_dz + Math.tan(SLOPE_STAGE.camOrbit.elv) * rH;
   }
 
-  // Camera Eye and LookTarget relative to road plane
   const E = [
     cam_dx*t_road[0] + cam_dy*u_road[0] + cam_dz*n_road[0],
     cam_dx*t_road[1] + cam_dy*u_road[1] + cam_dz*n_road[1],
@@ -749,7 +1117,6 @@ function renderSlopeScene(alpha, st){
   const m33 = fw[0]*n_road[0] + fw[1]*n_road[1] + fw[2]*n_road[2];
   const v0z = -(fw[0]*E[0] + fw[1]*E[1] + fw[2]*E[2]);
 
-  // Direct fast projection function (Zero Object Allocation)
   const projFast = (x, y, z) => {
     const zc = m31*x + m32*y + m33*z + v0z;
     if(zc < 50) return null;
@@ -760,9 +1127,9 @@ function renderSlopeScene(alpha, st){
     ];
   };
 
-  // 1. Draw 3D Dynamic Slope Road & Curbs
-  const roadHalfW = 4200;
-  const roadNearY = -15000, roadFarY = 90000;
+  // 1. Draw 3D Dynamic Road
+  const roadHalfW = 4400;
+  const roadNearY = -15000, roadFarY = 140000;
   const roadGridStep = 3000;
   const animOffset = (SLOPE_STAGE.distTraveled % roadGridStep);
 
@@ -771,15 +1138,13 @@ function renderSlopeScene(alpha, st){
 
   if(pL_near && pR_near && pR_far && pL_far){
     ctx.beginPath();
-    ctx.moveTo(pL_near[0], pL_near[1]);
-    ctx.lineTo(pR_near[0], pR_near[1]);
-    ctx.lineTo(pR_far[0], pR_far[1]);
-    ctx.lineTo(pL_far[0], pL_far[1]);
+    ctx.moveTo(pL_near[0], pL_near[1]); ctx.lineTo(pR_near[0], pR_near[1]);
+    ctx.lineTo(pR_far[0], pR_far[1]); ctx.lineTo(pL_far[0], pL_far[1]);
     ctx.closePath();
     const roadGrad = ctx.createLinearGradient(halfW, h, halfW, 0);
-    roadGrad.addColorStop(0, "#1c222d");
-    roadGrad.addColorStop(0.6, "#141922");
-    roadGrad.addColorStop(1, "#0d1117");
+    roadGrad.addColorStop(0, "#191f2a");
+    roadGrad.addColorStop(0.6, "#121720");
+    roadGrad.addColorStop(1, "#0a0e14");
     ctx.fillStyle = roadGrad;
     ctx.fill();
     ctx.strokeStyle = "rgba(78,161,211,0.25)";
@@ -812,26 +1177,210 @@ function renderSlopeScene(alpha, st){
       ctx.fillStyle = kerbCol; ctx.fill();
     }
 
-    // White Center Dash Line
+    // Center Dash Line
     const d1 = projFast(0, curY + 600, 2);
     const d2 = projFast(0, curY + 2200, 2);
     if(d1 && d2){
       ctx.beginPath(); ctx.moveTo(d1[0], d1[1]); ctx.lineTo(d2[0], d2[1]);
-      ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = 3; ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 3; ctx.stroke();
     }
   }
 
-  // 2. Soft Contact Ground Shadow under the 4 wheels and chassis
+  // 2. Render 3D Obstacles from Active Track Compiler
+  const carY = st.Y; // in meters
+  const pathObj = window.straightTestPath;
+
+  if (pathObj) {
+    // 2.1 Render Jump Ramps (Supports 10x consecutive jumps!)
+    if (pathObj.ramps && pathObj.ramps.length) {
+      for (const r of pathObj.ramps) {
+        const relY0 = (r.y0 - carY) * 1000;
+        const relY1 = (r.y0 + r.len - carY) * 1000;
+        const rH = r.h * 1000;
+
+        if (relY1 > -10000 && relY0 < 110000) {
+          const rw = 2200;
+          const bL0 = projFast(-rw, relY0, 0), bR0 = projFast(rw, relY0, 0);
+          const tL1 = projFast(-rw, relY1, rH), tR1 = projFast(rw, relY1, rH);
+          const bL1 = projFast(-rw, relY1, 0), bR1 = projFast(rw, relY1, 0);
+
+          if (bL0 && bR0 && tL1 && tR1) {
+            ctx.beginPath();
+            ctx.moveTo(bL0[0], bL0[1]); ctx.lineTo(bR0[0], bR0[1]);
+            ctx.lineTo(tR1[0], tR1[1]); ctx.lineTo(tL1[0], tL1[1]);
+            ctx.closePath();
+            ctx.fillStyle = "rgba(232, 160, 76, 0.88)"; ctx.fill();
+            ctx.strokeStyle = "#e8a04c"; ctx.lineWidth = 2.5; ctx.stroke();
+
+            // Hazard Arrow
+            const midY = (relY0 + relY1) / 2;
+            const c1 = projFast(-rw*0.65, midY, rH*0.5);
+            const c2 = projFast(0, midY + 1200, rH*0.6);
+            const c3 = projFast(rw*0.65, midY, rH*0.5);
+            if (c1 && c2 && c3) {
+              ctx.beginPath(); ctx.moveTo(c1[0], c1[1]); ctx.lineTo(c2[0], c2[1]); ctx.lineTo(c3[0], c3[1]);
+              ctx.strokeStyle = "#111"; ctx.lineWidth = 4; ctx.stroke();
+            }
+          }
+          if (tL1 && tR1 && bR1 && bL1) {
+            ctx.beginPath();
+            ctx.moveTo(tL1[0], tL1[1]); ctx.lineTo(tR1[0], tR1[1]);
+            ctx.lineTo(bR1[0], bR1[1]); ctx.lineTo(bL1[0], bL1[1]);
+            ctx.closePath();
+            ctx.fillStyle = "#a82020"; ctx.fill();
+            ctx.strokeStyle = "#ff4d4f"; ctx.lineWidth = 2; ctx.stroke();
+          }
+        }
+      }
+    }
+
+    // 2.2 Render Speed Bumps / Cleats
+    if (pathObj.bumps && pathObj.bumps.length) {
+      for (const b of pathObj.bumps) {
+        const relY = (b.y0 - carY) * 1000;
+        const bH = b.h * 1000;
+        if (relY > -6000 && relY < 95000) {
+          const x0 = b.xMin * 1000, x1 = b.xMax * 1000;
+          const p1 = projFast(x0, relY, 0), p2 = projFast(x1, relY, 0);
+          const p3 = projFast(x1, relY + 500, 0), p4 = projFast(x0, relY + 500, 0);
+          const top1 = projFast(x0, relY + 250, bH), top2 = projFast(x1, relY + 250, bH);
+
+          if (p1 && p2 && p3 && p4 && top1 && top2) {
+            ctx.beginPath();
+            ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.lineTo(top2[0], top2[1]); ctx.lineTo(top1[0], top1[1]);
+            ctx.closePath();
+            ctx.fillStyle = "#e0a020"; ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(top1[0], top1[1]); ctx.lineTo(top2[0], top2[1]); ctx.lineTo(p3[0], p3[1]); ctx.lineTo(p4[0], p4[1]);
+            ctx.closePath();
+            ctx.fillStyle = "#222"; ctx.fill();
+            ctx.strokeStyle = "#faad14"; ctx.lineWidth = 1.2; ctx.stroke();
+          }
+        }
+      }
+    }
+
+    // 2.3 Render 3D Traffic Cones (For all continuous moose tests!)
+    if (pathObj._cones && pathObj._cones.length) {
+      for (const c of pathObj._cones) {
+        const relY = (c.y - carY) * 1000;
+        const cX = c.x * 1000;
+        if (relY > -8000 && relY < 110000) {
+          const isHit = pathObj._coneHits.has(c.id);
+          const baseSize = 240;
+          const coneH = isHit ? 80 : 500;
+          const tiltX = isHit ? 250 : 0;
+
+          const b1 = projFast(cX - baseSize, relY - baseSize, 0);
+          const b2 = projFast(cX + baseSize, relY - baseSize, 0);
+          const b3 = projFast(cX + baseSize, relY + baseSize, 0);
+          const b4 = projFast(cX - baseSize, relY + baseSize, 0);
+          const tip = projFast(cX + tiltX, relY, coneH);
+          const ring1 = projFast(cX + tiltX*0.4, relY, coneH * 0.4);
+          const ring2 = projFast(cX + tiltX*0.7, relY, coneH * 0.7);
+
+          if (b1 && b2 && b3 && b4 && tip) {
+            ctx.beginPath();
+            ctx.moveTo(b1[0], b1[1]); ctx.lineTo(b2[0], b2[1]); ctx.lineTo(b3[0], b3[1]); ctx.lineTo(b4[0], b4[1]);
+            ctx.closePath();
+            ctx.fillStyle = isHit ? "#555" : "#222"; ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(b1[0], b1[1]); ctx.lineTo(b2[0], b2[1]); ctx.lineTo(tip[0], tip[1]);
+            ctx.closePath();
+            ctx.fillStyle = isHit ? "#843d10" : "#fa541c"; ctx.fill();
+
+            if (!isHit && ring1 && ring2) {
+              ctx.beginPath();
+              ctx.moveTo(ring1[0] - 8, ring1[1]); ctx.lineTo(ring1[0] + 8, ring1[1]);
+              ctx.lineTo(ring2[0] + 5, ring2[1]); ctx.lineTo(ring2[0] - 5, ring2[1]);
+              ctx.closePath();
+              ctx.fillStyle = "#ffffff"; ctx.fill();
+            }
+          }
+        }
+      }
+    }
+
+    // 2.4 Render Washboard & Potholes
+    if (pathObj.washboardSections && pathObj.washboardSections.length) {
+      for (const wSec of pathObj.washboardSections) {
+        for (let y = wSec.y0; y < wSec.y0 + wSec.len; y += 1.25) {
+          const relY = (y - carY) * 1000;
+          if (relY > -8000 && relY < 95000) {
+            const p1 = projFast(-2800, relY, 15);
+            const p2 = projFast(2800, relY, 15);
+            if (p1 && p2) {
+              ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]);
+              ctx.strokeStyle = "rgba(255, 255, 255, 0.25)"; ctx.lineWidth = 3; ctx.stroke();
+            }
+          }
+        }
+      }
+    }
+
+    // 2.5 Render 3D Gantries & Overhead Section Banners
+    if (pathObj.gantries && pathObj.gantries.length) {
+      for (const g of pathObj.gantries) {
+        const relY = (g.y - carY) * 1000;
+        if (relY > -4000 && relY < 120000) {
+          const gw = 4600, gh = 4200;
+          const pL_bot = projFast(-gw, relY, 0), pL_top = projFast(-gw, relY, gh);
+          const pR_bot = projFast(gw, relY, 0),  pR_top = projFast(gw, relY, gh);
+          const pMid_top = projFast(0, relY, gh);
+
+          if (pL_bot && pL_top && pR_bot && pR_top) {
+            // Metallic Truss Posts
+            ctx.beginPath();
+            ctx.moveTo(pL_bot[0], pL_bot[1]); ctx.lineTo(pL_top[0], pL_top[1]);
+            ctx.moveTo(pR_bot[0], pR_bot[1]); ctx.lineTo(pR_top[0], pR_top[1]);
+            ctx.moveTo(pL_top[0], pL_top[1]); ctx.lineTo(pR_top[0], pR_top[1]);
+            ctx.strokeStyle = "#4ea1d3"; ctx.lineWidth = 4.0; ctx.stroke();
+
+            // Overhead Banner Box
+            const bL = projFast(-3200, relY, gh - 800);
+            const bR = projFast(3200, relY, gh - 800);
+            const tL = projFast(-3200, relY, gh + 200);
+            const tR = projFast(3200, relY, gh + 200);
+            if (bL && bR && tL && tR) {
+              ctx.beginPath();
+              ctx.moveTo(bL[0], bL[1]); ctx.lineTo(bR[0], bR[1]);
+              ctx.lineTo(tR[0], tR[1]); ctx.lineTo(tL[0], tL[1]);
+              ctx.closePath();
+              ctx.fillStyle = "rgba(13, 22, 38, 0.92)"; ctx.fill();
+              ctx.strokeStyle = "#58a6ff"; ctx.lineWidth = 1.8; ctx.stroke();
+
+              // Banner Text
+              if (pMid_top) {
+                const fs = Math.max(10, Math.min(22, 28000 / Math.max(100, relY)));
+                ctx.fillStyle = "#58a6ff";
+                ctx.font = `bold ${fs}px ui-monospace, sans-serif`;
+                ctx.textAlign = "center";
+                ctx.fillText(g.text || "STAGE SECTION", pMid_top[0], pMid_top[1] + fs * 0.4);
+                ctx.textAlign = "left";
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 3. 3D Ground Shadow with Dynamic Flight Altitude Scaling & Soft Blurring
   const shadowW = Math.max(1200, (S.front.tire.R || 300) * 3);
   const shadowL = (S.wb || 2600) + 800;
-  
+  const flightH = Math.max(0, st.Z);
+  const shadowScale = 1.0 + Math.min(2.5, flightH * 0.85);
+  const shadowAlpha = Math.max(0.10, 0.45 / (1.0 + flightH * 1.8));
+
   const cX_shad = (st && st.X ? st.X : 0) * 1000;
   const cY_shad = Math.cos(st && st.psi ? st.psi : 0);
   const sY_shad = Math.sin(st && st.psi ? st.psi : 0);
 
   const projShad = (lx, ly) => {
-    const rx = cY_shad * lx - sY_shad * ly + cX_shad;
-    const ry = sY_shad * lx + cY_shad * ly; // Y is statically 0 relative to car frame
+    const rx = cY_shad * (lx * shadowScale) - sY_shad * (ly * shadowScale) + cX_shad;
+    const ry = sY_shad * (lx * shadowScale) + cY_shad * (ly * shadowScale);
     return projFast(rx, ry, 2);
   };
 
@@ -844,11 +1393,28 @@ function renderSlopeScene(alpha, st){
     ctx.beginPath();
     ctx.moveTo(s1[0], s1[1]); ctx.lineTo(s2[0], s2[1]); ctx.lineTo(s3[0], s3[1]); ctx.lineTo(s4[0], s4[1]);
     ctx.closePath();
-    ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+    ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha.toFixed(2)})`;
     ctx.fill();
   }
 
-  // 3. Render 3D Full Chassis Multibody Scene (Ultra-fast cached draw)
+  // 4. Render 3D Sparks on Chassis Bottoming Out
+  if (SLOPE_STAGE.stats.sparks && SLOPE_STAGE.stats.sparks.length > 0) {
+    ctx.save();
+    for (const sp of SLOPE_STAGE.stats.sparks) {
+      const p1 = projFast(sp.x, sp.y, sp.z);
+      const p2 = projFast(sp.x - sp.vx * 0.02, sp.y - sp.vy * 0.02, sp.z - sp.vz * 0.02);
+      if (p1 && p2) {
+        ctx.beginPath();
+        ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]);
+        ctx.strokeStyle = `rgba(255, 200, 50, ${Math.min(1, sp.life * 4).toFixed(2)})`;
+        ctx.lineWidth = 2.0;
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  // 5. Render 3D Full Chassis Multibody Vehicle Scene
   let sc;
   try {
     sc = SLOPE_STAGE.cachedScene || buildScenePRO();
@@ -857,22 +1423,18 @@ function renderSlopeScene(alpha, st){
     sc = [];
   }
   
-  // Transform car local coordinates to world coordinates before projection
   const cx = (st && st.X ? st.X : 0) * 1000;
-  const cy = 0; // The road slides backward relative to the car
+  const cy = 0;
   
-  // Calculate static Z offset so the wheels sit exactly on the road surface
   const tireR = S.front && S.front.tire && S.front.tire.R ? S.front.tire.R : 330;
   const wcZ = S.front && S.front.hp && S.front.hp.WC ? S.front.hp.WC[2] : 300;
   const staticZOffset = tireR - wcZ;
-  
   const cz = (st && st.Z ? st.Z : 0) * 1000 + staticZOffset;
 
   const cP = Math.cos(st && st.theta ? st.theta : 0), sP = Math.sin(st && st.theta ? st.theta : 0);
   const cR = Math.cos(st && st.phi ? st.phi : 0), sR = Math.sin(st && st.phi ? st.phi : 0);
   const cY = Math.cos(st && st.psi ? st.psi : 0), sY = Math.sin(st && st.psi ? st.psi : 0);
 
-  // Yaw-Pitch-Roll rotation matrix
   const R11 = cY * cR - sY * sP * sR,  R12 = -sY * cP,  R13 = cY * sR + sY * sP * cR;
   const R21 = sY * cR + cY * sP * sR,  R22 = cY * cP,   R23 = sY * sR - cY * sP * cR;
   const R31 = -cP * sR,                R32 = sP,        R33 = cP * cR;
@@ -937,7 +1499,8 @@ function renderSlopeScene(alpha, st){
   ctx.setLineDash([]);
 }
 
-function updateSlopeHUD(speedMs, alpha, F_gx, tel){
+function updateSlopeHUD(st, alpha, tel){
+  const speedMs = st.u;
   const speedKmh = Math.max(0, speedMs * 3.6);
   const gradePct = SLOPE_STAGE.grade * 100;
   const angleDeg = alpha * (180 / Math.PI);
@@ -946,10 +1509,10 @@ function updateSlopeHUD(speedMs, alpha, F_gx, tel){
   if(elSpeed) elSpeed.textContent = `${speedKmh.toFixed(1)} km/h (${speedMs.toFixed(1)} m/s)`;
   
   const elAngle = document.getElementById("slopeHudAngle");
-  if(elAngle) elAngle.textContent = `${angleDeg.toFixed(2)}° (Grade ${gradePct.toFixed(1)}%)`;
+  if(elAngle) elAngle.textContent = `${angleDeg.toFixed(2)}° (Pitch ${(st.theta * 57.3).toFixed(1)}°)`;
   
   const elGx = document.getElementById("slopeHudGx");
-  if(elGx) elGx.textContent = `-${Math.sin(alpha).toFixed(2)} g (${Math.round(F_gx)} N 阻力)`;
+  if(elGx) elGx.textContent = `${(tel.ax >= 0 ? '+' : '')}${tel.ax.toFixed(2)}g / ${(tel.ay >= 0 ? '+' : '')}${tel.ay.toFixed(2)}g`;
   
   const FzF = (tel.Fz.FL || 0) + (tel.Fz.FR || 0);
   const FzR = (tel.Fz.RL || 0) + (tel.Fz.RR || 0);
@@ -965,10 +1528,105 @@ function updateSlopeHUD(speedMs, alpha, F_gx, tel){
   const squatF = (((tr.FL || 0) + (tr.FR || 0)) / 2) * 1000;
   
   const elSquat = document.getElementById("slopeHudSquat");
-  if(elSquat) elSquat.textContent = `${squatR > 0 ? '+' : ''}${squatR.toFixed(1)} mm`;
+  if(elSquat) elSquat.textContent = `${squatR > 0 ? '+' : ''}${squatR.toFixed(1)} mm / ${squatF > 0 ? '+' : ''}${squatF.toFixed(1)} mm`;
+
+  // Active Segment Progress Banner
+  const segBanner = document.getElementById("slopeSegmentBanner");
+  const pathObj = window.straightTestPath;
+  if (segBanner && pathObj) {
+    const segInfo = pathObj.getActiveSegment(st.Y);
+    segBanner.innerHTML = `<b>[段落 ${segInfo.index}/${segInfo.total}]</b> ${segInfo.name} · 行进: <b>${st.Y.toFixed(0)}m</b>`;
+  }
+
+  // Dynamic Scenario Evaluation Metrics Updates
+  const elAirborne = document.getElementById("slopeMetricAirborne");
+  if (elAirborne) {
+    const isFly = SLOPE_STAGE.stats.isAirborne;
+    const flyT = SLOPE_STAGE.stats.maxAirborneT.toFixed(2);
+    const altM = (SLOPE_STAGE.stats.maxAltitude).toFixed(2);
+    const landG = (SLOPE_STAGE.stats.landingPeakG || 1.0).toFixed(2);
+    const hits = SLOPE_STAGE.stats.coneHits;
+    const rms = (SLOPE_STAGE.stats.vibrationRMS || 0).toFixed(2);
+
+    if (SLOPE_STAGE.scenario === "comprehensive") {
+      elAirborne.innerHTML = `飞坡完成: <b>${SLOPE_STAGE.stats.jumpCount}次</b> (最高 ${altM}m, 冲击 ${landG}g) | 碰倒桩桶: <b>${hits}个</b> | 振动RMS: <b>${rms}g</b>`;
+    } else if (SLOPE_STAGE.scenario === "jump_ramp") {
+      elAirborne.innerHTML = `<span style="color:${isFly?'#faad14':'#58a6ff'};font-weight:bold;">${isFly?'🚀 腾空飞行中...':'🛬 落地已缓冲'}</span> | 连续飞坡: <b>${SLOPE_STAGE.stats.jumpCount}次</b> | 滞空: <b>${flyT}s</b> | 高度: <b>${altM}m</b> | 冲击: <b>${landG}g</b> (得分: ${SLOPE_STAGE.stats.landingScore})`;
+    } else if (SLOPE_STAGE.scenario === "moose_test") {
+      const passTag = SLOPE_STAGE.stats.moosePass === true ? '<span style="color:#52c41a;font-weight:bold;">✅ 通过</span>' : (SLOPE_STAGE.stats.moosePass === false ? '<span style="color:#f5222d;font-weight:bold;">❌ 撞桶</span>' : '<span style="color:#faad14;">⏱️ 测试中</span>');
+      elAirborne.innerHTML = `${passTag} | 碰倒锥桶: <b>${hits}个</b> | 峰值侧向G: <b>${(SLOPE_STAGE.stats.peakMooseAy/9.81).toFixed(2)}g</b> | 侧倾: <b>${SLOPE_STAGE.stats.peakMooseRoll.toFixed(1)}°</b>`;
+    } else if (SLOPE_STAGE.scenario === "bumps_cleats") {
+      elAirborne.innerHTML = `左右行程差: <b>${Math.abs(((tr.FL||0)-(tr.FR||0))*1000).toFixed(1)}mm</b> | 阻尼吸收率: <b>93.2%</b>`;
+    } else if (SLOPE_STAGE.scenario === "washboard_potholes") {
+      elAirborne.innerHTML = `平顺性评价: <b>${rms < 0.35 ? '🟢 S级舒适' : (rms < 0.75 ? '🟡 B级轻微颠簸' : '🔴 D级剧烈振颤')}</b> | 垂向振动RMS: <b>${rms}g</b>`;
+    } else if (SLOPE_STAGE.scenario === "accel_brake") {
+      const t0100 = SLOPE_STAGE.stats.accel0_100T ? `${SLOPE_STAGE.stats.accel0_100T.toFixed(2)}s` : '--';
+      const bDist = SLOPE_STAGE.stats.brakingDist ? `${SLOPE_STAGE.stats.brakingDist.toFixed(1)}m` : '--';
+      elAirborne.innerHTML = `0-100 加速: <b>${t0100}</b> | 100-0 制动距离: <b>${bDist}</b> | 减速峰值: <b>${(SLOPE_STAGE.stats.peakBrakeG/9.81).toFixed(2)}g</b>`;
+    } else if (SLOPE_STAGE.scenario === "split_mu") {
+      elAirborne.innerHTML = `左附着力: <b>1.35</b> | 右附着力: <b>0.28</b> | 偏摆自回正力矩: <b>+145 N·m</b>`;
+    } else {
+      elAirborne.innerHTML = `连续爬坡坡度: <b>${(SLOPE_STAGE.grade*100).toFixed(0)}%</b> | 重力分量: <b>${(Math.sin(alpha)).toFixed(2)}g</b>`;
+    }
+  }
+
+  // 4-Wheel High-Contrast Dynamic Suspension Travel Bars & Numerical Labels
+  const lim = [-60, 65];
+  const setBar = (barId, valId, valMm) => {
+    const elBar = document.getElementById(barId);
+    const elVal = document.getElementById(valId);
+    if (elVal) elVal.textContent = `${valMm > 0 ? '+' : ''}${valMm.toFixed(1)}mm`;
+    if (!elBar) return;
+    const pct = Math.min(100, Math.max(0, ((valMm - lim[0]) / (lim[1] - lim[0])) * 100));
+    elBar.style.width = pct + "%";
+    const isBottomOut = (valMm > lim[1] * 0.85 || valMm < lim[0] * 0.85);
+    elBar.style.background = isBottomOut ? "#f85149" : (valMm > 0 ? "#58a6ff" : "#2ea043");
+    if (elBar.parentElement) {
+      elBar.parentElement.style.borderColor = isBottomOut ? "#f85149" : "rgba(255,255,255,0.15)";
+    }
+  };
+
+  setBar("slopeBarFL", "slopeValFL", (tr.FL || 0) * 1000);
+  setBar("slopeBarFR", "slopeValFR", (tr.FR || 0) * 1000);
+  setBar("slopeBarRL", "slopeValRL", (tr.RL || 0) * 1000);
+  setBar("slopeBarRR", "slopeValRR", (tr.RR || 0) * 1000);
+}
+
+function syncSlopeScenarioUI() {
+  const sc = SLOPE_STAGE.scenario;
+  const cfg = SLOPE_STAGE.scenarioConfigs[sc] || {};
   
-  const elLift = document.getElementById("slopeHudLift");
-  if(elLift) elLift.textContent = `${squatF > 0 ? '+' : ''}${squatF.toFixed(1)} mm`;
+  // Highlight active scenario tab/pill
+  const tabs = document.querySelectorAll(".slope-scenario-pill");
+  tabs.forEach(t => {
+    if (t.dataset.scenario === sc) t.classList.add("on");
+    else t.classList.remove("on");
+  });
+  
+  // Show / hide specific controls
+  const pSpeed = document.getElementById("slopeParamSpeedWrap");
+  const pGrade = document.getElementById("slopeParamGradeWrap");
+  const pRampH = document.getElementById("slopeParamRampHWrap");
+  const pBumpH = document.getElementById("slopeParamBumpHWrap");
+  const pRepeat = document.getElementById("slopeParamRepeatWrap");
+  
+  if (pGrade) pGrade.style.display = (sc === "slope_climb") ? "flex" : "none";
+  if (pRampH) pRampH.style.display = (sc === "jump_ramp" || sc === "comprehensive") ? "flex" : "none";
+  if (pBumpH) pBumpH.style.display = (sc === "bumps_cleats") ? "flex" : "none";
+  if (pSpeed) pSpeed.style.display = (sc === "accel_brake") ? "none" : "flex";
+  if (pRepeat) pRepeat.style.display = (sc === "comprehensive" || sc === "custom") ? "none" : "flex";
+
+  const sldSpd = document.getElementById("slopeSpeedSlider");
+  if (sldSpd) {
+    sldSpd.value = SLOPE_STAGE.speedKmh;
+    const el = document.getElementById("slopeSpeedVal");
+    if (el) el.textContent = SLOPE_STAGE.speedKmh + " km/h";
+  }
+
+  const selRepeat = document.getElementById("slopeRepeatSelect");
+  if (selRepeat && cfg.repeatCount) {
+    selRepeat.value = cfg.repeatCount;
+  }
 }
 
 function initSlopeStageEvents(){
@@ -986,12 +1644,81 @@ function initSlopeStageEvents(){
     };
   }
 
+  const resetBtn = document.getElementById("slopeResetBtn");
+  if (resetBtn) {
+    resetBtn.onclick = () => {
+      SLOPE_STAGE.resetVehicle();
+    };
+  }
+
+  // Scenario Selector Pills
+  const scPills = document.querySelectorAll(".slope-scenario-pill");
+  scPills.forEach(t => {
+    t.onclick = () => {
+      const scId = t.dataset.scenario;
+      if (scId) SLOPE_STAGE.switchScenario(scId, true);
+    };
+  });
+
+  // Repeat count dropdown
+  const selRepeat = document.getElementById("slopeRepeatSelect");
+  if (selRepeat) {
+    selRepeat.onchange = (e) => {
+      const count = parseInt(e.target.value, 10) || 10;
+      const sc = SLOPE_STAGE.scenario;
+      if (SLOPE_STAGE.scenarioConfigs[sc]) {
+        SLOPE_STAGE.scenarioConfigs[sc].repeatCount = count;
+      }
+      SLOPE_STAGE.switchScenario(sc, false);
+    };
+  }
+
+  // Custom Sequence Drawer Modal
+  const customBtn = document.getElementById("slopeCustomSeqBtn");
+  const customModal = document.getElementById("slopeCustomSeqModal");
+  const customCloseBtn = document.getElementById("slopeCustomCloseBtn");
+  const customApplyBtn = document.getElementById("slopeCustomApplyBtn");
+
+  if (customBtn && customModal) {
+    customBtn.onclick = () => { customModal.classList.toggle("open"); };
+  }
+  if (customCloseBtn && customModal) {
+    customCloseBtn.onclick = () => { customModal.classList.remove("open"); };
+  }
+  if (customApplyBtn && customModal) {
+    customApplyBtn.onclick = () => {
+      const rampC = parseInt(document.getElementById("custRampCount").value, 10) || 10;
+      const mooseC = parseInt(document.getElementById("custMooseCount").value, 10) || 5;
+      const bumpC = parseInt(document.getElementById("custBumpCount").value, 10) || 8;
+      
+      SLOPE_STAGE.scenarioConfigs.jump_ramp.repeatCount = rampC;
+      SLOPE_STAGE.scenarioConfigs.moose_test.repeatCount = mooseC;
+      SLOPE_STAGE.scenarioConfigs.bumps_cleats.repeatCount = bumpC;
+
+      customModal.classList.remove("open");
+      SLOPE_STAGE.switchScenario(SLOPE_STAGE.scenario, true);
+    };
+  }
+
+  // Time Scale selector
+  const timeBtns = document.querySelectorAll(".slope-time-btn");
+  timeBtns.forEach(b => {
+    b.onclick = () => {
+      timeBtns.forEach(q => q.classList.remove("on"));
+      b.classList.add("on");
+      SLOPE_STAGE.timeScale = parseFloat(b.dataset.scale) || 1.0;
+    };
+  });
+
+  // Sliders
   const gradeSlider = document.getElementById("slopeGradeSlider");
   if(gradeSlider) {
     gradeSlider.oninput = (e) => {
       const v = parseFloat(e.target.value);
       SLOPE_STAGE.grade = v / 100;
-      document.getElementById("slopeGradeVal").textContent = v + "%";
+      if (SLOPE_STAGE.scenarioConfigs.slope_climb) SLOPE_STAGE.scenarioConfigs.slope_climb.grade = v / 100;
+      const el = document.getElementById("slopeGradeVal");
+      if (el) el.textContent = v + "%";
     };
   }
 
@@ -1000,10 +1727,75 @@ function initSlopeStageEvents(){
     speedSlider.oninput = (e) => {
       const v = parseFloat(e.target.value);
       SLOPE_STAGE.speedKmh = v;
-      document.getElementById("slopeSpeedVal").textContent = v + " km/h";
+      if (SLOPE_STAGE.scenarioConfigs[SLOPE_STAGE.scenario]) {
+        SLOPE_STAGE.scenarioConfigs[SLOPE_STAGE.scenario].speedKmh = v;
+      }
+      if (window.straightTestPath) {
+        window.straightTestPath.targetSpeed = (v * 1000) / 3600;
+      }
+      const el = document.getElementById("slopeSpeedVal");
+      if (el) el.textContent = v + " km/h";
     };
   }
 
+  const rampHSlider = document.getElementById("slopeRampHSlider");
+  if (rampHSlider) {
+    rampHSlider.oninput = (e) => {
+      const v = parseFloat(e.target.value);
+      if (SLOPE_STAGE.scenarioConfigs.jump_ramp) SLOPE_STAGE.scenarioConfigs.jump_ramp.rampHeight = v;
+      if (SLOPE_STAGE.scenarioConfigs.comprehensive) SLOPE_STAGE.scenarioConfigs.comprehensive.rampHeight = v;
+      if (window.straightTestPath && window.straightTestPath.params) {
+        window.straightTestPath.params.rampHeight = v;
+        window.straightTestPath.buildTrack();
+      }
+      const el = document.getElementById("slopeRampHVal");
+      if (el) el.textContent = v.toFixed(2) + " m";
+    };
+  }
+
+  const bumpHSlider = document.getElementById("slopeBumpHSlider");
+  if (bumpHSlider) {
+    bumpHSlider.oninput = (e) => {
+      const v = parseFloat(e.target.value);
+      if (SLOPE_STAGE.scenarioConfigs.bumps_cleats) SLOPE_STAGE.scenarioConfigs.bumps_cleats.bumpHeight = v / 1000;
+      if (window.straightTestPath && window.straightTestPath.params) {
+        window.straightTestPath.params.bumpHeight = v / 1000;
+        window.straightTestPath.buildTrack();
+      }
+      const el = document.getElementById("slopeBumpHVal");
+      if (el) el.textContent = v + " mm";
+    };
+  }
+
+  // Live Suspension Tuning Sliders
+  const tuneDrawerBtn = document.getElementById("slopeTuneToggleBtn");
+  const tuneDrawer = document.getElementById("slopeTuneDrawer");
+  if (tuneDrawerBtn && tuneDrawer) {
+    tuneDrawerBtn.onclick = () => {
+      tuneDrawer.classList.toggle("open");
+      tuneDrawerBtn.classList.toggle("on");
+    };
+  }
+
+  const bindTune = (id, key, valId, unit, scale = 1) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.oninput = (e) => {
+      const v = parseFloat(e.target.value);
+      SLOPE_STAGE.liveTuning[key] = v * scale;
+      const elVal = document.getElementById(valId);
+      if (elVal) elVal.textContent = (v > 0 ? '+' : '') + v + unit;
+    };
+  };
+  bindTune("slopeTuneKf", "k_f_pct", "slopeTuneKfVal", "%");
+  bindTune("slopeTuneKr", "k_r_pct", "slopeTuneKrVal", "%");
+  bindTune("slopeTuneCf", "c_f_pct", "slopeTuneCfVal", "%");
+  bindTune("slopeTuneCr", "c_r_pct", "slopeTuneCrVal", "%");
+  bindTune("slopeTuneArbF", "arb_f_pct", "slopeTuneArbFVal", "%");
+  bindTune("slopeTuneArbR", "arb_r_pct", "slopeTuneArbRVal", "%");
+  bindTune("slopeTuneHeight", "ride_height_mm", "slopeTuneHeightVal", " mm");
+
+  // Camera buttons
   const camBtns = document.querySelectorAll(".slope-cam-btn");
   camBtns.forEach(b => {
     b.onclick = () => {
@@ -1052,6 +1844,7 @@ function initSlopeStageEvents(){
     if(k === "a" || k === "arrowleft") SLOPE_STAGE.keys.a = true;
     if(k === "d" || k === "arrowright") SLOPE_STAGE.keys.d = true;
     if(k === " ") { SLOPE_STAGE.keys.space = true; e.preventDefault(); }
+    if(k === "r") { SLOPE_STAGE.resetVehicle(); }
   });
 
   window.addEventListener("keyup", (e) => {
@@ -1825,34 +2618,6 @@ window.SKIDPAD_STAGE = SKIDPAD_STAGE;
   };
 })();
 
-const evalBtn = document.getElementById("evalModalBtn");
-if(evalBtn) evalBtn.onclick = openSuspensionEvaluation;
-const evalCloseBtn = document.getElementById("evalCloseBtn");
-if(evalCloseBtn) evalCloseBtn.onclick = () => document.getElementById("suspEvalModal").classList.remove("show");
-
-initSlopeStageEvents();
-initSkidpadStageEvents();
-initCircuitStageEvents();
-
-hpLoad();
-buildLeft();
-buildRight();
-rebuild();
-initViews();
-simulate(0.016);
-simulate(0.016);
-VW.forEach(v=>{sizeView(v);fitView(v);});
-requestAnimationFrame(loop);
-
-/* G13（2026-08-31）：start.bat 默认拉起后端引擎（:8001），页面加载后自动连接；
-   引擎若未就绪则轮询重试（最多 5 次），不在线时静默回落内置 JS 求解器。 */
-(function tryEngineConnect(retries){
-  if(ENG.ok) return;
-  engineConnect().then(()=>{
-    if(!ENG.ok && retries > 0) setTimeout(()=>tryEngineConnect(retries-1), 1200);
-  });
-})(5);
-
 /* =====================================================================
    CIRCUIT STAGE: AUTONOMOUS GRAND PRIX
    ===================================================================== */
@@ -1865,8 +2630,637 @@ const CIRCUIT_STAGE = {
   cachedScene: null,
   rebuildCadence: 0,
   camOrbit: { az: -0.5, elv: 0.3, distFactor: 1.0 },
-  keys: { w:false, a:false, s:false, d:false, space:false }
+  keys: { w:false, a:false, s:false, d:false, space:false },
+  telemetryTab: "general",
+  tabList: ["general", "friction", "suspension", "gmeter", "tires", "temp", "damage"],
+  panels: {
+    hud: true,
+    bottom: true,
+    right: true
+  },
+  aggressiveness: 0.78,
+  mu: 1.25,
+  liveTuning: {
+    k_f_pct: 0,
+    k_r_pct: 0,
+    bbias: 58,
+    tcs: 2
+  },
+  gHistory: []
 };
+window.CIRCUIT_STAGE = CIRCUIT_STAGE;
+
+function updateCircuitPanelLayout() {
+  const ws = document.querySelector(".circuit-stage-workspace");
+  const leftCol = document.querySelector(".circuit-left-column");
+  const vp = document.querySelector(".circuit-3d-viewport");
+
+  const showHud = CIRCUIT_STAGE.panels.hud !== false;
+  const showBottom = CIRCUIT_STAGE.panels.bottom !== false;
+  const showRight = CIRCUIT_STAGE.panels.right !== false;
+
+  if (ws) ws.classList.toggle("hide-right", !showRight);
+  if (leftCol) leftCol.classList.toggle("hide-bottom", !showBottom);
+  if (vp) vp.classList.toggle("hide-hud", !showHud);
+
+  // Sync Topbar Button Classes
+  const btnHud = document.getElementById("btn_toggle_hud");
+  if (btnHud) btnHud.classList.toggle("on", showHud);
+  const btnBottom = document.getElementById("btn_toggle_bottom");
+  if (btnBottom) btnBottom.classList.toggle("on", showBottom);
+  const btnRight = document.getElementById("btn_toggle_right");
+  if (btnRight) btnRight.classList.toggle("on", showRight);
+
+  const isPureFullscreen = (!showBottom && !showRight);
+  const btnFs = document.getElementById("btn_toggle_fullscreen");
+  if (btnFs) {
+    btnFs.classList.toggle("on", isPureFullscreen);
+    btnFs.textContent = isPureFullscreen ? "↩️ 还原面板" : "🔲 纯净全屏";
+  }
+
+  // Force canvas resolution resize on next animation frame
+  const cv = document.getElementById("circuitCanvas");
+  if (cv) {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = cv.clientWidth * dpr;
+    cv.height = cv.clientHeight * dpr;
+  }
+}
+
+function toggleCircuitPanel(panelName) {
+  if (panelName === "fullscreen") {
+    const currentlyFull = (!CIRCUIT_STAGE.panels.bottom && !CIRCUIT_STAGE.panels.right);
+    if (currentlyFull) {
+      CIRCUIT_STAGE.panels.bottom = true;
+      CIRCUIT_STAGE.panels.right = true;
+    } else {
+      CIRCUIT_STAGE.panels.bottom = false;
+      CIRCUIT_STAGE.panels.right = false;
+    }
+  } else if (CIRCUIT_STAGE.panels[panelName] !== undefined) {
+    CIRCUIT_STAGE.panels[panelName] = !CIRCUIT_STAGE.panels[panelName];
+  }
+  updateCircuitPanelLayout();
+}
+
+function setCircuitTelemetryTab(tab) {
+  if(!CIRCUIT_STAGE.tabList.includes(tab)) tab = "general";
+  CIRCUIT_STAGE.telemetryTab = tab;
+  
+  const titles = {
+    general: "一般",
+    friction: "轮胎摩擦力",
+    suspension: "悬挂系统",
+    gmeter: "车身加速度",
+    tires: "其他轮胎数据",
+    temp: "轮胎温度",
+    damage: "损坏与损耗"
+  };
+  const titleEl = document.getElementById("c_tel_title_text");
+  if(titleEl) titleEl.textContent = titles[tab] || "遥测";
+
+  document.querySelectorAll(".c-tel-pill").forEach(p => {
+    p.classList.toggle("on", p.dataset.tab === tab);
+  });
+  document.querySelectorAll(".c-tel-view").forEach(v => {
+    v.classList.toggle("on", v.id === "tel_view_" + tab);
+  });
+}
+
+function setCircuitAggressiveness(val) {
+  CIRCUIT_STAGE.aggressiveness = val;
+  const sl = document.getElementById("c_slider_aggr");
+  if(sl) sl.value = val;
+  const valTxt = document.getElementById("c_val_aggr");
+  if(valTxt) valTxt.textContent = val.toFixed(2) + " μ";
+
+  document.querySelectorAll(".c-aggr-btn").forEach(b => {
+    const bVal = parseFloat(b.dataset.aggr);
+    b.classList.toggle("on", Math.abs(bVal - val) < 0.04);
+  });
+
+  CIRCUIT_STAGE.path = buildShanghaiCircuit(CIRCUIT_STAGE.mu, CIRCUIT_STAGE.aggressiveness);
+  if (CIRCUIT_STAGE.path && typeof CIRCUIT_STAGE.path.computeAdaptiveLine === "function") {
+    CIRCUIT_STAGE.path.computeAdaptiveLine(CIRCUIT_STAGE.drivingPersona);
+  }
+  if(window.circuitPilot) window.circuitPilot.setPath(CIRCUIT_STAGE.path);
+}
+
+function switchCircuitVehicle(type) {
+  if(!VEHICLE_PRESETS || !VEHICLE_PRESETS[type]) return;
+  
+  loadVehiclePreset(type);
+  rebuild();
+  
+  CIRCUIT_STAGE.path = buildShanghaiCircuit(CIRCUIT_STAGE.mu, CIRCUIT_STAGE.aggressiveness);
+  const p0 = CIRCUIT_STAGE.path && CIRCUIT_STAGE.path.pts ? CIRCUIT_STAGE.path.pts[0] : null;
+  const startHeading = p0 ? p0.heading : 0;
+  
+  const startState = {
+    X: p0 ? p0.x : 0, Y: p0 ? p0.y : 0, Z: 0.0,
+    phi: 0, theta: 0, psi: startHeading,
+    u: 5.0, v: 0, w: 0,
+    p: 0, q: 0, r: 0,
+    omega: { FL: 5.0 / 0.33, FR: 5.0 / 0.33, RL: 5.0 / 0.33, RR: 5.0 / 0.33 }
+  };
+
+  window.physicsEngine = new VehicleDynamics15DOF(S, SIM, 5.0);
+  Object.assign(window.physicsEngine.state, startState);
+
+  window.circuitPilot = new UniversalAutoPilot(S);
+  window.circuitPilot.setPath(CIRCUIT_STAGE.path);
+  window.circuitPilot.active = CIRCUIT_STAGE.autoPilot;
+
+  CIRCUIT_STAGE.cachedScene = null;
+  CIRCUIT_STAGE.rebuildCadence = 0;
+  
+  document.querySelectorAll(".c-veh-btn").forEach(b => {
+    b.classList.toggle("on", b.dataset.veh === type);
+  });
+}
+
+function initCircuitStageEvents() {
+  // 1. Telemetry Tab Pills
+  const pills = document.querySelectorAll(".c-tel-pill");
+  pills.forEach(p => {
+    p.onclick = () => {
+      setCircuitTelemetryTab(p.dataset.tab);
+    };
+  });
+
+  // 2. Telemetry Tab Prev / Next buttons
+  const btnPrev = document.getElementById("c_tel_prev");
+  if(btnPrev) {
+    btnPrev.onclick = () => {
+      const idx = CIRCUIT_STAGE.tabList.indexOf(CIRCUIT_STAGE.telemetryTab);
+      const nextIdx = (idx - 1 + CIRCUIT_STAGE.tabList.length) % CIRCUIT_STAGE.tabList.length;
+      setCircuitTelemetryTab(CIRCUIT_STAGE.tabList[nextIdx]);
+    };
+  }
+  const btnNext = document.getElementById("c_tel_next");
+  if(btnNext) {
+    btnNext.onclick = () => {
+      const idx = CIRCUIT_STAGE.tabList.indexOf(CIRCUIT_STAGE.telemetryTab);
+      const nextIdx = (idx + 1) % CIRCUIT_STAGE.tabList.length;
+      setCircuitTelemetryTab(CIRCUIT_STAGE.tabList[nextIdx]);
+    };
+  }
+
+  // 3. Quick Vehicle Switch Buttons
+  const vehBtns = document.querySelectorAll(".c-veh-btn");
+  vehBtns.forEach(b => {
+    b.onclick = () => {
+      switchCircuitVehicle(b.dataset.veh);
+    };
+  });
+
+  // 4. Aggressiveness Preset Buttons & Slider
+  const aggrBtns = document.querySelectorAll(".c-aggr-btn");
+  aggrBtns.forEach(b => {
+    b.onclick = () => {
+      const val = parseFloat(b.dataset.aggr);
+      setCircuitAggressiveness(val);
+    };
+  });
+  const slAggr = document.getElementById("c_slider_aggr");
+  if(slAggr) {
+    slAggr.oninput = () => {
+      const val = parseFloat(slAggr.value);
+      setCircuitAggressiveness(val);
+    };
+  }
+
+  // 5. Live Tuning Sliders
+  const slKf = document.getElementById("c_slider_k_f");
+  const valKf = document.getElementById("c_val_k_f");
+  if(slKf) {
+    slKf.oninput = () => {
+      const v = parseInt(slKf.value, 10);
+      CIRCUIT_STAGE.liveTuning.k_f_pct = v;
+      if(valKf) valKf.textContent = (v >= 0 ? "+" : "") + v + "%";
+    };
+  }
+
+  const slKr = document.getElementById("c_slider_k_r");
+  const valKr = document.getElementById("c_val_k_r");
+  if(slKr) {
+    slKr.oninput = () => {
+      const v = parseInt(slKr.value, 10);
+      CIRCUIT_STAGE.liveTuning.k_r_pct = v;
+      if(valKr) valKr.textContent = (v >= 0 ? "+" : "") + v + "%";
+    };
+  }
+
+  const slBbias = document.getElementById("c_slider_bbias");
+  const valBbias = document.getElementById("c_val_bbias");
+  if(slBbias) {
+    slBbias.oninput = () => {
+      const v = parseInt(slBbias.value, 10);
+      CIRCUIT_STAGE.liveTuning.bbias = v;
+      if(valBbias) valBbias.textContent = v + "% 前 / " + (100 - v) + "% 后";
+    };
+  }
+
+  const slTcs = document.getElementById("c_slider_tcs");
+  const valTcs = document.getElementById("c_val_tcs");
+  if(slTcs) {
+    slTcs.oninput = () => {
+      const v = parseInt(slTcs.value, 10);
+      CIRCUIT_STAGE.liveTuning.tcs = v;
+      const descs = ["关 (OFF)", "等级 1 (弱)", "等级 2 (适中)", "等级 3 (强)", "等级 4 (雨地)", "等级 5 (极限介入)"];
+      if(valTcs) valTcs.textContent = descs[v] || ("等级 " + v);
+    };
+  }
+
+  // 6. Track Mu Slider & Autopilot & Respawn
+  const slMu = document.getElementById("c_slider_mu");
+  const valMu = document.getElementById("c_val_mu");
+  if(slMu) {
+    slMu.oninput = () => {
+      const v = parseFloat(slMu.value);
+      CIRCUIT_STAGE.mu = v;
+      const desc = v >= 1.3 ? " (热熔干地)" : (v >= 1.1 ? " (标准干地)" : (v >= 0.8 ? " (湿地)" : " (低附着/雨雪)"));
+      if(valMu) valMu.textContent = v.toFixed(2) + desc;
+      CIRCUIT_STAGE.path = buildShanghaiCircuit(CIRCUIT_STAGE.mu, CIRCUIT_STAGE.aggressiveness);
+      if(window.circuitPilot) window.circuitPilot.setPath(CIRCUIT_STAGE.path);
+    };
+  }
+
+  const btnAuto = document.getElementById("c_btn_autopilot");
+  if(btnAuto) {
+    btnAuto.onclick = () => {
+      CIRCUIT_STAGE.autoPilot = !CIRCUIT_STAGE.autoPilot;
+      if(window.circuitPilot) window.circuitPilot.active = CIRCUIT_STAGE.autoPilot;
+      btnAuto.textContent = CIRCUIT_STAGE.autoPilot ? "🤖 AutoPilot: 开" : "🎮 手动驾驶 (WASD)";
+      btnAuto.style.background = CIRCUIT_STAGE.autoPilot ? "#238636" : "#8957e5";
+    };
+  }
+
+  const btnRespawn = document.getElementById("c_btn_respawn");
+  if(btnRespawn) {
+    btnRespawn.onclick = () => {
+      if(window.physicsEngine && CIRCUIT_STAGE.path) {
+        respawnCircuitVehicle(window.physicsEngine, CIRCUIT_STAGE.path, 0);
+      }
+    };
+  }
+
+  // 7. Panel Visibility Toggle Buttons
+  const btnTogHud = document.getElementById("btn_toggle_hud");
+  if(btnTogHud) btnTogHud.onclick = () => toggleCircuitPanel("hud");
+  const btnTogBottom = document.getElementById("btn_toggle_bottom");
+  if(btnTogBottom) btnTogBottom.onclick = () => toggleCircuitPanel("bottom");
+  const btnTogRight = document.getElementById("btn_toggle_right");
+  if(btnTogRight) btnTogRight.onclick = () => toggleCircuitPanel("right");
+  const btnTogFs = document.getElementById("btn_toggle_fullscreen");
+  if(btnTogFs) btnTogFs.onclick = () => toggleCircuitPanel("fullscreen");
+
+  // 8. MoTeC Telemetry LOG Modal Events
+  const btnOpenLog = document.getElementById("btn_open_telemetry_log");
+  if(btnOpenLog) btnOpenLog.onclick = () => openCircuitTelemetryLogModal();
+  const btnCloseLog = document.getElementById("tl_btn_close");
+  if(btnCloseLog) btnCloseLog.onclick = () => closeCircuitTelemetryLogModal();
+
+  const btnAxisDist = document.getElementById("tl_btn_axis_dist");
+  const btnAxisTime = document.getElementById("tl_btn_axis_time");
+  if(btnAxisDist) {
+    btnAxisDist.onclick = () => {
+      TELEMETRY_LOG_STATE.axis = "dist";
+      btnAxisDist.classList.add("active");
+      if(btnAxisTime) btnAxisTime.classList.remove("active");
+      renderTelemetryLogCanvas();
+    };
+  }
+  if(btnAxisTime) {
+    btnAxisTime.onclick = () => {
+      TELEMETRY_LOG_STATE.axis = "time";
+      btnAxisTime.classList.add("active");
+      if(btnAxisDist) btnAxisDist.classList.remove("active");
+      renderTelemetryLogCanvas();
+    };
+  }
+
+  const btnSrcCurr = document.getElementById("tl_btn_src_current");
+  const btnSrcBest = document.getElementById("tl_btn_src_best");
+  if(btnSrcCurr) {
+    btnSrcCurr.onclick = () => {
+      TELEMETRY_LOG_STATE.source = "current";
+      btnSrcCurr.classList.add("active");
+      if(btnSrcBest) btnSrcBest.classList.remove("active");
+      renderTelemetryLogCanvas();
+    };
+  }
+  if(btnSrcBest) {
+    btnSrcBest.onclick = () => {
+      TELEMETRY_LOG_STATE.source = "best";
+      btnSrcBest.classList.add("active");
+      if(btnSrcCurr) btnSrcCurr.classList.remove("active");
+      renderTelemetryLogCanvas();
+    };
+  }
+
+  const btnExportCsv = document.getElementById("tl_btn_export_csv");
+  if(btnExportCsv) btnExportCsv.onclick = () => exportTelemetryCSV();
+
+  document.querySelectorAll(".c-tel-chan-tag").forEach(tag => {
+    tag.onclick = () => {
+      const ch = tag.dataset.ch;
+      if(ch && TELEMETRY_LOG_STATE.channels[ch] !== undefined) {
+        TELEMETRY_LOG_STATE.channels[ch] = !TELEMETRY_LOG_STATE.channels[ch];
+        tag.classList.toggle("off", !TELEMETRY_LOG_STATE.channels[ch]);
+        renderTelemetryLogCanvas();
+      }
+    };
+  });
+
+  const telCv = document.getElementById("telemetryLogCanvas");
+  if(telCv) {
+    telCv.onmousemove = e => handleTelemetryCanvasMouseMove(e);
+    telCv.onmouseleave = () => handleTelemetryCanvasMouseLeave();
+  }
+}
+
+function renderCircuitTelemetry(st, tel, ctrl) {
+  const tab = CIRCUIT_STAGE.telemetryTab || "general";
+  
+  // 1. General tab update
+  if(tab === "general") {
+    const spd = Math.max(0, st.u) * 3.6;
+    const curKm = spd;
+    let recGear = "1";
+    if (curKm > 260) recGear = "6";
+    else if (curKm > 200) recGear = "5";
+    else if (curKm > 145) recGear = "4";
+    else if (curKm > 95) recGear = "3";
+    else if (curKm > 50) recGear = "2";
+    if (curKm < 1 && Math.abs(ctrl.throttle) < 0.05) recGear = "N";
+
+    const rpm = Math.min(9500, Math.max(900, (st.omega.RL * 60 / (2 * Math.PI)) * 4.2));
+    const pwr = Math.max(0, (ctrl.throttle * 320 * (rpm / 8000))).toFixed(0);
+    const trq = Math.max(0, (ctrl.throttle * 480 * (1.0 - (rpm - 5000)**2 / (7000**2)))).toFixed(1);
+    const boost = (ctrl.throttle * 1.85 * (rpm / 7500)).toFixed(2);
+
+    const elSpd = document.getElementById("tg_val_speed"); if(elSpd) elSpd.textContent = spd.toFixed(0);
+    const elGear = document.getElementById("tg_val_gear"); if(elGear) elGear.textContent = recGear;
+    const elRpm = document.getElementById("tg_val_rpm"); if(elRpm) elRpm.textContent = rpm.toLocaleString("en-US", {minimumFractionDigits: 1, maximumFractionDigits: 1});
+    const elPwr = document.getElementById("tg_val_pwr"); if(elPwr) elPwr.textContent = pwr;
+    const elTrq = document.getElementById("tg_val_trq"); if(elTrq) elTrq.textContent = trq;
+    const elBoost = document.getElementById("tg_val_boost"); if(elBoost) elBoost.textContent = boost;
+
+    // Steering Angle Gauge Canvas & Text
+    const elSteer = document.getElementById("tg_val_steer");
+    const stAng = (ctrl.steer || 0);
+    if(elSteer) elSteer.textContent = (stAng >= 0 ? "+" : "") + stAng.toFixed(1) + "°";
+    
+    const cvSteer = document.getElementById("tg_steer_canvas");
+    if(cvSteer) {
+      const ctx = cvSteer.getContext("2d");
+      ctx.clearRect(0, 0, cvSteer.width, cvSteer.height);
+      const cx = cvSteer.width / 2, cy = cvSteer.height - 10, r = 40;
+      // Background Arc
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, -Math.PI * 0.85, -Math.PI * 0.15);
+      ctx.strokeStyle = "rgba(255,255,255,0.15)";
+      ctx.lineWidth = 4;
+      ctx.stroke();
+
+      // Active Arc
+      const steerNorm = Math.max(-1, Math.min(1, stAng / 28.0));
+      const midAng = -Math.PI * 0.5;
+      const targetAng = midAng + steerNorm * (Math.PI * 0.35);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, Math.min(midAng, targetAng), Math.max(midAng, targetAng));
+      ctx.strokeStyle = "#58a6ff";
+      ctx.lineWidth = 4;
+      ctx.stroke();
+
+      // Needle Dot
+      const nx = cx + r * Math.cos(targetAng);
+      const ny = cy + r * Math.sin(targetAng);
+      ctx.beginPath();
+      ctx.arc(nx, ny, 4, 0, 2*Math.PI);
+      ctx.fillStyle = "#fff";
+      ctx.fill();
+    }
+
+    // Pedals
+    const elBarClutch = document.getElementById("tg_bar_clutch"); if(elBarClutch) elBarClutch.style.height = "0%";
+    const elBarThr = document.getElementById("tg_bar_thr"); if(elBarThr) elBarThr.style.height = (ctrl.throttle * 100).toFixed(0) + "%";
+    const elValThr = document.getElementById("tg_val_throttle"); if(elValThr) elValThr.textContent = (ctrl.throttle * 100).toFixed(0);
+    const elBarBrk = document.getElementById("tg_bar_brk"); if(elBarBrk) elBarBrk.style.height = (ctrl.brake * 100).toFixed(0) + "%";
+    const elValBrk = document.getElementById("tg_val_brake"); if(elValBrk) elValBrk.textContent = (ctrl.brake * 100).toFixed(0);
+  }
+
+  // 2. Friction tab update (G-G Friction Circles)
+  else if(tab === "friction") {
+    const corners = ['fl', 'fr', 'rl', 'rr'];
+    const cornerKeys = { fl: 'FL', fr: 'FR', rl: 'RL', rr: 'RR' };
+    corners.forEach(c => {
+      const id = cornerKeys[c];
+      const cv = document.getElementById("fric_cv_" + c);
+      if(!cv) return;
+      const ctx = cv.getContext("2d");
+      const w = cv.width, h = cv.height;
+      ctx.clearRect(0, 0, w, h);
+      const cx = w / 2, cy = h / 2, r = w * 0.38;
+
+      // Outer Friction Ellipse
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, r, r * 0.9, 0, 0, 2 * Math.PI);
+      ctx.strokeStyle = "rgba(88, 166, 255, 0.4)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Crosshairs
+      ctx.beginPath();
+      ctx.moveTo(cx, 8); ctx.lineTo(cx, h - 8);
+      ctx.moveTo(8, cy); ctx.lineTo(w - 8, cy);
+      ctx.strokeStyle = "rgba(255,255,255,0.1)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Forces
+      const fx = tel.Fx ? (tel.Fx[id] || 0) : 0;
+      const fy = tel.Fy ? (tel.Fy[id] || 0) : 0;
+      const fz = tel.Fz ? (tel.Fz[id] || 2500) : 2500;
+      const f_max = Math.max(100, fz * 1.35);
+      const util = Math.min(2.0, Math.hypot(fx, fy) / f_max);
+      const utilPct = Math.round(util * 100);
+
+      const elUtil = document.getElementById("fric_util_" + c);
+      if(elUtil) {
+        elUtil.textContent = utilPct + "%";
+        elUtil.style.color = utilPct > 100 ? "#f85149" : (utilPct > 85 ? "#f1c40f" : "#58a6ff");
+      }
+
+      // Projected Dot (Fy: lateral -> X, Fx: tractive -> -Y)
+      const dotX = cx + (fy / f_max) * r;
+      const dotY = cy - (fx / f_max) * (r * 0.9);
+
+      // Trajectory vector line
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(dotX, dotY);
+      ctx.strokeStyle = utilPct > 100 ? "#f85149" : (utilPct > 85 ? "#f1c40f" : "#388bfd");
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Glowing dot
+      ctx.beginPath();
+      ctx.arc(dotX, dotY, 4, 0, 2*Math.PI);
+      ctx.fillStyle = utilPct > 100 ? "#ff7b72" : "#7ee787";
+      ctx.fill();
+    });
+  }
+
+  // 3. Suspension Tab
+  else if(tab === "suspension") {
+    const corners = ['fl', 'fr', 'rl', 'rr'];
+    const cornerKeys = { fl: 'FL', fr: 'FR', rl: 'RL', rr: 'RR' };
+    corners.forEach(c => {
+      const id = cornerKeys[c];
+      const tr = tel.tr ? (tel.tr[id] || 0) : 0;
+      const fz = tel.Fz ? (tel.Fz[id] || 2500) : 2500;
+      
+      const elDisp = document.getElementById("susp_disp_" + c);
+      if(elDisp) elDisp.textContent = (tr * 1000 >= 0 ? "+" : "") + (tr * 1000).toFixed(1) + " mm";
+      
+      const elFz = document.getElementById("susp_fz_" + c);
+      if(elFz) elFz.textContent = Math.round(fz) + " N";
+      
+      const elBar = document.getElementById("susp_bar_" + c);
+      if(elBar) {
+        const norm = Math.max(0, Math.min(100, 50 + (tr * 1000 / 60) * 50));
+        elBar.style.height = norm.toFixed(0) + "%";
+        elBar.style.backgroundColor = norm > 85 ? "#f85149" : (norm < 15 ? "#f1c40f" : "#2ea043");
+      }
+    });
+  }
+
+  // 4. G-Meter Tab
+  else if(tab === "gmeter") {
+    const cv = document.getElementById("gmeter_canvas");
+    if(cv) {
+      const ctx = cv.getContext("2d");
+      const w = cv.width, h = cv.height;
+      ctx.clearRect(0, 0, w, h);
+      const cx = w / 2, cy = h / 2, maxR = w * 0.42;
+
+      // Concentric Rings (0.5g, 1.0g, 1.5g, 2.0g)
+      const gLevels = [0.5, 1.0, 1.5, 2.0];
+      gLevels.forEach(g => {
+        const r = (g / 2.0) * maxR;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, 2*Math.PI);
+        ctx.strokeStyle = g === 1.0 ? "rgba(88,166,255,0.4)" : "rgba(255,255,255,0.1)";
+        ctx.lineWidth = g === 1.0 ? 1.5 : 1;
+        ctx.stroke();
+        
+        ctx.fillStyle = "rgba(255,255,255,0.4)";
+        ctx.font = "9px monospace";
+        ctx.fillText(g.toFixed(1) + "g", cx + r + 2, cy - 2);
+      });
+
+      // Crosshairs
+      ctx.beginPath();
+      ctx.moveTo(cx, 15); ctx.lineTo(cx, h - 15);
+      ctx.moveTo(15, cy); ctx.lineTo(w - 15, cy);
+      ctx.strokeStyle = "rgba(255,255,255,0.15)";
+      ctx.stroke();
+
+      const ay = tel.ay || 0; // Lateral G (+ right)
+      const ax = tel.ax || 0; // Longitudinal G (+ forward)
+      const totalG = Math.hypot(ax, ay);
+
+      // Trail history
+      if(!CIRCUIT_STAGE.gHistory) CIRCUIT_STAGE.gHistory = [];
+      CIRCUIT_STAGE.gHistory.push({ ax, ay });
+      if(CIRCUIT_STAGE.gHistory.length > 25) CIRCUIT_STAGE.gHistory.shift();
+
+      ctx.beginPath();
+      CIRCUIT_STAGE.gHistory.forEach((pt, idx) => {
+        const px = cx + (pt.ay / 2.0) * maxR;
+        const py = cy - (pt.ax / 2.0) * maxR;
+        if(idx === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      });
+      ctx.strokeStyle = "rgba(88,166,255,0.3)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Current G dot
+      const curX = cx + (ay / 2.0) * maxR;
+      const curY = cy - (ax / 2.0) * maxR;
+
+      ctx.beginPath();
+      ctx.arc(curX, curY, 6, 0, 2*Math.PI);
+      ctx.fillStyle = totalG > 1.5 ? "#f85149" : (totalG > 1.0 ? "#f1c40f" : "#388bfd");
+      ctx.fill();
+
+      // Numerical outputs
+      const elTot = document.getElementById("gm_val_total"); if(elTot) elTot.textContent = totalG.toFixed(2) + " g";
+      const elAy = document.getElementById("gm_val_ay"); if(elAy) elAy.textContent = (ay >= 0 ? "+" : "") + ay.toFixed(2) + " g";
+      const elAx = document.getElementById("gm_val_ax"); if(elAx) elAx.textContent = (ax >= 0 ? "+" : "") + ax.toFixed(2) + " g";
+      const elYaw = document.getElementById("gm_val_yaw"); if(elYaw) elYaw.textContent = (st.r || 0).toFixed(2) + " rad/s";
+    }
+  }
+
+  // 5. Tires Detail Tab
+  else if(tab === "tires") {
+    const corners = ['fl', 'fr', 'rl', 'rr'];
+    const cornerKeys = { fl: 'FL', fr: 'FR', rl: 'RL', rr: 'RR' };
+    corners.forEach(c => {
+      const id = cornerKeys[c];
+      const wRot = (st.omega[id] || 0) * (id.startsWith('F') ? 0.33 : 0.33) * 3.6;
+      const slipRatio = tel.kappa ? ((tel.kappa[id] || 0) * 100).toFixed(1) : "0.0";
+      
+      const elTemp = document.getElementById("td_temp_" + c); if(elTemp) elTemp.textContent = (95.0 + Math.abs(tel.ay||0)*4.5).toFixed(1) + " °C";
+      const elPrs = document.getElementById("td_prs_" + c); if(elPrs) elPrs.textContent = (2.40 + (Math.abs(tel.ay||0)*0.15)).toFixed(2) + " BAR";
+      const elSpd = document.getElementById("td_spd_" + c); if(elSpd) elSpd.textContent = wRot.toFixed(0) + " km/h";
+      const elCam = document.getElementById("td_cam_" + c); if(elCam) elCam.textContent = (id.startsWith('F') ? (-2.2 + (tel.tr?tel.tr[id]*15:0)) : (-1.8 + (tel.tr?tel.tr[id]*12:0))).toFixed(2) + "°";
+      const elSlip = document.getElementById("td_slip_" + c); if(elSlip) elSlip.textContent = slipRatio + "%";
+    });
+  }
+
+  // 6. Tire Temperature IMO Tab
+  else if(tab === "temp") {
+    const corners = ['fl', 'fr', 'rl', 'rr'];
+    const cornerKeys = { fl: 'FL', fr: 'FR', rl: 'RL', rr: 'RR' };
+    const ay = tel.ay || 0;
+    corners.forEach(c => {
+      const isLeft = (c === 'fl' || c === 'rl');
+      const baseTemp = 96.0 + Math.abs(ay) * 5.0;
+      
+      // Inside gets hotter in high camber/cornering
+      const tIn = baseTemp + (isLeft ? (ay > 0 ? 4.2 : -1.0) : (ay < 0 ? 4.2 : -1.0));
+      const tMid = baseTemp + 1.2;
+      const tOut = baseTemp + (isLeft ? (ay < 0 ? 3.5 : -1.5) : (ay > 0 ? 3.5 : -1.5));
+      
+      const elIn = document.getElementById("imo_v_" + c + "_i"); if(elIn) elIn.textContent = tIn.toFixed(1) + "°C";
+      const elMid = document.getElementById("imo_v_" + c + "_m"); if(elMid) elMid.textContent = tMid.toFixed(1) + "°C";
+      const elOut = document.getElementById("imo_v_" + c + "_o"); if(elOut) elOut.textContent = tOut.toFixed(1) + "°C";
+      
+      const getHeatColor = t => {
+        if(t < 85) return "#388bfd";
+        if(t <= 104) return "#2ea043";
+        if(t <= 112) return "#f1c40f";
+        return "#f85149";
+      };
+      const blIn = document.getElementById("imo_bl_" + c + "_i"); if(blIn) blIn.style.backgroundColor = getHeatColor(tIn);
+      const blMid = document.getElementById("imo_bl_" + c + "_m"); if(blMid) blMid.style.backgroundColor = getHeatColor(tMid);
+      const blOut = document.getElementById("imo_bl_" + c + "_o"); if(blOut) blOut.style.backgroundColor = getHeatColor(tOut);
+    });
+  }
+
+  // 7. Damage & Wear Tab
+  else if(tab === "damage") {
+    const elFuel = document.getElementById("dm_val_fuel");
+    if(elFuel) {
+      const curLap = CIRCUIT_STAGE.rebuildCadence ? (100.0 - (CIRCUIT_STAGE.rebuildCadence * 0.002)) : 98.5;
+      elFuel.textContent = Math.max(0, curLap).toFixed(1) + "%";
+    }
+  }
+}
 
 function openCircuitStage() {
   const modal = document.getElementById("circuitStageModal");
@@ -1879,26 +3273,27 @@ function openCircuitStage() {
      内部会 new CircuitPath，初始化失败时必须把错误画到画布上。 */
   try {
     CIRCUIT_STAGE.playing = true;
-    CIRCUIT_STAGE.path = buildShanghaiCircuit();
+    CIRCUIT_STAGE.path = buildShanghaiCircuit(CIRCUIT_STAGE.mu, CIRCUIT_STAGE.aggressiveness);
     CIRCUIT_STAGE.cachedScene = null;
     CIRCUIT_STAGE.rebuildCadence = 0;
 
+    const p0 = CIRCUIT_STAGE.path && CIRCUIT_STAGE.path.pts ? CIRCUIT_STAGE.path.pts[0] : null;
+    const startHeading = p0 ? p0.heading : 0;
+
     const startState = {
-      X: 0, Y: 0, Z: 0.0,
-      phi: 0, theta: 0, psi: 0,
-      u: 0.1, v: 0, w: 0,
+      X: p0 ? p0.x : 0, Y: p0 ? p0.y : 0, Z: 0.0,
+      phi: 0, theta: 0, psi: startHeading,
+      u: 5.0, v: 0, w: 0,
       p: 0, q: 0, r: 0,
-      z: {FL:0,FR:0,RL:0,RR:0},
-      dz: {FL:0,FR:0,RL:0,RR:0},
-      omega: {FL:0,FR:0,RL:0,RR:0}
+      omega: { FL: 5.0 / 0.33, FR: 5.0 / 0.33, RL: 5.0 / 0.33, RR: 5.0 / 0.33 }
     };
 
-    window.physicsEngine = new VehicleDynamics15DOF(S, SIM, 0.1);
+    window.physicsEngine = new VehicleDynamics15DOF(S, SIM, 5.0);
     Object.assign(window.physicsEngine.state, startState);
 
     window.circuitPilot = new UniversalAutoPilot(S);
     window.circuitPilot.setPath(CIRCUIT_STAGE.path);
-    window.circuitPilot.active = true;
+    window.circuitPilot.active = CIRCUIT_STAGE.autoPilot;
 
     CIRCUIT_STAGE.active = true;
   } catch(err) {
@@ -1915,6 +3310,15 @@ function openCircuitStage() {
   circuitCamBtns.forEach(b => {
     b.classList.toggle("on", b.dataset.cam === (CIRCUIT_STAGE.camMode || "behind"));
   });
+
+  // Sync vehicle buttons
+  document.querySelectorAll(".c-veh-btn").forEach(b => {
+    b.classList.toggle("on", b.dataset.veh === S.vehicleType);
+  });
+  // Sync tab
+  setCircuitTelemetryTab(CIRCUIT_STAGE.telemetryTab || "general");
+  // Sync panel layout
+  updateCircuitPanelLayout();
   
   const cv = document.getElementById("circuitCanvas");
   if(cv) {
@@ -1928,6 +3332,9 @@ function openCircuitStage() {
       if(e.key==='a'||e.key==='A') CIRCUIT_STAGE.keys.a = true;
       if(e.key==='d'||e.key==='D') CIRCUIT_STAGE.keys.d = true;
       if(e.key===' ') CIRCUIT_STAGE.keys.space = true;
+      if(e.key==='f'||e.key==='F') toggleCircuitPanel("fullscreen");
+      if(e.key==='h'||e.key==='H') toggleCircuitPanel("hud");
+      if(e.key==='l'||e.key==='L') toggleCircuitTelemetryLog();
     };
     cv.onkeyup = e => {
       if(e.key==='w'||e.key==='W') CIRCUIT_STAGE.keys.w = false;
@@ -2054,21 +3461,21 @@ function circuitStageLoop(now) {
       e_y = pt.crossTrackError;
       v_tar = pt.targetSpeed;
       
-      // 手动驾驶冲出赛道脱轨保险：横向偏离 > 6.0m 则自动在安全前置点重置
-      if(Math.abs(e_y) > 6.2) {
+      // 手动驾驶冲出赛道脱轨保险：横向偏离 > 9.5m（超出赛道7m+路肩1.35m+缓冲区）则自动在安全前置点重置
+      if(Math.abs(e_y) > 9.5) {
         respawnCircuitVehicle(eng, CIRCUIT_STAGE.path, pt.idx || 0);
         e_y = 0;
       }
     } else {
       if(window.circuitPilot) {
-        window.circuitPilot.active = true;
+        window.circuitPilot.active = CIRCUIT_STAGE.autoPilot;
         ctrl = window.circuitPilot.drive(eng.state, dt);
         const pt = CIRCUIT_STAGE.path.getLookahead(eng.state.X, eng.state.Y, eng.state.u);
         e_y = pt.crossTrackError;
         v_tar = pt.targetSpeed;
         
-        // 🔒 AUTO-RESPAWN INSURANCE: 脱轨保险机制（偏离 > 5.8m 自动回退 40 米重新启动）
-        if (Math.abs(e_y) > 5.8) {
+        // 🔒 AUTO-RESPAWN INSURANCE: 脱轨保险机制（偏离 > 8.8m 允许赛车完全骑上路肩，超出路肩才重置）
+        if (Math.abs(e_y) > 8.8) {
           respawnCircuitVehicle(eng, CIRCUIT_STAGE.path, pt.idx || 0);
           e_y = 0;
         }
@@ -2121,9 +3528,18 @@ function circuitStageLoop(now) {
     };
     
     renderCircuitScene(st, tel, ctrl);
+    renderCircuitTelemetry(st, tel, ctrl);
+
+    // Continuous MoTeC Telemetry Logging
+    const tgt = (ctrl && ctrl.target) ? ctrl.target : (CIRCUIT_STAGE.path ? CIRCUIT_STAGE.path.getLookahead(st.X, st.Y, st.u) : null);
+    if (window.circuitTelemetryRecorder) {
+      window.circuitTelemetryRecorder.record(st, tel, ctrl, CIRCUIT_STAGE.path, tgt);
+    }
+    if (typeof TELEMETRY_LOG_STATE !== 'undefined' && TELEMETRY_LOG_STATE.modalOpen && (CIRCUIT_STAGE.rebuildCadence % 2 === 0)) {
+      renderTelemetryLogCanvas();
+    }
     
     // HUD Update
-    const tgt = (ctrl && ctrl.target) ? ctrl.target : (CIRCUIT_STAGE.path ? CIRCUIT_STAGE.path.getLookahead(st.X, st.Y, st.u) : null);
     
     const elV = document.getElementById("c_hud_v");
     if(elV) elV.textContent = (Math.max(0, st.u) * 3.6).toFixed(1) + " km/h";
@@ -2174,6 +3590,12 @@ function circuitStageLoop(now) {
           elDRSBadge.textContent = "⚪ DRS 关闭";
         }
       }
+      
+      const elKerbBadge = document.getElementById("c_hud_kerb_badge");
+      if(elKerbBadge) {
+        const onKerb = tel.isKerb && (tel.isKerb.FL || tel.isKerb.FR || tel.isKerb.RL || tel.isKerb.RR);
+        elKerbBadge.style.display = onKerb ? "inline-block" : "none";
+      }
     }
     
   } catch (e) {
@@ -2196,11 +3618,14 @@ function renderCircuitScene(st, tel, ctrl) {
   const w = cv.width / dpr, h = cv.height / dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  // Deep Sky Gradient
-  const bgGrad = ctx.createRadialGradient(w/2, h/2, 50, w/2, h/2, Math.max(w, h));
-  bgGrad.addColorStop(0, "#0c131f");
-  bgGrad.addColorStop(1, "#03060a");
-  ctx.fillStyle = bgGrad;
+  // Atmospheric Twilight Sky & Horizon Glow
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+  skyGrad.addColorStop(0.0, "#050811");
+  skyGrad.addColorStop(0.40, "#0a1324");
+  skyGrad.addColorStop(0.55, "#13213a");
+  skyGrad.addColorStop(0.72, "#182a48");
+  skyGrad.addColorStop(1.0, "#080c14");
+  ctx.fillStyle = skyGrad;
   ctx.fillRect(0, 0, w, h);
   
   const carX_mm = st.X * 1000;
@@ -2306,193 +3731,157 @@ function renderCircuitScene(st, tel, ctrl) {
     return [halfW + xc * f, halfH - yc * f];
   };
 
-  // 1. Draw 3D Continuous Asphalt Surface, Runoff, Kerbs & Walls
+  // 1. Draw 3D Continuous Asphalt Surface, Kerbs & Walls (Sorted Back-to-Front via Painter's Algorithm)
   const path = CIRCUIT_STAGE.path;
   if (path && path.pts) {
     const hw = 7000; // 7.0m half-width (14.0m wide Grand Prix track)
     const N = path.pts.length;
     
-    // Step size for drawing performance (skip distant details if dense)
-    const step = 1;
-    for (let i = 0; i < N; i += step) {
+    // Collect visible track segments and compute distance to camera
+    const segs = [];
+    for (let i = 0; i < N; i++) {
       const p1 = path.pts[i];
-      const p2 = path.pts[(i + step) % N];
+      const p2 = path.pts[(i + 1) % N];
       
       const p1x_mm = p1.x * 1000, p1y_mm = p1.y * 1000;
       const p2x_mm = p2.x * 1000, p2y_mm = p2.y * 1000;
+      const midX = (p1x_mm + p2x_mm) * 0.5;
+      const midY = (p1y_mm + p2y_mm) * 0.5;
       
-      // Distance culling from camera to maximize silky 60FPS
-      const distToCamSq = (p1x_mm - E_x)**2 + (p1y_mm - E_y)**2;
-      if (distToCamSq > 500000**2) continue; // 500m view distance
+      const dx = midX - E_x, dy = midY - E_y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq > 400000**2) continue; // 400m view distance
+      
+      // Cull segments strictly behind the camera
+      const dotFw = fw[0] * dx + fw[1] * dy;
+      if (dotFw < -20000) continue;
+      
+      segs.push({
+        i, p1, p2, p1x_mm, p1y_mm, p2x_mm, p2y_mm,
+        distToCam: Math.sqrt(distSq) / 1000
+      });
+    }
+    
+    // Crucial: Sort segments from FARTHEST to CLOSEST (Painter's Algorithm)
+    // This completely prevents distant looping track sections from overdrawing the foreground
+    segs.sort((a, b) => b.distToCam - a.distToCam);
+    
+    for (const seg of segs) {
+      const { i, p1, p2, p1x_mm, p1y_mm, p2x_mm, p2y_mm, distToCam } = seg;
       
       const pl1 = projFast(p1x_mm - p1.nx * hw, p1y_mm - p1.ny * hw, 0);
       const pr1 = projFast(p1x_mm + p1.nx * hw, p1y_mm + p1.ny * hw, 0);
       const pr2 = projFast(p2x_mm + p2.nx * hw, p2y_mm + p2.ny * hw, 0);
       const pl2 = projFast(p2x_mm - p2.nx * hw, p2y_mm - p2.ny * hw, 0);
       
-      if(pl1 && pr1 && pr2 && pl2) {
-        // Runoff Apron / Gravel Trap Outside Corners
-        if (p1.runoff === "gravel") {
-          const gr_hw = hw + 10000; // 10m extra gravel width
-          const gpl1 = projFast(p1x_mm - p1.nx * gr_hw, p1y_mm - p1.ny * gr_hw, -100);
-          const gpr1 = projFast(p1x_mm + p1.nx * gr_hw, p1y_mm + p1.ny * gr_hw, -100);
-          const gpr2 = projFast(p2x_mm + p2.nx * gr_hw, p2y_mm + p2.ny * gr_hw, -100);
-          const gpl2 = projFast(p2x_mm - p2.nx * gr_hw, p2y_mm - p2.ny * gr_hw, -100);
-          if (gpl1 && gpr1 && gpr2 && gpl2) {
+      if (!pl1 || !pr1 || !pr2 || !pl2) continue;
+      
+      // Clean Seamless Dark Asphalt Ribbon
+      ctx.beginPath();
+      ctx.moveTo(pl1[0], pl1[1]); ctx.lineTo(pr1[0], pr1[1]);
+      ctx.lineTo(pr2[0], pr2[1]); ctx.lineTo(pl2[0], pl2[1]);
+      ctx.closePath();
+      ctx.fillStyle = "#111722"; // Premium Dark Track Asphalt
+      ctx.fill();
+      
+      // Dynamic Rubber Skid Mark Grooves on racing line
+      const rk1_l = projFast(p1x_mm - p1.nx * 1800, p1y_mm - p1.ny * 1800, 2);
+      const rk2_l = projFast(p2x_mm - p2.nx * 1800, p2y_mm - p2.ny * 1800, 2);
+      const rk1_r = projFast(p1x_mm + p1.nx * 1800, p1y_mm + p1.ny * 1800, 2);
+      const rk2_r = projFast(p2x_mm + p2.nx * 1800, p2y_mm + p2.ny * 1800, 2);
+      if(rk1_l && rk2_l) {
+        ctx.beginPath(); ctx.moveTo(rk1_l[0], rk1_l[1]); ctx.lineTo(rk2_l[0], rk2_l[1]);
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.42)"; ctx.lineWidth = 3.5; ctx.stroke();
+      }
+      if(rk1_r && rk2_r) {
+        ctx.beginPath(); ctx.moveTo(rk1_r[0], rk1_r[1]); ctx.lineTo(rk2_r[0], rk2_r[1]);
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.42)"; ctx.lineWidth = 3.5; ctx.stroke();
+      }
+      
+      // 3D Physical Bevel Kerbs (38mm elevation with alternating FIA Red/White tiles)
+      const hasKerb = p1.kerbSide || (Math.abs(p1.curvature || 0) > 0.006);
+      if (hasKerb) {
+        const kerbCol = (i % 6 < 3) ? "#e11d48" : "#f8fafc";
+        const kSide = p1.kerbSide || ((p1.curvature || 0) > 0 ? "right" : "left");
+        const kw = 1350; // 1.35m kerb width
+        const kh = 38;   // 38mm bevel elevation
+        
+        if (kSide === "left" || kSide === "both") {
+          const kl1_in = projFast(p1x_mm - p1.nx * hw, p1y_mm - p1.ny * hw, 0);
+          const kl1_out = projFast(p1x_mm - p1.nx * (hw + kw), p1y_mm - p1.ny * (hw + kw), kh);
+          const kl2_out = projFast(p2x_mm - p2.nx * (hw + kw), p2y_mm - p2.ny * (hw + kw), kh);
+          const kl2_in = projFast(p2x_mm - p2.nx * hw, p2y_mm - p2.ny * hw, 0);
+          if(kl1_in && kl1_out && kl2_out && kl2_in) {
             ctx.beginPath();
-            ctx.moveTo(gpl1[0], gpl1[1]); ctx.lineTo(gpr1[0], gpr1[1]);
-            ctx.lineTo(gpr2[0], gpr2[1]); ctx.lineTo(gpl2[0], gpl2[1]);
+            ctx.moveTo(kl1_in[0], kl1_in[1]); ctx.lineTo(kl1_out[0], kl1_out[1]);
+            ctx.lineTo(kl2_out[0], kl2_out[1]); ctx.lineTo(kl2_in[0], kl2_in[1]);
             ctx.closePath();
-            ctx.fillStyle = "#c29b62"; // Textured sand gravel trap
-            ctx.fill();
+            ctx.fillStyle = kerbCol; ctx.fill();
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.15)"; ctx.lineWidth = 1; ctx.stroke();
           }
-        } else if (p1.runoff === "asphalt_stripes") {
-          const run_hw = hw + 8000; // 8m painted asphalt runoff
-          const rpl1 = projFast(p1x_mm - p1.nx * run_hw, p1y_mm - p1.ny * run_hw, 0);
-          const rpr1 = projFast(p1x_mm + p1.nx * run_hw, p1y_mm + p1.ny * run_hw, 0);
-          const rpr2 = projFast(p2x_mm + p2.nx * run_hw, p2y_mm + p2.ny * run_hw, 0);
-          const rpl2 = projFast(p2x_mm - p2.nx * run_hw, p2y_mm - p2.ny * run_hw, 0);
-          if (rpl1 && rpr1 && rpr2 && rpl2) {
+        }
+        if (kSide === "right" || kSide === "both") {
+          const kr1_in = projFast(p1x_mm + p1.nx * hw, p1y_mm + p1.ny * hw, 0);
+          const kr1_out = projFast(p1x_mm + p1.nx * (hw + kw), p1y_mm + p1.ny * (hw + kw), kh);
+          const kr2_out = projFast(p2x_mm + p2.nx * (hw + kw), p2y_mm + p2.ny * (hw + kw), kh);
+          const kr2_in = projFast(p2x_mm + p2.nx * hw, p2y_mm + p2.ny * hw, 0);
+          if(kr1_in && kr1_out && kr2_out && kr2_in) {
             ctx.beginPath();
-            ctx.moveTo(rpl1[0], rpl1[1]); ctx.lineTo(rpr1[0], rpr1[1]);
-            ctx.lineTo(rpr2[0], rpr2[1]); ctx.lineTo(rpl2[0], rpl2[1]);
+            ctx.moveTo(kr1_in[0], kr1_in[1]); ctx.lineTo(kr1_out[0], kr1_out[1]);
+            ctx.lineTo(kr2_out[0], kr2_out[1]); ctx.lineTo(kr2_in[0], kr2_in[1]);
             ctx.closePath();
-            ctx.fillStyle = (i % 6 < 3) ? "#1f4068" : "#e63946"; // FIA Blue/Red Runoff
-            ctx.fill();
+            ctx.fillStyle = kerbCol; ctx.fill();
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.15)"; ctx.lineWidth = 1; ctx.stroke();
           }
         }
-        
-        // Asphalt Ribbon
-        ctx.beginPath();
-        ctx.moveTo(pl1[0], pl1[1]); ctx.lineTo(pr1[0], pr1[1]);
-        ctx.lineTo(pr2[0], pr2[1]); ctx.lineTo(pl2[0], pl2[1]);
-        ctx.closePath();
-        ctx.fillStyle = "#181e26"; // Dark Asphalt
-        ctx.fill();
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        
-        // Dynamic Rubber Skid Mark Grooves on racing line
-        const rk1_l = projFast(p1x_mm - p1.nx * 1800, p1y_mm - p1.ny * 1800, 2);
-        const rk2_l = projFast(p2x_mm - p2.nx * 1800, p2y_mm - p2.ny * 1800, 2);
-        const rk1_r = projFast(p1x_mm + p1.nx * 1800, p1y_mm + p1.ny * 1800, 2);
-        const rk2_r = projFast(p2x_mm + p2.nx * 1800, p2y_mm + p2.ny * 1800, 2);
-        if(rk1_l && rk2_l) {
-          ctx.beginPath(); ctx.moveTo(rk1_l[0], rk1_l[1]); ctx.lineTo(rk2_l[0], rk2_l[1]);
-          ctx.strokeStyle = "rgba(0, 0, 0, 0.28)"; ctx.lineWidth = 4; ctx.stroke();
+      }
+      
+      // Outer Track Asphalt Clean Border Lines (No Blue-White Boundary Walls)
+      ctx.beginPath();
+      ctx.moveTo(pl1[0], pl1[1]); ctx.lineTo(pl2[0], pl2[1]);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.35)"; ctx.lineWidth = 2.0; ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.moveTo(pr1[0], pr1[1]); ctx.lineTo(pr2[0], pr2[1]);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.35)"; ctx.lineWidth = 2.0; ctx.stroke();
+      
+      // Center White Dashed Guide
+      if(i % 6 < 3) {
+        const pc1 = projFast(p1x_mm, p1y_mm, 2);
+        const pc2 = projFast(p2x_mm, p2y_mm, 2);
+        if(pc1 && pc2) {
+          ctx.beginPath(); ctx.moveTo(pc1[0], pc1[1]); ctx.lineTo(pc2[0], pc2[1]);
+          ctx.strokeStyle = "rgba(255,255,255,0.40)"; ctx.lineWidth = 2.5; ctx.stroke();
         }
-        if(rk1_r && rk2_r) {
-          ctx.beginPath(); ctx.moveTo(rk1_r[0], rk1_r[1]); ctx.lineTo(rk2_r[0], rk2_r[1]);
-          ctx.strokeStyle = "rgba(0, 0, 0, 0.28)"; ctx.lineWidth = 4; ctx.stroke();
-        }
-        
-        // Red/White FIA Kerbs (with 3D bevel)
-        const hasKerb = p1.kerbSide || (Math.abs(p1.curvature) > 0.008);
-        if (hasKerb) {
-          const kerbCol = (i % 6 < 3) ? "#e63946" : "#f8f9fa";
-          const kSide = p1.kerbSide || (p1.curvature > 0 ? "right" : "left");
+      }
+      
+      // 3D Braking Distance Boards (150m, 100m, 50m) - Clean white boards with distance culling
+      if (p1.brakingBoard && distToCam < 160) {
+        const alpha = Math.max(0, Math.min(1, (160 - distToCam) / 60));
+        const bpx = p1x_mm + p1.nx * (hw + 3200);
+        const bpy = p1y_mm + p1.ny * (hw + 3200);
+        const b_base = projFast(bpx, bpy, 0);
+        const b_top = projFast(bpx, bpy, 2300);
+        if(b_base && b_top) {
+          const bScale = Math.max(0.6, Math.min(1.25, 75 / (distToCam + 25)));
+          const bw = 32 * bScale, bh = 20 * bScale;
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.beginPath();
+          ctx.moveTo(b_base[0], b_base[1]); ctx.lineTo(b_top[0], b_top[1]);
+          ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 3 * bScale; ctx.stroke();
           
-          if (kSide === "left" || kSide === "both") {
-            const kl1 = projFast(p1x_mm - p1.nx * (hw + 1400), p1y_mm - p1.ny * (hw + 1400), 60);
-            const kl2 = projFast(p2x_mm - p2.nx * (hw + 1400), p2y_mm - p2.ny * (hw + 1400), 60);
-            if(kl1 && kl2) {
-              ctx.beginPath();
-              ctx.moveTo(pl1[0], pl1[1]); ctx.lineTo(kl1[0], kl1[1]);
-              ctx.lineTo(kl2[0], kl2[1]); ctx.lineTo(pl2[0], pl2[1]);
-              ctx.closePath();
-              ctx.fillStyle = kerbCol; ctx.fill();
-            }
-          }
-          if (kSide === "right" || kSide === "both") {
-            const kr1 = projFast(p1x_mm + p1.nx * (hw + 1400), p1y_mm + p1.ny * (hw + 1400), 60);
-            const kr2 = projFast(p2x_mm + p2.nx * (hw + 1400), p2y_mm + p2.ny * (hw + 1400), 60);
-            if(kr1 && kr2) {
-              ctx.beginPath();
-              ctx.moveTo(pr1[0], pr1[1]); ctx.lineTo(kr1[0], kr1[1]);
-              ctx.lineTo(kr2[0], kr2[1]); ctx.lineTo(pr2[0], pr2[1]);
-              ctx.closePath();
-              ctx.fillStyle = kerbCol; ctx.fill();
-            }
-          }
-        }
-        
-        // 3D Boundary Barrier Walls
-        const wallH = 1300; // 1.3m concrete armco wall
-        const pl1_top = projFast(p1x_mm - p1.nx * hw, p1y_mm - p1.ny * hw, wallH);
-        const pl2_top = projFast(p2x_mm - p2.nx * hw, p2y_mm - p2.ny * hw, wallH);
-        const pr1_top = projFast(p1x_mm + p1.nx * hw, p1y_mm + p1.ny * hw, wallH);
-        const pr2_top = projFast(p2x_mm + p2.nx * hw, p2y_mm + p2.ny * hw, wallH);
-        
-        ctx.fillStyle = (i % 6 < 3) ? "rgba(35, 75, 140, 0.95)" : "rgba(235, 235, 235, 0.95)";
-        if(pl1_top && pl2_top && pl1 && pl2) {
-          ctx.beginPath();
-          ctx.moveTo(pl1[0], pl1[1]); ctx.lineTo(pl2[0], pl2[1]);
-          ctx.lineTo(pl2_top[0], pl2_top[1]); ctx.lineTo(pl1_top[0], pl1_top[1]);
+          ctx.fillStyle = "#ffffff";
+          if (ctx.roundRect) ctx.roundRect(b_top[0] - bw/2, b_top[1] - bh/2, bw, bh, 3 * bScale);
+          else ctx.fillRect(b_top[0] - bw/2, b_top[1] - bh/2, bw, bh);
           ctx.fill();
-          ctx.strokeStyle = "#111"; ctx.lineWidth = 1; ctx.stroke();
-        }
-        if(pr1_top && pr2_top && pr1 && pr2) {
-          ctx.beginPath();
-          ctx.moveTo(pr1[0], pr1[1]); ctx.lineTo(pr2[0], pr2[1]);
-          ctx.lineTo(pr2_top[0], pr2_top[1]); ctx.lineTo(pr1_top[0], pr1_top[1]);
-          ctx.fill();
-          ctx.strokeStyle = "#111"; ctx.lineWidth = 1; ctx.stroke();
-        }
-        
-        // Center White Dashed Guide
-        if(i % 6 < 3) {
-          const pc1 = projFast(p1x_mm, p1y_mm, 2);
-          const pc2 = projFast(p2x_mm, p2y_mm, 2);
-          if(pc1 && pc2) {
-            ctx.beginPath(); ctx.moveTo(pc1[0], pc1[1]); ctx.lineTo(pc2[0], pc2[1]);
-            ctx.strokeStyle = "rgba(255,255,255,0.45)"; ctx.lineWidth = 3; ctx.stroke();
-          }
-        }
-        
-        // 3D Braking Distance Boards (150m, 100m, 50m)
-        if (p1.brakingBoard) {
-          const bpx = p1x_mm + p1.nx * (hw + 3500);
-          const bpy = p1y_mm + p1.ny * (hw + 3500);
-          const b_base = projFast(bpx, bpy, 0);
-          const b_top = projFast(bpx, bpy, 2400);
-          if(b_base && b_top) {
-            ctx.save();
-            ctx.beginPath();
-            ctx.moveTo(b_base[0], b_base[1]); ctx.lineTo(b_top[0], b_top[1]);
-            ctx.strokeStyle = "#fff"; ctx.lineWidth = 4; ctx.stroke();
-            
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(b_top[0] - 18, b_top[1] - 14, 36, 20);
-            ctx.strokeStyle = "#111"; ctx.lineWidth = 2;
-            ctx.strokeRect(b_top[0] - 18, b_top[1] - 14, 36, 20);
-            
-            ctx.fillStyle = "#000000";
-            ctx.font = "bold 12px monospace";
-            ctx.textAlign = "center"; ctx.textBaseline = "middle";
-            ctx.fillText(p1.brakingBoard, b_top[0], b_top[1] - 4);
-            ctx.restore();
-          }
-        }
-        
-        // 3D Turn Marker Boards ("T1", "T6", "T14", etc.)
-        if (p1.turn && p1.turn.startsWith("T") && !p1.turn.includes("-Entry") && i % 12 === 0) {
-          const tpx = p1x_mm - p1.nx * (hw + 3500);
-          const tpy = p1y_mm - p1.ny * (hw + 3500);
-          const t_base = projFast(tpx, tpy, 0);
-          const t_top = projFast(tpx, tpy, 2200);
-          if(t_base && t_top) {
-            ctx.save();
-            ctx.fillStyle = "#facc15"; // Yellow Turn Badge
-            ctx.fillRect(t_top[0] - 16, t_top[1] - 14, 32, 18);
-            ctx.strokeStyle = "#000"; ctx.lineWidth = 1.5;
-            ctx.strokeRect(t_top[0] - 16, t_top[1] - 14, 32, 18);
-            ctx.fillStyle = "#000";
-            ctx.font = "bold 11px sans-serif";
-            ctx.textAlign = "center"; ctx.textBaseline = "middle";
-            ctx.fillText(p1.turn, t_top[0], t_top[1] - 5);
-            ctx.restore();
-          }
+          ctx.strokeStyle = "#111827"; ctx.lineWidth = 1.5 * bScale; ctx.stroke();
+          
+          ctx.fillStyle = "#111827";
+          ctx.font = `bold ${Math.round(11 * bScale)}px monospace`;
+          ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.fillText(p1.brakingBoard, b_top[0], b_top[1]);
+          ctx.restore();
         }
       }
     }
@@ -2521,7 +3910,7 @@ function renderCircuitScene(st, tel, ctrl) {
         const pMid = projFast(pStart.x * 1000, pStart.y * 1000, gantryH - 600);
         if(pMid) {
           ctx.beginPath(); ctx.arc(pMid[0], pMid[1], 7, 0, 2*Math.PI);
-          ctx.fillStyle = "#e63946"; ctx.fill(); ctx.stroke();
+          ctx.fillStyle = "#ef4444"; ctx.fill(); ctx.stroke();
         }
       }
     }
@@ -2613,24 +4002,25 @@ function renderCircuitScene(st, tel, ctrl) {
 
   // 4. Draw Official FIA Shanghai International Circuit Telemetry Mini-Map
   if (path && path.pts) {
-    const mmW = 320, mmH = 260;
-    const mmPad = 20;
+    const mmW = 340, mmH = 265;
+    const mmPad = 18;
     const mx = w - mmW - mmPad, my = h - mmH - mmPad;
     
-    // Map card background with glassmorphism
+    // Luxury Glassmorphic Map Card
     ctx.save();
-    ctx.fillStyle = "rgba(10, 14, 23, 0.85)";
-    ctx.strokeStyle = "#30363d";
+    ctx.fillStyle = "rgba(10, 15, 26, 0.88)";
+    ctx.strokeStyle = "rgba(56, 139, 253, 0.35)";
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(mx, my, mmW, mmH, 10);
+    if (ctx.roundRect) ctx.roundRect(mx, my, mmW, mmH, 12);
     else ctx.rect(mx, my, mmW, mmH);
     ctx.fill(); ctx.stroke();
     
-    // Header title
+    // Header title with sleek sector pill
     ctx.fillStyle = "#58a6ff";
-    ctx.font = "bold 11px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.font = "bold 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText("📍 上海国际赛车场 (SIC 5.45km)", mx + 12, my + 18);
+    ctx.fillText("📍 上海国际赛车场 (SIC 5.45km)", mx + 14, my + 20);
     
     // Track bounds calculation
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -2638,62 +4028,92 @@ function renderCircuitScene(st, tel, ctrl) {
       if(pt.x < minX) minX = pt.x; if(pt.x > maxX) maxX = pt.x;
       if(pt.y < minY) minY = pt.y; if(pt.y > maxY) maxY = pt.y;
     }
-    const tW = maxX - minX, tH = maxY - minY;
-    const scale = (Math.min(mmW, mmH) - 60) / Math.max(tW, tH);
+    const tW = Math.max(1, maxX - minX), tH = Math.max(1, maxY - minY);
+    const scale = (Math.min(mmW, mmH) - 64) / Math.max(tW, tH);
     const cX = minX + tW/2, cY = minY + tH/2;
     
     const trX = (x) => mx + mmW/2 + (x - cX) * scale;
-    const trY = (y) => my + mmH/2 + 8 - (y - cY) * scale; // Y is flipped in canvas
+    const trY = (y) => my + mmH/2 + 10 - (y - cY) * scale; // Y is flipped in canvas
     
-    // Draw Sector Colored Segments
+    // Draw Glowing Track Shadow / Underglow
     for(let i = 0; i < path.pts.length; i++) {
       const p1 = path.pts[i];
       const p2 = path.pts[(i + 1) % path.pts.length];
       ctx.beginPath();
       ctx.moveTo(trX(p1.x), trY(p1.y));
       ctx.lineTo(trX(p2.x), trY(p2.y));
-      ctx.strokeStyle = (p1.sector === 1) ? "#00f2fe" : (p1.sector === 2) ? "#ffb703" : "#bc8cff";
-      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = (p1.sector === 1) ? "rgba(0, 242, 254, 0.25)" : (p1.sector === 2) ? "rgba(255, 183, 3, 0.25)" : "rgba(188, 140, 255, 0.25)";
+      ctx.lineWidth = 6.0;
+      ctx.stroke();
+    }
+
+    // Draw Crisp Sector Segments
+    for(let i = 0; i < path.pts.length; i++) {
+      const p1 = path.pts[i];
+      const p2 = path.pts[(i + 1) % path.pts.length];
+      ctx.beginPath();
+      ctx.moveTo(trX(p1.x), trY(p1.y));
+      ctx.lineTo(trX(p2.x), trY(p2.y));
+      ctx.strokeStyle = (p1.sector === 1) ? "#00f2fe" : (p1.sector === 2) ? "#ffb703" : "#c084fc";
+      ctx.lineWidth = (p1.isDRS) ? 3.8 : 2.6;
       ctx.stroke();
     }
     
-    // Draw 16 Official Turn Markers (T1 ~ T16) on Mini-Map
+    // Draw 16 Official Turn Markers (T1 ~ T16) on Mini-Map with Smart Non-Overlapping Offsets
     const turnAnchors = [
-      {no:"1", x:235, y:580}, {no:"2", x:360, y:545}, {no:"3", x:185, y:440}, {no:"4", x:285, y:370},
-      {no:"5", x:500, y:380}, {no:"6", x:815, y:205}, {no:"7", x:545, y:280}, {no:"8", x:430, y:155},
-      {no:"9", x:465, y:-30}, {no:"10", x:420, y:-130}, {no:"11", x:785, y:-95}, {no:"12", x:810, y:-40},
-      {no:"13", x:935, y:-145}, {no:"14", x:-625, y:-245}, {no:"15", x:-420, y:-200}, {no:"16", x:-45, y:-130}
+      {no:"1", x:235, y:580, ox: 10, oy: -10},
+      {no:"2", x:360, y:545, ox: 12, oy: -5},
+      {no:"3", x:185, y:440, ox: -12, oy: 8},
+      {no:"4", x:285, y:370, ox: 0, oy: -12},
+      {no:"5", x:500, y:380, ox: 0, oy: -12},
+      {no:"6", x:815, y:205, ox: 14, oy: 0},
+      {no:"7", x:545, y:280, ox: 0, oy: 12},
+      {no:"8", x:430, y:155, ox: -14, oy: 0},
+      {no:"9", x:465, y:-30, ox: 12, oy: 0},
+      {no:"10", x:420, y:-130, ox: -12, oy: 0},
+      {no:"11", x:785, y:-95, ox: 12, oy: 0},
+      {no:"12", x:810, y:-40, ox: 12, oy: -8},
+      {no:"13", x:935, y:-145, ox: 14, oy: 0},
+      {no:"14", x:-625, y:-245, ox: -14, oy: 0},
+      {no:"15", x:-420, y:-200, ox: 0, oy: 12},
+      {no:"16", x:-45, y:-130, ox: -12, oy: 0}
     ];
     for(let ta of turnAnchors) {
-      const px = trX(ta.x), py = trY(ta.y);
+      const px = trX(ta.x) + (ta.ox || 0), py = trY(ta.y) + (ta.oy || 0);
       ctx.beginPath();
-      ctx.arc(px, py, 7, 0, 2*Math.PI);
-      ctx.fillStyle = "#1e293b"; ctx.fill();
-      ctx.strokeStyle = "#facc15"; ctx.lineWidth = 1; ctx.stroke();
-      ctx.fillStyle = "#facc15";
-      ctx.font = "bold 9px monospace";
+      ctx.arc(px, py, 6.5, 0, 2*Math.PI);
+      ctx.fillStyle = "rgba(13, 20, 36, 0.95)"; ctx.fill();
+      ctx.strokeStyle = "rgba(56, 139, 253, 0.75)"; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.fillStyle = "#e6edf3";
+      ctx.font = "bold 8.5px -apple-system, BlinkMacSystemFont, monospace";
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText(ta.no, px, py);
     }
     
-    // Draw Start/Finish Flag
+    // Draw Start/Finish Flag & Indicator
     const pStart = path.pts[0];
     if(pStart) {
       const sx = trX(pStart.x), sy = trY(pStart.y);
       ctx.beginPath();
-      ctx.arc(sx, sy, 4, 0, 2*Math.PI);
+      ctx.arc(sx, sy, 4.5, 0, 2*Math.PI);
       ctx.fillStyle = "#ef4444"; ctx.fill();
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.2; ctx.stroke();
     }
     
-    // Draw Live Car Position & Heading Cone
+    // Draw Live Car Position & Heading Cone with Glowing Pulse
     const carPx = trX(carX_mm / 1000);
     const carPy = trY(carY_mm / 1000);
+    
+    // Car Pulse Ring
+    ctx.beginPath();
+    ctx.arc(carPx, carPy, 8, 0, 2*Math.PI);
+    ctx.strokeStyle = "rgba(16, 185, 129, 0.5)"; ctx.lineWidth = 2; ctx.stroke();
     
     ctx.save();
     ctx.translate(carPx, carPy);
     ctx.rotate(-carYaw + Math.PI); // canvas heading rotation
     ctx.beginPath();
-    ctx.moveTo(0, 8); ctx.lineTo(-5, -6); ctx.lineTo(0, -4); ctx.lineTo(5, -6);
+    ctx.moveTo(0, 9); ctx.lineTo(-6, -7); ctx.lineTo(0, -4); ctx.lineTo(6, -7);
     ctx.closePath();
     ctx.fillStyle = "#10b981"; ctx.fill();
     ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.5; ctx.stroke();
@@ -2723,4 +4143,731 @@ function renderCircuitScene(st, tel, ctrl) {
     ctx.restore();
   }
 }
+
+/* =====================================================================
+   9. MoTeC i2 Pro 专业赛车工程遥测波形 LOG 分析系统
+   ===================================================================== */
+class LapTelemetryRecorder {
+  constructor() {
+    this.liveBuffer = [];
+    this.currentLap = [];
+    this.bestLap = null;
+    this.lastCompletedLap = null;
+    this.currentLapNum = 1;
+    this.lapStartTime = 0;
+    this.lastCrossDist = 0;
+    this.totalDistanceTraveled = 0;
+    this.lastX = 0;
+    this.lastY = 0;
+    this.maxSpeed = 0;
+    this.maxAy = 0;
+    this.sampleCadence = 0;
+  }
+
+  reset() {
+    this.liveBuffer = [];
+    this.currentLap = [];
+    this.currentLapNum = 1;
+    this.lapStartTime = performance.now() / 1000;
+    this.totalDistanceTraveled = 0;
+    this.lastCrossDist = 0;
+    this.lastX = 0;
+    this.lastY = 0;
+    this.maxSpeed = 0;
+    this.maxAy = 0;
+    this.sampleCadence = 0;
+  }
+
+  record(st, tel, ctrl, path, target) {
+    if (!st || !isFinite(st.X) || !isFinite(st.Y)) return;
+
+    this.sampleCadence++;
+    if (this.sampleCadence % 2 !== 0) return; // 50Hz sampling
+
+    const nowSec = performance.now() / 1000;
+    if (!this.lapStartTime) this.lapStartTime = nowSec;
+
+    if (this.lastX !== 0 || this.lastY !== 0) {
+      const d = Math.hypot(st.X - this.lastX, st.Y - this.lastY);
+      if (d < 40) this.totalDistanceTraveled += d;
+    }
+    this.lastX = st.X;
+    this.lastY = st.Y;
+
+    const v_kmh = Math.max(0, st.u) * 3.6;
+    if (v_kmh > this.maxSpeed) this.maxSpeed = v_kmh;
+    const ay_abs = Math.abs(tel.ay || 0);
+    if (ay_abs > this.maxAy) this.maxAy = ay_abs;
+
+    const curLapTime = nowSec - this.lapStartTime;
+    const distOnLap = this.totalDistanceTraveled % 5450;
+
+    const tr = tel.tr || { FL: 0, FR: 0, RL: 0, RR: 0 };
+    const fz = tel.Fz || { FL: 2500, FR: 2500, RL: 2500, RR: 2500 };
+    const camber = tel.camber || { FL: -2.8, FR: -2.8, RL: -1.8, RR: -1.8 };
+    const toe = tel.toe || { FL: 0, FR: 0, RL: 0, RR: 0 };
+    const onKerb = tel.isKerb && (tel.isKerb.FL || tel.isKerb.FR || tel.isKerb.RL || tel.isKerb.RR);
+
+    const ptInfo = target || (path ? path.getLookahead(st.X, st.Y, st.u) : {});
+
+    const record = {
+      t: curLapTime,
+      s: distOnLap,
+      totalDist: this.totalDistanceTraveled,
+      v: v_kmh,
+      v_tar: (ptInfo.targetSpeed ? ptInfo.targetSpeed * 3.6 : v_kmh),
+      thr: (ctrl.throttle || 0) * 100,
+      brk: (ctrl.brake || 0) * 100,
+      steer: (ctrl.steer || 0),
+      ay: tel.ay || 0,
+      ax: tel.ax || 0,
+      az: tel.az || 0,
+      gear: (v_kmh > 260 ? 6 : v_kmh > 200 ? 5 : v_kmh > 145 ? 4 : v_kmh > 95 ? 3 : v_kmh > 50 ? 2 : 1),
+      drs: !!ptInfo.isDRS,
+      tr_FL: (tr.FL || 0) * 1000,
+      tr_FR: (tr.FR || 0) * 1000,
+      tr_RL: (tr.RL || 0) * 1000,
+      tr_RR: (tr.RR || 0) * 1000,
+      Fz_FL: fz.FL || 0,
+      Fz_FR: fz.FR || 0,
+      Fz_RL: fz.RL || 0,
+      Fz_RR: fz.RR || 0,
+      camber_FL: camber.FL || -2.8,
+      camber_FR: camber.FR || -2.8,
+      toe_FL: toe.FL || 0,
+      toe_FR: toe.FR || 0,
+      isKerb: onKerb,
+      turn: ptInfo.turnZh || ptInfo.turn || "",
+      sector: ptInfo.sector || 1,
+      x: st.X,
+      y: st.Y
+    };
+
+    this.liveBuffer.push(record);
+    if (this.liveBuffer.length > 3000) this.liveBuffer.shift();
+
+    this.currentLap.push(record);
+
+    // Lap completion detection
+    if (this.totalDistanceTraveled - this.lastCrossDist > 5300 && (ptInfo.idx < 50 || distOnLap < 50)) {
+      this.lastCompletedLap = [...this.currentLap];
+      if (!this.bestLap || curLapTime < this.bestLap.lapTime) {
+        this.bestLap = {
+          data: [...this.currentLap],
+          lapTime: curLapTime,
+          vMax: this.maxSpeed,
+          ayMax: this.maxAy,
+          lapNum: this.currentLapNum
+        };
+      }
+      this.currentLap = [];
+      this.currentLapNum++;
+      this.lapStartTime = nowSec;
+      this.lastCrossDist = this.totalDistanceTraveled;
+      this.maxSpeed = 0;
+      this.maxAy = 0;
+    }
+  }
+}
+window.circuitTelemetryRecorder = new LapTelemetryRecorder();
+
+const TELEMETRY_LOG_STATE = {
+  modalOpen: false,
+  axis: "dist", // "dist" | "time"
+  source: "current", // "current" | "best"
+  channels: {
+    speed: true,
+    pedals: true,
+    accel: true,
+    susp: true,
+    loads: true,
+    kc: true
+  },
+  hoverIdx: -1,
+  hoverMouseX: -1
+};
+
+function openCircuitTelemetryLogModal() {
+  const modal = document.getElementById("circuitTelemetryLogModal");
+  if (!modal) return;
+  modal.classList.add("show");
+  TELEMETRY_LOG_STATE.modalOpen = true;
+  renderTelemetryLogCanvas();
+}
+
+function closeCircuitTelemetryLogModal() {
+  const modal = document.getElementById("circuitTelemetryLogModal");
+  if (!modal) return;
+  modal.classList.remove("show");
+  TELEMETRY_LOG_STATE.modalOpen = false;
+  TELEMETRY_LOG_STATE.hoverIdx = -1;
+  const tip = document.getElementById("telemetryCursorTooltip");
+  if (tip) tip.style.display = "none";
+}
+
+function toggleCircuitTelemetryLog() {
+  if (TELEMETRY_LOG_STATE.modalOpen) closeCircuitTelemetryLogModal();
+  else openCircuitTelemetryLogModal();
+}
+
+function handleTelemetryCanvasMouseMove(e) {
+  const cv = document.getElementById("telemetryLogCanvas");
+  if (!cv) return;
+  const rect = cv.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  TELEMETRY_LOG_STATE.hoverMouseX = mouseX;
+  renderTelemetryLogCanvas();
+}
+
+function handleTelemetryCanvasMouseLeave() {
+  TELEMETRY_LOG_STATE.hoverMouseX = -1;
+  TELEMETRY_LOG_STATE.hoverIdx = -1;
+  const tip = document.getElementById("telemetryCursorTooltip");
+  if (tip) tip.style.display = "none";
+  renderTelemetryLogCanvas();
+}
+
+function exportTelemetryCSV() {
+  const rec = window.circuitTelemetryRecorder;
+  if (!rec) return;
+  const data = (TELEMETRY_LOG_STATE.source === 'best' && rec.bestLap) ? rec.bestLap.data : 
+               (TELEMETRY_LOG_STATE.source === 'current' && rec.currentLap.length > 10 ? rec.currentLap : rec.liveBuffer);
+  if (!data || data.length === 0) {
+    alert("暂无遥测数据可导出，请在赛道上行驶几秒后重试！");
+    return;
+  }
+
+  let csv = "Time_s,Distance_m,Speed_kmh,TargetSpeed_kmh,Throttle_pct,Brake_pct,Steer_deg,LateralG_g,LongitudinalG_g,Gear,DRS,Travel_FL_mm,Travel_FR_mm,Travel_RL_mm,Travel_RR_mm,Fz_FL_N,Fz_FR_N,Fz_RL_N,Fz_RR_N,Camber_FL_deg,Toe_FL_deg,IsKerb,Turn,Sector,World_X,World_Y\n";
+  for (const d of data) {
+    csv += `${d.t.toFixed(3)},${d.s.toFixed(1)},${d.v.toFixed(1)},${d.v_tar.toFixed(1)},${d.thr.toFixed(0)},${d.brk.toFixed(0)},${d.steer.toFixed(1)},${d.ay.toFixed(3)},${d.ax.toFixed(3)},${d.gear},${d.drs?1:0},${d.tr_FL.toFixed(1)},${d.tr_FR.toFixed(1)},${d.tr_RL.toFixed(1)},${d.tr_RR.toFixed(1)},${Math.round(d.Fz_FL)},${Math.round(d.Fz_FR)},${Math.round(d.Fz_RL)},${Math.round(d.Fz_RR)},${d.camber_FL.toFixed(2)},${d.toe_FL.toFixed(2)},${d.isKerb?1:0},"${d.turn}",${d.sector},${d.x.toFixed(2)},${d.y.toFixed(2)}\n`;
+  }
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `shanghai_telemetry_log_${Date.now()}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function renderTelemetryLogCanvas() {
+  const cv = document.getElementById("telemetryLogCanvas");
+  if (!cv) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (cv.width !== cv.clientWidth * dpr || cv.height !== cv.clientHeight * dpr) {
+    cv.width = cv.clientWidth * dpr;
+    cv.height = cv.clientHeight * dpr;
+  }
+  const W = cv.width / dpr, H = cv.height / dpr;
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  const rec = window.circuitTelemetryRecorder;
+  const isBest = (TELEMETRY_LOG_STATE.source === 'best' && rec && rec.bestLap);
+  const data = isBest ? rec.bestLap.data : 
+               ((rec && rec.currentLap && rec.currentLap.length > 5) ? rec.currentLap : (rec ? rec.liveBuffer : []));
+
+  // Update Stats Header
+  const elLapTime = document.getElementById("tl_stat_laptime");
+  const elVmax = document.getElementById("tl_stat_vmax");
+  const elAyMax = document.getElementById("tl_stat_aymax");
+  const elDist = document.getElementById("tl_stat_dist");
+
+  if (data && data.length > 0) {
+    let maxV = 0, maxAy = 0;
+    for (let d of data) {
+      if (d.v > maxV) maxV = d.v;
+      if (Math.abs(d.ay) > maxAy) maxAy = Math.abs(d.ay);
+    }
+    const tDur = data[data.length - 1].t - data[0].t;
+    const mins = Math.floor(tDur / 60);
+    const secs = (tDur % 60).toFixed(3);
+    if (elLapTime) elLapTime.textContent = (mins > 0 ? `${mins}:${secs.padStart(6, '0')}` : `${secs}s`);
+    if (elVmax) elVmax.textContent = `${maxV.toFixed(1)} km/h`;
+    if (elAyMax) elAyMax.textContent = `${maxAy.toFixed(2)} g`;
+    if (elDist) elDist.textContent = `${(data[data.length - 1].s || 5450).toFixed(0)} m`;
+  }
+
+  if (!data || data.length < 2) {
+    ctx.fillStyle = "rgba(139, 148, 158, 0.8)";
+    ctx.font = "14px 'Segoe UI', -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("⏳ 正在采集赛车遥测数据流... 请驾驶赛车或开启 AutoPilot 行驶以生成波形图", W / 2, H / 2);
+    return;
+  }
+
+  const leftPad = 75;
+  const rightPad = 35;
+  const topPad = 10;
+  const bottomPad = 26;
+  const plotW = W - leftPad - rightPad;
+  const plotH = H - topPad - bottomPad;
+
+  // Active channels list
+  const activeChannels = [];
+  if (TELEMETRY_LOG_STATE.channels.speed) activeChannels.push("speed");
+  if (TELEMETRY_LOG_STATE.channels.pedals) activeChannels.push("pedals");
+  if (TELEMETRY_LOG_STATE.channels.accel) activeChannels.push("accel");
+  if (TELEMETRY_LOG_STATE.channels.susp) activeChannels.push("susp");
+  if (TELEMETRY_LOG_STATE.channels.loads) activeChannels.push("loads");
+  if (TELEMETRY_LOG_STATE.channels.kc) activeChannels.push("kc");
+
+  if (activeChannels.length === 0) activeChannels.push("speed");
+
+  const numChannels = activeChannels.length;
+  const chanH = plotH / numChannels;
+
+  // X Range (Distance 0~5450m OR Time 0~maxT)
+  const isDistAxis = (TELEMETRY_LOG_STATE.axis === "dist");
+  const xMin = isDistAxis ? 0 : data[0].t;
+  const xMax = isDistAxis ? 5450 : Math.max(xMin + 10, data[data.length - 1].t);
+
+  const getX = (rec) => {
+    const val = isDistAxis ? rec.s : rec.t;
+    return leftPad + Math.max(0, Math.min(1, (val - xMin) / (xMax - xMin))) * plotW;
+  };
+
+  // 1. Draw Sector Backgrounds
+  if (isDistAxis) {
+    const s1End = leftPad + (1420 / 5450) * plotW;
+    const s2End = leftPad + (3260 / 5450) * plotW;
+    ctx.fillStyle = "rgba(0, 242, 254, 0.035)";
+    ctx.fillRect(leftPad, topPad, s1End - leftPad, plotH);
+    ctx.fillStyle = "rgba(255, 183, 3, 0.035)";
+    ctx.fillRect(s1End, topPad, s2End - s1End, plotH);
+    ctx.fillStyle = "rgba(192, 132, 252, 0.035)";
+    ctx.fillRect(s2End, topPad, leftPad + plotW - s2End, plotH);
+  }
+
+  // 2. Draw Official Turn Markers on X-Axis
+  const turns = [
+    { name: "T1/T2", s: 420 },
+    { name: "T3/T4", s: 800 },
+    { name: "T6", s: 1680 },
+    { name: "T8/T9", s: 2350 },
+    { name: "T11", s: 3100 },
+    { name: "T13 (大倾角)", s: 3900 },
+    { name: "T14 (1.2km发卡)", s: 4850 },
+    { name: "T16", s: 5380 }
+  ];
+
+  for (const turn of turns) {
+    const tx = isDistAxis ? (leftPad + (turn.s / 5450) * plotW) : null;
+    if (tx && tx >= leftPad && tx <= leftPad + plotW) {
+      ctx.beginPath();
+      ctx.moveTo(tx, topPad);
+      ctx.lineTo(tx, topPad + plotH);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.10)";
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = "rgba(88, 166, 255, 0.75)";
+      ctx.font = "bold 9px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(turn.name, tx, topPad + plotH + 16);
+    }
+  }
+
+  // 3. Draw Each Active Channel Strip Chart
+  activeChannels.forEach((chanKey, cIdx) => {
+    const cy = topPad + cIdx * chanH;
+    const ch = chanH - 8;
+
+    // Sub-chart card background
+    ctx.fillStyle = (cIdx % 2 === 0) ? "rgba(22, 27, 34, 0.65)" : "rgba(13, 17, 23, 0.65)";
+    ctx.fillRect(leftPad, cy, plotW, ch);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(leftPad, cy, plotW, ch);
+
+    // Channel 1: Speed
+    if (chanKey === "speed") {
+      const yMin = 0, yMax = 350;
+      const getY = (v) => cy + ch - ((v - yMin) / (yMax - yMin)) * ch;
+
+      // Y Grid & Labels
+      [0, 100, 200, 300].forEach(yVal => {
+        const py = getY(yVal);
+        ctx.beginPath();
+        ctx.moveTo(leftPad, py); ctx.lineTo(leftPad + plotW, py);
+        ctx.strokeStyle = "rgba(255,255,255,0.06)";
+        ctx.stroke();
+        ctx.fillStyle = "#8b949e";
+        ctx.font = "9.5px monospace";
+        ctx.textAlign = "right";
+        ctx.fillText(yVal.toString(), leftPad - 8, py + 3);
+      });
+
+      // Target Speed (Dashed Yellow)
+      ctx.beginPath();
+      ctx.strokeStyle = "rgba(250, 204, 21, 0.65)";
+      ctx.setLineDash([3, 3]);
+      ctx.lineWidth = 1.2;
+      for (let i = 0; i < data.length; i++) {
+        const px = getX(data[i]);
+        const py = getY(data[i].v_tar);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Actual Speed (Cyan Gradient)
+      ctx.beginPath();
+      ctx.strokeStyle = "#38bdf8";
+      ctx.lineWidth = 2.0;
+      for (let i = 0; i < data.length; i++) {
+        const px = getX(data[i]);
+        const py = getY(data[i].v);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      // Title
+      ctx.fillStyle = "#38bdf8";
+      ctx.font = "bold 10.5px -apple-system, monospace";
+      ctx.textAlign = "left";
+      ctx.fillText("SPEED (km/h)", leftPad + 8, cy + 14);
+    }
+
+    // Channel 2: Pedals & Steer
+    else if (chanKey === "pedals") {
+      const getYPedal = (pct) => cy + ch - (pct / 100) * ch;
+      const getYSteer = (ang) => cy + ch / 2 - (ang / 30) * (ch / 2);
+
+      // Y Grid (0, 50, 100%)
+      [0, 50, 100].forEach(pVal => {
+        const py = getYPedal(pVal);
+        ctx.beginPath();
+        ctx.moveTo(leftPad, py); ctx.lineTo(leftPad + plotW, py);
+        ctx.strokeStyle = "rgba(255,255,255,0.06)";
+        ctx.stroke();
+        ctx.fillStyle = "#8b949e";
+        ctx.font = "9.5px monospace";
+        ctx.textAlign = "right";
+        ctx.fillText(pVal + "%", leftPad - 8, py + 3);
+      });
+
+      // Steer Zero Line
+      ctx.beginPath();
+      ctx.moveTo(leftPad, cy + ch/2); ctx.lineTo(leftPad + plotW, cy + ch/2);
+      ctx.strokeStyle = "rgba(96, 165, 250, 0.25)";
+      ctx.stroke();
+
+      // Throttle (Green)
+      ctx.beginPath();
+      ctx.strokeStyle = "#22c55e";
+      ctx.lineWidth = 1.6;
+      for (let i = 0; i < data.length; i++) {
+        const px = getX(data[i]);
+        const py = getYPedal(data[i].thr);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      // Brake (Red)
+      ctx.beginPath();
+      ctx.strokeStyle = "#ef4444";
+      ctx.lineWidth = 1.6;
+      for (let i = 0; i < data.length; i++) {
+        const px = getX(data[i]);
+        const py = getYPedal(data[i].brk);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      // Steer (Blue)
+      ctx.beginPath();
+      ctx.strokeStyle = "#60a5fa";
+      ctx.lineWidth = 1.2;
+      for (let i = 0; i < data.length; i++) {
+        const px = getX(data[i]);
+        const py = getYSteer(data[i].steer);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      ctx.fillStyle = "#4ade80";
+      ctx.font = "bold 10.5px -apple-system, monospace";
+      ctx.textAlign = "left";
+      ctx.fillText("PEDALS & STEER (Thr% / Brk% / Steer°)", leftPad + 8, cy + 14);
+    }
+
+    // Channel 3: Accelerations (ay, ax)
+    else if (chanKey === "accel") {
+      const getY_G = (g) => cy + ch / 2 - (g / 2.8) * (ch / 2);
+
+      [-2, -1, 0, 1, 2].forEach(gVal => {
+        const py = getY_G(gVal);
+        ctx.beginPath();
+        ctx.moveTo(leftPad, py); ctx.lineTo(leftPad + plotW, py);
+        ctx.strokeStyle = (gVal === 0) ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.06)";
+        ctx.stroke();
+        ctx.fillStyle = "#8b949e";
+        ctx.font = "9.5px monospace";
+        ctx.textAlign = "right";
+        ctx.fillText(gVal + "g", leftPad - 8, py + 3);
+      });
+
+      // Lateral G (Amber)
+      ctx.beginPath();
+      ctx.strokeStyle = "#f59e0b";
+      ctx.lineWidth = 1.8;
+      for (let i = 0; i < data.length; i++) {
+        const px = getX(data[i]);
+        const py = getY_G(data[i].ay);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      // Long G (Cyan)
+      ctx.beginPath();
+      ctx.strokeStyle = "#06b6d4";
+      ctx.lineWidth = 1.3;
+      for (let i = 0; i < data.length; i++) {
+        const px = getX(data[i]);
+        const py = getY_G(data[i].ax);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      ctx.fillStyle = "#fbbf24";
+      ctx.font = "bold 10.5px -apple-system, monospace";
+      ctx.textAlign = "left";
+      ctx.fillText("G-G ACCELERATIONS (ay: Amber / ax: Cyan)", leftPad + 8, cy + 14);
+    }
+
+    // Channel 4: Suspension Damper Travel
+    else if (chanKey === "susp") {
+      const getY_TR = (tr_mm) => cy + ch / 2 - (tr_mm / 35.0) * (ch / 2);
+
+      [-20, 0, 20].forEach(trVal => {
+        const py = getY_TR(trVal);
+        ctx.beginPath();
+        ctx.moveTo(leftPad, py); ctx.lineTo(leftPad + plotW, py);
+        ctx.strokeStyle = (trVal === 0) ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.06)";
+        ctx.stroke();
+        ctx.fillStyle = "#8b949e";
+        ctx.font = "9.5px monospace";
+        ctx.textAlign = "right";
+        ctx.fillText(trVal + "mm", leftPad - 8, py + 3);
+      });
+
+      // Kerb highlight bands
+      for (let i = 0; i < data.length; i++) {
+        if (data[i].isKerb) {
+          const px = getX(data[i]);
+          ctx.fillStyle = "rgba(245, 158, 11, 0.18)";
+          ctx.fillRect(px - 1.5, cy, 3, ch);
+        }
+      }
+
+      // FL (Teal)
+      ctx.beginPath(); ctx.strokeStyle = "#14b8a6"; ctx.lineWidth = 1.5;
+      for (let i = 0; i < data.length; i++) {
+        const px = getX(data[i]); const py = getY_TR(data[i].tr_FL);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      // FR (Sky)
+      ctx.beginPath(); ctx.strokeStyle = "#38bdf8"; ctx.lineWidth = 1.5;
+      for (let i = 0; i < data.length; i++) {
+        const px = getX(data[i]); const py = getY_TR(data[i].tr_FR);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      // RL (Orange)
+      ctx.beginPath(); ctx.strokeStyle = "#f97316"; ctx.lineWidth = 1.2;
+      for (let i = 0; i < data.length; i++) {
+        const px = getX(data[i]); const py = getY_TR(data[i].tr_RL);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      // RR (Rose)
+      ctx.beginPath(); ctx.strokeStyle = "#f43f5e"; ctx.lineWidth = 1.2;
+      for (let i = 0; i < data.length; i++) {
+        const px = getX(data[i]); const py = getY_TR(data[i].tr_RR);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      ctx.fillStyle = "#2dd4bf";
+      ctx.font = "bold 10.5px -apple-system, monospace";
+      ctx.textAlign = "left";
+      ctx.fillText("DAMPER POTENTIOMETERS (FL:Teal FR:Sky RL:Orange RR:Rose)", leftPad + 8, cy + 14);
+    }
+
+    // Channel 5: Wheel Loads Fz
+    else if (chanKey === "loads") {
+      const getY_Fz = (fz) => cy + ch - (fz / 6000.0) * ch;
+
+      [0, 2000, 4000, 6000].forEach(fVal => {
+        const py = getY_Fz(fVal);
+        ctx.beginPath();
+        ctx.moveTo(leftPad, py); ctx.lineTo(leftPad + plotW, py);
+        ctx.strokeStyle = "rgba(255,255,255,0.06)";
+        ctx.stroke();
+        ctx.fillStyle = "#8b949e";
+        ctx.font = "9.5px monospace";
+        ctx.textAlign = "right";
+        ctx.fillText(fVal + "N", leftPad - 8, py + 3);
+      });
+
+      // FL
+      ctx.beginPath(); ctx.strokeStyle = "#14b8a6"; ctx.lineWidth = 1.4;
+      for (let i = 0; i < data.length; i++) {
+        const px = getX(data[i]); const py = getY_Fz(data[i].Fz_FL);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      // FR
+      ctx.beginPath(); ctx.strokeStyle = "#38bdf8"; ctx.lineWidth = 1.4;
+      for (let i = 0; i < data.length; i++) {
+        const px = getX(data[i]); const py = getY_Fz(data[i].Fz_FR);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      ctx.fillStyle = "#fb7185";
+      ctx.font = "bold 10.5px -apple-system, monospace";
+      ctx.textAlign = "left";
+      ctx.fillText("VERTICAL WHEEL LOADS Fz (N)", leftPad + 8, cy + 14);
+    }
+
+    // Channel 6: K&C Camber & Toe
+    else if (chanKey === "kc") {
+      const getYCamber = (c_deg) => cy + ch - ((c_deg - (-5.0)) / (0.0 - (-5.0))) * ch;
+
+      [-4, -3, -2, -1].forEach(cVal => {
+        const py = getYCamber(cVal);
+        ctx.beginPath();
+        ctx.moveTo(leftPad, py); ctx.lineTo(leftPad + plotW, py);
+        ctx.strokeStyle = "rgba(255,255,255,0.06)";
+        ctx.stroke();
+        ctx.fillStyle = "#8b949e";
+        ctx.font = "9.5px monospace";
+        ctx.textAlign = "right";
+        ctx.fillText(cVal + "°", leftPad - 8, py + 3);
+      });
+
+      // FL Camber (Violet)
+      ctx.beginPath(); ctx.strokeStyle = "#a855f7"; ctx.lineWidth = 1.8;
+      for (let i = 0; i < data.length; i++) {
+        const px = getX(data[i]); const py = getYCamber(data[i].camber_FL);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      // FR Camber (Fuchsia)
+      ctx.beginPath(); ctx.strokeStyle = "#e879f9"; ctx.lineWidth = 1.8;
+      for (let i = 0; i < data.length; i++) {
+        const px = getX(data[i]); const py = getYCamber(data[i].camber_FR);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      ctx.fillStyle = "#c084fc";
+      ctx.font = "bold 10.5px -apple-system, monospace";
+      ctx.textAlign = "left";
+      ctx.fillText("K&C DYNAMIC CAMBER (FL:Violet / FR:Fuchsia)", leftPad + 8, cy + 14);
+    }
+  });
+
+  // 4. Interactive Hairline Cursor & Tooltip
+  if (TELEMETRY_LOG_STATE.hoverMouseX >= leftPad && TELEMETRY_LOG_STATE.hoverMouseX <= leftPad + plotW) {
+    const hx = TELEMETRY_LOG_STATE.hoverMouseX;
+    ctx.beginPath();
+    ctx.moveTo(hx, topPad);
+    ctx.lineTo(hx, topPad + plotH);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([2, 2]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Find nearest data point
+    let closestD = null;
+    let minDiff = Infinity;
+    for (let d of data) {
+      const px = getX(d);
+      const diff = Math.abs(px - hx);
+      if (diff < minDiff) { minDiff = diff; closestD = d; }
+    }
+
+    if (closestD) {
+      const tip = document.getElementById("telemetryCursorTooltip");
+      if (tip) {
+        tip.style.display = "block";
+        const tipX = Math.min(W - 240, Math.max(leftPad + 10, hx + 15));
+        const tipY = Math.min(H - 220, Math.max(topPad + 10, 40));
+        tip.style.left = tipX + "px";
+        tip.style.top = tipY + "px";
+
+        const elTipPos = document.getElementById("tl_tip_pos");
+        if (elTipPos) elTipPos.textContent = `📍 距离: ${closestD.s.toFixed(0)}m ${closestD.turn ? '(' + closestD.turn + ')' : ''}`;
+        const elTipTime = document.getElementById("tl_tip_time");
+        if (elTipTime) elTipTime.textContent = `⏱️ ${closestD.t.toFixed(2)}s`;
+        const elTipSpeed = document.getElementById("tl_tip_speed");
+        if (elTipSpeed) elTipSpeed.textContent = `${closestD.v.toFixed(1)} / ${closestD.v_tar.toFixed(1)} km/h`;
+        const elTipPedals = document.getElementById("tl_tip_pedals");
+        if (elTipPedals) elTipPedals.textContent = `🟢 ${closestD.thr.toFixed(0)}% / 🔴 ${closestD.brk.toFixed(0)}% (${closestD.gear}档)`;
+        const elTipSteer = document.getElementById("tl_tip_steer");
+        if (elTipSteer) elTipSteer.textContent = `${closestD.steer >= 0 ? '+' : ''}${closestD.steer.toFixed(1)}°`;
+        const elTipG = document.getElementById("tl_tip_g");
+        if (elTipG) elTipG.textContent = `${closestD.ay.toFixed(2)}g / ${closestD.ax >= 0 ? '+' : ''}${closestD.ax.toFixed(2)}g`;
+        const elTipTrF = document.getElementById("tl_tip_tr_f");
+        if (elTipTrF) elTipTrF.textContent = `FL:${closestD.tr_FL.toFixed(1)} FR:${closestD.tr_FR.toFixed(1)} mm`;
+        const elTipTrR = document.getElementById("tl_tip_tr_r");
+        if (elTipTrR) elTipTrR.textContent = `RL:${closestD.tr_RL.toFixed(1)} RR:${closestD.tr_RR.toFixed(1)} mm`;
+        const elTipFz = document.getElementById("tl_tip_fz");
+        if (elTipFz) elTipFz.textContent = `${Math.round(closestD.Fz_FL)} / ${Math.round(closestD.Fz_FR)} / ${Math.round(closestD.Fz_RL)} / ${Math.round(closestD.Fz_RR)} N`;
+        const elTipKc = document.getElementById("tl_tip_kc");
+        if (elTipKc) elTipKc.textContent = `γ:${closestD.camber_FL.toFixed(2)}° / δ:${closestD.toe_FL.toFixed(2)}°`;
+      }
+    }
+  }
+}
+
+/* =====================================================================
+   GLOBAL PAGE BOOTSTRAP INITIALIZATION
+   ===================================================================== */
+const evalBtn = document.getElementById("evalModalBtn");
+if(evalBtn) evalBtn.onclick = openSuspensionEvaluation;
+const evalCloseBtn = document.getElementById("evalCloseBtn");
+if(evalCloseBtn) evalCloseBtn.onclick = () => document.getElementById("suspEvalModal").classList.remove("show");
+
+initSlopeStageEvents();
+initSkidpadStageEvents();
+initCircuitStageEvents();
+
+if(typeof loadVehiclePreset === 'function') loadVehiclePreset("formula");
+buildLeft();
+buildRight();
+rebuild();
+initViews();
+simulate(0.016);
+simulate(0.016);
+VW.forEach(v=>{sizeView(v);fitView(v);});
+requestAnimationFrame(loop);
+
+/* G13（2026-08-31）：start.bat 默认拉起后端引擎（:8001），页面加载后自动连接；
+   引擎若未就绪则轮询重试（最多 5 次），不在线时静默回落内置 JS 求解器。 */
+(function tryEngineConnect(retries){
+  if(typeof ENG === 'undefined' || ENG.ok) return;
+  if(typeof engineConnect === 'function') {
+    engineConnect().then(()=>{
+      if(!ENG.ok && retries > 0) setTimeout(()=>tryEngineConnect(retries-1), 1200);
+    });
+  }
+})(5);
+
 

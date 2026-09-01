@@ -923,7 +923,7 @@ function buildTrackPanel(host){
   d.style.padding = "6px 8px 8px 8px";
   
   const b1 = E("button"); 
-  b1.innerHTML = "🛣️ 直线爬坡动力学测试 (SLOPE)"; 
+  b1.innerHTML = "🛣️ 直线综合工况试验场 (PROVING GROUND)"; 
   b1.onclick = () => { openSlopeStage(); };
   b1.style.padding = "7px 8px"; b1.style.background = "rgba(46,160,67,0.12)"; b1.style.border = "1px solid rgba(46,160,67,0.35)"; 
   b1.style.color = "#7ee787"; b1.style.borderRadius = "var(--r-sm)"; b1.style.cursor = "pointer"; b1.style.fontWeight = "600"; b1.style.fontSize = "10.5px"; b1.style.letterSpacing = "0.04em";

@@ -360,35 +360,489 @@ class CirclePath extends TrackPath {
 }
 
 class StraightPath extends TrackPath {
-  constructor(speedMs) {
+  constructor(speedMs = 23.6, scenario = "comprehensive", params = {}) {
     super();
     this.targetSpeed = speedMs;
+    this.scenario = scenario || "comprehensive";
+    this.params = Object.assign({
+      repeatCount: 10,
+      rampHeight: 1.10,
+      rampLen: 14.0,
+      rampSpacing: 65.0,
+      bumpSubType: "staggered",
+      bumpHeight: 0.060,
+      bumpSpacing: 4.0,
+      mooseLaneWidth: 2.8,
+      mooseOffset: 3.5,
+      mooseSpeedKmh: 75.0,
+      washboardWavelength: 1.25,
+      washboardAmplitude: 0.035,
+      potholeDepth: -0.055,
+      muLeft: 1.35,
+      muRight: 0.28,
+      grade: 0.18,
+      customSegments: null
+    }, params);
+
+    this.segments = [];
+    this.ramps = [];
+    this.bumps = [];
+    this.mooseSections = [];
+    this.washboardSections = [];
+    this.splitMuSections = [];
+    this.slopeSections = [];
+    this.gantries = [];
+    this._cones = [];
+    this._coneHits = new Set();
+
+    this.buildTrack();
   }
-  
+
+  setScenario(scenario, params = {}) {
+    this.scenario = scenario;
+    if (params) Object.assign(this.params, params);
+    this._coneHits.clear();
+    this.buildTrack();
+  }
+
+  buildTrack() {
+    this.segments = [];
+    this.ramps = [];
+    this.bumps = [];
+    this.mooseSections = [];
+    this.washboardSections = [];
+    this.splitMuSections = [];
+    this.slopeSections = [];
+    this.gantries = [];
+    this._cones = [];
+
+    const sc = this.scenario;
+    const rCount = Math.max(1, Math.min(50, this.params.repeatCount || 10));
+
+    if (sc === "comprehensive") {
+      // 🏆 默认：全工况综合连环大试验场 (7 大工况连续串联)
+      let curY = 0;
+      
+      // 1. 弹射加速与制动区 (0-100 & 100-0)
+      this.segments.push({
+        id: "seg_accel", type: "accel_brake", name: "⚡ 弹射加速与制动",
+        yStart: curY, yEnd: curY + 110.0, targetSpeed: 38.0, triggerY: curY + 75.0
+      });
+      this.gantries.push({ y: curY, text: "🏁 START · 0-100 ACCEL & BRAKE" });
+      curY += 120.0;
+
+      // 2. 三连飞坡跳台 (3x Jump Ramps)
+      this.gantries.push({ y: curY, text: "🚀 TRIPLE JUMP RAMPS · 三连飞坡" });
+      for (let i = 0; i < 3; i++) {
+        const ry = curY + 15.0 + i * 65.0;
+        const rH = this.params.rampHeight || 1.10;
+        this.ramps.push({
+          id: `comp_ramp_${i}`, y0: ry, len: 14.0, h: rH, landingY: ry + 28.0, landingLen: 16.0, index: i + 1, total: 3
+        });
+      }
+      this.segments.push({
+        id: "seg_ramp", type: "jump_ramp", name: "🚀 三连飞坡跳台 (3x Ramps)",
+        yStart: curY, yEnd: curY + 220.0, targetSpeed: this.targetSpeed
+      });
+      curY += 230.0;
+
+      // 3. 连续交错坎与减速丘 (Speed Bumps & Cleats)
+      this.gantries.push({ y: curY, text: "🚧 SPEED BUMPS & CLEATS · 连续过坎" });
+      const bH = this.params.bumpHeight || 0.060;
+      for (let i = 0; i < 6; i++) {
+        const by = curY + 15.0 + i * 8.0;
+        this.bumps.push({
+          y0: by, side: (i % 2 === 0 ? "L" : "R"), h: bH,
+          xMin: (i % 2 === 0 ? -2.5 : 0.1), xMax: (i % 2 === 0 ? -0.1 : 2.5)
+        });
+      }
+      this.segments.push({
+        id: "seg_bumps", type: "bumps_cleats", name: "🚧 连续交错减速坎 (6x Bumps)",
+        yStart: curY, yEnd: curY + 80.0, targetSpeed: 16.7
+      });
+      curY += 90.0;
+
+      // 4. 连续双移线麋鹿避障 (2x Moose Tests, alternating left and right)
+      this.gantries.push({ y: curY, text: "🦌 ISO 3888-2 MOOSE TEST · 连续麋鹿避障" });
+      for (let i = 0; i < 2; i++) {
+        const my = curY + 15.0 + i * 70.0;
+        const dir = (i % 2 === 0 ? -1 : 1);
+        this.mooseSections.push({
+          id: `comp_moose_${i}`, y0: my, offset: dir * (this.params.mooseOffset || 3.5),
+          width: this.params.mooseLaneWidth || 2.8, len: 60.0, index: i + 1, total: 2
+        });
+      }
+      this.segments.push({
+        id: "seg_moose", type: "moose_test", name: "🦌 连续双移线避障 (2x Moose)",
+        yStart: curY, yEnd: curY + 160.0, targetSpeed: (this.params.mooseSpeedKmh || 75.0) / 3.6
+      });
+      curY += 170.0;
+
+      // 5. 搓板与暗坑耐久路 (Washboard & Potholes)
+      this.gantries.push({ y: curY, text: "🪨 WASHBOARD & POTHOLES · 搓板坑洼耐久" });
+      this.washboardSections.push({
+        id: "comp_wash", y0: curY + 10.0, len: 45.0,
+        wavelength: this.params.washboardWavelength || 1.25,
+        amp: this.params.washboardAmplitude || 0.035,
+        potholeDepth: this.params.potholeDepth || -0.055
+      });
+      this.segments.push({
+        id: "seg_wash", type: "washboard_potholes", name: "🪨 搓板波纹与暗坑路",
+        yStart: curY, yEnd: curY + 80.0, targetSpeed: 13.9
+      });
+      curY += 90.0;
+
+      // 6. 对开冰雪沥青路 ($\mu$-Split Surface)
+      this.gantries.push({ y: curY, text: "❄️ SPLIT-MU SURFACE · 对开冰雪制动" });
+      this.splitMuSections.push({
+        id: "comp_split", y0: curY + 10.0, len: 90.0,
+        muLeft: this.params.muLeft || 1.35, muRight: this.params.muRight || 0.28
+      });
+      this.segments.push({
+        id: "seg_split", type: "split_mu", name: "❄️ 对开路面附着偏摆",
+        yStart: curY, yEnd: curY + 100.0, targetSpeed: 19.4
+      });
+      curY += 110.0;
+
+      // 7. 连续极限坡度爬坡 (Slope Climb)
+      this.gantries.push({ y: curY, text: "⛰️ EXTREME SLOPE CLIMB · 极限陡坡爬坡" });
+      this.slopeSections.push({
+        id: "comp_slope", y0: curY + 10.0, len: 120.0, grade: this.params.grade || 0.20
+      });
+      this.segments.push({
+        id: "seg_slope", type: "slope_climb", name: "⛰️ 连续极限陡坡爬坡",
+        yStart: curY, yEnd: curY + 130.0, targetSpeed: 18.0
+      });
+      curY += 140.0;
+
+      this.gantries.push({ y: curY, text: "🏁 FINISH · LAP COMPLETE" });
+      this.totalLength = curY;
+
+    } else if (sc === "jump_ramp") {
+      // 🚀 连续飞坡极限界 (连续 10 个飞坡跳台)
+      const rH = this.params.rampHeight || 1.10;
+      const rLen = this.params.rampLen || 14.0;
+      const rY0 = this.params.rampY !== undefined ? this.params.rampY : 20.0;
+      const sp = this.params.rampSpacing || 65.0;
+      let curY = rY0;
+      this.gantries.push({ y: 0, text: `🚀 ${rCount}x CONSECUTIVE JUMP RAMPS · 十连飞坡极限界` });
+
+      for (let i = 0; i < rCount; i++) {
+        const ry = curY;
+        this.ramps.push({
+          id: `ramp_${i}`, y0: ry, len: rLen, h: rH, landingY: ry + rLen + 14.0, landingLen: 16.0, index: i + 1, total: rCount
+        });
+        this.segments.push({
+          id: `seg_ramp_${i}`, type: "jump_ramp", name: `🚀 第 ${i + 1}/${rCount} 个飞坡跳台`,
+          yStart: ry - 10.0, yEnd: ry + sp - 10.0, targetSpeed: this.targetSpeed
+        });
+        curY += sp;
+      }
+      this.totalLength = curY + 50.0;
+
+    } else if (sc === "moose_test") {
+      // 🦌 连续麋鹿避障测试 (连续 5~10 组左右交替双移线)
+      const off = Math.abs(this.params.mooseOffset || 3.5);
+      const w = this.params.mooseLaneWidth || 2.8;
+      const mY0 = this.params.mooseStartY !== undefined ? this.params.mooseStartY : 20.0;
+      let curY = mY0;
+      this.gantries.push({ y: 0, text: `🦌 ${rCount}x CONSECUTIVE MOOSE TESTS · 连续麋鹿避障` });
+
+      for (let i = 0; i < rCount; i++) {
+        const my = curY;
+        const dir = (i % 2 === 0 ? -1 : 1);
+        this.mooseSections.push({
+          id: `moose_${i}`, y0: my, offset: dir * off, width: w, len: 60.0, index: i + 1, total: rCount
+        });
+        this.segments.push({
+          id: `seg_moose_${i}`, type: "moose_test", name: `🦌 第 ${i + 1}/${rCount} 组麋鹿双移线 (${dir < 0 ? '向左' : '向右'})`,
+          yStart: my - 10.0, yEnd: my + 68.0, targetSpeed: (this.params.mooseSpeedKmh || 75.0) / 3.6
+        });
+        curY += 75.0;
+      }
+      this.totalLength = curY + 50.0;
+
+    } else if (sc === "bumps_cleats") {
+      // 🚧 连续过坎与减速带
+      const bH = this.params.bumpHeight || 0.060;
+      const bY0 = this.params.bumpStartY !== undefined ? this.params.bumpStartY : 20.0;
+      const bSp = this.params.bumpSpacing || 4.0;
+      let curY = bY0;
+      this.gantries.push({ y: 0, text: `🚧 ${rCount * 4}x SPEED BUMPS & CLEATS · 连续过坎测试` });
+
+      for (let i = 0; i < rCount * 4; i++) {
+        const by = curY + i * bSp;
+        this.bumps.push({
+          y0: by, side: (i % 2 === 0 ? "L" : "R"), h: bH,
+          xMin: (i % 2 === 0 ? -2.5 : 0.1), xMax: (i % 2 === 0 ? -0.1 : 2.5)
+        });
+      }
+      this.segments.push({
+        id: "seg_bumps_all", type: "bumps_cleats", name: `🚧 连续交错过坎 (${rCount * 4} 连坎)`,
+        yStart: 0, yEnd: curY + rCount * 4 * bSp, targetSpeed: this.targetSpeed
+      });
+      this.totalLength = curY + rCount * 4 * bSp + 50.0;
+
+    } else if (sc === "washboard_potholes") {
+      // 🪨 连续搓板与深坑路
+      const wY0 = this.params.washboardStartY !== undefined ? this.params.washboardStartY : 20.0;
+      let curY = wY0;
+      this.gantries.push({ y: 0, text: "🪨 CONTINUOUS WASHBOARD & POTHOLES · 连续搓板坑洼" });
+      const wLen = 120.0;
+      this.washboardSections.push({
+        id: "wash_main", y0: curY, len: wLen,
+        wavelength: this.params.washboardWavelength || 1.25,
+        amp: this.params.washboardAmplitude || 0.035,
+        potholeDepth: this.params.potholeDepth || -0.055
+      });
+      this.segments.push({
+        id: "seg_wash_all", type: "washboard_potholes", name: "🪨 连续搓板坑洼耐久路",
+        yStart: 0, yEnd: curY + wLen + 50.0, targetSpeed: this.targetSpeed
+      });
+      this.totalLength = curY + wLen + 80.0;
+
+    } else if (sc === "accel_brake") {
+      this.gantries.push({ y: 0, text: "⚡ 0-100 ACCELERATION & MAXIMUM BRAKING" });
+      this.segments.push({
+        id: "seg_accel", type: "accel_brake", name: "⚡ 0-100 弹射加速与全力制动",
+        yStart: 0, yEnd: 150.0, targetSpeed: 45.0, triggerY: this.params.accelBrakeTriggerY || 90.0
+      });
+      this.totalLength = 200.0;
+
+    } else if (sc === "split_mu") {
+      this.gantries.push({ y: 0, text: "❄️ SPLIT-MU RUNWAY · 对开路面附着稳定性" });
+      this.splitMuSections.push({
+        id: "split_main", y0: 10.0, len: 180.0,
+        muLeft: this.params.muLeft || 1.35, muRight: this.params.muRight || 0.28
+      });
+      this.segments.push({
+        id: "seg_split", type: "split_mu", name: "❄️ 对开路面附着偏摆测试",
+        yStart: 0, yEnd: 200.0, targetSpeed: this.targetSpeed
+      });
+      this.totalLength = 240.0;
+
+    } else if (sc === "slope_climb") {
+      this.gantries.push({ y: 0, text: "⛰️ CONTINUOUS SLOPE CLIMB · 连续大坡度爬坡" });
+      this.slopeSections.push({
+        id: "slope_main", y0: 10.0, len: 300.0, grade: this.params.grade || 0.18
+      });
+      this.segments.push({
+        id: "seg_slope", type: "slope_climb", name: "⛰️ 连续极限大坡度爬坡",
+        yStart: 0, yEnd: 320.0, targetSpeed: this.targetSpeed
+      });
+      this.totalLength = 350.0;
+    }
+
+    this.rebuildCones();
+  }
+
+  rebuildCones() {
+    this._cones = [];
+    if (!this.mooseSections.length) return;
+
+    for (const sec of this.mooseSections) {
+      const sy = sec.y0;
+      const w = sec.width || 2.8;
+      const off = sec.offset || -3.5;
+      const prefix = sec.id;
+
+      // Section 1: Entry Lane (Length 12m)
+      for (let y = sy; y <= sy + 12; y += 3.0) {
+        this._cones.push({ id: `${prefix}_eL_${y}`, x: -w / 2, y: y, side: "L" });
+        this._cones.push({ id: `${prefix}_eR_${y}`, x: w / 2, y: y, side: "R" });
+      }
+      // Section 3: Offset Evasion Lane (Length 11m, lateral offset)
+      const s3_start = sy + 12 + 13.5;
+      const s3_end = s3_start + 11.0;
+      for (let y = s3_start; y <= s3_end; y += 2.75) {
+        this._cones.push({ id: `${prefix}_mL_${y}`, x: off - (w * 1.05) / 2, y: y, side: "L" });
+        this._cones.push({ id: `${prefix}_mR_${y}`, x: off + (w * 1.05) / 2, y: y, side: "R" });
+      }
+      // Section 5: Return / Exit Lane (Length 12m)
+      const s5_start = s3_end + 12.5;
+      const s5_end = s5_start + 12.0;
+      for (let y = s5_start; y <= s5_end; y += 3.0) {
+        this._cones.push({ id: `${prefix}_xL_${y}`, x: -(w * 1.15) / 2, y: y, side: "L" });
+        this._cones.push({ id: `${prefix}_xR_${y}`, x: (w * 1.15) / 2, y: y, side: "R" });
+      }
+    }
+  }
+
+  checkConeCollisions(posX, posY, psi, vehW = 1.8, vehL = 3.8) {
+    if (!this._cones.length) return 0;
+    const cPsi = Math.cos(psi), sPsi = Math.sin(psi);
+    const halfW = vehW / 2 + 0.15;
+    const halfL = vehL / 2 + 0.15;
+
+    for (const c of this._cones) {
+      if (this._coneHits.has(c.id)) continue;
+      // Quick radius reject
+      if (Math.abs(c.y - posY) > 4.5 || Math.abs(c.x - posX) > 3.5) continue;
+      const dx = c.x - posX;
+      const dy = c.y - posY;
+      const lx = dx * cPsi + dy * sPsi;
+      const ly = -dx * sPsi + dy * cPsi;
+      if (Math.abs(lx) <= halfW && Math.abs(ly) <= halfL) {
+        this._coneHits.add(c.id);
+      }
+    }
+    return this._coneHits.size;
+  }
+
+  getActiveSegment(y) {
+    if (!this.segments.length) return { name: "直线道路", type: "straight", index: 1, total: 1, progress: 0 };
+    for (let i = 0; i < this.segments.length; i++) {
+      const seg = this.segments[i];
+      if (y >= seg.yStart && y <= seg.yEnd) {
+        const prog = (y - seg.yStart) / Math.max(1, seg.yEnd - seg.yStart);
+        return { name: seg.name, type: seg.type, index: i + 1, total: this.segments.length, progress: prog, seg };
+      }
+    }
+    const last = this.segments[this.segments.length - 1];
+    if (y > last.yEnd) {
+      return { name: "🏁 终点冲刺区", type: "finish", index: this.segments.length, total: this.segments.length, progress: 1.0 };
+    }
+    return { name: this.segments[0].name, type: this.segments[0].type, index: 1, total: this.segments.length, progress: 0 };
+  }
+
   getLookahead(x, y, v) {
-    const psi_tangent = 0; // Straight up North (+Y)
-    
-    const tx = -Math.sin(psi_tangent); // 0
-    const ty = Math.cos(psi_tangent);  // 1
-    const nx_norm = ty;  // 1
-    const ny_norm = -tx; // 0
-    
-    const e_y = (x - 0) * nx_norm + (y - y) * ny_norm; // = x
-    
-    return {
-      targetHeading: psi_tangent,
-      targetCurvature: 0,
-      targetSpeed: this.targetSpeed,
-      crossTrackError: e_y
-    };
+    // 1. Check if inside any Moose Section
+    for (const sec of this.mooseSections) {
+      const sy = sec.y0;
+      const off = sec.offset;
+      const s1_end = sy + 12.0;
+      const s2_end = s1_end + 13.5;
+      const s3_end = s2_end + 11.0;
+      const s4_end = s3_end + 12.5;
+
+      if (y >= sy && y <= s4_end + 10.0) {
+        let targetX = 0;
+        let targetHeading = 0;
+        let targetCurvature = 0;
+
+        if (y <= s1_end) {
+          targetX = 0; targetHeading = 0; targetCurvature = 0;
+        } else if (y <= s2_end) {
+          const t = (y - s1_end) / 13.5;
+          const s_curve = 0.5 - 0.5 * Math.cos(Math.PI * t);
+          const ds_dy = (0.5 * Math.PI / 13.5) * Math.sin(Math.PI * t);
+          const d2s_dy2 = (0.5 * Math.PI * Math.PI / (13.5 * 13.5)) * Math.cos(Math.PI * t);
+          targetX = off * s_curve;
+          targetHeading = Math.atan2(off * ds_dy, 1.0);
+          targetCurvature = (off * d2s_dy2) / Math.pow(1.0 + (off * ds_dy) ** 2, 1.5);
+        } else if (y <= s3_end) {
+          targetX = off; targetHeading = 0; targetCurvature = 0;
+        } else if (y <= s4_end) {
+          const t = (y - s3_end) / 12.5;
+          const s_curve = 0.5 + 0.5 * Math.cos(Math.PI * t);
+          const ds_dy = -(0.5 * Math.PI / 12.5) * Math.sin(Math.PI * t);
+          const d2s_dy2 = -(0.5 * Math.PI * Math.PI / (12.5 * 12.5)) * Math.cos(Math.PI * t);
+          targetX = off * s_curve;
+          targetHeading = Math.atan2(off * ds_dy, 1.0);
+          targetCurvature = (off * d2s_dy2) / Math.pow(1.0 + (off * ds_dy) ** 2, 1.5);
+        } else {
+          targetX = 0; targetHeading = 0; targetCurvature = 0;
+        }
+
+        const e_y = (x - targetX);
+        const targetSpeed = (this.params.mooseSpeedKmh || 75.0) * (1000 / 3600);
+        return { targetHeading, targetCurvature, targetSpeed, crossTrackError: e_y, targetX };
+      }
+    }
+
+    // 2. Check if inside Accel & Brake Segment
+    for (const seg of this.segments) {
+      if (seg.type === "accel_brake" && y >= seg.yStart && y <= seg.yEnd) {
+        const triggerY = seg.triggerY || (seg.yStart + 75.0);
+        const targetSpeed = (y < triggerY) ? seg.targetSpeed : 0.0;
+        return { targetHeading: 0, targetCurvature: 0, targetSpeed, crossTrackError: x, targetX: 0 };
+      }
+    }
+
+    // Default straight path
+    return { targetHeading: 0, targetCurvature: 0, targetSpeed: this.targetSpeed, crossTrackError: x, targetX: 0 };
+  }
+
+  getRoadElevation(x, y) {
+    let z_road = 0.0;
+    let isKerb = false;
+    let isBump = false;
+    let isPothole = false;
+    let isRamp = false;
+    let mu = 1.35;
+
+    // 1. Jump Ramps
+    for (const r of this.ramps) {
+      if (y >= r.y0 && y <= (r.y0 + r.len) && Math.abs(x) <= 3.8) {
+        isRamp = true;
+        const t = (y - r.y0) / r.len;
+        z_road = Math.max(z_road, r.h * (t * t * (3.0 - 2.0 * t)));
+      } else if (y > (r.y0 + r.len) && y < r.landingY) {
+        // Drop-off flight gap: ground elevation is 0
+      } else if (y >= r.landingY && y <= (r.landingY + r.landingLen) && Math.abs(x) <= 4.0) {
+        const t = (y - r.landingY) / r.landingLen;
+        z_road = Math.max(z_road, (1.0 - t) * 0.04);
+      }
+    }
+
+    // 2. Speed Bumps & Cleats
+    for (const bp of this.bumps) {
+      if (y >= bp.y0 && y <= bp.y0 + 1.0 && x >= bp.xMin && x <= bp.xMax) {
+        isBump = true;
+        const t = (y - bp.y0) / 1.0;
+        z_road = Math.max(z_road, bp.h * Math.sin(Math.PI * t) ** 2);
+      }
+    }
+
+    // 3. Washboard & Potholes
+    for (const w of this.washboardSections) {
+      if (y >= w.y0 && y <= (w.y0 + w.len) && Math.abs(x) <= 3.8) {
+        isBump = true;
+        z_road += w.amp * Math.sin((2.0 * Math.PI * (y - w.y0)) / w.wavelength);
+      } else if (y > (w.y0 + w.len) && y <= (w.y0 + w.len + 50.0)) {
+        const pits = [
+          { y0: w.y0 + w.len + 8.0, x0: -0.75, rx: 0.6, ry: 0.8 },
+          { y0: w.y0 + w.len + 18.0, x0: 0.85, rx: 0.65, ry: 0.85 },
+          { y0: w.y0 + w.len + 28.0, x0: -0.45, rx: 0.7, ry: 0.9 },
+          { y0: w.y0 + w.len + 38.0, x0: 0.60, rx: 0.6, ry: 0.8 }
+        ];
+        for (const p of pits) {
+          const dx = (x - p.x0) / p.rx;
+          const dy = (y - p.y0) / p.ry;
+          const r2 = dx * dx + dy * dy;
+          if (r2 <= 1.0) {
+            isPothole = true;
+            const factor = Math.cos((Math.PI / 2) * Math.sqrt(r2));
+            z_road = Math.min(z_road, w.potholeDepth * factor);
+          }
+        }
+        if (Math.abs(x) <= 3.8) {
+          z_road += 0.005 * Math.sin(y * 11.3) * Math.cos(x * 9.7);
+        }
+      }
+    }
+
+    // 4. Split-Mu Friction
+    for (const sp of this.splitMuSections) {
+      if (y >= sp.y0 && y <= (sp.y0 + sp.len)) {
+        mu = (x > 0 ? sp.muRight : sp.muLeft);
+      }
+    }
+
+    return { z_road, isKerb, isBump, isPothole, isRamp, mu };
+  }
+
+  getMu(x, y) {
+    return this.getRoadElevation(x, y).mu;
   }
 }
 
 // -------------------- CIRCUIT TRACK SPLINE & PROFILING --------------------
 class CircuitPath extends TrackPath {
-  constructor(waypoints, mu = 1.3) {
+  constructor(waypoints, mu = 1.35, aggressiveness = 1.0) {
     super();
     this.mu = mu;
+    this.aggressiveness = aggressiveness || 1.0;
     this.pts = [];
     this.waypoints = waypoints;
     
@@ -413,18 +867,22 @@ class CircuitPath extends TrackPath {
           v_max: v_target,
           turn: p1.turn || "",
           turnZh: p1.turnZh || p1.turn || "",
+          turnApex: (s === 0 ? !!p1.turnApex : false),
           sector: p1.sector || 1,
           gear: p1.gear || 3,
           isDRS: !!p1.isDRS,
           kerbSide: p1.kerbSide || null,
           runoff: p1.runoff || null,
-          brakingBoard: p1.brakingBoard || null
+          brakingBoard: (s === 0 ? (p1.brakingBoard || null) : null)
         });
       }
     }
     
     const P = this.pts.length;
-    // 2. Heading & Normal (+Y North, +X East, CCW from +Y)
+    this.totalPoints = P;
+    
+    // 2. Heading, Normal & Cumulative Arc-Length Distance
+    let totalDist = 0;
     for(let i = 0; i < P; i++){
       const prev = this.pts[(i - 1 + P) % P];
       const curr = this.pts[i];
@@ -435,12 +893,14 @@ class CircuitPath extends TrackPath {
       curr.heading = Math.atan2(-dx, dy);
       curr.nx = Math.cos(curr.heading);
       curr.ny = Math.sin(curr.heading);
+      
+      const stepDist = Math.hypot(curr.x - prev.x, curr.y - prev.y);
+      totalDist += stepDist;
+      curr.s = totalDist;
     }
+    this.totalLength = totalDist;
     
-    // 3. Curvature & Max Grip Speed (7-point sliding window for smooth continuous curvature)
-    const v_top_veh = (typeof window !== "undefined" && window.S && window.S.qs && window.S.qs.speed) ? (window.S.qs.speed * (1000/3600)) : 92.0;
-    const a_lat_max = Math.max(4.0, this.mu * 9.81 * 0.68); // 0.68mu safe cornering grip
-
+    // 3. Smooth Curvature Calculation across all points (7-point span)
     for(let i = 0; i < P; i++){
       const prev = this.pts[(i - 4 + P) % P];
       const curr = this.pts[i];
@@ -452,15 +912,25 @@ class CircuitPath extends TrackPath {
       while(dpsi < -Math.PI) dpsi += 2 * Math.PI;
       
       curr.curvature = dpsi / (ds + 1e-6);
-      const curv_v = Math.sqrt(a_lat_max / (Math.abs(curr.curvature) + 1e-5));
-      curr.v_max = Math.min(v_top_veh, Math.min(curr.v_max, curv_v));
     }
     
-    // 4. Backward & Forward Speed Passes (Fully-Converged Trail-Braking Profile)
-    const a_brake = 6.2; // 0.63g safe trail braking deceleration
-    const a_accel = 5.0; // 0.51g acceleration
+    // 4. Physical Aerodynamic Speed Envelope & Friction Limits
+    const vehType = (typeof window !== "undefined" && window.S && window.S.vehicleType) ? window.S.vehicleType : "formula";
+    const v_top_kmh = (vehType === "formula") ? 335.0 : (vehType === "gt3" || vehType === "sport") ? 295.0 : (vehType === "kart") ? 140.0 : 245.0;
+    const v_top_veh = v_top_kmh * (1000.0 / 3600.0);
+    const aggrScale = Math.min(1.35, Math.max(0.65, this.aggressiveness));
+    const a_lat_max = Math.max(4.5, this.mu * 9.81 * 0.72 * aggrScale);
     
-    // Backward braking propagation until full circuit convergence (60 iterations)
+    for(let i = 0; i < P; i++){
+      const pt = this.pts[i];
+      const curv_v = Math.sqrt(a_lat_max / (Math.abs(pt.curvature) + 1e-5));
+      pt.v_max = Math.min(v_top_veh, Math.min(pt.v_max, curv_v));
+    }
+    
+    // 5. Backward & Forward Braking/Acceleration Passes
+    const a_brake = 4.8 * Math.min(1.2, Math.max(0.8, aggrScale));
+    const a_accel = 5.2 * Math.min(1.2, Math.max(0.8, aggrScale));
+    
     for(let pass = 0; pass < 60; pass++) {
       let maxDiff = 0;
       for(let i = P - 1; i >= 0; i--){
@@ -475,7 +945,6 @@ class CircuitPath extends TrackPath {
       if(maxDiff < 0.01) break;
     }
 
-    // Forward acceleration propagation (60 iterations)
     for(let pass = 0; pass < 60; pass++) {
       let maxDiff = 0;
       for(let i = 0; i < P; i++){
@@ -489,15 +958,14 @@ class CircuitPath extends TrackPath {
       }
       if(maxDiff < 0.01) break;
     }
-    
-    this.totalPoints = P;
   }
-  
+
   getLookahead(x, y, v) {
+    const P = this.pts.length;
     let minDist = Infinity;
     let closestIdx = 0;
     
-    for(let i = 0; i < this.totalPoints; i++){
+    for(let i = 0; i < P; i++){
       const pt = this.pts[i];
       const d = (pt.x - x)**2 + (pt.y - y)**2;
       if(d < minDist){ minDist = d; closestIdx = i; }
@@ -519,11 +987,66 @@ class CircuitPath extends TrackPath {
       turn: pt.turn,
       turnZh: pt.turnZh,
       sector: pt.sector,
-      gear: pt.gear,
+      gear: pt.gear || 3,
       isDRS: pt.isDRS,
       kerbSide: pt.kerbSide,
       runoff: pt.runoff,
       brakingBoard: pt.brakingBoard
     };
   }
+
+  getRoadElevation(x, y) {
+    let minDist = Infinity;
+    let closestIdx = 0;
+    
+    for(let i = 0; i < this.totalPoints; i++){
+      const pt = this.pts[i];
+      const d = (pt.x - x)**2 + (pt.y - y)**2;
+      if(d < minDist){ minDist = d; closestIdx = i; }
+    }
+    
+    const pt = this.pts[closestIdx];
+    const ey = (x - pt.x) * pt.nx + (y - pt.y) * pt.ny;
+    const absEy = Math.abs(ey);
+    const hw = 7.0; // 7.0m asphalt half-width
+    const kw = 1.35; // 1.35m FIA Kerb width
+    const s = closestIdx * 2.0; // ~2m per interpolated point
+    
+    let z_road = 0.0;
+    let isKerb = false;
+    let kerbRatio = 0.0;
+    let mu = this.mu || 1.35;
+    
+    const hasKerb = pt.kerbSide || (Math.abs(pt.curvature || 0) > 0.006);
+    
+    if (absEy > hw && absEy <= (hw + kw) && hasKerb) {
+      isKerb = true;
+      kerbRatio = (absEy - hw) / kw;
+      // Smooth sinusoidal bevel slope (up to 38mm kerb crest)
+      const z_bevel = 0.038 * Math.sin(kerbRatio * (Math.PI / 2.0));
+      // High-frequency Rumble Strip sinusoidal serrations (wavelength 0.35m, amplitude 12mm)
+      const lambda = 0.35;
+      const z_rumble = 0.012 * Math.sin((Math.PI * s) / lambda)**2;
+      z_road = z_bevel + z_rumble * Math.sin(kerbRatio * Math.PI);
+      mu = 1.18; // Painted kerb friction coefficient
+    } else if (absEy > (hw + kw)) {
+      // Off-track grass / gravel apron
+      z_road = -0.012 + 0.004 * Math.sin(s * 3.1) * Math.cos(ey * 2.0);
+      mu = 0.78;
+    } else {
+      // Pristine track asphalt
+      z_road = 0.0;
+      mu = this.mu || 1.35;
+    }
+    
+    return { z_road, isKerb, kerbRatio, mu, ey, s, pt };
+  }
 }
+
+window.TrackPath = TrackPath;
+window.CirclePath = CirclePath;
+window.StraightPath = StraightPath;
+window.CircuitPath = CircuitPath;
+
+
+
