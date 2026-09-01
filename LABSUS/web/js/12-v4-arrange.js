@@ -235,7 +235,7 @@ function v4InitThemePicker(){
    布局重组：左坞站三 Tab
    ============================================================ */
 const V4_TUNE_T=/车型平台预设|悬架底盘模块编辑|几何与转向输入|多体求解模式|内置弹性与阻尼元件|横向稳定杆|准静态操稳工况/;
-const V4_ANA_T=/引擎连接|整车底盘分析|动态驾驶测试|赛道动态遥测|4-Post|Baseline/;
+const V4_ANA_T=/引擎连接|整车底盘分析|动态驾驶测试|赛道动态遥测|4-Post|Baseline|轮胎实测标定|台架对拍|衬套刚度标定/;
 const V4_SET_T=/硬点永久保存|系统显示|实体着色|3D 空间硬点表|显示图层控制/;
 function v4ArrangeLeft(){
   const lp=document.getElementById("lp");if(!lp||lp.dataset.v4)return;lp.dataset.v4="1";
@@ -312,7 +312,8 @@ function v4AccSummaries(){
    右坞站：核心结论卡 + 诊断卡（镜像 #rp 内的实时读数）
    ============================================================ */
 const V4_WIN={roCam:[-1.6,-0.6,"目标 −1.2°±0.4"],roToe:[-0.9,0.3,"目标窗口 −0.9~+0.3"],
-  roRC:[30,75,"目标 30–75 mm"],roQsRollGrad:[0.1,0.8,"理想 ≤0.8 °/g"]};
+  roRC:[30,75,"目标 30–75 mm"],roQsRollGrad:[0.1,0.8,"理想 ≤0.8 °/g"],
+  roUsGrad:[0.2,2.0,"目标 0.2–2.0 °/g"]};
 function v4BuildHero(){
   const host=document.getElementById("v4Hero");if(!host)return;
   host.innerHTML='<div class="v4-hero-hd"><b>核心结论</b><i>Key Results</i><span class="v4-live">实时</span></div>'+
@@ -321,6 +322,7 @@ function v4BuildHero(){
   '<div class="v4-hc" id="hcToe"><div class="en">Toe 前束</div><div class="v">--</div><div class="hint">'+V4_WIN.roToe[2]+'</div></div>'+
   '<div class="v4-hc" id="hcRc"><div class="en">Roll Center 侧倾中心</div><div class="v">--</div><div class="hint">'+V4_WIN.roRC[2]+'</div></div>'+
   '<div class="v4-hc" id="hcRg"><div class="en">Roll Gradient 侧倾梯度</div><div class="v">--</div><div class="hint">'+V4_WIN.roQsRollGrad[2]+'</div></div>'+
+  '<div class="v4-hc" id="hcUs"><div class="en">US Gradient 不足转向梯度</div><div class="v">--</div><div class="hint">'+V4_WIN.roUsGrad[2]+'</div></div>'+
   '<div class="v4-hc" id="hcTl"><div class="en">TLLTD 前轴占比</div><div class="v">--</div><div class="v4-bar"><i id="hcTlBar"></i></div><div class="hint" id="hcTlHint">前 52% · 后 48%</div></div>'+
   '<div class="v4-hc" id="hcBias"><div class="en">Handling Bias 操稳倾向</div><div class="v" style="font-size:13px">--</div><div class="hint">准静态载荷转移判定</div></div>'+
   '</div>';
@@ -343,7 +345,7 @@ function v4MirrorHero(){
   if(typeof UI==="undefined"||!UI.ro)return;
   const txt=id=>{const e=UI.ro[id];return e?e.textContent:"--";};
   const num=s=>{const v=parseFloat(String(s).replace(/[^\d.\-]/g,""));return isFinite(v)?v:null;};
-  [["hcCam","roCam"],["hcToe","roToe"],["hcRc","roRC"],["hcRg","roQsRollGrad"]].forEach(([hc,ro])=>{
+  [["hcCam","roCam"],["hcToe","roToe"],["hcRc","roRC"],["hcRg","roQsRollGrad"],["hcUs","roUsGrad"]].forEach(([hc,ro])=>{
     const t=txt(ro),v=num(t),w=V4_WIN[ro];
     v4HcSet(hc,t,v===null?null:(v>=w[0]&&v<=w[1]));
   });
@@ -362,6 +364,14 @@ function v4MirrorHero(){
     hb.classList.remove("ok","warn","bad");
     if(/中性|平衡/.test(bias))hb.classList.add("ok");
     else if(bias!=="--")hb.classList.add("warn");}
+  /* 诊断建议：基于 US Gradient 与操稳倾向给出调校优先级（底盘开发第一 KPI） */
+  const dgTxt=document.getElementById("v4DiagTxt");
+  if(dgTxt){const ku=num(txt("roUsGrad"));
+    if(ku===null)dgTxt.textContent="请施加侧向工况（准静态 gy ≥ 0.02g）后，此处给出不足转向梯度诊断。";
+    else if(ku<0)dgTxt.textContent="⚠ 梯度为负（过度转向）：建议软化后轴侧倾刚度（后 ARB/后弹簧）、或提高后轴负外倾增益，恢复稳定裕度。";
+    else if(ku<0.2)dgTxt.textContent="梯度偏低（近中性）：高速稳定性裕度小；可前移侧倾刚度分配（加粗前 ARB）或增大前轴载荷转移占比。";
+    else if(ku>2.0)dgTxt.textContent="梯度过大（强不足转向）：入弯迟钝；建议加粗后 ARB / 硬化后弹簧释放后轴，或核查前轴侧偏刚度是否过低。";
+    else dgTxt.textContent="✓ 梯度在目标窗口（0.2–2.0 °/g）：转向平衡健康；结合侧倾梯度与 TLLTD 微调前后侧倾刚度分配。";}
   /* 引擎胶囊与评分同步 */
   if(typeof ENG!=="undefined"){
     const pill=document.getElementById("engPillV4");

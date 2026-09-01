@@ -15,7 +15,7 @@ P2-3 指标状态机：
 - VALID          输入满足几何/物理前提，数值可信
 - APPROXIMATE    输入接近前提（如残差略超阈值），数值近似
 - NOT_APPLICABLE 该指标对当前配置不适用（如无转向输入时 Ackermann）
-- NOT_IMPLEMENTED 尚未实现或依赖后续阶段（如 Jacking 依赖 P3 载荷）
+- NOT_IMPLEMENTED 尚未实现或依赖后续阶段（显式占位，禁止伪造数值）
 - SOLVER_FAILED  求解失败或输入缺失导致无法计算
 - EQUILIBRIUM_FAILED 力平衡无法满足（P3 载荷指标使用）
 - OUT_OF_RANGE   输入超出适用区间（如全行程残差超阈值）

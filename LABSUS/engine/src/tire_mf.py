@@ -52,6 +52,16 @@ class MagicFormulaSub:
         y = self._d(fz) * np.sin(c * np.arctan(x - e * (x - np.arctan(x))))
         return y + self.p["Sv"]
 
+    def cornering_stiffness(self, fz: float) -> float:
+        """侧偏刚度 Cα = dFy/dα @α=0（N/rad）：线性区斜率 = B·C·D(Fz)。
+
+        含载荷敏感性（LS）——重载下 Cα 递增但次线性，是载荷转移损失轴总
+        抓地力与稳态不足转向梯度的轮胎侧根基（讲义 EP08/EP10）。
+        """
+        if fz <= 0:
+            return 0.0
+        return float(self.p["By"] * self.p["Cy"] * self._d(fz))
+
     def fx(self, kappa, fz: float) -> np.ndarray:
         k = np.asarray(kappa, float)
         b, c, e = self.p["By"] * 1.2, self.p["Cy"], self.p["Ey"]

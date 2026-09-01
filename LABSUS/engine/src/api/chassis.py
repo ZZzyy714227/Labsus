@@ -194,7 +194,8 @@ def _kw_at(ax: AxleSpec, tr: float, kw0_nm: float) -> float:
 def quasi_loads(vehicle: VehicleSpec, q: QuasiInputs,
                 mr: dict[str, float], rcH: dict[str, float],
                 rc_sw: dict[str, dict],
-                warnings: list[str] | None = None) -> ChassisLoads:
+                warnings: list[str] | None = None,
+                tire=None) -> ChassisLoads:
     """准静态载荷转移 —— 侧倾耦合迭代（镜像前端 solveQuasiStatic 修复版）。
 
     3 轮迭代：每轮由当前侧倾角解外侧（压缩侧）轮行程差 dt=roll·半轮距 →
@@ -317,6 +318,36 @@ def quasi_loads(vehicle: VehicleSpec, q: QuasiInputs,
         "RL": max(0.0, (Fzr0 + dFz_long) / 2 - dFz_r_tot * sgn_y),
         "RR": max(0.0, (Fzr0 + dFz_long) / 2 + dFz_r_tot * sgn_y),
     }
+
+    # ── 稳态不足转向梯度（线性区，镜像前端 solveQuasiStatic）──
+    # α轴 = Fy轴 / ΣCα(各轮真实载荷)；Cα = B·C·D(Fz) 含 LS 载荷敏感性
+    # （EP08/EP10：载荷转移使轴总刚度次线性增长 → 梯度含非线性饱和种子）。
+    # 只含轮胎分量；roll steer / 柔度项在 sweep_roll / compliance 通道另查。
+    us_grad = alpha_f = alpha_r = 0.0
+    if tire is not None and abs(q.gy) >= 0.02:
+        def _ca_mf(fz_w: float) -> float:
+            if fz_w <= 0:
+                return 0.0
+            r = fz_w / tire.FzNom
+            d = tire.Fy0 * r * max(0.1, 1.0 - tire.LS * (r - 1.0))
+            return tire.By * tire.Cy * d
+        fy_f = mT * ay * (b / L)
+        fy_r = mT * ay * (a / L)
+        ca_f = _ca_mf(fz["FL"]) + _ca_mf(fz["FR"])
+        ca_r = _ca_mf(fz["RL"]) + _ca_mf(fz["RR"])
+        if ca_f > 1e-6 and ca_r > 1e-6:
+            alpha_f = (fy_f / ca_f) * R2D
+            alpha_r = (fy_r / ca_r) * R2D
+            us_grad = (alpha_f - alpha_r) / q.gy   # deg/g（gy 以 g 为单位）
+    elif tire is not None and warnings is not None and abs(q.gy) < 0.02:
+        warnings.append("|gy|<0.02g：不足转向梯度与前后侧偏角不计算（线性区除零保护）")
+
+    # ── Jacking 效应（kinematics.jacking 同源，讲义 EP10）──
+    f_jack_f = mS * ay * (b / L) * (2.0 * zrc_f / tf)
+    f_jack_r = mS * ay * (a / L) * (2.0 * zrc_r / tr)
+    f_jack = f_jack_f + f_jack_r
+    jack_heave_mm = f_jack / ((kw_f0 + kw_r0) / 1000.0)   # 簧载 heave（mm）
+
     return ChassisLoads(
         roll_deg=roll_deg, roll_grad_deg_per_g=roll_grad,
         kphi_f=kphi_f * D2R, kphi_r=kphi_r * D2R, kphi_tot=kphi_tot * D2R,
@@ -325,7 +356,90 @@ def quasi_loads(vehicle: VehicleSpec, q: QuasiInputs,
         dFz_u_f=dFz_u_f, dFz_geo_f=dFz_geo_f, dFz_elas_f=dFz_elas_f, dFz_f_tot=dFz_f_tot,
         dFz_u_r=dFz_u_r, dFz_geo_r=dFz_geo_r, dFz_elas_r=dFz_elas_r, dFz_r_tot=dFz_r_tot,
         dFz_long=dFz_long, tlltd_pct=tlltd, fz={k: round(float(v), 2) for k, v in fz.items()},
+        us_grad_deg_per_g=round(us_grad, 4),
+        alpha_f_deg=round(alpha_f, 4), alpha_r_deg=round(alpha_r, 4),
+        jacking_f_n=round(f_jack, 1), jacking_heave_mm=round(jack_heave_mm, 4),
     )
+
+
+def _us_curve(vehicle: VehicleSpec, tire, mr: dict[str, float],
+              rcH: dict[str, float], rc_sw: dict[str, dict],
+              n: int = 21, gy_max: float = 2.0) -> dict[str, list]:
+    """不足转向特性 δ-ay 扫掠（底盘开发汇报核心图，讲义 EP11/EP12）。
+
+    沿 gy 0→gy_max 均匀扫描准静态工况，输出 δ_us = αf − αr（°）曲线；
+    仅含轮胎分量，与单点 us_grad_deg_per_g 严格同口径（roll steer /
+    compliance 项在 sweep_roll / compliance 通道另查，不在此伪造）。
+    """
+    from src.api.v3models import QuasiInputs
+    gy_l, af_l, ar_l, us_l, roll_l = [], [], [], [], []
+    for i in range(n):
+        g = gy_max * i / (n - 1)
+        q = QuasiInputs(gy=g, gx=0.0, aero_force_n=0.0, aero_bias=0.5)
+        ld = quasi_loads(vehicle, q, mr, rcH, rc_sw, warnings=None, tire=tire)
+        gy_l.append(round(g, 4))
+        af_l.append(ld.alpha_f_deg)
+        ar_l.append(ld.alpha_r_deg)
+        us_l.append(round(ld.alpha_f_deg - ld.alpha_r_deg, 4) if g >= 0.02 else 0.0)
+        roll_l.append(ld.roll_deg)
+    return {"gy": gy_l, "alpha_f_deg": af_l, "alpha_r_deg": ar_l,
+            "us_angle_deg": us_l, "roll_deg": roll_l}
+
+
+def _roll_steer_rate(vehicle: VehicleSpec) -> dict[str, float]:
+    """侧倾转向率 @0（°toe/mm，外轮，±10mm 轮跳中央差分）。
+
+    完整版不足转向特性的 roll steer 分量基底（讲义 EP02/EP13）：
+    侧倾时轮对车身的附加转向角 δ_rs(roll) ≈ rate · roll_rad · half。
+    """
+    corners = make_corners(vehicle)
+    out: dict[str, float] = {}
+    for ax_name, ax_key in (("front", "FR"), ("rear", "RR")):
+        ax = vehicle.front if ax_name == "front" else vehicle.rear
+        c = corners[ax_key]
+        m_p, _, _ = corner_pose(ax, c["points"], 10.0, 0.0, c["left"])
+        m_m, _, _ = corner_pose(ax, c["points"], -10.0, 0.0, c["left"])
+        out[ax_name] = (m_p["toe"] - m_m["toe"]) / 20.0   # °/mm
+    return out
+
+
+def _us_curve(vehicle: VehicleSpec, tire, mr: dict[str, float],
+              rcH: dict[str, float], rc_sw: dict[str, dict],
+              roll_steer: dict[str, float] | None = None,
+              n: int = 21, gy_max: float = 2.0) -> dict[str, list]:
+    """不足转向特性 δ-ay 扫掠（底盘开发汇报核心图，讲义 EP11/EP12）。
+
+    沿 gy 0→gy_max 均匀扫描准静态工况。完整版：
+        δ_us = (αf − αr)  [轮胎分量]
+             + (δ_rs,f − δ_rs,r)  [侧倾转向分量，rate·roll_rad·half]
+    compliance steer 项在 compliance 通道另查，不在此伪造。
+    输出同时携带分量（us_tire_deg / us_roll_steer_deg）供前端双线叠画。
+    """
+    from src.api.v3models import QuasiInputs
+    half_f = abs(vehicle.front.points["WC"][0])    # mm
+    half_r = abs(vehicle.rear.points["WC"][0])
+    gy_l, af_l, ar_l, tire_l, rs_l, us_l, roll_l = [], [], [], [], [], [], []
+    for i in range(n):
+        g = gy_max * i / (n - 1)
+        q = QuasiInputs(gy=g, gx=0.0, aero_force_n=0.0, aero_bias=0.5)
+        ld = quasi_loads(vehicle, q, mr, rcH, rc_sw, warnings=None, tire=tire)
+        roll_rad = math.radians(ld.roll_deg)
+        rs = 0.0
+        if roll_steer:
+            rs_f = roll_steer.get("front", 0.0) * roll_rad * half_f
+            rs_r = roll_steer.get("rear", 0.0) * roll_rad * half_r
+            rs = rs_f - rs_r
+        tire_us = round(ld.alpha_f_deg - ld.alpha_r_deg, 4) if g >= 0.02 else 0.0
+        gy_l.append(round(g, 4))
+        af_l.append(ld.alpha_f_deg)
+        ar_l.append(ld.alpha_r_deg)
+        tire_l.append(tire_us)
+        rs_l.append(round(rs, 4))
+        us_l.append(round(tire_us + rs, 4))
+        roll_l.append(ld.roll_deg)
+    return {"gy": gy_l, "alpha_f_deg": af_l, "alpha_r_deg": ar_l,
+            "us_tire_deg": tire_l, "us_roll_steer_deg": rs_l,
+            "us_angle_deg": us_l, "roll_deg": roll_l}
 
 
 def _resolve_mr_fb(ax: AxleSpec, points: dict, is_front: bool,
@@ -391,12 +505,15 @@ def solve_chassis(req: ChassisRequest) -> ChassisPoseResponse:
     if abs(h_weighted - v_.hcg_mm) > 20.0:
         warnings.append(f"hs/hcg 记账不自洽：加权高度 {h_weighted:.0f}mm vs hcg "
                         f"{v_.hcg_mm:.0f}mm（载荷转移之和与整车公式将有偏差）")
-    loads = quasi_loads(req.vehicle, req.quasi, mr, rcH, rc_sw, warnings=warnings)
+    loads = quasi_loads(req.vehicle, req.quasi, mr, rcH, rc_sw, warnings=warnings,
+                        tire=req.tire)
+    us_curve = _us_curve(req.vehicle, req.tire, mr, rcH, rc_sw,
+                         roll_steer=_roll_steer_rate(req.vehicle))
     attitude = _attitude(trav, req.vehicle)
     return ChassisPoseResponse(
         status="SOLVER_FAILED" if "SOLVER_FAILED" in statuses else "VALID",
         ms=(time.perf_counter() - t0) * 1000.0,
-        pose=pose, attitude=attitude, loads=loads, mr=mr,
+        pose=pose, attitude=attitude, loads=loads, mr=mr, us_curve=us_curve,
         warnings=list(dict.fromkeys(warnings))[:8],
     )
 
@@ -489,7 +606,12 @@ def sweep_roll(req: ChassisRequest) -> ChassisSweepResponse:
 
 
 def sweep_steer(req: ChassisRequest) -> ChassisSweepResponse:
-    """整车转向扫掠：rack 位移扫描（前轴两轮；后轮 rack=0）。"""
+    """整车转向扫掠：rack 位移扫描（前轴两轮；后轮 rack=0）。
+
+    gains 额外输出转向外倾增益分解（讲义 EP04×EP06：Caster 转向时给外轮
+    负 camber、KPI 反向夺走；@最大转向角处：合成 ≈ −caster·sin δ + kpi·(1−cos δ)
+    + 残差（连杆几何/摆臂高阶效应）。合成值来自真实机构求解曲线。
+    """
     t0 = time.perf_counter()
     corners = make_corners(req.vehicle)
     xs = np.linspace(req.sweep.min, req.sweep.max, req.sweep.n)
@@ -503,13 +625,32 @@ def sweep_steer(req: ChassisRequest) -> ChassisSweepResponse:
             m, res, warn = corner_pose(ax, c["points"], 0.0, float(rk), c["left"])
             statuses.add("VALID" if res < 0.02 else "SOLVER_FAILED")
             warnings.extend(warn)
-            for kk in ("cam", "toe"):
+            for kk in ("cam", "toe", "cast", "kpi"):
                 curves.setdefault(f"{kk}_{key}", []).append(round(float(m[kk]), 6))
     gains: dict[str, float] = {}
-    if len(xs) >= 2:
+    if len(xs) >= 3:
         gains["steer_toe_gain_deg_per_mm"] = round(
             float(np.interp(0.0 + 2.0, xs, curves["toe_FR"])
                   - np.interp(0.0 - 2.0, xs, curves["toe_FR"])) / 4.0, 6)
+        # 转向外倾增益分解（δ 用内轮 toe 相对直行的变化近似转向角）
+        toe0 = float(np.interp(0.0, xs, curves["toe_FR"]))
+        cam0 = float(np.interp(0.0, xs, curves["cam_FR"]))
+        deltas = [v - toe0 for v in curves["toe_FR"]]
+        imax = int(np.argmax(np.abs(deltas)))
+        dmax = deltas[imax]
+        cast0 = float(np.interp(0.0, xs, curves["cast_FR"]))
+        kpi0 = float(np.interp(0.0, xs, curves["kpi_FR"]))
+        total = curves["cam_FR"][imax] - cam0
+        d_rad = math.radians(abs(dmax))
+        caster_term = -cast0 * math.sin(d_rad)
+        kpi_term = kpi0 * (1.0 - math.cos(d_rad))
+        gains["steer_camber_gain_deg_per_deg"] = round(
+            float(_slope(curves["cam_FR"], deltas, 0.0)), 6)
+        gains["steer_camber_total_at_max_deg"] = round(total, 4)
+        gains["steer_camber_caster_at_max_deg"] = round(caster_term, 4)
+        gains["steer_camber_kpi_at_max_deg"] = round(kpi_term, 4)
+        gains["steer_camber_residual_at_max_deg"] = round(
+            total - caster_term - kpi_term, 4)
     return ChassisSweepResponse(
         case="steer", status=_merged_status(statuses),
         ms=(time.perf_counter() - t0) * 1000.0,

@@ -49,7 +49,8 @@ const EVAL_BENCHMARKS = {
   dampingRatioF:   { name: "前阻尼比 (Damping Ratio)", target: "0.55 ~ 0.75", unit: "", eval: v => (v >= 0.55 && v <= 0.75 ? 'good' : (v >= 0.4 && v <= 0.85 ? 'warn' : 'bad')), desc: "前轴振动衰减能力，防止多余弹跳" },
   dampingRatioR:   { name: "后阻尼比 (Damping Ratio)", target: "0.60 ~ 0.80", unit: "", eval: v => (v >= 0.60 && v <= 0.80 ? 'good' : (v >= 0.45 && v <= 0.90 ? 'warn' : 'bad')), desc: "后轴振动衰减能力" },
   rollStiffnessPct:{ name: "前侧倾刚度占比 (F/T Roll)", target: "48% ~ 58%", unit: "%", eval: v => (v >= 48 && v <= 58 ? 'good' : (v >= 40 && v <= 65 ? 'warn' : 'bad')), desc: "决定稳态过弯平衡：>55% 趋向不足转向，<48% 趋向过度" },
-  ackermannPct:    { name: "阿克曼转向百分比 (Ackermann)", target: "30% ~ 80%", unit: "%", eval: v => (v == null ? 'warn' : (v >= 30 && v <= 80 ? 'good' : (v >= 10 && v <= 100 ? 'warn' : 'bad'))), desc: "高速赛车通常采用 40%~60% 减少外侧胎拖拽；未从转向扫掠计算时显示 —（不再给出假数据）" }
+  ackermannPct:    { name: "阿克曼转向百分比 (Ackermann)", target: "30% ~ 80%", unit: "%", eval: v => (v == null ? 'warn' : (v >= 30 && v <= 80 ? 'good' : (v >= 10 && v <= 100 ? 'warn' : 'bad'))), desc: "高速赛车通常采用 40%~60% 减少外侧胎拖拽；未从转向扫掠计算时显示 —（不再给出假数据）" },
+  usGradient:      { name: "稳态不足转向梯度 (US Gradient)", target: "0.2 ~ 2.0 °/g", unit: "°/g", eval: v => (v == null ? 'warn' : (v >= 0.2 && v <= 2.0 ? 'good' : (v >= 0.05 && v <= 3.5 ? 'warn' : 'bad'))), desc: "底盘开发第一 KPI：前后轴侧偏角差随侧向加速度的斜率；正=不足转向，负=过度。含轮胎载荷敏感性；高 μ 胎组梯度天然偏小（可×μ归一比较）；|gy|<0.02g 时显示 —" }
 };
 
 function calculateEvaluationData(){
@@ -133,7 +134,13 @@ function calculateEvaluationData(){
     /* F-11（2026-08-30）：`S.ackermann || 52` 是假数据——S.ackermann 全文无赋值点，
        恒 52% 使红绿灯失真。未计算时如实显示 "—"（eval 侧同步处理 null）。 */
     ackermannPct:{ val: Number.isFinite(S.ackermann) ? S.ackermann : null,
-                   formatted: Number.isFinite(S.ackermann) ? S.ackermann.toFixed(0) : "—" }
+                   formatted: Number.isFinite(S.ackermann) ? S.ackermann.toFixed(0) : "—" },
+    /* 稳态不足转向梯度：取当前准静态工况（需 |gy|≥0.02g）；镜像引擎
+       chassis.quasi_loads 的轮胎分量公式（含 LS 载荷敏感性）。 */
+    usGradient:{ val: (SIM.qsRes && Math.abs(S.qs.gy) >= 0.02 && Number.isFinite(SIM.qsRes.usGrad)
+                       && Math.abs(SIM.qsRes.usGrad) > 1e-9) ? SIM.qsRes.usGrad : null,
+                 formatted: (SIM.qsRes && Math.abs(S.qs.gy) >= 0.02 && Number.isFinite(SIM.qsRes.usGrad)
+                       && Math.abs(SIM.qsRes.usGrad) > 1e-9) ? SIM.qsRes.usGrad.toFixed(2) : "—" }
   };
 
   /* F-18（2026-08-30）：dimScores 与 EVAL_BENCHMARKS 双轨制消除 —— 旧公式

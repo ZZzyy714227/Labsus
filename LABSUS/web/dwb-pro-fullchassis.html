@@ -141,12 +141,14 @@
       </div>
       
       <!-- 面板显示/隐藏控制组 -->
-      <div class="circuit-panel-toggles" style="display:inline-flex; align-items:center; gap:5px; margin-right:12px; border-left:1px solid rgba(255,255,255,0.12); padding-left:10px;">
-        <span style="font-size:11px; color:#8b949e; margin-right:2px;">面板:</span>
+      <div class="circuit-panel-toggles">
+        <span class="c-toggle-label">面板:</span>
         <button class="c-toggle-panel-btn on" id="btn_toggle_hud" data-panel="hud" title="切换左下悬浮迷你HUD (快捷键: H)">👁️ 悬浮HUD</button>
         <button class="c-toggle-panel-btn on" id="btn_toggle_bottom" data-panel="bottom" title="切换底部快速调校控制台">⚙️ 底部调校</button>
         <button class="c-toggle-panel-btn on" id="btn_toggle_right" data-panel="right" title="切换右侧全功能遥测面板">📊 右侧遥测</button>
+        <span class="c-toggle-sep"></span>
         <button class="c-toggle-panel-btn" id="btn_open_telemetry_log" style="background:#1f6feb; color:#fff; border-color:#388bfd; font-weight:bold;" title="打开 MoTeC / F1 专业遥测波形 LOG 看板 (快捷键: L)">📈 遥测 LOG</button>
+        <span class="c-toggle-sep"></span>
         <button class="c-toggle-panel-btn" id="btn_toggle_fullscreen" title="一键纯净全屏赛道 / 还原面板 (快捷键: F)">🔲 纯净全屏</button>
       </div>
 
@@ -252,18 +254,16 @@
         </div>
 
         <!-- 控制台分组 4: 辅助与环境 -->
-        <div class="c-tune-group" style="min-width:180px;">
+        <div class="c-tune-group compact">
           <div class="c-tune-group-title">🚦 赛道控制与辅助</div>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <div style="display:flex; gap:6px;">
-              <button class="c-ctrl-btn" id="c_btn_autopilot" style="flex:1; background:#238636; color:#fff;">🤖 AutoPilot: 开</button>
-              <button class="c-ctrl-btn" id="c_btn_respawn" style="flex:1;">🔄 重置发车</button>
-            </div>
-            <div class="c-tune-slider-row" style="margin-top:2px;">
-              <label>路面附着 μ:</label>
-              <input type="range" id="c_slider_mu" min="0.50" max="1.45" step="0.05" value="1.25">
-              <span id="c_val_mu" class="c-slider-val">1.25 (干地)</span>
-            </div>
+          <div class="c-ctrl-stack">
+            <button class="c-ctrl-btn" id="c_btn_autopilot" style="background:#238636; color:#fff;">🤖 AutoPilot: 开</button>
+            <button class="c-ctrl-btn" id="c_btn_respawn">🔄 重置发车</button>
+          </div>
+          <div class="c-tune-slider-row">
+            <label>路面附着 μ:</label>
+            <input type="range" id="c_slider_mu" min="0.50" max="1.45" step="0.05" value="1.25">
+            <span id="c_val_mu" class="c-slider-val">1.25 (干地)</span>
           </div>
         </div>
       </div>

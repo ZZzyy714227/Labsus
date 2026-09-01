@@ -146,6 +146,26 @@ def test_chassis_sweep_steer():
     assert b["curves"]["toe_FR"][-1] < b["curves"]["toe_FR"][0]
 
 
+def test_chassis_sweep_steer_camber_decomposition():
+    """转向外倾增益分解（讲义 EP04×EP06）：Caster 项为负、KPI 项非负，
+    合成 ≈ caster+kpi+residual，一阶增益为负（外轮转向得负 camber）。"""
+    r = client.post("/api/v3/chassis/kandc/steer",
+                    json=_req(sweep={"min": -8, "max": 8, "n": 17}))
+    g = r.json()["gains"]
+    for k in ("steer_camber_gain_deg_per_deg", "steer_camber_total_at_max_deg",
+              "steer_camber_caster_at_max_deg", "steer_camber_kpi_at_max_deg",
+              "steer_camber_residual_at_max_deg"):
+        assert k in g, f"missing {k}"
+    assert g["steer_camber_caster_at_max_deg"] < 0.0    # Caster → 外轮负 camber
+    assert g["steer_camber_kpi_at_max_deg"] >= 0.0      # KPI → 夺走负 camber
+    total = g["steer_camber_total_at_max_deg"]
+    decomp = (g["steer_camber_caster_at_max_deg"]
+              + g["steer_camber_kpi_at_max_deg"]
+              + g["steer_camber_residual_at_max_deg"])
+    assert abs(total - decomp) < 0.01                   # 分解恒等闭合
+    assert g["steer_camber_gain_deg_per_deg"] < 0.0     # 一阶：转向得负 camber
+
+
 def test_chassis_invalid_points_422():
     body = _req()
     body["vehicle"]["front"]["points"] = {"LCA_F": [1, 2, 3]}
@@ -242,3 +262,80 @@ def test_chassis_hs_hcg_conservation_warning():
     assert any("hs/hcg" in w for w in r.json()["warnings"])
     r2 = client.post("/api/v3/chassis/solve", json=_req())   # 基线（370 vs 350）不告警
     assert not any("hs/hcg" in w for w in r2.json()["warnings"])
+
+
+# ── 稳态不足转向梯度 + Jacking（真实底盘开发 KPI，镜像前端 solveQuasiStatic）──
+
+def test_chassis_us_gradient_positive_neutral_bias():
+    """默认设计（前轴载荷需求 53.5%）应呈小幅不足转向：0 < K < 2.5 °/g。"""
+    r = client.post("/api/v3/chassis/solve",
+                    json=_req(quasi={"gy": 1.0, "gx": 0.0, "aero_force_n": 0.0,
+                                     "aero_bias": 0.5}))
+    assert r.status_code == 200
+    ld = r.json()["loads"]
+    assert 0.0 < ld["us_grad_deg_per_g"] < 2.5
+    assert ld["alpha_f_deg"] > ld["alpha_r_deg"] > 0.0
+
+
+def test_chassis_us_gradient_near_linear_scaling():
+    """准线性区：gy 减半，梯度同量级（载荷转移 + RC 迁移非线性容差 55%）。"""
+    def _grad(gy):
+        b = client.post("/api/v3/chassis/solve",
+                        json=_req(quasi={"gy": gy, "gx": 0.0, "aero_force_n": 0.0,
+                                         "aero_bias": 0.5})).json()["loads"]
+        return b["us_grad_deg_per_g"]
+    k1, k05 = _grad(1.0), _grad(0.5)
+    assert k1 > 0 and k05 > 0
+    assert abs(k05 - k1) / k1 < 0.55
+
+
+def test_chassis_us_curve_sweep():
+    """不足转向特性 δ-ay 扫掠：21 点 0→2g；完整版含侧倾转向分量且恒等闭合。"""
+    r = client.post("/api/v3/chassis/solve",
+                    json=_req(quasi={"gy": 1.0, "gx": 0.0, "aero_force_n": 0.0,
+                                     "aero_bias": 0.5}))
+    b = r.json()
+    uc = b["us_curve"]
+    for k in ("gy", "alpha_f_deg", "alpha_r_deg", "us_tire_deg",
+              "us_roll_steer_deg", "us_angle_deg", "roll_deg"):
+        assert k in uc and len(uc[k]) == 21
+    assert uc["gy"][0] == 0.0 and abs(uc["gy"][-1] - 2.0) < 1e-6
+    assert uc["us_angle_deg"][0] == 0.0                   # gy≈0 不计算，置 0
+    i1 = uc["gy"].index(1.0)
+    ld = b["loads"]
+    assert abs(uc["us_tire_deg"][i1]
+               - (ld["alpha_f_deg"] - ld["alpha_r_deg"])) < 1e-3   # 轮胎分量同口径
+    for i in range(21):                                   # 恒等闭合
+        assert abs(uc["us_angle_deg"][i]
+                   - (uc["us_tire_deg"][i] + uc["us_roll_steer_deg"][i])) < 1e-3
+    assert uc["us_angle_deg"][-1] > uc["us_angle_deg"][5] > 0       # 随 ay 增长
+
+
+def test_chassis_us_gradient_zero_gy_guard():
+    """|gy|<0.02g：梯度置 0 + 显式警告（线性区除零保护，不伪造数值）。"""
+    r = client.post("/api/v3/chassis/solve", json=_req())
+    ld = r.json()["loads"]
+    assert ld["us_grad_deg_per_g"] == 0.0
+    assert ld["alpha_f_deg"] == 0.0 and ld["alpha_r_deg"] == 0.0
+    assert any("不足转向梯度" in w for w in r.json()["warnings"])
+
+
+def test_chassis_jacking_lifts_sprung_mass():
+    """正 RC + 正 gy → Jacking 垂向力为正（抬升簧载），量级合理。"""
+    r = client.post("/api/v3/chassis/solve",
+                    json=_req(quasi={"gy": 1.0, "gx": 0.0, "aero_force_n": 0.0,
+                                     "aero_bias": 0.5}))
+    ld = r.json()["loads"]
+    assert ld["jacking_f_n"] > 0.0
+    assert 0.0 < ld["jacking_heave_mm"] < 50.0
+
+
+def test_kinematics_jacking_formula():
+    """kinematics.jacking：F_jack = Fy·2·z_RC/T；负 RC 下拉；退化输入状态机。"""
+    from src.metrics.kinematics import jacking
+    r = jacking(fy_sprung_n=5000.0, rc_h_mm=50.0, track_mm=1600.0)
+    assert r.status == "VALID" and abs(r.value - 5000.0 * 100.0 / 1600.0) < 1e-9
+    r_neg = jacking(fy_sprung_n=5000.0, rc_h_mm=-20.0, track_mm=1600.0)
+    assert r_neg.status == "VALID" and r_neg.value < 0.0
+    assert jacking(5000.0, 50.0, 0.0).status == "SOLVER_FAILED"
+    assert jacking(5000.0, float("nan"), 1600.0).status == "NOT_APPLICABLE"
