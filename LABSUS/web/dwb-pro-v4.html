@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LABSUS v4 · 悬架实验室新版工作台（舞台 + 坞站布局）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/v4.css">
+</head>
+<body>
+<div id="app">
+  <!-- ═══════════ 顶部工具栏：决策与执行（保留全部旧 id 供 JS 写入） ═══════════ -->
+  <div id="tb">
+    <div class="brand"><b>LABSUS</b></div>
+    <div class="tt"><span>悬架实验室 · v4 新版工作台</span><span>Suspension Lab · Stage + Dock Layout</span></div>
+    <div class="sp"></div>
+
+    <!-- 车型平台 -->
+    <div class="cell slim"><i>车型平台</i>
+      <select id="topVehSelect" style="background:transparent;border:none;color:var(--pri);font:600 11px var(--font-ui);cursor:pointer;outline:none;" onchange="loadVehiclePreset(this.value)">
+        <option value="formula">🏎️ Formula SAE (方程式)</option>
+        <option value="gt3">🏁 FIA GT3 (赛车模式)</option>
+        <option value="gt3_sport">🚗 FIA GT3 (日常模式)</option>
+        <option value="baja">🏜️ SAE Baja (越野赛车)</option>
+      </select>
+    </div>
+
+    <!-- 前轴 / 后轴 -->
+    <div class="v4-seg v4-axis" title="切换调校轴（写入 S.axis）">
+      <button id="v4AxisF" class="on">前轴 F</button>
+      <button id="v4AxisR">后轴 R</button>
+    </div>
+
+    <!-- 工作模式（12 号脚本路由运行按钮） -->
+    <div class="v4-seg" id="v4ModeSeg">
+      <button data-mode="geo" class="on">几何</button>
+      <button data-mode="kc">K&amp;C</button>
+      <button data-mode="chassis">整车</button>
+      <button data-mode="track">赛道</button>
+    </div>
+
+    <!-- ▶ 运行：全界面唯一主按钮 -->
+    <button class="v4-run" id="v4RunBtn">▶ 运行</button>
+
+    <!-- 状态胶囊 -->
+    <button class="v4-pill warn" id="engPillV4" title="点击 连接 / 断开 引擎">
+      <span class="dot"></span><span id="tbEng">内置 JS</span></button>
+    <div class="v4-pill ro ok" title="仿真状态">
+      <b class="g" id="tbStateBox" style="display:flex;align-items:center;gap:6px;font-weight:inherit"><span class="dot" id="tbStateDot" style="background:var(--ok)"></span><span id="tbState">运行</span></b></div>
+    <div class="v4-pill ro" title="正在调校对象"><span id="tbArch">前悬架 PUSHROD</span></div>
+    <div class="v4-pill ro" title="Baseline 快照状态"><span id="tbBase">未锁定</span></div>
+    <div class="v4-pill ro" title="求解内核"><span id="tbSolver">闭式几何 + 静力平衡</span></div>
+
+    <button id="evalModalBtn" class="v4-mini" title="查看全维度悬架工程评价与AI调校建议">📊 评价报告</button>
+    <button id="pureSuspTg" class="v4-mini" title="切换纯悬架透视 (隐藏车架与外围附件)">透视</button>
+    <button id="v4ThemeBtn" title="配色方案选择">🎨</button>
+    <div id="themeTg" class="theme-tg" title="切换浅色 / 深色模式"><i></i></div>
+    <div class="cell slim"><i>fps</i><b id="tbFps">--</b></div>
+  </div>
+
+  <!-- ═══════════ 主区：左坞站 + 中央舞台 + 右坞站 ═══════════ -->
+  <div id="main">
+    <!-- 左坞站：Tab 与分区由 12 号脚本在 buildLeft() 产物上重组 -->
+    <aside class="pnl" id="lp"></aside>
+
+    <!-- 中央舞台：视口工具条 + #vp（initViews 向其中生成四个 .vw） -->
+    <section id="v4stage">
+      <div class="v4-vpbar">
+        <div class="v4-seg" id="v4ViewSeg">
+          <button data-vi="0" class="on">1 正视</button>
+          <button data-vi="1">2 俯视</button>
+          <button data-vi="2">3 侧视</button>
+          <button data-vi="3">4 轴测</button>
+        </div>
+        <button class="v4-mini" id="v4QuadBtn" title="四宫格 / 单视口切换">▦ 四宫格</button>
+        <div class="v4-sp"></div>
+        <span id="v4VpTitle" style="font:500 10px var(--font-ui);color:var(--ink-2)">正视图 FRONT VIEW</span>
+        <button class="v4-mini" id="v4FullBtn" title="舞台全屏">⛶ 全屏</button>
+      </div>
+      <div id="vp"></div>
+    </section>
+
+    <!-- 右坞站：核心结论卡(#v4Hero) → 明细(#rp, buildRight 产物) → 诊断卡 -->
+    <aside class="pnl" id="v4right">
+      <div id="v4scroll">
+        <div id="v4Hero"></div>
+        <div id="rp"></div>
+        <div id="v4Diag"></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ═══════════ 底部状态栏：只留系统心跳（保留全部旧 id） ═══════════ -->
+  <div id="sb">
+    <div class="c"><u>构型</u><b id="sbArchName">前悬架 (推杆)</b></div>
+    <div class="c"><u>节点</u><b id="sbNode">-</b></div>
+    <div class="c"><u>刚性线约束</u><b id="sbRig">-</b></div>
+    <div class="c v4-hide"><u>系统自由度</u><b id="sbDof">-</b></div>
+    <div class="c ok" id="sbResC"><u>残差 RESIDUAL</u><b id="sbRes">-</b></div>
+    <div class="c"><u>前轴 TLLTD</u><b class="hl" id="sbTLLTD">52.4%</b></div>
+    <div class="c"><u>侧倾梯度</u><b id="sbRollGrad">1.68 °/g</b></div>
+    <div class="c"><u>求解耗时</u><b id="sbMs">-</b></div>
+    <div class="sp"></div>
+    <div class="c"><u>坐标拾取</u><b id="sbCur">-</b></div>
+    <div class="c hl"><u>提示</u><b id="sbHint">Space 运行 · 1-4 切视图 · 正交视图左键拖拽硬点</b></div>
+  </div>
+</div>
+
+<!-- 主题选择浮层（12 号脚本填充内容） -->
+<div id="v4ThemePop" style="display:none"></div>
+
+<!-- ================================ 综合悬架工程评价与诊断模态窗口 ================================ -->
+<div id="suspEvalModal" class="susp-eval-modal-backdrop">
+  <div class="susp-eval-modal-container">
+    <div class="susp-eval-header">
+      <div class="susp-eval-title-group">
+        <h2 class="susp-eval-title">📊 悬架系统综合性能工程评价与诊断报告</h2>
+        <span class="susp-eval-subtitle" id="evalVehSubtitle">FIA GT3</span>
+        <span class="susp-eval-subtitle">综合评分: <b id="evalOverallScore">88.5</b> / 100</span>
+      </div>
+      <button class="susp-eval-close-btn" id="evalCloseBtn">✖ 关闭报告</button>
+    </div>
+    
+    <div class="susp-eval-body">
+      <!-- 左侧：六维雷达图与评分 -->
+      <div class="susp-eval-col-left">
+        <div class="eval-card radar-card">
+          <div class="eval-card-header">
+            <h3>🕸️ 六维工程性能雷达图</h3>
+            <span class="eval-grade-badge" id="evalGradeBadge">GRADE A</span>
+          </div>
+          <div class="radar-container">
+            <canvas id="evalRadarCanvas" width="340" height="340"></canvas>
+          </div>
+          <div class="eval-score-grid" id="evalDimensionScores">
+            <!-- JS 动态注入六个维度的得分 -->
+          </div>
+        </div>
+
+        <!-- 调校诊断与工程建议 -->
+        <div class="eval-card advisor-card">
+          <div class="eval-card-header">
+            <h3>🛠️ 悬架调校建议与专家诊断</h3>
+          </div>
+          <div class="eval-advice-list" id="evalAdviceList">
+            <!-- 动态生成 -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧：详细指标交通灯诊断矩阵 -->
+      <div class="susp-eval-col-right">
+        <div class="eval-card metrics-detail-card">
+          <div class="eval-card-header">
+            <h3>🎯 核心设计指标交通灯矩阵 (Traffic Lights)</h3>
+            <span class="metric-filter-hint">绿色: 理想 · 黄色: 警告 · 红色: 异常</span>
+          </div>
+          <div class="eval-metrics-grid" id="evalMetricsGrid">
+            <!-- 动态注入 24 项指标卡片 -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================ 综合赛道测试 3D 动力学舞台模态窗口 ================================ -->
+<div id="circuitStageModal" class="circuit-stage-modal-backdrop">
+  <!-- 顶部状态栏 -->
+  <div class="skidpad-stage-topbar">
+    <div class="skidpad-top-left" style="display:flex; align-items:center;">
+      <span class="skidpad-stage-logo" style="color:#58a6ff;">🏁 上海国际赛车场 (SIC 5.45km) · F1 GRAND PRIX</span>
+      <span id="c_hud_corner_badge" style="background:rgba(23,42,69,0.9); border:1px solid #388bfd; border-radius:999px; padding:4px 14px; color:#58a6ff; font-weight:bold; font-size:12px; margin-left:15px; letter-spacing:0.5px;">🏁 [S1] 发车主直道 (起终点)</span>
+      <span id="c_hud_gear_badge" style="background:#238636; color:#fff; border-radius:4px; padding:2px 8px; font-weight:bold; font-size:11px; margin-left:8px; font-family:monospace;">6 档</span>
+      <span id="c_hud_drs_badge" style="background:#8957e5; color:#fff; border-radius:4px; padding:2px 8px; font-weight:bold; font-size:11px; margin-left:8px; font-family:monospace;">🟢 DRS 开启</span>
+      <span id="c_hud_kerb_badge" style="display:none; background:#d97706; color:#fff; border-radius:4px; padding:2px 8px; font-weight:bold; font-size:11px; margin-left:8px; font-family:monospace;">💥 压路肩振动</span>
+      <div class="circuit-cam-group" style="margin-left: 15px;">
+        <button class="circuit-cam-btn on" data-cam="behind" title="追尾跟拍 (默认跟随视角)">🏎️ 追尾跟拍</button>
+        <button class="circuit-cam-btn" data-cam="cockpit" title="驾驶舱第一人称视角">💺 驾驶舱</button>
+        <button class="circuit-cam-btn" data-cam="nose" title="前鼻锥与悬架连杆特写">🔭 悬架鼻锥</button>
+        <button class="circuit-cam-btn" data-cam="wheel" title="右前轮跳动与悬架摆臂特写">🛞 车轮特写</button>
+        <button class="circuit-cam-btn" data-cam="rear" title="尾翼后视视角">🏁 尾翼后视</button>
+        <button class="circuit-cam-btn" data-cam="heli" title="直升机全景跟踪">🚁 直升机航拍</button>
+        <button class="circuit-cam-btn" data-cam="tv" title="赛道电视转播机位">📺 电视转播</button>
+        <button class="circuit-cam-btn" data-cam="blimp" title="沙盘全景顶视">🌐 沙盘俯瞰</button>
+      </div>
+    </div>
+    <div class="skidpad-top-right">
+      <div style="display:inline-flex; align-items:center; gap:10px; margin-right:12px; font-size:11px; font-family:monospace; color:#8b949e;">
+        <span>S1 <b style="color:#58a6ff;">27.8s</b></span>
+        <span>S2 <b style="color:#f0883e;">24.7s</b></span>
+        <span>S3 <b style="color:#bc8cff;">41.5s</b></span>
+        <span>基准 <b style="color:#7ee787;">1:34.00</b></span>
+      </div>
+      
+      <!-- 面板显示/隐藏控制组 -->
+      <div class="circuit-panel-toggles" style="display:inline-flex; align-items:center; gap:5px; margin-right:12px; border-left:1px solid rgba(255,255,255,0.12); padding-left:10px;">
+        <span style="font-size:11px; color:#8b949e; margin-right:2px;">面板:</span>
+        <button class="c-toggle-panel-btn on" id="btn_toggle_hud" data-panel="hud" title="切换左下悬浮迷你HUD (快捷键: H)">👁️ 悬浮HUD</button>
+        <button class="c-toggle-panel-btn on" id="btn_toggle_bottom" data-panel="bottom" title="切换底部快速调校控制台">⚙️ 底部调校</button>
+        <button class="c-toggle-panel-btn on" id="btn_toggle_right" data-panel="right" title="切换右侧全功能遥测面板">📊 右侧遥测</button>
+        <button class="c-toggle-panel-btn" id="btn_open_telemetry_log" style="background:#1f6feb; color:#fff; border-color:#388bfd; font-weight:bold;" title="打开 MoTeC / F1 专业遥测波形 LOG 看板 (快捷键: L)">📈 遥测 LOG</button>
+        <button class="c-toggle-panel-btn" id="btn_toggle_fullscreen" title="一键纯净全屏赛道 / 还原面板 (快捷键: F)">🔲 纯净全屏</button>
+      </div>
+
+      <button class="skidpad-action-btn" id="circuitPlayBtn">⏸ 暂停</button>
+      <button class="skidpad-action-btn skidpad-exit-btn" id="circuitExitBtn" onclick="closeCircuitStage()">✖ 退出舞台</button>
+    </div>
+  </div>
+
+  <!-- 主体工作区 (3-Pane Grid: 3D视口 68%x67%, 底部控制台 68%x33%, 右侧遥测HUD 32%x100%) -->
+  <div class="circuit-stage-workspace">
+    <!-- 左侧主列 (68% 宽) -->
+    <div class="circuit-left-column">
+      <!-- 左上: 3D 赛道视口 (67% 高) -->
+      <div class="circuit-3d-viewport">
+        <canvas id="circuitCanvas" tabindex="0"></canvas>
+        
+        <!-- 左下角悬浮 mini 实时遥测 HUD -->
+        <div id="circuitHUD" class="circuit-mini-hud">
+          <div class="circuit-mini-hud-header">
+            <span>🏎️ 赛道实时简报</span>
+            <span id="c_hud_sector_badge" class="circuit-sec-badge">SECTOR 1</span>
+          </div>
+          <div class="circuit-mini-hud-row"><span>位置 (Location)</span><b id="c_hud_turn">发车主直道</b></div>
+          <div class="circuit-mini-hud-row"><span>时速 (Speed)</span><b id="c_hud_v" style="color:#7ee787; font-size:14px;">0.0 km/h</b></div>
+          <div class="circuit-mini-hud-row"><span>弯道目标 (Target V)</span><b id="c_hud_vtar" style="color:#79c0ff;">0.0 km/h</b></div>
+          <div class="circuit-mini-hud-row"><span>侧向力 (Lateral G)</span><b id="c_hud_ay">0.00 g</b></div>
+          <div class="circuit-mini-hud-row"><span>档位 (Gear)</span><b id="c_hud_gear" style="color:#f2cc60;">6 档</b></div>
+          <div class="circuit-mini-hud-row"><span>油门/制动</span><span><b id="c_hud_thr" style="color:#ff7b72;">0%</b> / <b id="c_hud_brk" style="color:#f2cc60;">0%</b></span></div>
+          <div class="circuit-mini-hud-row"><span>循迹偏离</span><b id="c_hud_err">0.00 m</b></div>
+        </div>
+      </div>
+
+      <!-- 左下: 赛车快速调校与调试控制台 (33% 高) -->
+      <div class="circuit-tuning-console">
+        <!-- 控制台分组 1: 车型平台切换 -->
+        <div class="c-tune-group">
+          <div class="c-tune-group-title">🏎️ 车型平台快速切换</div>
+          <div class="c-veh-grid">
+            <button class="c-veh-btn on" data-veh="formula" id="c_veh_formula">
+              <span class="c-veh-icon">🏎️</span>
+              <span class="c-veh-name">方程式赛车</span>
+              <span class="c-veh-desc">235kg 推杆高频</span>
+            </button>
+            <button class="c-veh-btn" data-veh="gt3" id="c_veh_gt3">
+              <span class="c-veh-icon">🏎️</span>
+              <span class="c-veh-name">FIA GT3 赛车</span>
+              <span class="c-veh-desc">1250kg 大口径ARB</span>
+            </button>
+            <button class="c-veh-btn" data-veh="gt3_sport" id="c_veh_gt3_sport">
+              <span class="c-veh-icon">🚗</span>
+              <span class="c-veh-name">GT3 公路运动</span>
+              <span class="c-veh-desc">1350kg 兼顾平顺</span>
+            </button>
+            <button class="c-veh-btn" data-veh="baja" id="c_veh_baja">
+              <span class="c-veh-icon">🚜</span>
+              <span class="c-veh-name">巴哈越野车</span>
+              <span class="c-veh-desc">长行程全地形</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 控制台分组 2: 驾驶风格激进度 -->
+        <div class="c-tune-group">
+          <div class="c-tune-group-title">⚡ 自动驾驶激进度 (DRIVING AGGRESSIVENESS)</div>
+          <div class="c-aggr-tabs">
+            <button class="c-aggr-btn" data-aggr="0.65" id="c_aggr_safe">🟢 保守稳健 (0.65μ)</button>
+            <button class="c-aggr-btn on" data-aggr="0.78" id="c_aggr_std">🟡 标准竞速 (0.78μ)</button>
+            <button class="c-aggr-btn" data-aggr="0.90" id="c_aggr_aggr">🟠 激进飞驰 (0.90μ)</button>
+            <button class="c-aggr-btn" data-aggr="0.98" id="c_aggr_limit">🔴 排位极限 (0.98μ)</button>
+          </div>
+          <div class="c-tune-slider-row" style="margin-top:6px;">
+            <label>激进度微调:</label>
+            <input type="range" id="c_slider_aggr" min="0.60" max="1.05" step="0.01" value="0.78">
+            <span id="c_val_aggr" class="c-slider-val">0.78 μ</span>
+          </div>
+        </div>
+
+        <!-- 控制台分组 3: 实时底盘与电控微调 -->
+        <div class="c-tune-group">
+          <div class="c-tune-group-title">🛠️ 赛车实时快速微调 (LIVE CHASSIS TUNE)</div>
+          <div class="c-tune-sliders-grid">
+            <div class="c-tune-slider-item">
+              <label>前弹簧刚度 (F-Spring)</label>
+              <input type="range" id="c_slider_k_f" min="-30" max="30" step="5" value="0">
+              <span id="c_val_k_f" class="c-slider-val">基准 (0%)</span>
+            </div>
+            <div class="c-tune-slider-item">
+              <label>后弹簧刚度 (R-Spring)</label>
+              <input type="range" id="c_slider_k_r" min="-30" max="30" step="5" value="0">
+              <span id="c_val_k_r" class="c-slider-val">基准 (0%)</span>
+            </div>
+            <div class="c-tune-slider-item">
+              <label>制动平衡比 (Brake Bias)</label>
+              <input type="range" id="c_slider_bbias" min="50" max="70" step="1" value="58">
+              <span id="c_val_bbias" class="c-slider-val">58% 前 / 42% 后</span>
+            </div>
+            <div class="c-tune-slider-item">
+              <label>TCS 牵引力控制等级</label>
+              <input type="range" id="c_slider_tcs" min="0" max="5" step="1" value="2">
+              <span id="c_val_tcs" class="c-slider-val">等级 2 (适中)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 控制台分组 4: 辅助与环境 -->
+        <div class="c-tune-group" style="min-width:180px;">
+          <div class="c-tune-group-title">🚦 赛道控制与辅助</div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; gap:6px;">
+              <button class="c-ctrl-btn" id="c_btn_autopilot" style="flex:1; background:#238636; color:#fff;">🤖 AutoPilot: 开</button>
+              <button class="c-ctrl-btn" id="c_btn_respawn" style="flex:1;">🔄 重置发车</button>
+            </div>
+            <div class="c-tune-slider-row" style="margin-top:2px;">
+              <label>路面附着 μ:</label>
+              <input type="range" id="c_slider_mu" min="0.50" max="1.45" step="0.05" value="1.25">
+              <span id="c_val_mu" class="c-slider-val">1.25 (干地)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧纵向专业遥测 HUD 面板 (32% 宽, 100% 高) -->
+    <div class="circuit-right-column">
+      <!-- 遥测分页导航栏 (类似参考图: < 页面名称 >) -->
+      <div class="c-tel-header">
+        <button class="c-tel-nav-btn" id="c_tel_prev" title="上一页遥测">◀</button>
+        <div class="c-tel-title-container">
+          <span class="c-tel-title-badge">TELEMETRY</span>
+          <span id="c_tel_title_text" class="c-tel-title-text">一般</span>
+        </div>
+        <button class="c-tel-nav-btn" id="c_tel_next" title="下一页遥测">▶</button>
+      </div>
+
+      <!-- 遥测 Tab 快捷药丸切换 -->
+      <div class="c-tel-pills">
+        <button class="c-tel-pill on" data-tab="general">一般</button>
+        <button class="c-tel-pill" data-tab="friction">轮胎摩擦力</button>
+        <button class="c-tel-pill" data-tab="suspension">悬挂系统</button>
+        <button class="c-tel-pill" data-tab="gmeter">车身加速度</button>
+        <button class="c-tel-pill" data-tab="tires">其他轮胎数据</button>
+        <button class="c-tel-pill" data-tab="temp">轮胎温度</button>
+        <button class="c-tel-pill" data-tab="damage">损坏与损耗</button>
+      </div>
+
+      <!-- 遥测内容视窗容器 -->
+      <div class="c-tel-content">
+        <!-- 1. 一般 (General Telemetry) -->
+        <div class="c-tel-view on" id="tel_view_general">
+          <div class="c-tel-general-grid">
+            <div class="c-tg-left">
+              <div class="c-tg-box-main">
+                <div class="c-tg-field">
+                  <span class="c-tg-label">速度 KM/H</span>
+                  <span class="c-tg-val-huge" id="tg_val_speed">0</span>
+                </div>
+                <div class="c-tg-field">
+                  <span class="c-tg-label">档位</span>
+                  <span class="c-tg-val-huge" id="tg_val_gear">N</span>
+                </div>
+              </div>
+              <div class="c-tg-row"><span>转速 RPM</span><b id="tg_val_rpm">0.0</b></div>
+              <div class="c-tg-row"><span>马力 KW</span><b id="tg_val_pwr">0</b></div>
+              <div class="c-tg-row"><span>扭矩 N·m</span><b id="tg_val_trq">0.0</b></div>
+              <div class="c-tg-row"><span>增压/载荷 BAR</span><b id="tg_val_boost">0.00</b></div>
+            </div>
+            <div class="c-tg-right">
+              <div class="c-tg-steer-box">
+                <span class="c-tg-label">转向角度</span>
+                <canvas id="tg_steer_canvas" width="100" height="70"></canvas>
+                <b id="tg_val_steer">0.0°</b>
+              </div>
+              <div class="c-tg-pedal-box">
+                <div class="c-pedal-item">
+                  <span class="c-pedal-label">离合 %</span>
+                  <div class="c-pedal-bar-bg"><div class="c-pedal-bar-fill" id="tg_bar_clutch" style="height:0%;"></div></div>
+                  <b id="tg_val_clutch">0.0</b>
+                </div>
+                <div class="c-pedal-item">
+                  <span class="c-pedal-label">油门 %</span>
+                  <div class="c-pedal-bar-bg"><div class="c-pedal-bar-fill c-bar-thr" id="tg_bar_thr" style="height:0%;"></div></div>
+                  <b id="tg_val_throttle">0.0</b>
+                </div>
+                <div class="c-pedal-item">
+                  <span class="c-pedal-label">手刹 %</span>
+                  <div class="c-pedal-bar-bg"><div class="c-pedal-bar-fill" id="tg_bar_hb" style="height:0%;"></div></div>
+                  <b id="tg_val_hb">0.0</b>
+                </div>
+                <div class="c-pedal-item">
+                  <span class="c-pedal-label">刹车 %</span>
+                  <div class="c-pedal-bar-bg"><div class="c-pedal-bar-fill c-bar-brk" id="tg_bar_brk" style="height:0%;"></div></div>
+                  <b id="tg_val_brake">0.0</b>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 轮胎摩擦力 (Traction Friction Circles) -->
+        <div class="c-tel-view" id="tel_view_friction">
+          <div class="c-four-corners-grid">
+            <!-- 左前 FL -->
+            <div class="c-corner-card">
+              <div class="c-corner-header"><span>左前 (FL)</span><span class="c-util-val" id="fric_util_fl">0%</span></div>
+              <canvas class="c-fric-circle" id="fric_cv_fl" width="110" height="110"></canvas>
+            </div>
+            <!-- 右前 FR -->
+            <div class="c-corner-card">
+              <div class="c-corner-header"><span>右前 (FR)</span><span class="c-util-val" id="fric_util_fr">0%</span></div>
+              <canvas class="c-fric-circle" id="fric_cv_fr" width="110" height="110"></canvas>
+            </div>
+            <!-- 左后 RL -->
+            <div class="c-corner-card">
+              <div class="c-corner-header"><span>左后 (RL)</span><span class="c-util-val" id="fric_util_rl">0%</span></div>
+              <canvas class="c-fric-circle" id="fric_cv_rl" width="110" height="110"></canvas>
+            </div>
+            <!-- 右后 RR -->
+            <div class="c-corner-card">
+              <div class="c-corner-header"><span>右后 (RR)</span><span class="c-util-val" id="fric_util_rr">0%</span></div>
+              <canvas class="c-fric-circle" id="fric_cv_rr" width="110" height="110"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. 悬挂系统 (Suspension System) -->
+        <div class="c-tel-view" id="tel_view_suspension">
+          <div class="c-four-corners-grid">
+            <!-- 左前 FL -->
+            <div class="c-corner-card c-susp-card">
+              <div class="c-corner-header"><span>左前 (FL)</span><span>位移 <b id="susp_disp_fl">0.00</b></span></div>
+              <div class="c-susp-body">
+                <svg class="c-spring-svg" viewBox="0 0 24 60"><path d="M12,0 L12,8 L4,14 L20,20 L4,26 L20,32 L4,38 L20,44 L12,50 L12,60" fill="none" stroke="#f1c40f" stroke-width="2.5" stroke-linecap="round"/></svg>
+                <div class="c-susp-bar-bg"><div class="c-susp-bar-fill" id="susp_bar_fl"></div></div>
+                <div class="c-susp-fz">载荷: <b id="susp_fz_fl">0 N</b></div>
+              </div>
+            </div>
+            <!-- 右前 FR -->
+            <div class="c-corner-card c-susp-card">
+              <div class="c-corner-header"><span>右前 (FR)</span><span>位移 <b id="susp_disp_fr">0.00</b></span></div>
+              <div class="c-susp-body">
+                <svg class="c-spring-svg" viewBox="0 0 24 60"><path d="M12,0 L12,8 L4,14 L20,20 L4,26 L20,32 L4,38 L20,44 L12,50 L12,60" fill="none" stroke="#f1c40f" stroke-width="2.5" stroke-linecap="round"/></svg>
+                <div class="c-susp-bar-bg"><div class="c-susp-bar-fill" id="susp_bar_fr"></div></div>
+                <div class="c-susp-fz">载荷: <b id="susp_fz_fr">0 N</b></div>
+              </div>
+            </div>
+            <!-- 左后 RL -->
+            <div class="c-corner-card c-susp-card">
+              <div class="c-corner-header"><span>左后 (RL)</span><span>位移 <b id="susp_disp_rl">0.00</b></span></div>
+              <div class="c-susp-body">
+                <svg class="c-spring-svg" viewBox="0 0 24 60"><path d="M12,0 L12,8 L4,14 L20,20 L4,26 L20,32 L4,38 L20,44 L12,50 L12,60" fill="none" stroke="#f1c40f" stroke-width="2.5" stroke-linecap="round"/></svg>
+                <div class="c-susp-bar-bg"><div class="c-susp-bar-fill" id="susp_bar_rl"></div></div>
+                <div class="c-susp-fz">载荷: <b id="susp_fz_rl">0 N</b></div>
+              </div>
+            </div>
+            <!-- 右后 RR -->
+            <div class="c-corner-card c-susp-card">
+              <div class="c-corner-header"><span>右后 (RR)</span><span>位移 <b id="susp_disp_rr">0.00</b></span></div>
+              <div class="c-susp-body">
+                <svg class="c-spring-svg" viewBox="0 0 24 60"><path d="M12,0 L12,8 L4,14 L20,20 L4,26 L20,32 L4,38 L20,44 L12,50 L12,60" fill="none" stroke="#f1c40f" stroke-width="2.5" stroke-linecap="round"/></svg>
+                <div class="c-susp-bar-bg"><div class="c-susp-bar-fill" id="susp_bar_rr"></div></div>
+                <div class="c-susp-fz">载荷: <b id="susp_fz_rr">0 N</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. 车身加速度 (Body Acceleration & G-Meter) -->
+        <div class="c-tel-view" id="tel_view_gmeter">
+          <div class="c-gmeter-box">
+            <canvas id="gmeter_canvas" width="220" height="220"></canvas>
+            <div class="c-gmeter-readouts">
+              <div class="c-gm-item"><span class="c-gm-lbl">合 G 力 (Total G)</span><b class="c-gm-val" id="gm_val_total">0.00 g</b></div>
+              <div class="c-gm-item"><span class="c-gm-lbl">侧向 Ay (Lateral)</span><b class="c-gm-val" id="gm_val_ay">0.00 g</b></div>
+              <div class="c-gm-item"><span class="c-gm-lbl">纵向 Ax (Longitudinal)</span><b class="c-gm-val" id="gm_val_ax">0.00 g</b></div>
+              <div class="c-gm-item"><span class="c-gm-lbl">横摆角速度 (Yaw Rate)</span><b class="c-gm-val" id="gm_val_yaw">0.00 rad/s</b></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. 其他轮胎数据 (Tires Detail) -->
+        <div class="c-tel-view" id="tel_view_tires">
+          <div class="c-four-corners-grid">
+            <!-- 左前 FL -->
+            <div class="c-corner-card c-tires-card">
+              <div class="c-corner-header"><span>左前 (FL)</span></div>
+              <div class="c-tire-data-grid">
+                <div><span>温度</span><b id="td_temp_fl">98.5 °C</b></div>
+                <div><span>压力</span><b id="td_prs_fl">2.45 BAR</b></div>
+                <div><span>线速</span><b id="td_spd_fl">0 km/h</b></div>
+                <div><span>外倾角</span><b id="td_cam_fl">-2.15°</b></div>
+                <div><span>滑移率</span><b id="td_slip_fl">0.0%</b></div>
+                <div><span>损耗</span><b id="td_wear_fl">0.0%</b></div>
+              </div>
+            </div>
+            <!-- 右前 FR -->
+            <div class="c-corner-card c-tires-card">
+              <div class="c-corner-header"><span>右前 (FR)</span></div>
+              <div class="c-tire-data-grid">
+                <div><span>温度</span><b id="td_temp_fr">98.5 °C</b></div>
+                <div><span>压力</span><b id="td_prs_fr">2.45 BAR</b></div>
+                <div><span>线速</span><b id="td_spd_fr">0 km/h</b></div>
+                <div><span>外倾角</span><b id="td_cam_fr">-2.15°</b></div>
+                <div><span>滑移率</span><b id="td_slip_fr">0.0%</b></div>
+                <div><span>损耗</span><b id="td_wear_fr">0.0%</b></div>
+              </div>
+            </div>
+            <!-- 左后 RL -->
+            <div class="c-corner-card c-tires-card">
+              <div class="c-corner-header"><span>左后 (RL)</span></div>
+              <div class="c-tire-data-grid">
+                <div><span>温度</span><b id="td_temp_rl">96.0 °C</b></div>
+                <div><span>压力</span><b id="td_prs_rl">2.65 BAR</b></div>
+                <div><span>线速</span><b id="td_spd_rl">0 km/h</b></div>
+                <div><span>外倾角</span><b id="td_cam_rl">-1.85°</b></div>
+                <div><span>滑移率</span><b id="td_slip_rl">0.0%</b></div>
+                <div><span>损耗</span><b id="td_wear_rl">0.0%</b></div>
+              </div>
+            </div>
+            <!-- 右后 RR -->
+            <div class="c-corner-card c-tires-card">
+              <div class="c-corner-header"><span>右后 (RR)</span></div>
+              <div class="c-tire-data-grid">
+                <div><span>温度</span><b id="td_temp_rr">96.0 °C</b></div>
+                <div><span>压力</span><b id="td_prs_rr">2.65 BAR</b></div>
+                <div><span>线速</span><b id="td_spd_rr">0 km/h</b></div>
+                <div><span>外倾角</span><b id="td_cam_rr">-1.85°</b></div>
+                <div><span>滑移率</span><b id="td_slip_rr">0.0%</b></div>
+                <div><span>损耗</span><b id="td_wear_rr">0.0%</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. 轮胎温度三分区 I/M/O (Tire Temp) -->
+        <div class="c-tel-view" id="tel_view_temp">
+          <div class="c-four-corners-grid">
+            <!-- 左前 FL -->
+            <div class="c-corner-card c-temp-card">
+              <div class="c-corner-header"><span>左前 (FL)</span></div>
+              <div class="c-imo-box">
+                <div class="c-imo-col"><span class="c-imo-lbl">内侧</span><div class="c-imo-block" id="imo_bl_fl_i"></div><b id="imo_v_fl_i">100.4°C</b></div>
+                <div class="c-imo-col"><span class="c-imo-lbl">中间</span><div class="c-imo-block" id="imo_bl_fl_m"></div><b id="imo_v_fl_m">100.2°C</b></div>
+                <div class="c-imo-col"><span class="c-imo-lbl">外侧</span><div class="c-imo-block" id="imo_bl_fl_o"></div><b id="imo_v_fl_o">100.0°C</b></div>
+              </div>
+            </div>
+            <!-- 右前 FR -->
+            <div class="c-corner-card c-temp-card">
+              <div class="c-corner-header"><span>右前 (FR)</span></div>
+              <div class="c-imo-box">
+                <div class="c-imo-col"><span class="c-imo-lbl">内侧</span><div class="c-imo-block" id="imo_bl_fr_i"></div><b id="imo_v_fr_i">100.4°C</b></div>
+                <div class="c-imo-col"><span class="c-imo-lbl">中间</span><div class="c-imo-block" id="imo_bl_fr_m"></div><b id="imo_v_fr_m">100.2°C</b></div>
+                <div class="c-imo-col"><span class="c-imo-lbl">外侧</span><div class="c-imo-block" id="imo_bl_fr_o"></div><b id="imo_v_fr_o">100.0°C</b></div>
+              </div>
+            </div>
+            <!-- 左后 RL -->
+            <div class="c-corner-card c-temp-card">
+              <div class="c-corner-header"><span>左后 (RL)</span></div>
+              <div class="c-imo-box">
+                <div class="c-imo-col"><span class="c-imo-lbl">内侧</span><div class="c-imo-block" id="imo_bl_rl_i"></div><b id="imo_v_rl_i">98.0°C</b></div>
+                <div class="c-imo-col"><span class="c-imo-lbl">中间</span><div class="c-imo-block" id="imo_bl_rl_m"></div><b id="imo_v_rl_m">96.3°C</b></div>
+                <div class="c-imo-col"><span class="c-imo-lbl">外侧</span><div class="c-imo-block" id="imo_bl_rl_o"></div><b id="imo_v_rl_o">95.3°C</b></div>
+              </div>
+            </div>
+            <!-- 右后 RR -->
+            <div class="c-corner-card c-temp-card">
+              <div class="c-corner-header"><span>右后 (RR)</span></div>
+              <div class="c-imo-box">
+                <div class="c-imo-col"><span class="c-imo-lbl">内侧</span><div class="c-imo-block" id="imo_bl_rr_i"></div><b id="imo_v_rr_i">97.3°C</b></div>
+                <div class="c-imo-col"><span class="c-imo-lbl">中间</span><div class="c-imo-block" id="imo_bl_rr_m"></div><b id="imo_v_rr_m">97.0°C</b></div>
+                <div class="c-imo-col"><span class="c-imo-lbl">外侧</span><div class="c-imo-block" id="imo_bl_rr_o"></div><b id="imo_v_rr_o">97.4°C</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7. 损坏与损耗 (Damage & Wear) -->
+        <div class="c-tel-view" id="tel_view_damage">
+          <div class="c-damage-container">
+            <div class="c-damage-car-wireframe">
+              <div class="c-dm-wheel c-dm-fl"><span class="c-dm-lbl">FL</span><b id="dm_val_fl">0.0%</b></div>
+              <div class="c-dm-wheel c-dm-fr"><span class="c-dm-lbl">FR</span><b id="dm_val_fr">0.0%</b></div>
+              <div class="c-dm-body-shape"></div>
+              <div class="c-dm-wheel c-dm-rl"><span class="c-dm-lbl">RL</span><b id="dm_val_rl">0.0%</b></div>
+              <div class="c-dm-wheel c-dm-rr"><span class="c-dm-lbl">RR</span><b id="dm_val_rr">0.0%</b></div>
+            </div>
+            <div class="c-damage-list">
+              <div class="c-dm-item"><span>转向系统 %</span><b id="dm_val_steer">0.0</b></div>
+              <div class="c-dm-item"><span>电驱/引擎 %</span><b id="dm_val_engine">0.0</b></div>
+              <div class="c-dm-item"><span>离合器 %</span><b id="dm_val_clutch">0.0</b></div>
+              <div class="c-dm-item"><span>变速箱 %</span><b id="dm_val_gear">0.0</b></div>
+              <div class="c-dm-item"><span>悬架连杆 %</span><b id="dm_val_susp">0.0</b></div>
+              <div class="c-dm-item"><span>电池/燃料 %</span><b id="dm_val_fuel" style="color:#7ee787;">96.5</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================ MoTeC i2 Pro 专业赛车遥测数据分析看板 ================================ -->
+<div id="circuitTelemetryLogModal" class="circuit-telemetry-modal-backdrop">
+  <!-- 顶部状态与控制工具栏 -->
+  <div class="c-tel-header">
+    <div class="c-tel-title-box">
+      <span class="c-tel-badge">MoTeC i2 PRO</span>
+      <span class="c-tel-title">📊 赛车工程遥测数据分析看板 · SHANGHAI GP TELEMETRY LOG</span>
+    </div>
+    
+    <div class="c-tel-stats-bar">
+      <span class="c-tel-stat-item">单圈时间: <b id="tl_stat_laptime">--:--.---</b></span>
+      <span class="c-tel-stat-item">最高车速: <b id="tl_stat_vmax">0.0 km/h</b></span>
+      <span class="c-tel-stat-item">最大侧向G: <b id="tl_stat_aymax">0.00 g</b></span>
+      <span class="c-tel-stat-item">单圈里程: <b id="tl_stat_dist">5,450 m</b></span>
+    </div>
+    
+    <div class="c-tel-actions">
+      <!-- X轴基准切换 -->
+      <div style="display:flex; background:rgba(255,255,255,0.06); border-radius:4px; padding:2px; margin-right:6px;">
+        <button class="c-tel-btn active" id="tl_btn_axis_dist" title="按赛道里程 (0 ~ 5450m) 展开">🛣️ 距离轴</button>
+        <button class="c-tel-btn" id="tl_btn_axis_time" title="按行车时间 (0 ~ 95s) 展开">⏱️ 时间轴</button>
+      </div>
+
+      <!-- 数据源选择 -->
+      <div style="display:flex; background:rgba(255,255,255,0.06); border-radius:4px; padding:2px; margin-right:6px;">
+        <button class="c-tel-btn active" id="tl_btn_src_current" title="当前实时单圈数据">🔴 当前单圈</button>
+        <button class="c-tel-btn" id="tl_btn_src_best" title="最佳单圈基准数据">🟢 最佳单圈</button>
+      </div>
+
+      <!-- 导出CSV -->
+      <button class="c-tel-btn c-tel-btn-export" id="tl_btn_export_csv" title="导出专业 MoTeC / CSV 格式数据">💾 导出 CSV</button>
+      <!-- 关闭 -->
+      <button class="c-tel-btn c-tel-btn-close" id="tl_btn_close" title="退出遥测分析 (快捷键: L / Esc)">✖ 关闭</button>
+    </div>
+  </div>
+
+  <!-- 通道图例与可见性控制条 -->
+  <div class="c-tel-channel-bar">
+    <span style="color:#8b949e; margin-right:4px;">通道图例:</span>
+    <span class="c-tel-chan-tag" data-ch="speed" style="background:rgba(56,189,248,0.15); color:#38bdf8; border-color:#38bdf8;">📈 车速 Speed (km/h) / 目标速</span>
+    <span class="c-tel-chan-tag" data-ch="pedals" style="background:rgba(34,197,94,0.15); color:#4ade80; border-color:#22c55e;">🟢 油门 / 🔴 刹车 / 🔵 转向</span>
+    <span class="c-tel-chan-tag" data-ch="accel" style="background:rgba(245,158,11,0.15); color:#fbbf24; border-color:#f59e0b;">⚡ 横向 G (ay) / 纵向 G (ax)</span>
+    <span class="c-tel-chan-tag" data-ch="susp" style="background:rgba(20,184,166,0.15); color:#2dd4bf; border-color:#14b8a6;">🛞 四轮拉杆行程 Damper (mm) & 路肩</span>
+    <span class="c-tel-chan-tag" data-ch="loads" style="background:rgba(244,63,94,0.15); color:#fb7185; border-color:#f43f5e;">⚖️ 四轮垂向载荷 Fz (N)</span>
+    <span class="c-tel-chan-tag" data-ch="kc" style="background:rgba(168,85,247,0.15); color:#c084fc; border-color:#a855f7;">📐 K&C 外倾角 Camber (°) / 前束 Toe (°)</span>
+  </div>
+
+  <!-- 主图表画布区 -->
+  <div class="c-tel-main">
+    <div class="c-tel-canvas-container">
+      <canvas id="telemetryLogCanvas"></canvas>
+      
+      <!-- 鼠标探针数值浮动 HUD -->
+      <div id="telemetryCursorTooltip" class="c-tel-cursor-tooltip">
+        <div class="c-tel-cursor-row" style="border-bottom:1px solid rgba(255,255,255,0.12); padding-bottom:4px; margin-bottom:6px;">
+          <span id="tl_tip_pos" style="color:#58a6ff; font-weight:bold;">📍 距离: 1250 m (T1 弯心)</span>
+          <span id="tl_tip_time" style="color:#8b949e;">⏱️ 22.45s</span>
+        </div>
+        <div class="c-tel-cursor-row"><span class="c-tel-cursor-label">车速 / 目标速:</span><span class="c-tel-cursor-val" id="tl_tip_speed" style="color:#38bdf8;">145.2 / 148.0 km/h</span></div>
+        <div class="c-tel-cursor-row"><span class="c-tel-cursor-label">油门 / 刹车 / 档位:</span><span class="c-tel-cursor-val" id="tl_tip_pedals">🟢 85% / 🔴 0% (4档)</span></div>
+        <div class="c-tel-cursor-row"><span class="c-tel-cursor-label">方向盘转角:</span><span class="c-tel-cursor-val" id="tl_tip_steer" style="color:#60a5fa;">+12.4°</span></div>
+        <div class="c-tel-cursor-row"><span class="c-tel-cursor-label">横向 / 纵向 G:</span><span class="c-tel-cursor-val" id="tl_tip_g" style="color:#fbbf24;">1.85 g / +0.42 g</span></div>
+        <div class="c-tel-cursor-row"><span class="c-tel-cursor-label">悬架行程 FL/FR:</span><span class="c-tel-cursor-val" id="tl_tip_tr_f" style="color:#2dd4bf;">+18.2 / -12.4 mm</span></div>
+        <div class="c-tel-cursor-row"><span class="c-tel-cursor-label">悬架行程 RL/RR:</span><span class="c-tel-cursor-val" id="tl_tip_tr_r" style="color:#fb7185;">+14.5 / -8.6 mm</span></div>
+        <div class="c-tel-cursor-row"><span class="c-tel-cursor-label">四轮垂直载荷 Fz:</span><span class="c-tel-cursor-val" id="tl_tip_fz">4200 / 1250 / 3800 / 1550 N</span></div>
+        <div class="c-tel-cursor-row"><span class="c-tel-cursor-label">外倾角 / 前束 (FL):</span><span class="c-tel-cursor-val" id="tl_tip_kc" style="color:#c084fc;">-3.45° / +0.18°</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================ 定圆绕环测试 3D 动力学舞台模态窗口 ================================ -->
+<div id="skidpadStageModal" class="skidpad-stage-modal-backdrop">
+  <div class="skidpad-stage-topbar">
+    <div class="skidpad-top-left">
+      <span class="skidpad-stage-logo">⭕ 赛车定圆绕环动力学舞台 · CONSTANT RADIUS SKIDPAD STAGE</span>
+      <!-- 多机位切换按钮组 -->
+      <div class="skidpad-cam-group">
+        <button class="skidpad-cam-btn on" data-cam="behind">🏎️ 尾部跟随</button>
+        <button class="skidpad-cam-btn" data-cam="blimp">🚁 高空俯瞰</button>
+        <button class="skidpad-cam-btn" data-cam="outer">📐 外侧悬架</button>
+        <button class="skidpad-cam-btn" data-cam="center">🎯 圆心站台</button>
+        <button class="skidpad-cam-btn" data-cam="cockpit">💺 第一人称</button>
+      </div>
+    </div>
+    
+    <div class="skidpad-top-right">
+      <div class="skidpad-control-item">
+        <label>半径 RADIUS</label>
+        <input type="range" id="skidpadRadiusSlider" min="10" max="45" value="15.25" step="0.25">
+        <b id="skidpadRadiusVal">15.25 m</b>
+      </div>
+      <div class="skidpad-control-item">
+        <label>车速 SPEED</label>
+        <input type="range" id="skidpadSpeedSlider" min="15" max="110" value="45" step="1">
+        <b id="skidpadSpeedVal">45 km/h</b>
+      </div>
+      <div class="skidpad-control-item">
+        <label>模式</label>
+        <select id="skidpadModeSelect" class="skidpad-select">
+          <option value="steady">🎯 定速巡航</option>
+          <option value="sweep">📈 极限抓地扫描</option>
+        </select>
+      </div>
+      <div class="skidpad-control-item">
+        <label>回转方向</label>
+        <button class="skidpad-dir-btn" id="skidpadDirBtn">🔄 逆时针 (CCW)</button>
+      </div>
+      <button class="skidpad-action-btn" id="skidpadPlayBtn">⏸ 暂停</button>
+      <button class="skidpad-action-btn skidpad-exit-btn" id="skidpadExitBtn">✖ 退出舞台</button>
+    </div>
+  </div>
+
+  <div class="skidpad-stage-main">
+    <canvas id="skidpadCanvas"></canvas>
+
+    <!-- 实时遥测 HUD -->
+    <div class="skidpad-hud-overlay">
+      <div class="skidpad-hud-card">
+        <div class="skidpad-hud-row">
+          <span>🏎️ 车型平台</span>
+          <b id="skidpadVehName">Formula SAE</b>
+        </div>
+        <div class="skidpad-hud-row">
+          <span>⏱️ 单圈计时 / 圈数</span>
+          <b class="hl" id="skidpadHudLap">-- s (Lap 0)</b>
+        </div>
+        <div class="skidpad-hud-row">
+          <span>🏁 过弯车速 / 角速度</span>
+          <b class="hl" id="skidpadHudSpeed">45.0 km/h (0.82 rad/s)</b>
+        </div>
+        <div class="skidpad-hud-row">
+          <span>🔄 侧向向心加速度 (ay)</span>
+          <b class="warn" id="skidpadHudAy">1.04 g (抓地利用 78.5%)</b>
+        </div>
+        <div class="skidpad-hud-row">
+          <span>⚖️ 左右轮荷转移 (内 / 外)</span>
+          <b id="skidpadHudLoadSplit">28.4% / 71.6%</b>
+        </div>
+        <div class="skidpad-hud-row">
+          <span>📐 车身动态侧倾角 (Roll)</span>
+          <b id="skidpadHudRoll">+1.65°</b>
+        </div>
+        <div class="skidpad-hud-row">
+          <span>🧭 操稳转向特性判定</span>
+          <b id="skidpadHudSteerBehavior" class="good">中性偏微不足 (Neutral)</b>
+        </div>
+        <div class="skidpad-hud-row">
+          <span>🎛️ 外侧悬架压缩 (Jounce)</span>
+          <b id="skidpadHudOuterSquat">+12.8 mm</b>
+        </div>
+        <div class="skidpad-hud-row">
+          <span>🎛️ 内侧悬架拉伸 (Rebound)</span>
+          <b id="skidpadHudInnerLift">-9.6 mm</b>
+        </div>
+      </div>
+    </div>
+
+    <div class="skidpad-hint-box">
+      🎮 交互控制: 鼠标左键拖拽 360° 环视机位 · 滚轮缩放视距 · 支持 W/S/A/D/空格 随时手动切入接管
+    </div>
+  </div>
+</div>
+
+<!-- ================================ 直线综合工况试验场 3D 动力学舞台模态窗口 ================================ -->
+<div id="slopeStageModal" class="slope-stage-modal-backdrop">
+  <!-- Topbar Tier 1: Main Header Bar -->
+  <div class="slope-stage-topbar-tier1">
+    <div class="slope-t1-left">
+      <span class="slope-stage-logo">🛣️ 直线综合工况试验场 · PROVING GROUND</span>
+      
+      <!-- 工况预设模式胶囊组 -->
+      <div class="slope-scenario-pills">
+        <button class="slope-scenario-pill on" data-scenario="comprehensive" title="全工况综合连环大试验场 (连续7大工况大环线)">🏆 综合连环 (默认)</button>
+        <button class="slope-scenario-pill" data-scenario="jump_ramp" title="连续十连飞坡跳台极限测试">🚀 十连飞坡</button>
+        <button class="slope-scenario-pill" data-scenario="moose_test" title="连续左右交替ISO 3888-2双移线麋鹿避障">🦌 连续麋鹿 (5x)</button>
+        <button class="slope-scenario-pill" data-scenario="bumps_cleats" title="连续交错减速坎与凸块测试">🚧 连续过坎</button>
+        <button class="slope-scenario-pill" data-scenario="washboard_potholes" title="连续搓板波纹与暗坑耐久路">🪨 连续搓板</button>
+        <button class="slope-scenario-pill" data-scenario="accel_brake" title="0-100加速与全力制动循环">⚡ 弹射制动</button>
+        <button class="slope-scenario-pill" data-scenario="split_mu" title="左右高低附着力对开路面偏摆">❄️ 对开路面</button>
+        <button class="slope-scenario-pill" data-scenario="slope_climb" title="连续极限大坡度爬坡">⛰️ 极限爬坡</button>
+        <button class="slope-scenario-pill slope-custom-pill" id="slopeCustomSeqBtn" title="开放自定义工况链组合与次数">🛠️ 自定义工况链</button>
+      </div>
+    </div>
+    
+    <div class="slope-t1-right">
+      <!-- 慢动作倍率选择 -->
+      <div class="slope-time-group">
+        <button class="slope-time-btn on" data-scale="1.0">1.0x</button>
+        <button class="slope-time-btn" data-scale="0.5">0.5x</button>
+        <button class="slope-time-btn" data-scale="0.25">0.25x</button>
+        <button class="slope-time-btn" data-scale="0.1">0.1x</button>
+      </div>
+
+      <button class="slope-action-btn" id="slopeTuneToggleBtn" title="打开/收起实时悬架调校抽屉">🛠️ 悬架调校</button>
+      <button class="slope-action-btn" id="slopeResetBtn" title="重置赛车位置与工况统计 (快捷键 R)">🔄 重置</button>
+      <button class="slope-action-btn" id="slopePlayBtn">⏸ 暂停</button>
+      <button class="slope-action-btn slope-exit-btn" id="slopeExitBtn">✖ 退出舞台</button>
+    </div>
+  </div>
+
+  <!-- Topbar Tier 2: Subbar with Repeat Counts, Sliders, and Cameras -->
+  <div class="slope-stage-topbar-tier2">
+    <div class="slope-t2-left">
+      <!-- 连环次数选择 -->
+      <div class="slope-control-item" id="slopeParamRepeatWrap">
+        <label>连环次数 REPEAT</label>
+        <select id="slopeRepeatSelect" class="slope-select">
+          <option value="3">3 次连环</option>
+          <option value="5">5 次连环</option>
+          <option value="10" selected>10 次连环 (推荐)</option>
+          <option value="20">20 次极限连环</option>
+          <option value="50">50 次无限耐久</option>
+        </select>
+      </div>
+
+      <!-- 动态工况参数调节项 -->
+      <div class="slope-control-item" id="slopeParamSpeedWrap">
+        <label>时速 SPEED</label>
+        <input type="range" id="slopeSpeedSlider" min="20" max="160" value="85" step="5">
+        <b id="slopeSpeedVal">85 km/h</b>
+      </div>
+
+      <div class="slope-control-item" id="slopeParamRampHWrap" style="display:flex;">
+        <label>跳台高度 RAMP-H</label>
+        <input type="range" id="slopeRampHSlider" min="0.4" max="2.5" value="1.10" step="0.05">
+        <b id="slopeRampHVal">1.10 m</b>
+      </div>
+
+      <div class="slope-control-item" id="slopeParamBumpHWrap" style="display:none;">
+        <label>坎高 BUMP-H</label>
+        <input type="range" id="slopeBumpHSlider" min="20" max="120" value="60" step="5">
+        <b id="slopeBumpHVal">60 mm</b>
+      </div>
+
+      <div class="slope-control-item" id="slopeParamGradeWrap" style="display:none;">
+        <label>坡度 GRADE</label>
+        <input type="range" id="slopeGradeSlider" min="-30" max="60" value="18" step="1">
+        <b id="slopeGradeVal">18%</b>
+      </div>
+    </div>
+
+    <div class="slope-t2-right">
+      <!-- 多机位切换按钮组 -->
+      <div class="slope-cam-group">
+        <button class="slope-cam-btn on" data-cam="behind">🏎️ 尾部跟随</button>
+        <button class="slope-cam-btn" data-cam="front">🎯 车头特写</button>
+        <button class="slope-cam-btn" data-cam="suspension">📐 悬架特写</button>
+        <button class="slope-cam-btn" data-cam="threeq">🏆 45° 鸟瞰</button>
+        <button class="slope-cam-btn" data-cam="cockpit">💺 第一人称</button>
+        <button class="slope-cam-btn" data-cam="side_track">🚁 赛道侧向</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="slope-stage-main">
+    <canvas id="slopeCanvas"></canvas>
+
+    <!-- 顶端悬浮连续工况进度条 -->
+    <div class="slope-segment-banner-wrap">
+      <div id="slopeSegmentBanner" class="slope-segment-banner">
+        <b>[工况 1/7]</b> ⚡ 弹射加速与制动 · 行进: <b>0m</b>
+      </div>
+    </div>
+
+    <!-- 自定义工况链配置抽屉 / 弹窗 -->
+    <div id="slopeCustomSeqModal" class="slope-custom-seq-modal">
+      <div class="slope-custom-header">
+        <span>🛠️ 自定义工况测试链 (Custom Sequence Builder)</span>
+        <button id="slopeCustomCloseBtn" class="slope-custom-close">×</button>
+      </div>
+      <div class="slope-custom-body">
+        <div class="slope-custom-row">
+          <label>🚀 连续飞坡跳台数量</label>
+          <input type="number" id="custRampCount" min="1" max="30" value="10">
+          <span>组跳台</span>
+        </div>
+        <div class="slope-custom-row">
+          <label>🦌 连续麋鹿双移线数量</label>
+          <input type="number" id="custMooseCount" min="1" max="20" value="5">
+          <span>组避障</span>
+        </div>
+        <div class="slope-custom-row">
+          <label>🚧 连续减速坎/凸块数量</label>
+          <input type="number" id="custBumpCount" min="1" max="30" value="8">
+          <span>组交错坎</span>
+        </div>
+      </div>
+      <div class="slope-custom-footer">
+        <button id="slopeCustomApplyBtn" class="slope-custom-apply-btn">▶ 应用并启动连续测试</button>
+      </div>
+    </div>
+
+    <!-- 实时悬架参数调校抽屉 -->
+    <div id="slopeTuneDrawer" class="slope-tune-drawer">
+      <div class="slope-tune-header">
+        <span>🛠️ 实时底盘与悬架调校 (Live Suspension Tuning)</span>
+      </div>
+      <div class="slope-tune-body">
+        <div class="slope-tune-item">
+          <label>前弹簧刚度 (Kf)</label>
+          <input type="range" id="slopeTuneKf" min="-50" max="50" value="0" step="5">
+          <b id="slopeTuneKfVal">0%</b>
+        </div>
+        <div class="slope-tune-item">
+          <label>后弹簧刚度 (Kr)</label>
+          <input type="range" id="slopeTuneKr" min="-50" max="50" value="0" step="5">
+          <b id="slopeTuneKrVal">0%</b>
+        </div>
+        <div class="slope-tune-item">
+          <label>前减振器阻尼 (Cf)</label>
+          <input type="range" id="slopeTuneCf" min="-50" max="50" value="0" step="5">
+          <b id="slopeTuneCfVal">0%</b>
+        </div>
+        <div class="slope-tune-item">
+          <label>后减振器阻尼 (Cr)</label>
+          <input type="range" id="slopeTuneCr" min="-50" max="50" value="0" step="5">
+          <b id="slopeTuneCrVal">0%</b>
+        </div>
+        <div class="slope-tune-item">
+          <label>前防倾杆刚度 (ARB-F)</label>
+          <input type="range" id="slopeTuneArbF" min="-80" max="100" value="0" step="10">
+          <b id="slopeTuneArbFVal">0%</b>
+        </div>
+        <div class="slope-tune-item">
+          <label>后防倾杆刚度 (ARB-R)</label>
+          <input type="range" id="slopeTuneArbR" min="-80" max="100" value="0" step="10">
+          <b id="slopeTuneArbRVal">0%</b>
+        </div>
+        <div class="slope-tune-item">
+          <label>底盘离地间隙 (Ride Height)</label>
+          <input type="range" id="slopeTuneHeight" min="-30" max="60" value="0" step="5">
+          <b id="slopeTuneHeightVal">0 mm</b>
+        </div>
+      </div>
+    </div>
+
+    <!-- 实时遥测 HUD -->
+    <div class="slope-hud-overlay">
+      <div class="slope-hud-card">
+        <div class="slope-hud-row">
+          <span>🏎️ 车型平台</span>
+          <b id="slopeVehName">FIA GT3</b>
+        </div>
+        
+        <!-- 工况专属专项评价状态条 -->
+        <div class="slope-hud-row slope-hud-special-row">
+          <div id="slopeMetricAirborne" class="slope-metric-badge">🚀 飞坡准备 · 保持速度冲坡</div>
+        </div>
+
+        <div class="slope-hud-row">
+          <span>🏁 动态车速 / 动能</span>
+          <b class="hl" id="slopeHudSpeed">85.0 km/h (23.6 m/s)</b>
+        </div>
+        <div class="slope-hud-row">
+          <span>📐 坡度 / 俯仰姿态角</span>
+          <b id="slopeHudAngle">0.00° (Pitch 0.0°)</b>
+        </div>
+        <div class="slope-hud-row">
+          <span>⚖️ 纵向 / 侧向 G 值</span>
+          <b class="warn" id="slopeHudGx">+0.00 g / 0.00 g</b>
+        </div>
+        <div class="slope-hud-row">
+          <span>🔄 动态轴荷分布 (前 / 后)</span>
+          <b id="slopeHudLoadSplit">46.0% / 54.0%</b>
+        </div>
+        
+        <!-- 四轮动态悬架行程与打底指示条 (高对比度清晰显示) -->
+        <div class="slope-hud-travel-section">
+          <div class="slope-travel-title">四轮悬架压缩行程 (FL / FR / RL / RR)</div>
+          <div class="slope-travel-grid">
+            <div class="slope-corner-box">
+              <div class="slope-corner-lbl"><span>FL</span><b id="slopeValFL">0.0mm</b></div>
+              <div class="slope-bar-track"><div id="slopeBarFL" class="slope-bar-fill"></div></div>
+            </div>
+            <div class="slope-corner-box">
+              <div class="slope-corner-lbl"><span>FR</span><b id="slopeValFR">0.0mm</b></div>
+              <div class="slope-bar-track"><div id="slopeBarFR" class="slope-bar-fill"></div></div>
+            </div>
+            <div class="slope-corner-box">
+              <div class="slope-corner-lbl"><span>RL</span><b id="slopeValRL">0.0mm</b></div>
+              <div class="slope-bar-track"><div id="slopeBarRL" class="slope-bar-fill"></div></div>
+            </div>
+            <div class="slope-corner-box">
+              <div class="slope-corner-lbl"><span>RR</span><b id="slopeValRR">0.0mm</b></div>
+              <div class="slope-bar-track"><div id="slopeBarRR" class="slope-bar-fill"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="slope-hud-row">
+          <span>📉 后悬压缩 / 前悬拉伸</span>
+          <b class="hl" id="slopeHudSquat">+0.0 mm / -0.0 mm</b>
+        </div>
+      </div>
+    </div>
+
+    <div class="slope-hint-box">
+      🎮 交互控制：<b>W/↑</b> 加速 · <b>S/↓</b> 刹车 · <b>A/D/←/→</b> 转向 · <b>空格</b> 手刹制动 · <b>R</b> 重置复位 · <b>鼠标拖拽</b> 360° 环绕机位 · <b>滚轮</b> 视距缩放
+    </div>
+  </div>
+</div>
+
+<script src="js/01-core.js"></script>
+<script src="js/02-presets.js"></script>
+<script src="js/03-mechanism.js"></script>
+<script src="js/04-dynamics.js"></script>
+<script src="js/05-scene3d.js"></script>
+<script src="js/06-ui-panels.js"></script>
+<script src="js/07-plots.js"></script>
+<script src="js/08-interact.js"></script>
+<script src="js/09-track.js"></script>
+<script src="js/10-eval.js"></script>
+<script src="js/11-stages.js"></script>
+<script src="js/12-v4-arrange.js"></script>
+</body>
+</html>

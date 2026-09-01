@@ -19,26 +19,77 @@ function hpValidate(d){
   if(d.tieTrimR!==undefined&&!Number.isFinite(d.tieTrimR))return "tieTrimR 非法";
   return null;
 }
-function hpSnapshot(){return {front:S.front.hp, rear:S.rear.hp,
-  tieTrimF:S.front.tieTrim, tieTrimR:S.rear.tieTrim, wb:S.wb, hcg:S.hcg, t:Date.now()};}
-function hpSave(quiet){try{localStorage.setItem(HP_SAVE_KEY, JSON.stringify(hpSnapshot()));
-  if(!quiet)setKcStatus("硬点已保存 "+new Date().toLocaleTimeString(), C.pathC);}
-  catch(e){console.warn("hpSave failed",e);}}
-function hpLoad(){try{const raw=localStorage.getItem(HP_SAVE_KEY); if(!raw)return;
-  const d=JSON.parse(raw);
-  const err=hpValidate(d);
-  if(err){console.warn("hpLoad rejected:",err);
-    setKcStatus("本地保存的硬点未通过校验，已忽略："+err, C.nodeFix); return;}
-  for(const ax of ["front","rear"]){const hp=S[ax].hp, saved=d[ax];
-    for(const k in hp) if(saved[k]&&Array.isArray(saved[k])&&saved[k].length===3) hp[k]=saved[k].map(Number);}
-  if(typeof d.tieTrimF==="number")S.front.tieTrim=d.tieTrimF;
-  if(typeof d.tieTrimR==="number")S.rear.tieTrim=d.tieTrimR;
-  if(typeof d.wb==="number")S.wb=d.wb; if(typeof d.hcg==="number")S.hcg=d.hcg;
-  setKcStatus("已载入永久保存的硬点（localStorage）", C.pathC);}
-  catch(e){console.warn("hpLoad failed",e);}}
-function hpReset(){try{localStorage.removeItem(HP_SAVE_KEY);}catch(e){}
-  initData(); rebuild(); UI.sync.forEach(f=>f());
-  setKcStatus("已恢复出厂预设硬点（紧凑宽体 1620mm 比例）", C.nodeFix);}
+function hpSnapshot(){
+  return {
+    vehicleType: S.vehicleType || "formula",
+    frontArch: S.front ? S.front.arch : "pushrod",
+    rearArch: S.rear ? S.rear.arch : "pushrod",
+    front: S.front.hp,
+    rear: S.rear.hp,
+    tieTrimF: S.front.tieTrim,
+    tieTrimR: S.rear.tieTrim,
+    wb: S.wb,
+    hcg: S.hcg,
+    t: Date.now()
+  };
+}
+function hpSave(quiet){
+  try {
+    const key = HP_SAVE_KEY + "." + (S.vehicleType || "formula");
+    localStorage.setItem(key, JSON.stringify(hpSnapshot()));
+    localStorage.removeItem(HP_SAVE_KEY); // Clean up unnamespaced legacy cache
+    if(!quiet) setKcStatus("硬点已保存 "+new Date().toLocaleTimeString(), C.pathC);
+  } catch(e){
+    console.warn("hpSave failed",e);
+  }
+}
+function hpLoad(targetType){
+  try {
+    const vType = targetType || S.vehicleType || "formula";
+    const key = HP_SAVE_KEY + "." + vType;
+    let raw = localStorage.getItem(key);
+    if(!raw) {
+      const legRaw = localStorage.getItem(HP_SAVE_KEY);
+      if(legRaw) {
+        try {
+          const legD = JSON.parse(legRaw);
+          if(legD && legD.vehicleType === vType) raw = legRaw;
+          else localStorage.removeItem(HP_SAVE_KEY); // Clean mismatched legacy cache
+        } catch(e){}
+      }
+    }
+    if(!raw) return;
+    const d = JSON.parse(raw);
+    if(d.vehicleType && d.vehicleType !== vType) return; // Prevent cross-vehicle mismatch
+    if(d.frontArch && S.front && d.frontArch !== S.front.arch) return; // Prevent pushrod/direct strut mismatch
+    const err = hpValidate(d);
+    if(err){
+      console.warn("hpLoad rejected:", err);
+      return;
+    }
+    for(const ax of ["front","rear"]){
+      const hp = S[ax].hp, saved = d[ax];
+      for(const k in hp) {
+        if(saved[k] && Array.isArray(saved[k]) && saved[k].length === 3) hp[k] = saved[k].map(Number);
+      }
+    }
+    if(typeof d.tieTrimF === "number") S.front.tieTrim = d.tieTrimF;
+    if(typeof d.tieTrimR === "number") S.rear.tieTrim = d.tieTrimR;
+    if(typeof d.wb === "number") S.wb = d.wb;
+    if(typeof d.hcg === "number") S.hcg = d.hcg;
+  } catch(e){
+    console.warn("hpLoad failed", e);
+  }
+}
+function hpReset(){
+  try {
+    const vType = S.vehicleType || "formula";
+    localStorage.removeItem(HP_SAVE_KEY + "." + vType);
+    localStorage.removeItem(HP_SAVE_KEY);
+  } catch(e){}
+  loadVehiclePreset(S.vehicleType || "formula");
+  setKcStatus("已恢复出厂预设硬点", C.nodeFix);
+}
 function hpExport(){const blob=new Blob([JSON.stringify(hpSnapshot(),null,1)],
   {type:"application/json"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob);

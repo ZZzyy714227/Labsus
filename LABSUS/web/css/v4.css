@@ -1,0 +1,124 @@
+/* ============================================================
+   LABSUS v4 · 新版工作台样式（舞台 + 坞站）
+   策略：复用 fullchassis.css 的全部组件样式（.sec/.ro/模态框/舞台），
+   本文件只做：布局骨架覆盖 + v4 新增组件 + 主题变量通道。
+   主题令牌由 js/12-v4-arrange.js 以 inline setProperty 注入，
+   此处变量仅作兜底默认值（墨蓝经典 · 深色）。
+   ============================================================ */
+@import "fullchassis.css";
+
+/* ---------- 布局骨架 ---------- */
+#main{gap:8px}
+.pnl{width:300px;flex:0 0 300px}
+
+/* 左坞站：Tab 条 + 面板区（.sec 由 JS 生成，样式继承旧体系） */
+#lp{display:flex;flex-direction:column;overflow:hidden}
+.v4-sum{margin-left:auto;margin-right:6px;font:500 8.5px var(--font-mono);color:var(--ink-3);
+  background:var(--well);border:1px solid var(--hairline);border-radius:var(--r-sm);padding:1px 5px;white-space:nowrap}
+.v4-ltabs{display:flex;gap:3px;padding:8px 8px 6px;flex:0 0 auto;border-bottom:1px solid var(--glass-bd)}
+.v4-ltab{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;
+  padding:6px 2px;border-radius:var(--r-md);border:1px solid transparent;
+  background:transparent;color:var(--ink-3);font:500 10.5px var(--font-ui);cursor:pointer;transition:.15s}
+.v4-ltab:hover{color:var(--ink-2);background:var(--glass-hov)}
+.v4-ltab.on{color:var(--ink-1);background:var(--pri-fill);border-color:var(--pri-bd)}
+.v4-pane{display:none;flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding:8px;min-height:0}
+.v4-pane.on{display:block}
+
+/* 中央舞台 */
+#v4stage{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;min-height:0;
+  background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid var(--glass-bd);border-radius:var(--r-xl);box-shadow:var(--shadow);overflow:hidden}
+.v4-vpbar{display:flex;align-items:center;gap:8px;padding:6px 10px;flex:0 0 auto;
+  border-bottom:1px solid var(--glass-bd);background:var(--sh-bg)}
+.v4-vpbar .v4-sp{flex:1}
+.v4-seg{display:flex;gap:2px;background:var(--well);border:1px solid var(--glass-bd);border-radius:var(--r-md);padding:2px}
+.v4-seg button{border:none;background:transparent;color:var(--ink-3);font:500 10px var(--font-ui);
+  padding:3px 8px;border-radius:var(--r-sm);cursor:pointer;transition:.15s;white-space:nowrap}
+.v4-seg button:hover{color:var(--ink-2)}
+.v4-seg button.on{background:var(--pri-fill);color:var(--ink-1)}
+.v4-mini{display:flex;align-items:center;gap:5px;border:1px solid var(--glass-bd);background:transparent;
+  color:var(--ink-2);font:500 10px var(--font-ui);padding:3px 8px;border-radius:var(--r-md);cursor:pointer;transition:.15s}
+.v4-mini:hover{background:var(--glass-hov);color:var(--ink-1)}
+.v4-mini.on{background:var(--pri-fill);border-color:var(--pri-bd);color:var(--ink-1)}
+#vp{flex:1 1 auto;min-height:0;padding:8px}
+/* 单视口模式：只显示当前 .vw（沿用 max0 的隐藏手法） */
+#vp.vp-single{grid-template-columns:1fr;grid-template-rows:1fr}
+#vp.vp-single .vw{display:none}
+#vp.vp-single .vw.v4-cur{display:flex}
+
+/* 右坞站：结论卡（#v4Hero，位于 #rp 之外，避免 buildRight 重建时被清掉） */
+#v4right{display:flex;flex-direction:column;overflow:hidden}
+#rp{width:auto;flex:none;padding:0;overflow:visible}
+#v4scroll{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;min-height:0;display:flex;flex-direction:column;gap:8px;padding:0}
+#rp{overflow:visible;flex:0 0 auto}
+.v4-hero{flex:0 0 auto;background:var(--glass);border:1px solid var(--glass-bd);border-radius:var(--r-xl);padding:10px}
+.v4-hero-hd{display:flex;align-items:baseline;gap:7px;margin-bottom:8px}
+.v4-hero-hd b{font:600 11.5px var(--font-ui);color:var(--ink-1)}
+.v4-hero-hd i{font:500 8px var(--font-ui);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);font-style:normal}
+.v4-hero-hd .v4-live{margin-left:auto;font:500 8px var(--font-mono);color:var(--ink-3)}
+.v4-hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.v4-hc{background:var(--well);border:1px solid var(--hairline);border-radius:var(--r-lg);padding:8px 9px}
+.v4-hc .en{font:500 8px var(--font-ui);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.v4-hc .v{font:600 16px/1.25 var(--font-mono);letter-spacing:-.02em;color:var(--ink-1);margin-top:2px;font-variant-numeric:tabular-nums}
+.v4-hc .hint{font:400 8.5px var(--font-ui);color:var(--ink-3);margin-top:2px}
+.v4-hc.ok .v{color:var(--ok)} .v4-hc.ok .hint{color:var(--ok)}
+.v4-hc.warn .v{color:var(--warn)} .v4-hc.warn .hint{color:var(--warn)}
+.v4-hc.bad .v{color:var(--err)} .v4-hc.bad .hint{color:var(--err)}
+.v4-bar{height:4px;border-radius:var(--r-pill);background:var(--track);overflow:hidden;margin-top:6px}
+.v4-bar i{display:block;height:100%;border-radius:var(--r-pill);background:var(--pri);transition:width .3s}
+.v4-diag{flex:0 0 auto;background:var(--glass);border:1px solid var(--pri-bd);border-radius:var(--r-xl);padding:10px}
+.v4-diag p{font:400 10px/1.6 var(--font-ui);color:var(--ink-2);margin-top:6px}
+
+/* ---------- 顶栏（v4 版：决策与执行） ---------- */
+#tb{height:52px}
+#tb .v4-run{display:flex;align-items:center;gap:6px;margin:0 6px;padding:0 16px;height:30px;
+  border:none;border-radius:var(--r-md);cursor:pointer;color:#fff;
+  font:600 11px var(--font-ui);letter-spacing:.04em;
+  background:linear-gradient(135deg,var(--acc-in),var(--err));
+  box-shadow:0 3px 12px var(--err-fill);transition:filter .15s,transform .1s}
+#tb .v4-run:hover{filter:brightness(1.12)}
+#tb .v4-run:active{transform:scale(.97)}
+#tb .v4-run:disabled{filter:grayscale(.4) brightness(.8);cursor:wait}
+.v4-pill{display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;margin:0 2px;
+  border:1px solid var(--glass-bd);border-radius:var(--r-pill);background:transparent;
+  font:500 9.5px var(--font-mono);color:var(--ink-2);cursor:pointer;transition:.15s;white-space:nowrap}
+.v4-pill:hover{background:var(--glass-hov)}
+.v4-pill .dot{width:7px;height:7px;border-radius:var(--r-pill);background:currentColor;flex:0 0 7px}
+.v4-pill.ok{color:var(--ok);border-color:var(--ok)}
+.v4-pill.warn{color:var(--warn);border-color:var(--warn)}
+.v4-pill.err{color:var(--err);border-color:var(--err)}
+.v4-pill.ro{cursor:default}
+#tb .v4-axis{min-width:0}
+#tb .cell.slim{min-width:0;padding:0 9px}
+
+/* ---------- 主题选择器浮层 ---------- */
+#v4ThemeBtn{display:flex;align-items:center;justify-content:center;width:30px;height:30px;margin:0 2px;
+  border:1px solid var(--glass-bd);border-radius:var(--r-md);background:transparent;color:var(--ink-2);cursor:pointer;transition:.15s}
+#v4ThemeBtn:hover{background:var(--glass-hov);color:var(--ink-1)}
+#v4ThemePop{position:fixed;z-index:400;width:300px;max-height:80vh;overflow-y:auto;
+  background:var(--glass);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+  border:1px solid var(--glass-bd-2);border-radius:var(--r-xl);box-shadow:var(--shadow);padding:12px}
+#v4ThemePop .tp-h{font:600 11px var(--font-ui);color:var(--ink-1);margin-bottom:8px}
+#v4ThemePop .tp-sub{font:500 8.5px var(--font-ui);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin:10px 0 6px}
+.tp-preset{display:flex;align-items:center;gap:9px;width:100%;padding:8px 9px;margin-bottom:5px;
+  border:1px solid var(--glass-bd);border-radius:var(--r-lg);background:transparent;cursor:pointer;transition:.15s;text-align:left}
+.tp-preset:hover{background:var(--glass-hov)}
+.tp-preset.on{border-color:var(--pri-bd);background:var(--pri-fill)}
+.tp-dots{display:flex;gap:3px;flex:0 0 auto}
+.tp-dots i{width:13px;height:13px;border-radius:4px}
+.tp-preset .nm{font:500 10.5px var(--font-ui);color:var(--ink-1)}
+.tp-preset .ds{font:400 8.5px var(--font-ui);color:var(--ink-3);margin-left:auto}
+.tp-custom{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.tp-custom label{display:flex;flex-direction:column;align-items:center;gap:3px;
+  font:400 8.5px var(--font-ui);color:var(--ink-2)}
+.tp-custom input[type=color]{width:100%;height:24px;border:1px solid var(--glass-bd);border-radius:var(--r-sm);
+  background:var(--well);cursor:pointer;padding:1px}
+.tp-actions{display:flex;gap:6px;margin-top:10px}
+.tp-actions button{flex:1;padding:6px 4px;border:1px solid var(--glass-bd);border-radius:var(--r-md);
+  background:transparent;color:var(--ink-2);font:500 10px var(--font-ui);cursor:pointer;transition:.15s}
+.tp-actions button:hover{background:var(--glass-hov);color:var(--ink-1)}
+.tp-actions button.main{background:var(--pri-fill);border-color:var(--pri-bd);color:var(--ink-1)}
+
+/* ---------- 底栏瘦身 ---------- */
+#sb{height:26px}
+#sb .c.v4-hide{display:none}

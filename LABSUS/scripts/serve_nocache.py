@@ -4,10 +4,14 @@ import http.server, functools, os, sys
 # G10（2026-08-31）：自 web/ 迁入 scripts/，服务根改为 ../web
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "web")
 
+class ThreadedServer(http.server.ThreadingHTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
 class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
-    # F-72（2026-08-30）：HTTP/1.1 持久连接（旧默认 1.0 每请求重建连接，浏览器
-    # 加载大单文件时往返明显变多）
+    # F-72（2026-08-30）：HTTP/1.1 持久连接
     protocol_version = "HTTP/1.1"
+    timeout = 10  # 避免 keep-alive socket 无限阻塞工作线程
 
     extensions_map = {
         **http.server.SimpleHTTPRequestHandler.extensions_map,
@@ -49,4 +53,6 @@ if __name__ == "__main__":
     args = ap.parse_args()
     _try_bind(args.host, args.port)
     handler = functools.partial(NoCacheHandler, directory=ROOT)
-    http.server.ThreadingHTTPServer((args.host, args.port), handler).serve_forever()
+    server = ThreadedServer((args.host, args.port), handler)
+    print(f"LABSUS web server listening on http://{args.host}:{args.port}")
+    server.serve_forever()
