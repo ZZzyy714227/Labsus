@@ -95,8 +95,13 @@ def test_transient_circle_steady_state():
     assert any(abs(p["fz_FR"] - p["fz_FL"]) > 400 for p in tr[steady])
     # 侧倾与 ay 同号量级：ay ≈ 4.8 m/s²，roll 在 0.2~1.5°
     assert any(0.15 < abs(p["roll"]) < 2.0 for p in tr[steady])
-    # 摩擦圆预算：√(Fx²+Fy²) ≤ μ·Fz（μ=Fy0/FzNom≈2.29，留 5% 数值余量）
-    mu = 8000.0 / 3500.0
+    # 摩擦圆预算：√(Fx²+Fy²) ≤ μ·Fz（μ=Fy0/FzNom，留 5% 数值余量）
+    # G24：不再把 μ 写死为 8000/3500——那会把断言与库缺省解耦，改了缺省后断言
+    # 会静默退化成“用旧 μ 校验新仿真”的空检查。直接从 TireParams 缺省取。
+    from src.api.v3models import TireParams
+    _tp = TireParams()
+    mu = _tp.Fy0 / _tp.FzNom
+    assert abs(mu - 1.50) < 0.05, f"缺省胎峰值 μ 应为真实量级 1.50，实际 {mu:.3f}"
     worst = max(math.hypot(p[f"fx_{w}"], p[f"fy_{w}"]) / (mu * p[f"fz_{w}"])
                 for p in tr for w in ("FR", "FL", "RR", "RL") if p[f"fz_{w}"] > 10)
     assert worst < 1.05
@@ -164,6 +169,57 @@ def test_aero_downforce_adds_front_load_and_drag():
     assert aero["summary"]["v_end"] < base["summary"]["v_end"] - 0.2, (
         aero["summary"]["v_end"], base["summary"]["v_end"])   # 阻力减速（7s 段实测 ~0.35m/s）
     assert aero["summary"]["aero_n"] > 250.0
+
+
+def test_aero_ge_ground_effect_boost_front():
+    """P2a·cl(h)：急刹低头（前轴净高减）→ ge_f 增强前轴 cl ⇒ 前轴载荷显著高于
+    ge_gain=0 同工况（平面模型 h = 名义 ± a/b·tan(pitch)）。"""
+    track = [{"x": 0, "y": 0, "target_speed": 20.0},
+             {"x": 240, "y": 0, "target_speed": 4.0}]
+    aero_ge = {"k_down_f": 2.2, "k_down_r": 1.8, "k_drag": 1.4,
+               "ge_gain": 0.5, "ge_h0_mm": 100.0, "ge_href_mm": 100.0,
+               "ge_hmin_mm": 30.0, "ge_floor": 0.8, "drs_v_ms": 1000.0}
+    aero_0 = {k: v for k, v in aero_ge.items() if k != "ge_gain"}
+    pt = {"T_max": 320.0, "P_kw": 120.0}
+    b_ge = client.post("/api/v3/chassis/simulate_track",
+                       json=_body(track, sim_time=14.0, start_speed=20.0,
+                                  powertrain=pt, aero=aero_ge)).json()
+    b_0 = client.post("/api/v3/chassis/simulate_track",
+                      json=_body(track, sim_time=14.0, start_speed=20.0,
+                                 powertrain=pt, aero=aero_0)).json()
+    assert b_ge["status"] == b_0["status"] == "VALID"
+    ge_max = max(p["ge_f"] for p in b_ge["trace"])
+    ge_min = min(p["ge_f"] for p in b_ge["trace"])
+    assert ge_max > 1.3, f"低头应增强前轴 cl，实测峰值 ge_f={ge_max:.3f}"
+    assert ge_min >= 0.8 - 1e-6, "高 h 衰减不低于 ge_floor"
+    fz_ge = max(p["fz_FR"] + p["fz_FL"] for p in b_ge["trace"])
+    fz_0 = max(p["fz_FR"] + p["fz_FL"] for p in b_0["trace"])
+    assert fz_ge > fz_0 + 300, (fz_ge, fz_0)
+
+
+def test_aero_drs_straight_reduces_drag():
+    """P2a·DRS：长直道高速自动开翼（直道判定 + vx>drs_v_ms）→ 总阻力 ×0.72 ⇒
+    尾速提升、后轴 cl ×0.90 ⇒ 后轴载荷占比下降；drs_frac 反映开翼时长。"""
+    track = [{"x": 0, "y": 0, "target_speed": 32.0},
+             {"x": 700, "y": 0, "target_speed": 32.0},
+             {"x": 1400, "y": 0, "target_speed": 32.0}]
+    common = {"k_down_f": 2.2, "k_down_r": 1.8, "k_drag": 1.4, "ge_gain": 0.0}
+    pt = {"T_max": 320.0, "P_kw": 120.0}
+    a_drs = client.post("/api/v3/chassis/simulate_track",
+                        json=_body(track, sim_time=24.0, start_speed=25.0, powertrain=pt,
+                                   aero=dict(common, drs_v_ms=20.0, drs_cd_scale=0.72,
+                                             drs_cl_scale=0.90, drs_curve_radius_m=300.0))).json()
+    a_nod = client.post("/api/v3/chassis/simulate_track",
+                        json=_body(track, sim_time=24.0, start_speed=25.0, powertrain=pt,
+                                   aero=dict(common, drs_v_ms=1000.0))).json()
+    assert a_drs["status"] == a_nod["status"] == "VALID"
+    assert a_drs["summary"]["drs_frac"] > 0.5, "直道高速应持续开翼"
+    assert a_drs["summary"]["v_end"] > a_nod["summary"]["v_end"] + 0.02, (
+        a_drs["summary"]["v_end"], a_nod["summary"]["v_end"])
+    assert max(p["drs"] for p in a_nod["trace"]) == 0, "drs_v_ms 高阈值应永不触发"
+    f_frac = lambda r: (r["fz_RR"] + r["fz_RL"]) / max(1e-6, sum(
+        r[f"fz_{w}"] for w in ("FR", "FL", "RR", "RL")))
+    assert f_frac(a_drs["trace"][-1]) < f_frac(a_nod["trace"][-1]), "DRS 削后轴 cl → 占比降"
 
 
 def test_slip_relaxation_lags_kinematic():

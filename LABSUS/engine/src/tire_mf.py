@@ -12,10 +12,14 @@ def _load_d(d: dict[str, float]) -> dict[str, float]:
 
 
 def load_tir_params(src: dict) -> dict[str, float]:
-    """tir 风格映射：B/C/E → By/Cy/Ey；Fy0 → D。按需扩展键。"""
+    """tir 风格映射：B/C/E → By/Cy/Ey；Fy0 → D。按需扩展键。
+
+    G24：回退缺省与 v3models.TireParams 保持同源（真实 GT3 光头胎量级，
+    μ=5250/3500=1.50、By=20 ⇒ 峰值侧偏角 8.27°）。旧回退 8000/9.0 是占位值，
+    见 v3models.TireParams 文档。"""
     p = _load_d(src)
     return {
-        "Fy0": p.get("Fy0", 8000.0), "By": p.get("By", p.get("B", 9.0)),
+        "Fy0": p.get("Fy0", 5250.0), "By": p.get("By", p.get("B", 20.0)),
         "Cy": p.get("Cy", p.get("C", 1.2)), "Ey": p.get("Ey", p.get("E", -0.5)),
         "Sv": p.get("Sv", 0.0), "Sh": p.get("Sh", 0.0),
         "FzNom": p.get("FzNom", 3500.0),

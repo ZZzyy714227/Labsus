@@ -425,7 +425,10 @@ function sampleSweep(sw,tr,key){
    α轴 = Fy轴 / ΣCα(各轮真实载荷)；Cα = B·C·D(Fz) 含 LS 载荷敏感性。
    TIRE_MF_QS 与引擎 TireParams 缺省值逐字同源（test_dom 钉死）；
    轮胎实测标定（左坞站 TIRE CALIBRATION）成功后由 applyTireCalib() 覆写。 */
-let TIRE_MF_QS = { Fy0: 8000, FzNom: 3500, By: 9, Cy: 1.2, LS: 0.10 };
+/* G24：缺省胎 = 真实 GT3 光头胎量级，与引擎 v3models.TireParams 同源（双端对拍锚）。
+   Fy0/FzNom = 5250/3500 = μ 1.50；By=20 ⇒ 峰值侧偏角 8.27°、峰值滑移率 12.1%。
+   旧值 8000/9（μ=2.29、峰值侧偏角 17.87°）是占位值，不真实，详见 TireParams 文档。 */
+let TIRE_MF_QS = { Fy0: 5250, FzNom: 3500, By: 20, Cy: 1.2, LS: 0.10 };
 function applyTireCalib(p){
   if(!p || typeof p !== "object") return;
   ["Fy0","FzNom","By","Cy","LS"].forEach(k=>{ if(isFinite(p[k])) TIRE_MF_QS[k]=p[k]; });

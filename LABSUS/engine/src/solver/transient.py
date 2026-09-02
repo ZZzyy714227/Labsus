@@ -12,6 +12,8 @@
 - 动力（★ PowertrainParams）：峰值扭矩-恒功率包络 Fx = min(T/R, P/v)，
   驱动分配 drive_split_f（默认 0=纯后驱）；制动按 brake_split_f 参数化（默认 60:40）。
 - 气动（★ aero）：F_down_f/r = k_down·v² 直接进入准静态载荷转移；阻力 F_drag = k_drag·v²。
+  P2a（2026-09-02）：cl(h) 地面效应（ge_gain 缺省 0 = 关闭，向后兼容）+ DRS
+  开翼（直道 && vx>阈值 ⇒ 阻力 ×drs_cd_scale、后轴 cl ×drs_cl_scale）。
 - 载荷：每步 quasi_loads（上一步 ay/gx 破环），aero 下压力与分配比传入。
 - 驾驶员：纯追踪横向 + ★PI 速度纵向控制（消除稳态误差）。
 """
@@ -56,6 +58,41 @@ def _lut(lut: dict, travel_mm: float, key: str, default: float) -> float:
     return float(np.interp(travel_mm, xs, ys))
 
 
+def _ge_factor(h_m: float, gain: float, href_m: float, hmin_m: float,
+               floor_v: float) -> float:
+    """cl(h) 地面效应增强因子（P2a，与前端 qs.ge* 同构）：
+
+    ge(h) = clamp(1 + gain·(href/max(h, hmin) − 1), floor, 1 + gain·(href/hmin − 1))
+    h 越低（贴地）增强越强、直到 hmin 饱和；h > href 时衰减但不下 floor。
+    """
+    h = max(h_m, hmin_m)
+    ge_max = 1.0 + gain * (href_m / hmin_m - 1.0)
+    return max(floor_v, min(ge_max, 1.0 + gain * (href_m / h - 1.0)))
+
+
+def _curvature_radius(xy: np.ndarray) -> np.ndarray:
+    """每点局部曲率半径 m（相邻 3 点外接圆；共线/退化解 → 1e6 ≈ 直线）。
+
+    边界点沿用邻点；供 run_track_sim 的 DRS 直道判定用（一次性预处理 O(n)）。
+    """
+    n = len(xy)
+    out = np.full(n, 1e6)
+    if n < 3:
+        return out
+    a, b, c = xy[:-2], xy[1:-1], xy[2:]
+    ab = np.linalg.norm(b - a, axis=1)
+    bc = np.linalg.norm(c - b, axis=1)
+    ca = np.linalg.norm(a - c, axis=1)
+    cross = np.abs((b[:, 0] - a[:, 0]) * (c[:, 1] - a[:, 1])
+                   - (b[:, 1] - a[:, 1]) * (c[:, 0] - a[:, 0]))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        r = ab * bc * ca / (2.0 * cross)        # R = abc / (4Δ) = abc / (2·|cross|)
+    r[~np.isfinite(r) | (r <= 0)] = 1e6
+    out[1:-1] = r
+    out[0], out[-1] = out[1], out[-2]
+    return out
+
+
 class VehiclePlanar:
     """平面 3-DOF 整车（升级版）：MF+复合滑移+松弛+外倾项+动力/气动条目。"""
 
@@ -65,7 +102,10 @@ class VehiclePlanar:
         self.tire = tire
         self.tires = {w: MagicFormulaSub(load_tir_params(tire.model_dump())) for w in _WHEELS}
         self.mu = tire.Fy0 / tire.FzNom
-        self.Cg = float(getattr(tire, "Cg", 0.5))        # 外倾推力系数 1/rad（~0.5·γ·Fz @ γ=1rad）
+        self.Cg = float(getattr(tire, "Cg", 6.0))        # 外倾推力系数 1/rad（缺省 6.0
+                                                          #   ⇒ 21 kN/rad @ FzNom=3500，真实量级）
+                                                          # G24-S3：回退值随缺省同步 0.5→6.0，防 tire
+                                                          # 缺属性时静默降级成旧占位量级
         self.Ls = float(getattr(tire, "Ls", 0.35))       # 松弛长度 m
         self.lut_f = kc_luts.get("front", {})
         self.lut_r = kc_luts.get("rear", {})
@@ -104,22 +144,69 @@ class VehiclePlanar:
         self.prev_ay = 0.0
         self.prev_ax = 0.0
 
-    # ── 气动（★）─────────────────────────────────────────────
-    def aero_forces(self, vx: float) -> tuple[float, float, float]:
-        """返回 (F_down_f, F_down_r, F_drag) N（SI；k 单位 N/(m/s)²）。"""
+        # P2a（2026-09-02）：cl(h)/DRS 参数缓存（缺省与 AeroParams 同源；
+        # ge_gain 缺省 0 = 高度链路关闭，旧请求零行为变化）
+        ap = aero or {}
+        self.ge_gain = float(ap.get("ge_gain", 0.0))
+        self.ge_h0 = float(ap.get("ge_h0_mm", 100.0)) / 1000.0
+        self.ge_href = float(ap.get("ge_href_mm", 100.0)) / 1000.0
+        self.ge_hmin = float(ap.get("ge_hmin_mm", 30.0)) / 1000.0
+        self.ge_floor = float(ap.get("ge_floor", 0.80))
+        self.drs_cd_scale = float(ap.get("drs_cd_scale", 0.72))
+        self.drs_cl_scale = float(ap.get("drs_cl_scale", 0.90))
+        self._ge_f = 1.0                  # 最近步 ge 快照（trace 输出用，同 roll_ss 先例）
+        self._ge_r = 1.0
+        self._aero_down_n = 0.0           # 末步总下压快照（含 ge/DRS）
+
+    # ── 气动（★ + P2a cl(h)/DRS）────────────────────────────
+    def _ride_h(self) -> tuple[float, float]:
+        """本步车底净高估计 (h_f, h_r) m：名义 ge_h0 ± 姿态俯仰（抬头 → 前增后减，
+        与前端 0.11 + Z ± a/b·θ 同号；平面模型无 heave 状态，静态项即基准）。"""
+        p = math.radians(self.pitch_deg)
+        return self.ge_h0 + self.a * math.tan(p), self.ge_h0 - self.b * math.tan(p)
+
+    def aero_forces(self, vx: float, h_f: float | None = None,
+                    h_r: float | None = None, drs: bool = False) -> tuple[float, float, float]:
+        """返回 (F_down_f, F_down_r, F_drag) N（SI；k 单位 N/(m/s)²）。
+
+        h_f/h_r 车底净高 m（缺省名义 ge_h0）：ge_gain>0 时 cl 随 h 增强；
+        drs=True 时总阻力 ×drs_cd_scale、后轴 cl ×drs_cl_scale（尾翼襟翼）。
+        """
         v2 = vx * vx
         kf = float(self.aero_p.get("k_down_f", 0.55))
         kr = float(self.aero_p.get("k_down_r", 0.45))
         kd = float(self.aero_p.get("k_drag", 0.35))
-        return kf * v2, kr * v2, kd * v2
+        h_f = self.ge_h0 if h_f is None else h_f
+        h_r = self.ge_h0 if h_r is None else h_r
+        if self.ge_gain > 0.0:
+            gf = _ge_factor(h_f, self.ge_gain, self.ge_href, self.ge_hmin, self.ge_floor)
+            gr = _ge_factor(h_r, self.ge_gain, self.ge_href, self.ge_hmin, self.ge_floor)
+        else:
+            gf = gr = 1.0
+        self._ge_f, self._ge_r = gf, gr        # 快照（RK2 两次评估覆盖 → 终值 = k2）
+        cd = self.drs_cd_scale if drs else 1.0
+        clr = self.drs_cl_scale if drs else 1.0
+        return kf * v2 * gf, kr * v2 * gr * clr, kd * v2 * cd
 
-    def wheel_loads(self, vx: float) -> dict[str, float]:
+    def drag_force(self, vx: float, drs: bool = False) -> float:
+        """纵向气动阻力 N（CdA 与 h 无关，独立求值；不触碰 ge 快照——
+        drag 的 aero_forces 调用若以名义高覆盖快照，trace 的 ge_f/ge_r
+        会恒为 1（P2a-4 调试实证），下压快照唯一来源 = wheel_loads）。"""
+        v2 = vx * vx
+        kd = float(self.aero_p.get("k_drag", 0.35))
+        cd = self.drs_cd_scale if drs else 1.0
+        return kd * v2 * cd
+
+    def wheel_loads(self, vx: float, drs: bool = False) -> dict[str, float]:
         q = QuasiInputs(gy=self.prev_ay / G, gx=self.prev_ax / G)
         # ★ 气动下压力注入（aero_force_n / aero_bias 已有语义）。
         # 勘误（2026-08-30，F-23 复核）：dfn_f/dfn_r 是前/后轴下压力，阻力不入垂向
         # 载荷——审查报告误把 dr 读成 drag；实际阻力在 derivs 中单独作用于 Fx，
         # 本函数物理正确，仅重命名消歧义。
-        dfn_f, dfn_r, _ = self.aero_forces(vx)
+        # P2a：h 用姿态估计（抬头 → 前净高增 / 后净高减），ge_gain>0 时生效。
+        h_f, h_r = self._ride_h()
+        dfn_f, dfn_r, _ = self.aero_forces(vx, h_f, h_r, drs)
+        self._aero_down_n = dfn_f + dfn_r      # 末步真实下压快照（含 ge/DRS，summary 用）
         q.aero_force_n = dfn_f + dfn_r
         q.aero_bias = dfn_f / max(1.0, dfn_f + dfn_r)
         loads = quasi_loads(self.v, q, self.mr, self.rcH, self.rc_sw)
@@ -196,12 +283,14 @@ class VehiclePlanar:
                 "mu_use": mu_use, "slip_k": slip_k}
 
     def derivs(self, s: np.ndarray, delta: float, throttle: float,
-               brake: float, dt: float) -> tuple[np.ndarray, dict]:
+               brake: float, dt: float, drs: bool = False) -> tuple[np.ndarray, dict]:
         """纯函数导数（F-22 修复，2026-08-30）：不再推进 roll_deg/pitch_deg/
         alpha_lat 等滞后状态——旧实现让 RK2 的 k1/k2 两次评估各推一次滞后，
-        τ_eff 减半且中点状态被污染。滞后推进统一移到 step() 末尾。"""
+        τ_eff 减半且中点状态被污染。滞后推进统一移到 step() 末尾。
+
+        P2a：drs 为步内常量输入（同 delta/throttle 语义，不影响纯函数性）。"""
         vx, vy, r = s[3], s[4], s[5]
-        fz = self.wheel_loads(vx)
+        fz = self.wheel_loads(vx, drs)
         steer = self.steer_angles(delta)
         Fx = Fy = Mz = 0.0
         diag = {}
@@ -215,8 +304,8 @@ class VehiclePlanar:
             Fy += fw["fy"]
             Mz += lx * fw["fy"] - ly * fw["fx"]
             diag[w] = fw
-        # ★ 气动阻力
-        _, _, f_drag = self.aero_forces(vx)
+        # ★ 气动阻力（P2a：独立求值，不覆盖 ge 快照）
+        f_drag = self.drag_force(vx, drs)
         Fx -= f_drag * 1.0
         m = self.v.mass_kg
         ax = Fx / m + r * vy
@@ -225,11 +314,11 @@ class VehiclePlanar:
         return np.array([0.0, 0.0, 0.0, ax, ay, ar]), diag
 
     def step(self, s: np.ndarray, dt: float, delta: float, throttle: float,
-             brake: float) -> tuple[np.ndarray, dict]:
-        k1, diag = self.derivs(s, delta, throttle, brake, dt)
+             brake: float, drs: bool = False) -> tuple[np.ndarray, dict]:
+        k1, diag = self.derivs(s, delta, throttle, brake, dt, drs)
         mid = s + 0.5 * dt * k1
         mid[3:] = np.clip(mid[3:], -90.0, 90.0)
-        k2, _ = self.derivs(mid, delta, throttle, brake, dt)
+        k2, _ = self.derivs(mid, delta, throttle, brake, dt, drs)
         s2 = s + dt * k2
         s2[3:] = np.clip(s2[3:], -90.0, 90.0)
         psi = s2[2]
@@ -343,13 +432,22 @@ def run_track_sim(req: TrackSimRequest) -> dict:
     finished = False
     warnings: list[str] = []
     max_ay = 0.0
+    # P2a DRS：局部曲率半径 > 阈值（直道）&& vx > 阈值 ⇒ 开翼（无轨道 DRS 区
+    # 标记，直道判定替代；drs_v_ms 高阈值/ge_gain=0 ⇒ 旧请求零变化）
+    drs_v_ms = float(aero.get("drs_v_ms", 40.0))
+    drs_r_min = float(aero.get("drs_curve_radius_m", 300.0))
+    curv = _curvature_radius(track_xy)
+    drs_steps = 0
     for k in range(n_steps):
         t = k * req.dt
         v_target = float(tgt_speed[min(idx, len(tgt_speed) - 1)])
         delta, throttle, brake, idx = drv(track_xy, state, idx, v_target, L, req.dt)
         if throttle < 0.02 and brake < 0.02 and abs(v_target - state[3]) > 0.5:
             throttle = 0.05
-        state, diag = car.step(state, req.dt, delta, throttle, brake)
+        drs_on = state[3] > drs_v_ms and curv[min(idx, len(curv) - 1)] > drs_r_min
+        state, diag = car.step(state, req.dt, delta, throttle, brake, drs_on)
+        if drs_on:
+            drs_steps += 1
         max_ay = max(max_ay, abs(car.prev_ay))
         if k % keep == 0 or k == n_steps - 1:
             row = {"t": round(t, 4), "x": round(state[0], 3), "y": round(state[1], 3),
@@ -358,7 +456,8 @@ def run_track_sim(req: TrackSimRequest) -> dict:
                    "roll": round(car.roll_deg, 3), "pitch": round(car.pitch_deg, 3),
                    "ay": round(car.prev_ay, 2), "ax": round(car.prev_ax, 2),
                    "delta": round(delta, 4),
-                   "throttle": round(throttle, 2), "brake": round(brake, 2)}
+                   "throttle": round(throttle, 2), "brake": round(brake, 2),
+                   "drs": int(drs_on), "ge_f": round(car._ge_f, 4), "ge_r": round(car._ge_r, 4)}
             for w in _WHEELS:
                 row[f"alpha_{w}"] = round(diag[w]["alpha"], 3)
                 row[f"alphaL_{w}"] = round(diag[w]["alpha_lat"], 3)
@@ -390,6 +489,8 @@ def run_track_sim(req: TrackSimRequest) -> dict:
                     "v_max": round(max((p["vx"] for p in trace), default=0.0), 2),
                     "max_ay_g": round(max_ay / G, 3),
                     "max_slip_deg": round(max(lats, default=0.0), 2),
-                    "aero_n": round(sum(car.aero_forces(state[3])[:2]), 1)},
+                    "aero_n": round(car._aero_down_n, 1),
+                    "drs_frac": round(drs_steps / max(1, n_steps), 5),
+                    "ge_f": round(car._ge_f, 4), "ge_r": round(car._ge_r, 4)},
         "warnings": warnings,
     })

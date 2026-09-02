@@ -137,19 +137,33 @@ def test_quasi_loads_roll_instability_reports_warning():
 # ── F-24：解析松弛在极端步长下稳定 ─────────────────────────────
 
 def test_relaxation_stable_at_extreme_dt():
-    """dt=0.05 / vx=40 / σ=0.3（旧显式欧拉比率 6.7 → 发散）下仿真仍须收敛稳定。"""
+    """dt=0.05 / vx=40 / σ=0.3（旧显式欧拉比率 6.7 → 发散）下仿真仍须收敛稳定。
+
+    G24（2026-09-02）：半径从 30m 改为 150m。原工况 r=30m @40m/s 要求
+    a_y = v²/R = 1600/30 = 53.3 m/s² = **5.44g**，任何轮胎都做不到（旧缺省胎
+    μ=2.29 也只能 2.29g）——车根本跑不上这条线，一直在深度饱和里跑偏，
+    |alphaL|<60° 那个断言只是在“能不能不爆”的边缘跑运气。它当时能过，
+    恰恰是因为 μ=2.29 这个不真实的占位值把车“托”住了。
+    现取 R=150m ⇒ a_y = 1600/150 = 10.7 m/s² = 1.09g，在 μ=1.50 下可达；
+    而数值应力本意（dt·vx/σ = 0.05×40/0.3 = 6.7 ≫ 2）完整保留。"""
     track = [{"x": R * math.cos(th), "y": R * math.sin(th), "target_speed": 40.0}
-             for R in [30.0] for th in np.linspace(0, 2 * math.pi, 33)][:-1]
+             for R in [150.0] for th in np.linspace(0, 2 * math.pi, 33)][:-1]
     body = {"vehicle": _vehicle(), "track": track, "dt": 0.05,
             "sim_time": 6.0, "start_speed": 40.0}
     r = client.post("/api/v3/chassis/simulate_track", json=body)
     assert r.status_code == 200
     b = r.json()
     assert b["status"] == "VALID", b.get("warnings")
-    # 解析解保证 alpha_lat 有界：|alphaL| 不超过 2× 稳态运动学侧偏的上包络
+    # 动作已物理可行：|alphaL| 应落在真实胎的工作区间（峰值 6~10°，留饱和余量）
     worst = max(max(abs(p[f"alphaL_{w}"]) for w in ("FR", "FL", "RR", "RL"))
                 for p in b["trace"])
-    assert worst < 60.0, worst
+    assert worst < 25.0, worst
+    # 速度未失控（本测试只守“松弛积分不发散”，不守循迹质量）
+    assert max(abs(p["vx"]) for p in b["trace"]) < 60.0
+    # ※ 待查（不属本测试契约，故不在此断言）：R=150m @40m/s 下 max|r|=0.79 rad/s，
+    #   而 v/R=0.267。DriverPI 纯追踪在“大半径 + 前视 18m”工况下有过转瞬态
+    #   （疑似 phantom bracket）。旧工况 R=30m 从未暴露它，因为车根本跑不上那条线。
+    #   归入 G24 待办，与前端赛道舞台的循迹质量一起查。
 
 
 # ── F-25：响应 JSON 严格合法 ───────────────────────────────────

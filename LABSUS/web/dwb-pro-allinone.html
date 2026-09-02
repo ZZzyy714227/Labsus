@@ -1344,7 +1344,9 @@ function sampleSweep(sw,tr,key){
 /* —— 稳态不足转向梯度（线性区，镜像引擎 chassis.quasi_loads）——
    TIRE_MF_QS 与引擎 TireParams 缺省同源；轮胎实测标定成功后由
    applyTireCalib() 覆写（讲义 EP08 数据链，与 03-mechanism.js 同构）。 */
-let TIRE_MF_QS = { Fy0: 8000, FzNom: 3500, By: 9, Cy: 1.2, LS: 0.10 };
+/* G24：缺省胎 = 真实 GT3 光头胎量级，与引擎 v3models.TireParams / 03-mechanism.js 同源。
+   μ = 5250/3500 = 1.50；By=20 ⇒ 峰值侧偏角 8.27°。旧值 8000/9 为占位值。 */
+let TIRE_MF_QS = { Fy0: 5250, FzNom: 3500, By: 20, Cy: 1.2, LS: 0.10 };
 function applyTireCalib(p){
   if(!p || typeof p !== "object") return;
   ["Fy0","FzNom","By","Cy","LS"].forEach(k=>{ if(isFinite(p[k])) TIRE_MF_QS[k]=p[k]; });
