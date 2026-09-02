@@ -103,6 +103,38 @@ class UniversalAutoPilot {
     this.last_brake = 0;
     this.active = false;
     this.path = null;
+    // G21 逐圈刹车点试探学习：每弯余量系数（0.85=首圈保守，逐圈→ 1.0 探极限；
+    // 冲出即回退并锁定——真实车手“一圈一圈试极限”的机制）
+    this.cornerMargins = {};
+    this.cornerLock = {};
+    this.cornerDirty = {};
+  }
+
+  /* G21：初始化逐弯学习（首圈留 15% 余量） */
+  initLapLearning(nCorners) {
+    this.cornerMargins = {};
+    this.cornerLock = {};
+    this.cornerDirty = {};
+    for (let i = 0; i < (nCorners || 0); i++) this.cornerMargins[i] = 0.85;
+  }
+
+  /* G21：冲出赛道事件上报（纯记录不重置）→ 该弯标记，圈末回退并锁定 */
+  reportRunoff(cid) {
+    if (cid >= 0) this.cornerDirty[cid] = true;
+  }
+
+  /* G21：圈末结算——干净弯推进余量（刹车更晚），冲出弯回退 0.12 并锁定不再激进 */
+  endLap() {
+    for (const k in this.cornerMargins) {
+      const i = +k;
+      if (this.cornerDirty[i]) {
+        this.cornerMargins[i] = Math.max(0.70, this.cornerMargins[i] - 0.12);
+        this.cornerLock[i] = true;
+      } else if (!this.cornerLock[i]) {
+        this.cornerMargins[i] = Math.min(1.0, this.cornerMargins[i] + 0.07);
+      }
+    }
+    this.cornerDirty = {};
   }
   
   setPath(newPath) {
@@ -131,9 +163,17 @@ class UniversalAutoPilot {
     while(e_heading > Math.PI) e_heading -= 2 * Math.PI;
     while(e_heading < -Math.PI) e_heading += 2 * Math.PI;
     
-    let safe_ey = target.crossTrackError;
+    // G21：追外-内-外赛车线（目标点 = 中心线 + 横向偏移）；无偏移字段的路径回退原行为。
+    let e_line;
+    if (target.refX !== undefined && target.nx !== undefined) {
+      e_line = (fx - target.refX) * target.nx + (fy - target.refY) * target.ny;
+    } else {
+      e_line = target.crossTrackError;
+    }
+    let safe_ey = e_line;
     if (safe_ey > 6.0) safe_ey = 6.0;
     if (safe_ey < -6.0) safe_ey = -6.0;
+    this.last_line_error = e_line;   /* 供 HUD“循迹偏离”显示（相对赛车线而非中心线） */
     
     // Adaptive Stanley gain: softer at high speed (330km/h), responsive in hairpins
     const k_st = 1.6 / (1.0 + 0.020 * u);
@@ -151,7 +191,10 @@ class UniversalAutoPilot {
     this.last_steer = ctrl_steer;
     
     // Longitudinal Speed Control with Smooth Deadband & Progressive Braking
-    let e_v = target.targetSpeed - u;
+    // G21：逐圈刹车学习——弯内目标速 × 余量系数（首圈 0.85，逐圈→ 1.0 = 刹车更晚）
+    const cid = (typeof target.cornerId === "number") ? target.cornerId : -1;
+    const margin = (cid >= 0 && this.cornerMargins[cid] !== undefined) ? this.cornerMargins[cid] : 1.0;
+    let e_v = target.targetSpeed * margin - u;
     this.pid_speed.integral += e_v * dt;
     this.pid_speed.integral = Math.max(-6, Math.min(6, this.pid_speed.integral));
     
@@ -3378,6 +3421,18 @@ function openCircuitStage() {
     };
   }
   
+  // G21：轻量圈数统计（过起终点线计圈 + 圈时）与越界记录状态初始化；
+  // 驾驶系统逐圈刹车学习按弯道数初始化（首圈 15% 余量）。
+  CIRCUIT_STAGE.lapState = {
+    lap: 0, lapStarted: false, t0: 0, lastS: 0,
+    lapTimes: [], events: [],
+    lapOffs: 0, lapPenalty: 0, totalOffs: 0, totalPenalty: 0,
+    lastLapTime: null, onGravel: false, runoffFlash: 0, lapFlash: 0
+  };
+  if(window.circuitPilot && CIRCUIT_STAGE.path && window.circuitPilot.initLapLearning) {
+    window.circuitPilot.initLapLearning(CIRCUIT_STAGE.path.cornerCount || 0);
+  }
+  
   requestAnimationFrame(circuitStageLoop);
 }
 
@@ -3433,6 +3488,50 @@ function respawnCircuitVehicle(eng, path, closestIdx) {
   CIRCUIT_STAGE.respawnNoticeTime = performance.now() + 2500;
 }
 
+/* G21：出界检测（纯记录不重置）+ 轻量圈数统计。
+   四轮出路肩判定：|中心线偏离| > 沥青半宽 + 路肩宽 + 半车宽（≈0.95m）。
+   冲出 → 记录事件/罚时 +5s + 上报驾驶学习；回赛道需自驶回（滞回防抖）。
+   计圈：弧长 wrap 越起终点线即完圈，圈时/越界/罚时挂在该圈。 */
+function trackLimitsAndLaps(pt, eng) {
+  const ls = CIRCUIT_STAGE.lapState;
+  if(!ls) return;
+  const path = CIRCUIT_STAGE.path;
+  const hw = (path && path.hw_m) || 4.9, kw = (path && path.kerb_m) || 1.35;
+  const EDGE = hw + kw + 0.95;
+  const ey = pt.crossTrackError;
+  const offTrack = Math.abs(ey) > EDGE;
+  if(offTrack && !ls.onGravel) {
+    ls.onGravel = true;
+    ls.lapOffs++; ls.totalOffs++;
+    ls.lapPenalty += 5; ls.totalPenalty += 5;
+    ls.runoffFlash = performance.now();
+    ls.events.push({ lap: ls.lap, turn: pt.turnZh || pt.turn || "?",
+                     speed: Math.round((eng.state.u || 0) * 3.6), t: performance.now() });
+    if(ls.events.length > 50) ls.events.shift();
+    if(window.circuitPilot && window.circuitPilot.reportRunoff) window.circuitPilot.reportRunoff(pt.cornerId);
+  } else if(!offTrack && ls.onGravel && Math.abs(ey) < EDGE - 0.7) {
+    ls.onGravel = false;
+  }
+  const totalLen = (path && path.totalLength) || 0;
+  const sArc = pt.s || 0;
+  if(totalLen > 0) {
+    if(!ls.lapStarted && sArc < totalLen * 0.1) {
+      ls.lapStarted = true; ls.t0 = performance.now(); ls.lap = 1;
+    } else if(ls.lapStarted && ls.lastS > totalLen * 0.9 && sArc < totalLen * 0.1) {
+      const nowT = performance.now();
+      const lapTime = (nowT - ls.t0) / 1000;
+      ls.lapTimes.push({ lap: ls.lap, time: lapTime, offs: ls.lapOffs, penalty: ls.lapPenalty });
+      if(ls.lapTimes.length > 20) ls.lapTimes.shift();
+      ls.lastLapTime = lapTime;
+      ls.lapFlash = nowT;
+      if(window.circuitPilot && window.circuitPilot.endLap) window.circuitPilot.endLap();
+      ls.lap++;
+      ls.t0 = nowT; ls.lapOffs = 0; ls.lapPenalty = 0;
+    }
+    ls.lastS = sArc;
+  }
+}
+
 function circuitStageLoop(now) {
   if (!CIRCUIT_STAGE.active) return;
 
@@ -3450,36 +3549,27 @@ function circuitStageLoop(now) {
     }
     
     const isUserManual = (CIRCUIT_STAGE.keys.w || CIRCUIT_STAGE.keys.s || CIRCUIT_STAGE.keys.a || CIRCUIT_STAGE.keys.d || CIRCUIT_STAGE.keys.space);
+    let trackPt = null;
     if(isUserManual) {
       if(window.circuitPilot) window.circuitPilot.active = false;
       if(CIRCUIT_STAGE.keys.a) ctrl.steer -= 8;
       if(CIRCUIT_STAGE.keys.d) ctrl.steer += 8;
       if(CIRCUIT_STAGE.keys.w) ctrl.throttle = 1.0;
       if(CIRCUIT_STAGE.keys.s || CIRCUIT_STAGE.keys.space) ctrl.brake = 1.0;
-      
-      const pt = CIRCUIT_STAGE.path.getLookahead(eng.state.X, eng.state.Y, eng.state.u);
-      e_y = pt.crossTrackError;
-      v_tar = pt.targetSpeed;
-      
-      // 手动驾驶冲出赛道脱轨保险：横向偏离 > 9.5m（超出赛道7m+路肩1.35m+缓冲区）则自动在安全前置点重置
-      if(Math.abs(e_y) > 9.5) {
-        respawnCircuitVehicle(eng, CIRCUIT_STAGE.path, pt.idx || 0);
-        e_y = 0;
-      }
+      trackPt = CIRCUIT_STAGE.path.getLookahead(eng.state.X, eng.state.Y, eng.state.u);
     } else {
       if(window.circuitPilot) {
         window.circuitPilot.active = CIRCUIT_STAGE.autoPilot;
         ctrl = window.circuitPilot.drive(eng.state, dt);
-        const pt = CIRCUIT_STAGE.path.getLookahead(eng.state.X, eng.state.Y, eng.state.u);
-        e_y = pt.crossTrackError;
-        v_tar = pt.targetSpeed;
-        
-        // 🔒 AUTO-RESPAWN INSURANCE: 脱轨保险机制（偏离 > 8.8m 允许赛车完全骑上路肩，超出路肩才重置）
-        if (Math.abs(e_y) > 8.8) {
-          respawnCircuitVehicle(eng, CIRCUIT_STAGE.path, pt.idx || 0);
-          e_y = 0;
-        }
+        trackPt = CIRCUIT_STAGE.path.getLookahead(eng.state.X, eng.state.Y, eng.state.u);
       }
+    }
+    // G21：出界自动重置已关闭——四轮出路肩后纯物理接管（砾石 μ=0.78 打滑减速，
+    // 可控后自己开回赛道），只记录越界事件 + 罚时，并反馈给逐圈刹车学习。
+    if(trackPt) {
+      e_y = trackPt.crossTrackError;
+      v_tar = trackPt.targetSpeed;
+      trackLimitsAndLaps(trackPt, eng);
     }
   }
 
@@ -3552,13 +3642,41 @@ function circuitStageLoop(now) {
     const elBrk = document.getElementById("c_hud_brk");
     if(elBrk) elBrk.textContent = (ctrl.brake * 100).toFixed(0) + " %";
     const elErr = document.getElementById("c_hud_err");
-    if(elErr) elErr.textContent = Math.abs(e_y).toFixed(2) + " m";
+    if(elErr) {
+      /* G21：循迹偏离改为相对赛车线（外-内-外目标线）而非中心线 */
+      const lineErr = (window.circuitPilot && typeof window.circuitPilot.last_line_error === "number")
+        ? window.circuitPilot.last_line_error : e_y;
+      elErr.textContent = Math.abs(lineErr).toFixed(2) + " m";
+    }
+    /* G21：圈数/越界/罚时读数 */
+    const elLap = document.getElementById("c_hud_lap");
+    if(elLap && CIRCUIT_STAGE.lapState) {
+      const ls = CIRCUIT_STAGE.lapState;
+      const lapTxt = ls.lapStarted ? ("L" + ls.lap) : "L-";
+      const lastTxt = ls.lastLapTime ? (" · 上圈 " + ls.lastLapTime.toFixed(1) + "s") : "";
+      elLap.textContent = lapTxt + lastTxt + " · 冲出 " + ls.totalOffs + " · 罚 " + ls.totalPenalty + "s";
+      elLap.style.color = ls.totalOffs > 0 ? "#f2cc60" : "#79c0ff";
+    }
     
     if(tgt) {
       const elTurn = document.getElementById("c_hud_turn");
       if(elTurn) elTurn.textContent = tgt.turnZh || tgt.turn || "主赛道";
       const elBadge = document.getElementById("c_hud_corner_badge");
-      if(elBadge) elBadge.textContent = "🏁 [S" + (tgt.sector || 1) + "] " + (tgt.turnZh || tgt.turn || "主赛道");
+      if(elBadge) {
+        /* G21：冲出赛道闪示 3 秒（红）——越界只记录不重置 */
+        const ls = CIRCUIT_STAGE.lapState;
+        if(ls && ls.runoffFlash && performance.now() - ls.runoffFlash < 3000) {
+          elBadge.textContent = "⚠ 冲出赛道！+5s 罚时（记录已入圈）";
+          elBadge.style.background = "rgba(120,20,20,0.92)";
+          elBadge.style.borderColor = "#ef4444";
+          elBadge.style.color = "#ffd7d7";
+        } else {
+          elBadge.textContent = "🏁 [S" + (tgt.sector || 1) + "] " + (tgt.turnZh || tgt.turn || "主赛道");
+          elBadge.style.background = "rgba(23,42,69,0.9)";
+          elBadge.style.borderColor = "#388bfd";
+          elBadge.style.color = "#58a6ff";
+        }
+      }
       
       const elSecBadge = document.getElementById("c_hud_sector_badge");
       if(elSecBadge) {
@@ -3734,7 +3852,7 @@ function renderCircuitScene(st, tel, ctrl) {
   // 1. Draw 3D Continuous Asphalt Surface, Kerbs & Walls (Sorted Back-to-Front via Painter's Algorithm)
   const path = CIRCUIT_STAGE.path;
   if (path && path.pts) {
-    const hw = 7000; // 7.0m half-width (14.0m wide Grand Prix track)
+    const hw = 4900; // G21 窄道：4.9m 沥青半宽（原 7.0m 缩短 30%，路肩 1.35m 保留）
     const N = path.pts.length;
     
     // Collect visible track segments and compute distance to camera
