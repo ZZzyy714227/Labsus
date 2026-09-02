@@ -921,45 +921,109 @@ class CircuitPath extends TrackPath {
       curr.curvature = dpsi / (ds + 1e-6);
     }
     
-    // 3b. G21 赛车线：外-内-外目标线偏移（真实车手线路——入弯靠外侧、弯心压路肩、
-    //     出弯放开，扩大转弯半径）。路肩在窄道（沥青半宽 4.9m）下从可选变必选。
-    const HW_M = 4.9, KERB_M = 1.35, CURV_EPS = 0.0045;
+    // 3b. G22 赛车线：外-内-外目标线偏移（激进走线——吃满路肩、追求圈速）。
+    //     ── G21 原实现的两个根因缺陷（scratch/diag_*.cjs 三脚本实测确认）────
+    //     (a) 弯道分段碎片化：退出阈值 0.6× 太紧，T1-T4 蜗牛弯被切成 4 段，每段
+    //         独立跑一遍完整「外侧→弯心→外侧」剖面；且存在弧长 15m/转角 3.6°
+    //         的样条噪声伪弯段。实测 15 段中 5 段总转角 <25°。
+    //     (b) apexOff/outOff 幅度只由赛道宽度与 severity 决定，完全不随段长缩放
+    //         ⇒ 弧长仅 74m 的短弯也被要求做 ~10m 横向摆动，实测目标线折角
+    //         0.806 m/m = 38.9°，物理上不可跟 → 车把一个弯扭成好几个弯。
+    //     ── 修复 ────────────────────────────────────────────────────────────
+    //     (1) 退出阈值放宽到 0.30×，减少同一物理弯被局部曲率回落切碎；
+    //     (2) 丢弃总转角 < MIN_TURN_DEG 的伪弯段（样条噪声不是弯）；
+    //     (3) 偏移剖面改【弧长参数化】并向相邻直道两侧各延伸 EXT_M —— 真实车手
+    //         在入弯前的直道上就已靠外侧，横向移动的距离来自直道而非弯内。
+    //         这是把折角降下来的关键：靠加长行程，而不是靠砍幅度，故仍能吃满路肩；
+    //     (4) 幅度按有效长度限幅。四段余弦剖面的峰值斜率解析式为
+    //         peak|d(offset)/ds| = 2π·(apexOff+outOff)/L_eff
+    //         （实测校验：L=74m、A=10m → 0.85 m/m，与量到的 0.806 吻合），
+    //         故反解 A ≤ SLOPE_MAX·L_eff/(2π)：短弯自动少摆、长弯吃满。
+    //     (5) 窗口重叠时用「弯心权重」交叉淡入淡出，而非硬切归属，保证符号连续。
+    //     注：与赛道宽度无关。hw_m=4.9（总宽 9.8m，比真实 F1 赛道 13~15m 更窄），
+    //         且幅度由 hw_m 推导 —— 加宽赛道只会放大摆幅、扭得更凶。
+    const HW_M = 4.9, KERB_M = 1.35;
+    const CURV_ENTER = 0.0045;              // 进入弯道阈值（R<222m）
+    const CURV_EXIT = CURV_ENTER * 0.30;    // 退出阈值（R<740m）——迟滞放宽防切碎
+    const MIN_TURN_DEG = 25.0;              // 段总转角下限，低于此为样条噪声
+    const EXT_M = 55.0;                     // 剖面向两侧直道延伸（横向行程的真正来源）
+    const SLOPE_MAX = 0.24;                 // |d(offset)/ds| 上限 m/m（≈13.5° 折角）
     this.hw_m = HW_M; this.kerb_m = KERB_M;
-    for(let i2 = 0; i2 < P; i2++){ this.pts[i2].offset = 0; this.pts[i2].cornerId = -1; }
-    // 弯道分段：|κ|>阈值的连续段（迟滞 0.6× 防 S 弯频繁切段），弯角≥5 点才成立；
-    // 弯心侧由曲率符号定（右弯 curv<0 → 弯心在右侧 +）
-    const cornerSegs = [];
+    for (let i2 = 0; i2 < P; i2++) { this.pts[i2].offset = 0; this.pts[i2].cornerId = -1; }
+
+    // (1) 曲率分弯（带迟滞）
+    const rawSegs = [];
     let ci = 0;
-    while(ci < P){
-      if(Math.abs(this.pts[ci].curvature) > CURV_EPS){
-        let cj = ci;
-        while(cj < P && Math.abs(this.pts[cj].curvature) > CURV_EPS * 0.6) cj++;
-        if(cj - ci >= 5) cornerSegs.push([ci, cj - 1]);
+    while (ci < P) {
+      if (Math.abs(this.pts[ci].curvature) > CURV_ENTER) {
+        let cj = ci + 1;
+        while (cj < P && Math.abs(this.pts[cj].curvature) > CURV_EXIT) cj++;
+        rawSegs.push([ci, cj - 1]);
         ci = cj;
       } else ci++;
     }
+    // (2) 段总转角 = 曲率沿弧长积分；弯心侧由符号定（右弯 curv<0 → 弯心在右 +）
+    const turnOf = (i0, i1) => {
+      let t = 0;
+      for (let k = i0; k < i1; k++) t += this.pts[k].curvature * (this.pts[k + 1].s - this.pts[k].s);
+      return t;
+    };
+    const cornerSegs = [];
+    for (const sg of rawSegs) {
+      if (Math.abs(turnOf(sg[0], sg[1])) * 180 / Math.PI >= MIN_TURN_DEG) cornerSegs.push(sg);
+    }
+    this.cornerSegsDropped = rawSegs.length - cornerSegs.length;
+
+    // (3)(4)(5) 逐段生成偏移剖面，交叉淡入淡出累加
+    const TL = this.totalLength;
+    const offNum = new Array(P).fill(0), offDen = new Array(P).fill(0);
+    const cidW = new Array(P).fill(-1), cidBest = new Array(P).fill(-1);
     let cid = 0;
-    for(const [i0, i1] of cornerSegs){
-      let sumCurv = 0;
-      for(let k = i0; k <= i1; k++) sumCurv += this.pts[k].curvature;
-      const apexDir = (sumCurv < 0) ? 1 : -1;             // 右弯→弯心右（+），左弯→弯心左（−）
-      const avgCurvAbs = Math.abs(sumCurv) / (i1 - i0 + 1);
-      const severity = Math.min(1, avgCurvAbs / 0.012);   // 弯越急 → 越贴路肩/越外放
-      const apexOff = (HW_M + 0.6) * (0.55 + 0.45 * severity);   // 弯心骑上路肩内侧（μ=1.18 可接受）
-      const outOff = (HW_M - 0.3) * (0.55 + 0.45 * severity);    // 入/出弯贴外侧沥青边（留 0.3m 余量）
-      const n = i1 - i0 + 1;
-      for(let k = i0; k <= i1; k++){
-        const phi = (k - i0) / Math.max(1, n - 1);
+    for (const [i0, i1] of cornerSegs) {
+      const s0 = this.pts[i0].s, s1 = this.pts[i1].s;
+      const wA = s0 - EXT_M, wB = s1 + EXT_M;              // 延伸后的窗口
+      const L_eff = Math.max(1.0, wB - wA);
+      const sumCurv = turnOf(i0, i1);
+      const apexDir = (sumCurv < 0) ? 1 : -1;
+      const avgCurvAbs = Math.abs(sumCurv) / Math.max(1, i1 - i0 + 1) / 2.0;
+      const severity = Math.min(1, avgCurvAbs / 0.010);     // 弯越急 → 越贴路肩/越外放
+      // 激进口径：弯心骑满路肩内侧（HW+0.65·KERB≈5.78m），入/出弯贴外侧沥青边
+      const sevF = 0.62 + 0.38 * severity;
+      let apexOff = (HW_M + 0.65 * KERB_M) * sevF;
+      let outOff = (HW_M - 0.10) * sevF;
+      // (4) 折角预算反解幅度上限
+      const ampMax = SLOPE_MAX * L_eff / (2 * Math.PI);
+      const ampScale = Math.min(1.0, ampMax / Math.max(0.01, apexOff + outOff));
+      apexOff *= ampScale; outOff *= ampScale;
+
+      for (let k = 0; k < P; k++) {
+        // 环状窗口：s 可能跨起终点，取落在 [wA,wB] 内的那个镜像
+        const sk = this.pts[k].s;
+        let cand = null;
+        for (let m = -1; m <= 1; m++) {
+          const c = sk + m * TL;
+          if (c >= wA && c <= wB) { cand = c; break; }
+        }
+        if (cand === null) continue;
+        const phi = (cand - wA) / L_eff;
         // 四段余弦（C¹）：0 → −outOff → +apexOff → −outOff → 0，段边界归零不跳变
         let prof;
-        if(phi < 0.25){ const t = phi / 0.25; prof = -outOff * (1 - Math.cos(Math.PI * t)) / 2; }
-        else if(phi < 0.5){ const t = (phi - 0.25) / 0.25; prof = -outOff + (apexOff + outOff) * (1 - Math.cos(Math.PI * t)) / 2; }
-        else if(phi < 0.75){ const t = (phi - 0.5) / 0.25; prof = apexOff - (apexOff + outOff) * (1 - Math.cos(Math.PI * t)) / 2; }
+        if (phi < 0.25) { const t = phi / 0.25; prof = -outOff * (1 - Math.cos(Math.PI * t)) / 2; }
+        else if (phi < 0.5) { const t = (phi - 0.25) / 0.25; prof = -outOff + (apexOff + outOff) * (1 - Math.cos(Math.PI * t)) / 2; }
+        else if (phi < 0.75) { const t = (phi - 0.5) / 0.25; prof = apexOff - (apexOff + outOff) * (1 - Math.cos(Math.PI * t)) / 2; }
         else { const t = (phi - 0.75) / 0.25; prof = -outOff * (1 + Math.cos(Math.PI * t)) / 2; }
-        this.pts[k].offset = apexDir * prof;
-        this.pts[k].cornerId = cid;
+        // (5) 弯心权重：phi=0.5 处 1，窗口两端 0 —— 重叠段之间平滑过渡
+        const w = Math.max(0, 1 - Math.abs(phi - 0.5) * 2);
+        if (w <= 0) continue;
+        offNum[k] += apexDir * prof * w;
+        offDen[k] += w;
+        if (w > cidBest[k]) { cidBest[k] = w; cidW[k] = cid; }
       }
       cid++;
+    }
+    for (let k = 0; k < P; k++) {
+      this.pts[k].offset = offDen[k] > 1e-9 ? offNum[k] / offDen[k] : 0;
+      this.pts[k].cornerId = offDen[k] > 1e-9 ? cidW[k] : -1;
     }
     this.cornerCount = cid;
     // 移动平均平滑（防段间微跳与离散噪声），环状窗口 7 点
@@ -969,14 +1033,67 @@ class CircuitPath extends TrackPath {
       for(let w2 = -3; w2 <= 3; w2++) s += offRaw[(i3 + w2 + P) % P];
       this.pts[i3].offset = s / 7;
     }
+    // (6) 斜率硬限幅。步骤 (4) 的幅度预算只对【单段】剖面成立（峰值斜率
+    //     2π·A/L_eff）；步骤 (5) 的交叉淡入淡出在窗口重叠区会合成出超出该解析界
+    //     的斜率（实测 0.291 > 0.24）。故对 offset 数组做前向+后向双向限幅，
+    //     使 |d(offset)/ds| ≤ SLOPE_MAX 【恒成立】，不依赖剖面形状的假设。
+    for (let pass = 0; pass < 6; pass++) {
+      let changed = false;
+      for (let k = 0; k < P - 1; k++) {
+        const lim = SLOPE_MAX * Math.max(1e-6, this.pts[k + 1].s - this.pts[k].s);
+        const d = this.pts[k + 1].offset - this.pts[k].offset;
+        if (d > lim) { this.pts[k + 1].offset = this.pts[k].offset + lim; changed = true; }
+        else if (d < -lim) { this.pts[k + 1].offset = this.pts[k].offset - lim; changed = true; }
+      }
+      for (let k = P - 1; k > 0; k--) {
+        const lim = SLOPE_MAX * Math.max(1e-6, this.pts[k].s - this.pts[k - 1].s);
+        const d = this.pts[k].offset - this.pts[k - 1].offset;
+        if (d > lim) { this.pts[k - 1].offset = this.pts[k].offset - lim; changed = true; }
+        else if (d < -lim) { this.pts[k - 1].offset = this.pts[k].offset + lim; changed = true; }
+      }
+      if (!changed) break;
+    }
     for(let i4 = 0; i4 < P; i4++){
       const pt = this.pts[i4];
       pt.refX = pt.x + pt.nx * pt.offset;
       pt.refY = pt.y + pt.ny * pt.offset;
     }
+
+    // 3c. G22 赛车线自身的切向 / 曲率 / 法向 / 弧长（与中心线同口径的 7 点跨距）。
+    //     ★ 根因修复核心：控制器此前用【中心线】的 heading/curvature 去追【赛车线】的
+    //       横向目标，航向项增益 1.0 对横向项 ~0.03 形成 30:1 压制 ⇒ 车被拉回中线。
+    //       这三个量让赛车线成为一等公民，drive() 的三个参考量得以同源。
+    for (let i5 = 0; i5 < P; i5++) {
+      const pv = this.pts[(i5 - 4 + P) % P], nx5 = this.pts[(i5 + 4) % P];
+      this.pts[i5].refHeading = Math.atan2(-(nx5.refX - pv.refX), nx5.refY - pv.refY);
+    }
+    let sRef = 0;
+    for (let i6 = 0; i6 < P; i6++) {
+      const pv = this.pts[(i6 - 1 + P) % P], cu = this.pts[i6];
+      sRef += Math.hypot(cu.refX - pv.refX, cu.refY - pv.refY);
+      cu.sRef = sRef;
+    }
+    this.totalLengthRef = sRef;
+    for (let i7 = 0; i7 < P; i7++) {
+      const pv = this.pts[(i7 - 4 + P) % P], nx7 = this.pts[(i7 + 4) % P];
+      const ds = Math.hypot(nx7.refX - pv.refX, nx7.refY - pv.refY);
+      let dpsi = nx7.refHeading - pv.refHeading;
+      while (dpsi > Math.PI) dpsi -= 2 * Math.PI;
+      while (dpsi < -Math.PI) dpsi += 2 * Math.PI;
+      this.pts[i7].refCurvature = dpsi / (ds + 1e-6);
+      this.pts[i7].refNx = Math.cos(this.pts[i7].refHeading);
+      this.pts[i7].refNy = Math.sin(this.pts[i7].refHeading);
+    }
+    this._hintCtrl = 0;   // getLookahead 最近点搜索的 hint 缓存
+    this._hintRoad = 0;   // getRoadElevation 的 hint 缓存（每子步 4 轮，热路径）
     
     // 4. Physical Aerodynamic Speed Envelope & Friction Limits
     // G21（2026-09-01）push 升级：横向包络 0.72μ→0.85μ，制动 4.8→5.5，加速 5.2→5.8（真实车手探极限口径）
+    // G22：横向包络改用【赛车线曲率 refCurvature】而非中心线曲率 —— 车跑的是赛车线，
+    //      可用侧向加速度由赛车线的真实半径决定。弯心处赛车线半径更大 → 曲率更小
+    //      → 自然得到更高弯速，这就是「赛车线圈速奖励」的物理来源，无需再拍一个
+    //      经验百分比（原 5b 的 +4% 已删）；而换线过渡区 refCurvature 偏大 → 自动压速，
+    //      也是正确的（横向移动本身要吃掉一部分抓地力预算）。
     const vehType = (typeof window !== "undefined" && window.S && window.S.vehicleType) ? window.S.vehicleType : "formula";
     const v_top_kmh = (vehType === "formula") ? 335.0 : (vehType === "gt3" || vehType === "sport") ? 295.0 : (vehType === "kart") ? 140.0 : 245.0;
     const v_top_veh = v_top_kmh * (1000.0 / 3600.0);
@@ -985,7 +1102,8 @@ class CircuitPath extends TrackPath {
     
     for(let i = 0; i < P; i++){
       const pt = this.pts[i];
-      const curv_v = Math.sqrt(a_lat_max / (Math.abs(pt.curvature) + 1e-5));
+      const kLine = (pt.refCurvature !== undefined) ? pt.refCurvature : pt.curvature;
+      const curv_v = Math.sqrt(a_lat_max / (Math.abs(kLine) + 1e-5));
       pt.v_max = Math.min(v_top_veh, Math.min(pt.v_max, curv_v));
     }
     
@@ -1022,46 +1140,117 @@ class CircuitPath extends TrackPath {
       if(maxDiff < 0.01) break;
     }
 
-    // 5b. G21：赛车线扩大有效转弯半径 → 弯点小幅速度奖励（≤4%，急弯多奖）
-    for(let i5 = 0; i5 < P; i5++){
-      const pt = this.pts[i5];
-      if(pt.cornerId >= 0){
-        const sev = Math.min(1, Math.abs(pt.curvature) / 0.012);
-        pt.v_max = Math.min(v_top_veh, pt.v_max * (1 + 0.04 * sev));
-      }
-    }
+    // 5b. G22：原「弯点 +4% 速度奖励」已删除 —— 该经验加成是在补偿「速度包络用中心线
+    //      曲率、但车实际跑赛车线」的口径不一致。步骤 4 改用 refCurvature 后，弯速奖励
+    //      由赛车线的真实几何半径直接给出（弯心半径更大 → 曲率更小 → v_max 更高），
+    //      物理自洽且逐点连续，不再需要按 cornerId 拍一个全局百分比。
   }
 
-  getLookahead(x, y, v) {
+  /* G22：带 hint 窗口的最近点搜索。
+     性能根由：VehicleDynamics15DOF.step() 以 1000Hz 子步对【四个车轮】各调一次
+     getRoadElevation，单帧约 16 子步 × 4 轮 = 64 次；旧的 O(P) 全量遍历在 P=2884 时
+     是 ~18万次距离计算/帧。窗口 ±WIN 点（≈±80m）+ 两道退化护栏后降至 ~5千次。
+     useRef=true 时对赛车线(refX/refY)搜索，false 对中心线(x/y)。
+     护栏：① 命中窗口边界 ⇒ 可能真最近点在窗外；② 窗口内最近距离 > 25m ⇒
+     车辆可能已传送/重生。任一命中则回退全量搜索，保证结果与旧实现一致。 */
+  _nearestIdx(x, y, hint, useRef) {
     const P = this.pts.length;
-    let minDist = Infinity;
-    let closestIdx = 0;
-    
-    for(let i = 0; i < P; i++){
-      const pt = this.pts[i];
-      const d = (pt.x - x)**2 + (pt.y - y)**2;
-      if(d < minDist){ minDist = d; closestIdx = i; }
+    const WIN = 40;
+    const px = p => (useRef ? p.refX : p.x), py = p => (useRef ? p.refY : p.y);
+    if (typeof hint === "number" && hint >= 0 && hint < P && P > WIN * 2) {
+      let best = -1, bd = Infinity, lo = -1, hi = -1;
+      for (let k = -WIN; k <= WIN; k++) {
+        const i = (hint + k + P) % P, p = this.pts[i];
+        const d = (px(p) - x) ** 2 + (py(p) - y) ** 2;
+        if (d < bd) { bd = d; best = i; }
+        if (k === -WIN) lo = i;
+        if (k === WIN) hi = i;
+      }
+      if (best !== lo && best !== hi && bd < 625.0) return best;
     }
-    
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < P; i++) {
+      const p = this.pts[i];
+      const d = (px(p) - x) ** 2 + (py(p) - y) ** 2;
+      if (d < bd) { bd = d; best = i; }
+    }
+    return best;
+  }
+
+  /* G22：沿赛车线弧长前进 ld 米，返回目标点索引。
+     旧实现名为 getLookahead 但只返回【最近点】，v 参数完全未用。现保留真弧长
+     前进能力，但【默认关闭】——原因见 _leadDist。 */
+  _advanceIdx(i, ld) {
+    if (!(ld > 0)) return i;
+    const P = this.pts.length;
+    let acc = 0, k = i;
+    for (let n = 0; n < P; n++) {
+      const kn = (k + 1) % P;
+      const a = this.pts[k], b = this.pts[kn];
+      const seg = Math.hypot(b.refX - a.refX, b.refY - a.refY);
+      if (acc + seg >= ld) return kn;
+      acc += seg; k = kn;
+    }
+    return k;
+  }
+
+  /* G22：前视距离——【默认 0】，这是经过推导的结论而非遗漏。
+     drive() 是 Stanley 型控制器：横向误差在前轴量 + 曲率前馈。该组合在等曲率
+     弧上【精确】：车在线上且对齐时 e_ψ=0、e_y=0 ⇒ δ = -atan(WB·k)，正好等于所需。
+     若再对 heading 施加弧长前视 ld，前视点切向相对车身已转过 k·ld，会与曲率
+     前馈【重复计权】：k=0.02（R=50m）、ld=20m 时多打 23°，而真正需要的只有 3°。
+     旧代码的 `+forward*(lookDist*0.22)` 平移就是这类重复计权（且平移方向跟车身
+     航向而非赛道）。如确需预览，请显式传 leadM 并同步下调曲率前馈。 */
+  _leadDist(v, leadM, kAt) {
+    if (typeof leadM !== "number" || !isFinite(leadM) || leadM <= 0) return 0;
+    // 显式启用时：急弯自动少看（发卡弯 R≈25m 里看 30m 等于看到 70° 开外）
+    const ldCurv = 0.75 / Math.max(0.004, Math.abs(kAt || 0));
+    return Math.max(0, Math.min(45.0, Math.min(leadM, ldCurv)));
+  }
+
+  getLookahead(x, y, v, leadM) {
+    // ★ G22：最近点对【赛车线】搜索 —— 控制基准必须与目标线同源。
+    const closestIdx = this._nearestIdx(x, y, this._hintCtrl, true);
+    this._hintCtrl = closestIdx;
     const pt = this.pts[closestIdx];
+
+    // 两套横向误差，语义必须分开：
+    //   crossTrackError —— 相对【中心线】，物理赛道边界与罚时判定用（赛道边缘
+    //                      关于中心线对称，不能用赛车线量，否则弯心永远不触发）；
+    //   lineError       —— 相对【赛车线】，控制用（法向也取赛车线法向 refNx/refNy）。
     const crossTrackError = (x - pt.x) * pt.nx + (y - pt.y) * pt.ny;
-    
+    const lineError = (x - pt.refX) * pt.refNx + (y - pt.refY) * pt.refNy;
+
+    const ld = this._leadDist(v, leadM, pt.refCurvature);
+    const lookIdx = this._advanceIdx(closestIdx, ld);
+    const tp = this.pts[lookIdx];
+
     return {
-      targetHeading: pt.heading,
-      targetCurvature: pt.curvature,
-      targetSpeed: pt.v_max,
+      // ★ G22：三个控制参考量全部取自赛车线的前视点（修复前：heading/curvature
+      //   取中心线、横向目标取赛车线，两条线互相打架）
+      targetHeading: tp.refHeading,
+      targetCurvature: tp.refCurvature,
+      targetSpeed: tp.v_max,
       crossTrackError: crossTrackError,
+      lineError: lineError,
+      // 以下 x/y/nx/ny 保持【中心线】语义不变（向后兼容：11-stages.js:3782 的
+      // 转播机位用 tvPt.x/y/nx/ny 向赛道侧外推 22m，改成赛车线会偏移最多 5.8m）
       nx: pt.nx,
       ny: pt.ny,
       x: pt.x,
       y: pt.y,
       idx: closestIdx,
-      // G21：赛车线目标（外-内-外）与弯道索引（逐圈刹车学习用）
+      // G21/G22：赛车线目标点与法向（外-内-外）、弯道索引（逐圈刹车学习用）
       offset: pt.offset || 0,
-      refX: pt.refX !== undefined ? pt.refX : pt.x,
-      refY: pt.refY !== undefined ? pt.refY : pt.y,
+      refX: pt.refX,
+      refY: pt.refY,
+      refNx: pt.refNx,
+      refNy: pt.refNy,
       cornerId: pt.cornerId !== undefined ? pt.cornerId : -1,
+      lookIdx: lookIdx,
+      leadM: ld,
       s: pt.s || 0,
+      sRef: pt.sRef || 0,
       turn: pt.turn,
       turnZh: pt.turnZh,
       sector: pt.sector,
@@ -1074,21 +1263,19 @@ class CircuitPath extends TrackPath {
   }
 
   getRoadElevation(x, y) {
-    let minDist = Infinity;
-    let closestIdx = 0;
-    
-    for(let i = 0; i < this.totalPoints; i++){
-      const pt = this.pts[i];
-      const d = (pt.x - x)**2 + (pt.y - y)**2;
-      if(d < minDist){ minDist = d; closestIdx = i; }
-    }
-    
+    // G22：热路径——VehicleDynamics15DOF.step() 以 1000Hz 子步对四轮各调一次，
+    // 单帧 ~64 次。旧的 O(P) 全量遍历在 P=2884 时是 ~18万次距离计算/帧，
+    // 改用 hint 窗口后降至 ~5千次。路面高程/路肩/砾石均关于【中心线】定义，
+    // 故此处仍对中心线搜索（useRef=false），与 getLookahead 的赛车线基准分开。
+    const closestIdx = this._nearestIdx(x, y, this._hintRoad, false);
+    this._hintRoad = closestIdx;
+
     const pt = this.pts[closestIdx];
     const ey = (x - pt.x) * pt.nx + (y - pt.y) * pt.ny;
     const absEy = Math.abs(ey);
     const hw = this.hw_m || 7.0; // G21：窄道——沥青半宽（新 4.9m，旧赛道对象回退 7.0）
     const kw = this.kerb_m || 1.35; // 1.35m FIA Kerb width
-    const s = closestIdx * 2.0; // ~2m per interpolated point
+    const s = pt.s || (closestIdx * 2.0); // G22：用真实累计弧长（旧实现用 idx*2 估算）
     
     let z_road = 0.0;
     let isKerb = false;

@@ -337,16 +337,36 @@ class TrackPoint(BaseModel):
 
 
 class TireParams(BaseModel):
-    """四轮共用的 MF 参数（缺省 = tire_mf 默认）。μ 由 Fy0/FzNom 推导用于摩擦圆。"""
-    Fy0: float = 8000.0
-    By: float = 9.0
+    """四轮共用的 MF 参数（缺省 = tire_mf 默认）。μ 由 Fy0/FzNom 推导用于摩擦圆。
+
+    G24（2026-09-02）：缺省值换为真实 GT3 光头胎量级。旧缺省 Fy0=8000 / By=9 是
+    “先填个数让代码跑起来”的占位值，两处不真实：
+      • μ = 8000/3500 = 2.29 —— 真实赛车胎峰值摩擦 1.5~1.6；2.29 意味着无空力
+        的干地也能跑 2.29g，物理上做不到。
+      • By = 9 —— 配合 Cy=1.2/Ey=-0.5 使峰值出现在侧偏角 17.87°，真实光头胎
+        6~10°。后果：车需侧滑到 18° 才拿到满拓地力，实测前轴已过峰值饱和
+        （20.5°）而后轴只用 23%（4.2°）⇒ 深度不足转向，自动驾驶在弯里爬（47km/h）。
+    新缺省：μ = 5250/3500 = 1.50；By = 20 ⇒ 峰值侧偏角 atan(2.901/20) = 8.27°，
+    峰值滑移率 2.901/(20×1.2) = 12.1%（真实胎 8~15%）。
+    Cy/Ey/LS/FzNom 保留：LS=0.10 即“载荷翻倍 μ 降 10%”，已在真实量级。
+    注：s_peak=2.901 仅由 Cy/Ey 定（解 1.5s−0.5·atan s = tan(π/(2Cy))），
+    故调 By 就是线性地调峰值侧偏角。"""
+    Fy0: float = 5250.0
+    By: float = 20.0
     Cy: float = 1.2
     Ey: float = -0.5
     Sh: float = 0.0
     Sv: float = 0.0
     FzNom: float = 3500.0
     LS: float = 0.10               # 载荷敏感性（重载 μ 递减；0 = 线性基线）
-    Cg: float = 0.5                # 外倾推力系数 1/rad（S3-1 升级：Fy += -Cg·γ·Fz）
+    Cg: float = 6.0                # 外倾推力系数 1/rad（Fy += -Cg·γ·Fz）
+                                   # G24-S3（2026-09-02）：0.5 → 6.0。0.5 只给 1750 N/rad
+                                   # @ FzNom（真实 15~25 kN/rad），实测 camber 对总侧向力
+                                   # 贡献 <3% ⇒ 调悬架几何改不动圈速（lap 回归 Δ=0.012%）。
+                                   # 6.0 @ FzNom=3500 给 21 000 N/rad，入真实量级。
+                                   # ⚠ 提级必须与摩擦圆钳位同来：线性外倾项在 MF 力之外
+                                   #   叠加会顶破 μ·Fz（transient.wheel_force 用
+                                   #   lat_avail=sqrt(μfz²-fx²) 钳位，前端 11-stages.js 同式）。
     Ls: float = 0.35               # 侧偏松弛长度 m（瞬态一阶滞后）
 
     @model_validator(mode="after")
@@ -371,10 +391,30 @@ class PowertrainParams(BaseModel):
 
 
 class AeroParams(BaseModel):
-    """气动（S3-1 升级）：下压力/阻力随 v²。k 单位 N/(m/s)²。"""
+    """气动（S3-1 升级 + P2a 双端统一标定，2026-09-02）：
+
+    基础：下压力/阻力随 v²，k 单位 N/(m/s)²。
+    P2a 新增两链（与前端 qs ge*/drs* 同构）：
+    - cl(h)：ge(h) = clamp(1 + ge_gain·(href/max(h,hmin) − 1), floor, 1+ge_gain·(href/hmin−1))，
+      h 为该轴车底净高 m（平面模型无 heave 状态，用名义 ge_h0_mm ± 姿态俯仰估计）；
+    - DRS：开翼削总阻力 ×drs_cd_scale、后轴 cl ×drs_cl_scale（尾翼襟翼物理），
+      直道（局部曲率半径 > drs_curve_radius_m）且 vx > drs_v_ms 自动触发。
+    向后兼容：缺省 ge_gain=0（h 无效应）⇒ 未显式配置新字段的旧请求行为不变。
+    """
     k_down_f: float = 0.55         # 前轴下压力系数
     k_down_r: float = 0.45         # 后轴下压力系数
     k_drag: float = 0.35           # 纵向阻力系数
+    # ── P2a cl(h) 地面效应（高度敏感）──
+    ge_gain: float = 0.0           # 高度敏感强度；0 = 关闭（向后兼容缺省）
+    ge_h0_mm: float = 100.0        # 名义车底净高 mm（h_f/h_r 姿态基准）
+    ge_href_mm: float = 100.0      # ge=1 参考高 mm（h=href 时无增强）
+    ge_hmin_mm: float = 30.0       # 车底净高下限 mm（触底防护，增强在此饱和）
+    ge_floor: float = 0.80         # 高 h 下压衰减下限（cl 不归零）
+    # ── P2a DRS 尾翼 ──
+    drs_v_ms: float = 40.0         # 开翼速度阈值 m/s（前端预设同构，~144 km/h）
+    drs_cd_scale: float = 0.72     # 开翼总阻力缩放（−28%）
+    drs_cl_scale: float = 0.90     # 开翼后轴 cl 缩放（−10%）
+    drs_curve_radius_m: float = 300.0   # 直道判定：局部曲率半径下限 m
 
 
 class TrackSimRequest(BaseModel):

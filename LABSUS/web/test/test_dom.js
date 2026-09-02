@@ -214,7 +214,7 @@ ok(/shanghai:\{zh:"上海国际赛车场/.test(ai), 'allinone: Shanghai 5.45km �
  * chassis.quasi_loads 逐字同构；TIRE_MF_QS 与引擎 TireParams 缺省值同源，
  * 改一侧必须同步另一侧，否则双内核对拍漂移。 */
 ok(/usGradient:\s*\{\s*name: "稳态不足转向梯度/.test(fc), 'fullchassis: US Gradient 评价基准在位');
-ok(/let TIRE_MF_QS = \{ Fy0: 8000, FzNom: 3500, By: 9, Cy: 1\.2, LS: 0\.10 \}/.test(fc),
+ok(/let TIRE_MF_QS = \{ Fy0: 5250, FzNom: 3500, By: 20, Cy: 1\.2, LS: 0\.10 \}/.test(fc),
   'fullchassis: 准静态 MF 参数集与引擎 TireParams 缺省同源（模块级可变，标定可覆写）');
 ok(/usGrad: usGrad, alphaF: alphaFDeg/.test(fc) && /jackingN: jackingN/.test(fc),
   'fullchassis: solveQuasiStatic 输出 usGrad/α/Jacking');
@@ -244,8 +244,10 @@ ok(/gyOverride!==undefined\?gyOverride:S\.qs\.gy/.test(fc),
   'fullchassis: solveQuasiStatic 支持 gy 覆写（扫掠扫描基础）');
 /* 双端对拍锚：JS 准静态 MF 参数必须与引擎 v3models TireParams 缺省逐字一致 */
 const engModels = fs.readFileSync(path.join(webDir, '..', 'engine', 'src', 'api', 'v3models.py'), 'utf8');
-ok(/Fy0: float = 8000\.0/.test(engModels) && /FzNom: float = 3500\.0/.test(engModels)
-   && /LS: float = 0\.10/.test(engModels), 'engine: TireParams 缺省值未变（双端对拍锚）');
+ok(/Fy0: float = 5250\.0/.test(engModels) && /FzNom: float = 3500\.0/.test(engModels)
+   && /By: float = 20\.0/.test(engModels) && /LS: float = 0\.10/.test(engModels)
+   && /Cg: float = 6\.0/.test(engModels),
+   'engine: TireParams 缺省值未变（双端对拍锚；G24 已换为真实 GT3 胎 μ=1.50/By=20，G24-S3 Cg=6.0）');
 const engChassis = fs.readFileSync(path.join(webDir, '..', 'engine', 'src', 'api', 'chassis.py'), 'utf8');
 ok(/us_grad_deg_per_g/.test(engChassis) && /jacking_heave_mm/.test(engChassis),
   'engine: chassis solve 输出 US Gradient / Jacking');
@@ -265,6 +267,28 @@ ok(/function rollSteerRate/.test(ai) && /function bushPayload/.test(ai)
   'allinone: δ-ay 完整版 + 衬套标定链同构');
 
 require('./stage_boot_check')(webDir, ok, failures.push.bind(failures), { log(){} });
+
+/* G22（2026-09-02）第四道防线：赛车线循迹回归。
+ * 用户实测两个症状（车被"吸"回中心线、一个弯扭成好几个弯）的根因回归网：
+ * 锁定 getLookahead 的三个控制参考量必须同源于赛车线、弯道不得碎片化、
+ * 偏移折角受限、以及全圈闭环的横向偏差与转向翻转次数。
+ * 单独跑：node web/test/test_racingline.js */
+require('./test_racingline')(webDir, ok, failures.push.bind(failures), { log(){} });
+
+/* G23（2026-09-02）第五道防线：K&C 接线回归。
+ * 锁定“改悬架几何必须改变赛道行为”：前端 15DOF 引擎必须查 SIM.swF/swR
+ * 扫掠表取 camber/toe，而不是用硬编码梯度常数（接线前实测：两套不同几何
+ * 跑 300 步，Δψ/Δv/Δcamber 均为 0）。同时把守 LUT 缺失时的安全回退。
+ * 单独跑：node web/test/test_kc_wiring.js */
+require('./test_kc_wiring')(webDir, ok, failures.push.bind(failures), { log(){} });
+
+/* G23-P1b（2026-09-02）第六道防线：轮胎模型接线回归。
+ * 锁定前端 magicFormula 必须消费 SIM.tireCalib / SIM.tireCalibEy，且具备真实
+ * 轮胎的物理性质：峰值侧偏角 3~25°（接线前 0.32° = 纯库仑摩擦）、
+ * C_alpha/Fz 8~40（接线前 604）、载荷敏感性（Jensen）、摩擦圆不超、
+ * 路面 μ 仍定绝对上限（保证速度包络语义不变）。
+ * 单独跑：node web/test/test_tire_wiring.js */
+require('./test_tire_wiring')(webDir, ok, failures.push.bind(failures), { log(){} });
 
 // ── 结果 ───────────────────────────────────────────────────────
 if (failures.length) {
