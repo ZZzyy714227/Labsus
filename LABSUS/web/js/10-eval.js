@@ -921,12 +921,67 @@ class CircuitPath extends TrackPath {
       curr.curvature = dpsi / (ds + 1e-6);
     }
     
+    // 3b. G21 赛车线：外-内-外目标线偏移（真实车手线路——入弯靠外侧、弯心压路肩、
+    //     出弯放开，扩大转弯半径）。路肩在窄道（沥青半宽 4.9m）下从可选变必选。
+    const HW_M = 4.9, KERB_M = 1.35, CURV_EPS = 0.0045;
+    this.hw_m = HW_M; this.kerb_m = KERB_M;
+    for(let i2 = 0; i2 < P; i2++){ this.pts[i2].offset = 0; this.pts[i2].cornerId = -1; }
+    // 弯道分段：|κ|>阈值的连续段（迟滞 0.6× 防 S 弯频繁切段），弯角≥5 点才成立；
+    // 弯心侧由曲率符号定（右弯 curv<0 → 弯心在右侧 +）
+    const cornerSegs = [];
+    let ci = 0;
+    while(ci < P){
+      if(Math.abs(this.pts[ci].curvature) > CURV_EPS){
+        let cj = ci;
+        while(cj < P && Math.abs(this.pts[cj].curvature) > CURV_EPS * 0.6) cj++;
+        if(cj - ci >= 5) cornerSegs.push([ci, cj - 1]);
+        ci = cj;
+      } else ci++;
+    }
+    let cid = 0;
+    for(const [i0, i1] of cornerSegs){
+      let sumCurv = 0;
+      for(let k = i0; k <= i1; k++) sumCurv += this.pts[k].curvature;
+      const apexDir = (sumCurv < 0) ? 1 : -1;             // 右弯→弯心右（+），左弯→弯心左（−）
+      const avgCurvAbs = Math.abs(sumCurv) / (i1 - i0 + 1);
+      const severity = Math.min(1, avgCurvAbs / 0.012);   // 弯越急 → 越贴路肩/越外放
+      const apexOff = (HW_M + 0.6) * (0.55 + 0.45 * severity);   // 弯心骑上路肩内侧（μ=1.18 可接受）
+      const outOff = (HW_M - 0.3) * (0.55 + 0.45 * severity);    // 入/出弯贴外侧沥青边（留 0.3m 余量）
+      const n = i1 - i0 + 1;
+      for(let k = i0; k <= i1; k++){
+        const phi = (k - i0) / Math.max(1, n - 1);
+        // 四段余弦（C¹）：0 → −outOff → +apexOff → −outOff → 0，段边界归零不跳变
+        let prof;
+        if(phi < 0.25){ const t = phi / 0.25; prof = -outOff * (1 - Math.cos(Math.PI * t)) / 2; }
+        else if(phi < 0.5){ const t = (phi - 0.25) / 0.25; prof = -outOff + (apexOff + outOff) * (1 - Math.cos(Math.PI * t)) / 2; }
+        else if(phi < 0.75){ const t = (phi - 0.5) / 0.25; prof = apexOff - (apexOff + outOff) * (1 - Math.cos(Math.PI * t)) / 2; }
+        else { const t = (phi - 0.75) / 0.25; prof = -outOff * (1 + Math.cos(Math.PI * t)) / 2; }
+        this.pts[k].offset = apexDir * prof;
+        this.pts[k].cornerId = cid;
+      }
+      cid++;
+    }
+    this.cornerCount = cid;
+    // 移动平均平滑（防段间微跳与离散噪声），环状窗口 7 点
+    const offRaw = this.pts.map(p => p.offset);
+    for(let i3 = 0; i3 < P; i3++){
+      let s = 0;
+      for(let w2 = -3; w2 <= 3; w2++) s += offRaw[(i3 + w2 + P) % P];
+      this.pts[i3].offset = s / 7;
+    }
+    for(let i4 = 0; i4 < P; i4++){
+      const pt = this.pts[i4];
+      pt.refX = pt.x + pt.nx * pt.offset;
+      pt.refY = pt.y + pt.ny * pt.offset;
+    }
+    
     // 4. Physical Aerodynamic Speed Envelope & Friction Limits
+    // G21（2026-09-01）push 升级：横向包络 0.72μ→0.85μ，制动 4.8→5.5，加速 5.2→5.8（真实车手探极限口径）
     const vehType = (typeof window !== "undefined" && window.S && window.S.vehicleType) ? window.S.vehicleType : "formula";
     const v_top_kmh = (vehType === "formula") ? 335.0 : (vehType === "gt3" || vehType === "sport") ? 295.0 : (vehType === "kart") ? 140.0 : 245.0;
     const v_top_veh = v_top_kmh * (1000.0 / 3600.0);
     const aggrScale = Math.min(1.35, Math.max(0.65, this.aggressiveness));
-    const a_lat_max = Math.max(4.5, this.mu * 9.81 * 0.72 * aggrScale);
+    const a_lat_max = Math.max(4.5, this.mu * 9.81 * 0.85 * aggrScale);
     
     for(let i = 0; i < P; i++){
       const pt = this.pts[i];
@@ -935,8 +990,9 @@ class CircuitPath extends TrackPath {
     }
     
     // 5. Backward & Forward Braking/Acceleration Passes
-    const a_brake = 4.8 * Math.min(1.2, Math.max(0.8, aggrScale));
-    const a_accel = 5.2 * Math.min(1.2, Math.max(0.8, aggrScale));
+    // G21：push 口径——真实车手试探刹车点的包络上限（逐圈学习会在运行时继续压低）
+    const a_brake = 5.5 * Math.min(1.2, Math.max(0.8, aggrScale));
+    const a_accel = 5.8 * Math.min(1.2, Math.max(0.8, aggrScale));
     
     for(let pass = 0; pass < 60; pass++) {
       let maxDiff = 0;
@@ -965,6 +1021,15 @@ class CircuitPath extends TrackPath {
       }
       if(maxDiff < 0.01) break;
     }
+
+    // 5b. G21：赛车线扩大有效转弯半径 → 弯点小幅速度奖励（≤4%，急弯多奖）
+    for(let i5 = 0; i5 < P; i5++){
+      const pt = this.pts[i5];
+      if(pt.cornerId >= 0){
+        const sev = Math.min(1, Math.abs(pt.curvature) / 0.012);
+        pt.v_max = Math.min(v_top_veh, pt.v_max * (1 + 0.04 * sev));
+      }
+    }
   }
 
   getLookahead(x, y, v) {
@@ -991,6 +1056,12 @@ class CircuitPath extends TrackPath {
       x: pt.x,
       y: pt.y,
       idx: closestIdx,
+      // G21：赛车线目标（外-内-外）与弯道索引（逐圈刹车学习用）
+      offset: pt.offset || 0,
+      refX: pt.refX !== undefined ? pt.refX : pt.x,
+      refY: pt.refY !== undefined ? pt.refY : pt.y,
+      cornerId: pt.cornerId !== undefined ? pt.cornerId : -1,
+      s: pt.s || 0,
       turn: pt.turn,
       turnZh: pt.turnZh,
       sector: pt.sector,
@@ -1015,8 +1086,8 @@ class CircuitPath extends TrackPath {
     const pt = this.pts[closestIdx];
     const ey = (x - pt.x) * pt.nx + (y - pt.y) * pt.ny;
     const absEy = Math.abs(ey);
-    const hw = 7.0; // 7.0m asphalt half-width
-    const kw = 1.35; // 1.35m FIA Kerb width
+    const hw = this.hw_m || 7.0; // G21：窄道——沥青半宽（新 4.9m，旧赛道对象回退 7.0）
+    const kw = this.kerb_m || 1.35; // 1.35m FIA Kerb width
     const s = closestIdx * 2.0; // ~2m per interpolated point
     
     let z_road = 0.0;
