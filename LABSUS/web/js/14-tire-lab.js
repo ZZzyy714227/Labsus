@@ -91,6 +91,9 @@ const TIRE_LAB = {
     this.active = deepClone(a); this.active.name = nm;
     this.persistActive();
     if (typeof rebuild === "function") { try { rebuild(); } catch (e) {} }
+    /* M-1：舞台重建统一走本路径——SLOPE 引擎构造期固化 ReF，
+       activateCustom/restoreBuiltin/applyFromForm 全部经由 applyToState 收敛 */
+    this.rebuildActiveStages();
   },
 
   activateCustom(name) {
@@ -151,6 +154,29 @@ const TIRE_LAB = {
       g.appendChild(o);
     });
     sel.appendChild(g);
+  },
+
+  /* 已存预设管理区：名称 + 保存时间 + 删除（规格 §7 删除入口，解除 20 条上限死锁） */
+  renderSavedList() {
+    const box = document.getElementById("tlSavedList"); if (!box) return;
+    const names = Object.keys(this.customs);
+    if (!names.length) { box.innerHTML = ""; return; }
+    let html = `<div style="font:700 11px var(--font-ui);color:#58a6ff;margin-bottom:4px;">已存预设（${names.length}/${this.MAX_CUSTOMS}）</div>`;
+    names.forEach(n => {
+      const c = this.customs[n];
+      const when = (c.meta && c.meta.savedAt) ? c.meta.savedAt.slice(0, 10) : "";
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:2px 0;">
+        <span style="flex:1;font:11px var(--font-ui);color:#c9d1d9;">🛞 ${n}` +
+        `<span style="color:#8b949e;"> · ${when} · ${c.meta && c.meta.sourceVehicle ? c.meta.sourceVehicle : ""}</span></span>` +
+        `<button data-tl-del="${n}" style="background:none;border:1px solid #30363d;color:#f85149;border-radius:4px;padding:1px 8px;cursor:pointer;font:11px var(--font-ui);">删除</button>` +
+        `</div>`;
+    });
+    box.innerHTML = html;
+    const dels = box.querySelectorAll ? box.querySelectorAll("button[data-tl-del]") : [];
+    for (let i = 0; i < dels.length; i++) {
+      const btn = dels[i];
+      btn.onclick = () => { this.deleteCustom(btn.dataset ? btn.dataset.tlDel : btn.getAttribute("data-tl-del")); this.renderSavedList(); };
+    }
   },
 
   /* ── 弹窗 UI（懒构建；样式内联，与舞台 modal 同风格暗色面板）── */
@@ -240,6 +266,7 @@ const TIRE_LAB = {
         </div>
         <div id="tl_derive_MF" style="font:10px monospace;color:#8b949e;margin-top:6px;min-height:14px;"></div>
       </div>
+      <div id="tlSavedList" style="margin-top:10px;"></div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
         <button id="tlRestore" style="background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:6px;padding:5px 12px;cursor:pointer;font:600 11px var(--font-ui);">恢复内置</button>
         <button id="tlSave" style="background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:6px;padding:5px 12px;cursor:pointer;font:600 11px var(--font-ui);">保存为预设</button>
@@ -256,7 +283,7 @@ const TIRE_LAB = {
       q("tlCancel").onclick = () => this.close();
       q("tlApply").onclick = () => this.applyFromForm();
       q("tlSave").onclick = () => this.saveFromForm();
-      q("tlRestore").onclick = () => { this.restoreBuiltin(); this.close(); };
+      q("tlRestore").onclick = () => { this.restoreBuiltin(); this.rebuildActiveStages(); this.close(); };
     } catch (e) { console.warn("TIRE_LAB modal bind failed:", e); }
     try { m.addEventListener("input", () => this.updateDerived()); } catch (e) { console.warn("TIRE_LAB modal bind failed:", e); }
     return m;
@@ -272,7 +299,15 @@ const TIRE_LAB = {
     Object.keys(f.mf).forEach(k => set("tl_mf_" + k, f.mf[k]));
     const calibNote = document.getElementById("tlCalibNote");
     if (calibNote) calibNote.style.display = (SIM.tireCalib) ? "block" : "none";
+    /* M-3：实测标定存在时 MF 输入置灰——优先级 tireCalib > userTire，
+       自定义暂不生效；标定清除后恢复可编辑 */
+    const calib = !!SIM.tireCalib;
+    ["Fy0", "FzNom", "By", "Cy", "Ey", "LS", "Cg"].forEach(k => {
+      const e = document.getElementById("tl_mf_" + k);
+      if (e) { e.disabled = calib; e.style.opacity = calib ? "0.45" : "1"; }
+    });
     this.updateDerived();
+    this.renderSavedList();
   },
 
   readForm() {
@@ -304,8 +339,7 @@ const TIRE_LAB = {
     const cfg = this.readForm();
     const v = this.validate(cfg);
     if (!v.ok) { this.markErrors(v.errors); return; }
-    this.applyToState(cfg);
-    this.rebuildActiveStages();
+    this.applyToState(cfg);   // M-1：rebuildActiveStages 已由 applyToState 统一触发
     this.close();
   },
 
@@ -315,6 +349,7 @@ const TIRE_LAB = {
     if (!v.ok) { this.markErrors(v.errors); return; }
     const name = (typeof prompt === "function" && prompt("预设名称：", "我的轮胎")) || null;
     if (!name) return;
+    // 先应用后保存：保存失败（dup/limit）时配置已生效，与「应用」语义一致（有意顺序）
     this.applyToState(cfg);
     const r = this.saveCustom(name);
     if (!r.ok) {
@@ -345,3 +380,10 @@ const TIRE_LAB = {
 };
 if (typeof window !== "undefined") window.TIRE_LAB = TIRE_LAB;
 TIRE_LAB.loadAll();
+
+/* G29 启动恢复：刷新后重放激活的自定义轮胎 + 填充预设下拉（规格 §7）。
+   本脚本在 body 底部同步执行，DOM 已就绪；try/catch 防御降级不阻断启动。 */
+try {
+  if (TIRE_LAB.active) TIRE_LAB.applyToState(deepClone(TIRE_LAB.active));
+  TIRE_LAB.refreshPresetSelect();
+} catch (e) { console.warn("TIRE_LAB startup restore failed:", e); }
