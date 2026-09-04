@@ -258,6 +258,7 @@ const TIRE_LAB = {
       q("tlSave").onclick = () => this.saveFromForm();
       q("tlRestore").onclick = () => { this.restoreBuiltin(); this.close(); };
     } catch (e) {}
+    try { m.addEventListener("input", () => this.updateDerived()); } catch (e) {}
     return m;
   },
 
@@ -321,12 +322,19 @@ const TIRE_LAB = {
     this.close();
   },
 
-  /* 舞台生效路径：SLOPE 走 G28 重建模式（switchScenario 重建 physicsEngine）；
+  /* 舞台生效路径：SLOPE 打开期间直接重建 15-DOF 引擎——switchScenario 仅在
+     undulating_road 进/出分支重建（L1110/L1134），其余场景只 resetVehicle，
+     构造期固化的 ReF/ReR（L301-302）不会刷新；
      SKIDPAD/CIRCUIT 引擎在打开舞台时构造，重新打开舞台后生效 */
   rebuildActiveStages() {
     try {
-      if (typeof SLOPE_STAGE !== "undefined" && SLOPE_STAGE.active && SLOPE_STAGE.switchScenario) {
-        SLOPE_STAGE.switchScenario(SLOPE_STAGE.scenario, false);
+      if (typeof SLOPE_STAGE !== "undefined" && SLOPE_STAGE.active &&
+          typeof VehicleDynamics15DOF === "function" && typeof SIM !== "undefined") {
+        const cfg = SLOPE_STAGE.scenarioConfigs[SLOPE_STAGE.scenario] || {};
+        const kmh = (SLOPE_STAGE.scenario === "accel_brake") ? 0
+                  : (cfg.speedKmh || SLOPE_STAGE.speedKmh || 85);
+        window.physicsEngine = new VehicleDynamics15DOF(S, SIM, (kmh * 1000) / 3600);
+        SLOPE_STAGE.resetVehicle();  // 位置/姿态/omega 与新 Re 对齐（速度优先级与 openSlopeStage 一致）
       }
     } catch (e) {}
   }
