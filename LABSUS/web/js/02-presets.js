@@ -212,6 +212,11 @@ const S={
 };
 
 function loadVehiclePreset(type) {
+  /* G29：tirecustom: 前缀 → 轮胎工坊自定义条目（预设下拉复用同一 select） */
+  if (typeof type === "string" && type.indexOf("tirecustom:") === 0) {
+    if (typeof TIRE_LAB !== "undefined") TIRE_LAB.activateCustom(type.slice(10));
+    return;
+  }
   const p = VEHICLE_PRESETS[type];
   if(!p) return;
   S.vehicleType = type;
@@ -270,6 +275,10 @@ function loadVehiclePreset(type) {
   if(typeof VW !== 'undefined') {
     VW.forEach(v => { sizeView(v); fitView(v); });
   }
+
+  /* G29：换车型后重放自定义轮胎覆盖层（否则出厂胎覆盖用户胎） */
+  if (typeof TIRE_LAB !== "undefined" && TIRE_LAB.active) TIRE_LAB.syncAfterPreset();
+  if (typeof TIRE_LAB !== "undefined") TIRE_LAB.refreshPresetSelect();
 }
 
 function initData(){
