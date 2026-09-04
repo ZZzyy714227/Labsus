@@ -151,6 +151,184 @@ const TIRE_LAB = {
       g.appendChild(o);
     });
     sel.appendChild(g);
+  },
+
+  /* ── 弹窗 UI（懒构建；样式内联，与舞台 modal 同风格暗色面板）── */
+  open() {
+    if (!this._modal) { this._modal = this.buildModal(); document.body.appendChild(this._modal); }
+    this._form = this.captureFromPreset();
+    this.renderForm();
+    this._modal.style.display = "flex";
+  },
+  close() { if (this._modal) this._modal.style.display = "none"; },
+
+  /* MF 峰值侧偏角（度）：与 11-stages.js resolveTireParams 的 sPeak 二分同构。
+     Cy<1 无内部峰值 → NaN（UI 显示 ∞） */
+  alphaPeakDeg(By, Cy, Ey) {
+    if (!(Cy >= 1.0) || !(By > 0)) return NaN;
+    const argT = Math.tan(Math.PI / (2 * Cy));
+    const f = s => s - Ey * (s - Math.atan(s)) - argT;
+    let lo = 1e-6, hi = 50.0;
+    if (f(lo) > 0) return Math.atan(lo / By) * 180 / Math.PI;
+    if (f(hi) < 0) return NaN;
+    for (let i = 0; i < 40; i++) { const m = 0.5 * (lo + hi); if (f(m) > 0) hi = m; else lo = m; }
+    return Math.atan((0.5 * (lo + hi)) / By) * 180 / Math.PI;
+  },
+
+  /* 派生量回显：名义规格 / 扁平比 / 滚动半径 / 接地面积（@FzNom 与胎压） */
+  updateDerived() {
+    const f = this.readForm(); if (!f) return;
+    ["F", "R"].forEach(ax => {
+      const a = f[ax.toLowerCase()], e = document.getElementById("tl_derive_" + ax);
+      if (!e || !a) return;
+      const side = a.R - a.rim / 2, aspect = a.W > 0 ? (side / a.W * 100) : 0;
+      const area = a.p > 0 ? (f.mf.FzNom / (a.p * 1000) * 1e4) : 0;  // cm²
+      e.textContent = `${Math.round(a.W)}/${Math.round(aspect)}R${(a.rim / 25.4).toFixed(0)}` +
+        ` · 扁平比 ${aspect.toFixed(0)}% · 滚动半径 ${(a.R / 1000).toFixed(3)}m · 接地 ${area.toFixed(0)}cm²@FzNom`;
+    });
+    const mfe = document.getElementById("tl_derive_MF");
+    if (mfe) {
+      const ap = this.alphaPeakDeg(f.mf.By, f.mf.Cy, f.mf.Ey);
+      mfe.textContent = `峰值侧偏角 ≈ ${isFinite(ap) ? ap.toFixed(1) : "∞"}° · μ=${(f.mf.Fy0 / f.mf.FzNom).toFixed(2)}`;
+    }
+  },
+
+  axleCol(key, label) {
+    const n = (k, t, u, lo, hi, st) =>
+      `<label style="display:flex;justify-content:space-between;gap:6px;margin:3px 0;">
+         <span>${t}${u ? " (" + u + ")" : ""}</span>
+         <input id="tl_${key}_${k}" type="number" step="${st}" min="${lo}" max="${hi}"
+           style="width:76px;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:4px;padding:2px 5px;font:11px monospace;">
+       </label>`;
+    return `<div style="flex:1;background:#10151d;border:1px solid #21262d;border-radius:8px;padding:8px 10px;">
+      <div style="font:700 11px var(--font-ui);color:#58a6ff;margin-bottom:5px;">${label}</div>
+      ${n("R", "外径 R", "mm", 200, 800, 1)}${n("W", "胎宽 W", "mm", 100, 400, 1)}
+      ${n("rim", "轮毂直径", "mm", 203, 533, 0.1)}${n("rimW", "轮毂宽度", "mm", 127, 330, 1)}
+      ${n("et", "偏距 ET", "mm", -20, 60, 1)}${n("p", "胎压", "kPa", 120, 350, 1)}
+      <div id="tl_derive_${key}" style="font:10px monospace;color:#8b949e;margin-top:5px;min-height:24px;"></div>
+    </div>`;
+  },
+
+  buildModal() {
+    const m = document.createElement("div");
+    m.id = "tireLabModal";
+    m.style.cssText = "position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);";
+    const nMF = (k, t, lo, hi, st) =>
+      `<label style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+         <span style="font:10px var(--font-ui);color:#8b949e;">${t}</span>
+         <input id="tl_mf_${k}" type="number" step="${st}" min="${lo}" max="${hi}"
+           style="width:84px;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:4px;padding:2px 5px;font:11px monospace;text-align:center;">
+       </label>`;
+    m.innerHTML = `<div style="width:760px;max-height:88vh;overflow:auto;background:#0d1117;border:1px solid #30363d;border-radius:12px;padding:16px;color:#e6edf3;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <b style="font:700 15px var(--font-ui);">🛞 轮胎工坊 TIRE LAB</b>
+        <button id="tlClose" style="background:none;border:none;color:#8b949e;font-size:16px;cursor:pointer;">✕</button>
+      </div>
+      <div id="tlCalibNote" style="display:none;font:11px var(--font-ui);color:#d29922;margin-bottom:8px;">
+        ⚠ 实测标定结果存在，力学参数以标定为准（本弹窗自定义仅在标定清除后生效）
+      </div>
+      <div style="display:flex;gap:10px;">
+        ${this.axleCol("F", "前轴 FRONT")}
+        ${this.axleCol("R", "后轴 REAR")}
+      </div>
+      <div style="background:#10151d;border:1px solid #21262d;border-radius:8px;padding:8px 10px;margin-top:10px;">
+        <div style="font:700 11px var(--font-ui);color:#58a6ff;margin-bottom:5px;">力学参数 MF（四轮共用）</div>
+        <div style="display:flex;justify-content:space-around;flex-wrap:wrap;gap:6px;">
+          ${nMF("Fy0", "Fy0 (N)", 1000, 20000, 50)}${nMF("FzNom", "FzNom (N)", 500, 10000, 50)}
+          ${nMF("By", "By", 8, 32, 0.5)}${nMF("Cy", "Cy", 1.0, 1.6, 0.05)}
+          ${nMF("Ey", "Ey", -1.0, 0, 0.05)}${nMF("LS", "LS", 0, 1, 0.01)}${nMF("Cg", "Cg", 0.2, 12, 0.1)}
+        </div>
+        <div id="tl_derive_MF" style="font:10px monospace;color:#8b949e;margin-top:6px;min-height:14px;"></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+        <button id="tlRestore" style="background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:6px;padding:5px 12px;cursor:pointer;font:600 11px var(--font-ui);">恢复内置</button>
+        <button id="tlSave" style="background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:6px;padding:5px 12px;cursor:pointer;font:600 11px var(--font-ui);">保存为预设</button>
+        <button id="tlCancel" style="background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:6px;padding:5px 12px;cursor:pointer;font:600 11px var(--font-ui);">取消</button>
+        <button id="tlApply" style="background:#238636;border:1px solid #2ea043;color:#fff;border-radius:6px;padding:5px 14px;cursor:pointer;font:700 11px var(--font-ui);">应用 APPLY</button>
+      </div>
+    </div>`;
+    /* 事件绑定：m 此刻尚未插入 document，document.getElementById 找不到
+       innerHTML 内元素（未连接树）；用 m.querySelector 子树查找，
+       未连接状态也可命中（真实浏览器 + 沙箱桩均安全） */
+    try {
+      const q = id => m.querySelector("#" + id);
+      q("tlClose").onclick = () => this.close();
+      q("tlCancel").onclick = () => this.close();
+      q("tlApply").onclick = () => this.applyFromForm();
+      q("tlSave").onclick = () => this.saveFromForm();
+      q("tlRestore").onclick = () => { this.restoreBuiltin(); this.close(); };
+    } catch (e) {}
+    return m;
+  },
+
+  renderForm() {
+    const f = this._form; if (!f) return;
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+    ["front", "rear"].forEach(ax => {
+      const K = ax === "front" ? "F" : "R";
+      ["R", "W", "rim", "rimW", "et", "p"].forEach(k => set(`tl_${K}_${k}`, f[ax][k]));
+    });
+    Object.keys(f.mf).forEach(k => set("tl_mf_" + k, f.mf[k]));
+    const calibNote = document.getElementById("tlCalibNote");
+    if (calibNote) calibNote.style.display = (SIM.tireCalib) ? "block" : "none";
+    this.updateDerived();
+  },
+
+  readForm() {
+    const num = id => { const e = document.getElementById(id); return e ? parseFloat(e.value) : NaN; };
+    const g = (k, ax) => num(ax ? `tl_${ax}_${k}` : `tl_mf_${k}`);
+    return {
+      front: { R: g("R", "F"), W: g("W", "F"), rim: g("rim", "F"), rimW: g("rimW", "F"), et: g("et", "F"), p: g("p", "F") },
+      rear: { R: g("R", "R"), W: g("W", "R"), rim: g("rim", "R"), rimW: g("rimW", "R"), et: g("et", "R"), p: g("p", "R") },
+      mf: { Fy0: g("Fy0"), FzNom: g("FzNom"), By: g("By"), Cy: g("Cy"), Ey: g("Ey"), LS: g("LS"), Cg: g("Cg") }
+    };
+  },
+
+  markErrors(errors) {
+    ["F", "R"].forEach(ax => ["R", "W", "rim", "rimW", "et", "p"].forEach(k => {
+      const e = document.getElementById(`tl_${ax}_${k}`); if (e) e.style.borderColor = "#30363d";
+    }));
+    ["Fy0", "FzNom", "By", "Cy", "Ey", "LS", "Cg"].forEach(k => {
+      const e = document.getElementById("tl_mf_" + k); if (e) e.style.borderColor = "#30363d";
+    });
+    errors.forEach(label => {
+      const parts = label.split(".");           // "front.R" | "mf.Fy0"
+      const id = parts[0] === "mf" ? "tl_mf_" + parts[1]
+        : "tl_" + (parts[0] === "front" ? "F" : "R") + "_" + parts[1];
+      const e = document.getElementById(id); if (e) e.style.borderColor = "#f85149";
+    });
+  },
+
+  applyFromForm() {
+    const cfg = this.readForm();
+    const v = this.validate(cfg);
+    if (!v.ok) { this.markErrors(v.errors); return; }
+    this.applyToState(cfg);
+    this.rebuildActiveStages();
+    this.close();
+  },
+
+  saveFromForm() {
+    const cfg = this.readForm();
+    const v = this.validate(cfg);
+    if (!v.ok) { this.markErrors(v.errors); return; }
+    const name = (typeof prompt === "function" && prompt("预设名称：", "我的轮胎")) || null;
+    if (!name) return;
+    this.applyToState(cfg);
+    const r = this.saveCustom(name);
+    if (!r.ok && r.error === "limit") { if (typeof alert === "function") alert("自定义预设已达 20 条上限，请先删除旧条目。"); }
+    if (!r.ok && r.error === "dup") { if (typeof alert === "function") alert("名称已存在。"); }
+    this.close();
+  },
+
+  /* 舞台生效路径：SLOPE 走 G28 重建模式（switchScenario 重建 physicsEngine）；
+     SKIDPAD/CIRCUIT 引擎在打开舞台时构造，重新打开舞台后生效 */
+  rebuildActiveStages() {
+    try {
+      if (typeof SLOPE_STAGE !== "undefined" && SLOPE_STAGE.active && SLOPE_STAGE.switchScenario) {
+        SLOPE_STAGE.switchScenario(SLOPE_STAGE.scenario, false);
+      }
+    } catch (e) {}
   }
 };
 if (typeof window !== "undefined") window.TIRE_LAB = TIRE_LAB;

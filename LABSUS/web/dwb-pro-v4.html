@@ -25,6 +25,8 @@
         <option value="gt3_sport">🚗 FIA GT3 (日常模式)</option>
         <option value="baja">🏜️ SAE Baja (越野赛车)</option>
       </select>
+      <button id="tireLabBtn" onclick="if(typeof TIRE_LAB!=='undefined')TIRE_LAB.open()" title="自定义轮胎/轮毂尺寸与参数"
+        style="background:rgba(47,169,214,0.12);border:1px solid rgba(47,169,214,0.4);color:#2fa9d6;border-radius:999px;padding:3px 10px;font:600 11px var(--font-ui);cursor:pointer;">🛞 轮胎</button>
     </div>
 
     <!-- 前轴 / 后轴 -->
@@ -1032,6 +1034,7 @@
 <script src="js/04-dynamics.js"></script>
 <script src="js/05-scene3d.js"></script>
 <script src="js/06-ui-panels.js"></script>
+<script src="js/14-tire-lab.js"></script>
 <script src="js/07-plots.js"></script>
 <script src="js/08-interact.js"></script>
 <script src="js/09-track.js"></script>
