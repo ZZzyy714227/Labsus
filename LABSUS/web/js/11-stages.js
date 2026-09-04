@@ -371,7 +371,8 @@ class VehicleDynamics15DOF {
      数据源优先级：SIM.tireCalib（由 applyTireCalib 写入，即 /api/v3/tire/fit 辨识结果）
      → 引擎缺省。Ey 单独存于 SIM.tireCalibEy（03-mechanism.js 注释就写了
      “仅赛道瞬态用”、09-track.js 也确实在发给引擎，但前端实时引擎从未消费）。
-     逐项校验：非法值（NaN / FzNom≤0 / By≤0）逐项回退缺省，不整体报废。
+     逐项校验：非法值（NaN / FzNom≤0 / By≤0）沿链逐项下探（标定→自定义→缺省），
+     不整体报废。
      G29（2026-09-04）：优先级链插入 SIM.userTire（轮胎工坊自定义参数，14-tire-lab.js
      写入）；实测标定仍最高。缺省 D 表未动，test_dom.js:217 正则锁与 tphys_parity 不受影响。 */
   resolveTireParams() {
