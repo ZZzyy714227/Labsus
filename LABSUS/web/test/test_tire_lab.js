@@ -196,6 +196,23 @@ assert(T("S.front.tire.R") === T("VEHICLE_PRESETS.gt3.front.tire.R"),
   "restoreBuiltin reloads builtin preset tire (gt3 front R)");
 assert(T("S.front.kT === S.front._kTBase"), "kT restored to preset base");
 
+/* ═══ 3. resolveTireParams 优先级：tireCalib > userTire > 缺省 ═══ */
+console.log("=== 3. resolveTireParams Priority Chain ===");
+T(`SIM.tireCalib = null; SIM.tireCalibEy = undefined;
+   SIM.userTire = { Fy0:6000, FzNom:3500, By:22, Cy:1.25, Ey:-0.4, LS:0.2, Cg:7.0, p:252 };`);
+T("var eng = new VehicleDynamics15DOF(S, SIM, 10);");
+assert(T("eng.resolveTireParams().Fy0") === 6000, "userTire.Fy0 wins over default");
+assert(T("eng.resolveTireParams().By") === 22, "userTire.By wins over default");
+assert(T("eng.resolveTireParams().gripScale") > 1.0, "gripScale reflects custom mu>default");
+T(`SIM.tireCalib = { Fy0:4800, FzNom:3400, By:18, Cy:1.3, Ey:-0.6, LS:0.15, Cg:5.0 };`);
+T("var eng = new VehicleDynamics15DOF(S, SIM, 10);");
+assert(T("eng.resolveTireParams().Fy0") === 4800, "tireCalib outranks userTire");
+assert(T("eng.resolveTireParams().By") === 18, "tireCalib.By outranks userTire.By");
+T("SIM.tireCalib = null; SIM.userTire = null;");
+T("var eng = new VehicleDynamics15DOF(S, SIM, 10);");
+assert(T("eng.resolveTireParams().Fy0") === 5250, "defaults intact (anchor 5250)");
+assert(T("eng.resolveTireParams().By") === 20, "defaults intact (anchor By=20)");
+
 console.log(`\n[cumulative] ${passed}/${total} passed`);
 
 process.exit(passed === total ? 0 : 1);
