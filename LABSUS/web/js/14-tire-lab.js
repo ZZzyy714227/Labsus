@@ -121,7 +121,15 @@ const TIRE_LAB = {
   restoreBuiltin() {
     this.active = null; this.persistActive();
     SIM.userTire = null;
-    if (typeof loadVehiclePreset === "function") loadVehiclePreset(S.vehicleType);
+    if (typeof loadVehiclePreset === "function") {
+      loadVehiclePreset(S.vehicleType);
+      /* 预设重载 deepClone 轴对象后 _kTBase 失效——恢复内置后状态即预设，
+         重捕基准使 kT === _kTBase 不变式成立（与 applyToState 捕获逻辑幂等） */
+      ["front", "rear"].forEach(ax => {
+        const A = S[ax];
+        if (A && typeof A.kT === "number") A._kTBase = A.kT;
+      });
+    }
   },
 
   /* 02-presets 钩子：换车型后重放覆盖层（kT 基准随新预设刷新） */
