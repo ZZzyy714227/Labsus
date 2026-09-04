@@ -160,7 +160,42 @@ assert(T("TIRE_LAB.storageOk") === false, "localStorage failure degrades storage
 assert(T("typeof TIRE_LAB.customs === 'object'"), "loadAll degrades customs to object without throwing");
 T(`localStorage.getItem = _g; localStorage.setItem = _s; TIRE_LAB.storageOk = true; TIRE_LAB.loadAll();`);
 
-console.log(`\n[Part1] ${passed}/${total} passed`);
+/* ═══ 2. 应用层 ═══ */
+console.log("=== 2. Apply / Restore / Vehicle-Switch Persistence ===");
+T(`S.vehicleType = "gt3"; TIRE_LAB.active = null; SIM.userTire = null;
+   loadVehiclePreset("gt3");
+   TIRE_LAB.active = { name:null,
+     front:{R:300,W:265,rim:228.6,rimW:190,et:0,p:252}, rear:{R:310,W:285,rim:228.6,rimW:200,et:0,p:168},
+     mf:{Fy0:6000,FzNom:3500,By:22,Cy:1.2,Ey:-0.5,LS:0.10,Cg:6.0} };`);
+T("TIRE_LAB.applyToState(TIRE_LAB.active);");
+assert(T("S.front.tire.R") === 300 && T("S.rear.tire.R") === 310, "applyToState writes axle tire R");
+assert(T("S.front.tire.rimW") === 190 && T("S.rear.tire.et") === 0, "applyToState writes rimW/et");
+assert(T("S.front.tire.label.indexOf('CUSTOM')") === 0, "custom label applied");
+// kT 联动（无取整）：gt3 基准胎压 210，前 252（+20%）→ 精确比值 1.11；后 168（-20%）→ 0.89
+assert(Math.abs(T("S.front.kT / S.front._kTBase") - 1.11) < 1e-9, "front kT scaled by pressure factor (exact)");
+assert(Math.abs(T("S.rear.kT / S.rear._kTBase") - 0.89) < 1e-9, "rear kT scaled down (168kPa, exact)");
+// MF 注入 + LS 胎压修正（前轴 p=252）
+assert(Math.abs(T("SIM.userTire.Fy0") - 6000) < 1e-9, "SIM.userTire.Fy0 injected");
+assert(Math.abs(T("SIM.userTire.LS") - 0.10 * 0.95) < 1e-9, "SIM.userTire.LS adjusted by front pressure factor");
+assert(Math.abs(T("SIM.userTire.p") - 252) < 1e-9, "SIM.userTire.p = front pressure");
+// 车型切换保持（02-presets 尾部钩子）
+T("loadVehiclePreset('formula');");
+assert(T("S.vehicleType") === "formula", "vehicle switched to formula");
+assert(T("S.front.tire.R") === 300, "custom tire overlay survives vehicle switch");
+// 保存/激活/恢复
+T("TIRE_LAB.customs = {}; TIRE_LAB.saveCustom('我的越野胎');");
+assert(T("!!TIRE_LAB.customs['我的越野胎']"), "saveCustom stores current active");
+T("loadVehiclePreset('gt3'); TIRE_LAB.active = null; SIM.userTire = null;");
+T('TIRE_LAB.activateCustom("我的越野胎");');
+assert(T("S.front.tire.R") === 300 && T("SIM.userTire.Fy0") === 6000, "activateCustom re-applies saved tire");
+// 恢复内置（此时 S.vehicleType 为 gt3；restoreBuiltin 重载内置预设）
+T("TIRE_LAB.restoreBuiltin();");
+assert(T("TIRE_LAB.active") === null, "restoreBuiltin clears active");
+assert(T("SIM.userTire") === null, "restoreBuiltin clears SIM.userTire");
+assert(T("S.front.tire.R") === T("VEHICLE_PRESETS.gt3.front.tire.R"),
+  "restoreBuiltin reloads builtin preset tire (gt3 front R)");
+assert(T("S.front.kT === S.front._kTBase"), "kT restored to preset base");
 
-/* Part2-7 占位（后续任务追加） */
+console.log(`\n[cumulative] ${passed}/${total} passed`);
+
 process.exit(passed === total ? 0 : 1);
