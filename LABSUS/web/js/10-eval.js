@@ -385,6 +385,11 @@ class StraightPath extends TrackPath {
       washboardWavelength: 1.25,
       washboardAmplitude: 0.035,
       potholeDepth: -0.055,
+      undulatingWavelength: 4.8,
+      undulatingAmplitude: 0.14,
+      undulatingCrossAmp: 0.14,
+      undulatingPhase: 180,
+      undulatingType: "staggered_moguls",
       muLeft: 1.35,
       muRight: 0.28,
       grade: 0.18,
@@ -396,6 +401,7 @@ class StraightPath extends TrackPath {
     this.bumps = [];
     this.mooseSections = [];
     this.washboardSections = [];
+    this.undulatingSections = [];
     this.splitMuSections = [];
     this.slopeSections = [];
     this.gantries = [];
@@ -638,6 +644,34 @@ class StraightPath extends TrackPath {
         yStart: 0, yEnd: 320.0, targetSpeed: this.targetSpeed
       });
       this.totalLength = 350.0;
+
+    } else if (sc === "undulating_road") {
+      // 🌊 越野连续交错波浪起伏荒原 (Off-Road Staggered Moguls & Articulation)
+      const wL = this.params.undulatingWavelength || 4.5;
+      const amp = this.params.undulatingAmplitude !== undefined ? this.params.undulatingAmplitude : 0.18;
+      const crossAmp = this.params.undulatingCrossAmp !== undefined ? this.params.undulatingCrossAmp : 0.18;
+      const phaseDeg = this.params.undulatingPhase !== undefined ? this.params.undulatingPhase : 180;
+      const uType = this.params.undulatingType || "staggered_moguls";
+      const uY0 = 3.0;
+      const totalLen = Math.max(250.0, rCount * wL * 2.0);
+
+      this.undulatingSections.push({
+        id: "undul_main", y0: uY0, len: totalLen,
+        wavelength: wL, amp: amp, crossAmp: crossAmp, phaseDeg: phaseDeg, uType: uType,
+        repeatCount: rCount
+      });
+
+      this.gantries.push({ y: 0, text: `🌊 OFF-ROAD MOGULS · 越野连续交错起伏包 (波长 ${wL.toFixed(1)}m · 浪高 ${(amp*2000).toFixed(0)}mm)` });
+
+      for (let i = 0; i < rCount; i++) {
+        const segY = uY0 + i * wL;
+        this.segments.push({
+          id: `seg_undul_${i}`, type: "undulating_road",
+          name: `🌊 越野交错起伏包 (${i + 1}/${rCount}) · 左右反相铰接 · 浪高 ${(amp*2000).toFixed(0)}mm`,
+          yStart: segY, yEnd: segY + wL, targetSpeed: this.targetSpeed
+        });
+      }
+      this.totalLength = uY0 + totalLen + 50.0;
     }
 
     this.rebuildCones();
@@ -836,7 +870,91 @@ class StraightPath extends TrackPath {
       }
     }
 
+    // 5. Undulating Road Surface (自然非铺装起伏荒原 · 左右连续交错波浪包)
+    if (this.undulatingSections && this.undulatingSections.length) {
+      for (const u of this.undulatingSections) {
+        if (y >= u.y0 && y <= (u.y0 + u.len)) {
+          isBump = false; // 自然地表起伏，非离散碰撞坎
+          const dy = y - u.y0;
+          const k_y = (2.0 * Math.PI) / Math.max(1.5, u.wavelength);
+          const phaseRad = (u.phaseDeg !== undefined ? u.phaseDeg : 180) * (Math.PI / 180);
+
+          // 左右反相交错起伏波浪 (Staggered Moguls)
+          // 左轮 (x < 0) 遇波峰时，右轮 (x > 0) 正好进入波谷，激发悬架极限交叉轴运动
+          const leftWave = u.amp * Math.sin(k_y * dy);
+          const rightWave = u.amp * Math.sin(k_y * dy + phaseRad);
+
+          // 横向平滑过渡带 (中心 x=0 处平缓过渡)
+          const blend = Math.max(0.0, Math.min(1.0, (x + 0.9) / 1.8));
+          const smoothBlend = blend * blend * (3.0 - 2.0 * blend);
+          let localZ = leftWave * (1.0 - smoothBlend) + rightWave * smoothBlend;
+
+          // 叠加细微的自然荒原旷野微地形质感 (波长较长的平缓地貌)
+          localZ += 0.04 * Math.sin(0.35 * k_y * dy + x * 0.4);
+
+          // 边缘平缓渐变融入外围自然地表
+          const absX = Math.abs(x);
+          if (absX > 4.5) {
+            const edgeFade = Math.max(0.0, Math.min(1.0, (7.5 - absX) / 3.0));
+            localZ *= edgeFade;
+          }
+
+          z_road += localZ;
+        }
+      }
+    }
+
     return { z_road, isKerb, isBump, isPothole, isRamp, mu };
+  }
+
+  getRoadSlope(x, y) {
+    let dz_dy = 0;
+    let dz_dx = 0;
+
+    if (this.scenario === "slope_climb") {
+      dz_dy = this.params.grade || 0.18;
+    } else if (this.undulatingSections && this.undulatingSections.length) {
+      for (const u of this.undulatingSections) {
+        if (y >= u.y0 && y <= (u.y0 + u.len)) {
+          const dy = y - u.y0;
+          const k_y = (2.0 * Math.PI) / Math.max(1.5, u.wavelength);
+          const phaseRad = (u.phaseDeg !== undefined ? u.phaseDeg : 180) * (Math.PI / 180);
+
+          const dLeft_dy = u.amp * k_y * Math.cos(k_y * dy);
+          const dRight_dy = u.amp * k_y * Math.cos(k_y * dy + phaseRad);
+          const blend = Math.max(0.0, Math.min(1.0, (x + 0.9) / 1.8));
+          const smoothBlend = blend * blend * (3.0 - 2.0 * blend);
+
+          dz_dy += dLeft_dy * (1.0 - smoothBlend) + dRight_dy * smoothBlend;
+
+          const leftWave = u.amp * Math.sin(k_y * dy);
+          const rightWave = u.amp * Math.sin(k_y * dy + phaseRad);
+          if (Math.abs(x) <= 1.2) {
+            dz_dx += (rightWave - leftWave) / 1.8;
+          }
+        }
+      }
+    }
+
+    const slopeAngle = Math.atan(dz_dy);
+    const slopePct = dz_dy * 100;
+    const isUphill = dz_dy > 0.04;
+    const isDownhill = dz_dy < -0.04;
+    const elev = this.getRoadElevation(x, y).z_road;
+    const isSummit = Math.abs(dz_dy) <= 0.04 && elev > 0.08;
+    const isTrough = Math.abs(dz_dy) <= 0.04 && elev < -0.08;
+
+    return {
+      dz_dy,
+      dz_dx,
+      slopeGrade: dz_dy,
+      slopeAngle,
+      slopePct,
+      isUphill,
+      isDownhill,
+      isSummit,
+      isTrough
+    };
   }
 
   getMu(x, y) {
