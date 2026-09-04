@@ -218,8 +218,8 @@ class AxleSpec(BaseModel):
     unsprung_kg: float = 38.0               # mU 单侧
     motion_ratio: float | None = None       # 缺省 → 引擎 mr_at_zero 数值推导
     kw_curve: KwCurve | None = None         # 缺省 → 常数 kw = kS·mr²（见 KwCurve）
-    tire_rim_w: float | None = None        # G29 轮胎工坊：轮毂宽度 mm（可选，缺省不参与计算）
-    tire_et: float | None = None           # G29 轮胎工坊：偏距 mm（可选）
+    tire_rim_w: float | None = None         # G29 轮胎工坊：轮毂宽度 mm（可选，缺省不参与计算）
+    tire_et: float | None = None            # G29 轮胎工坊：偏距 mm（可选）
     arb: ArbSpec = Field(default_factory=ArbSpec)
 
 

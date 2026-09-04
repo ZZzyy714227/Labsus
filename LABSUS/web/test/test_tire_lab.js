@@ -1,7 +1,7 @@
 /* G29 轮胎工坊测试：headless vm（沙箱模式照抄 undulating_road_test.js）。
-   覆盖主题（对应节标 === 1./2./3.）：数据层（存储 CRUD/上限/降级/校验/胎压映射）、
+   覆盖主题（对应节标 === 1./2./3./4.）：数据层（存储 CRUD/上限/降级/校验/胎压映射）、
    应用层（applyToState/restore/车型切换保持）、resolveTireParams 优先级链、
-   chassisPayload 注入、弹窗表单读入与非法拦截。 */
+   chassisPayload 注入（弹窗表单读入与非法拦截为后续节 === 5.）。 */
 "use strict";
 const fs = require("fs"), path = require("path"), vm = require("vm");
 
@@ -224,7 +224,7 @@ assert(T("eng.resolveTireParams().By") === 20, "defaults intact (anchor By=20)")
 console.log("=== 4. chassisPayload Injection ===");
 T("SIM.userTire = null; TIRE_LAB.active = null;");
 T("loadVehiclePreset('gt3');");
-let pay0 = T("chassisPayload()");
+const pay0 = T("chassisPayload()");
 assert(pay0.tire === undefined, "payload has no tire block when no custom active");
 T(`TIRE_LAB.active = { name:null, front:{R:300,W:265,rim:228.6,rimW:190,et:0,p:252},
    rear:{R:310,W:285,rim:228.6,rimW:200,et:0,p:168},
@@ -237,6 +237,7 @@ assert(pay.vehicle.front.tire_rim_w === 190 && pay.vehicle.rear.tire_et === 0,
   "vehicle axle tire_rim_w/et injected");
 T("TIRE_LAB.restoreBuiltin();");
 assert(T("chassisPayload().tire") === undefined, "tire block absent again after restore");
+assert(JSON.stringify(T("chassisPayload()")) === JSON.stringify(pay0), "payload byte-identical after restore");
 
 console.log(`\n[cumulative] ${passed}/${total} passed`);
 
