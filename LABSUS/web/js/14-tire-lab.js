@@ -257,8 +257,8 @@ const TIRE_LAB = {
       q("tlApply").onclick = () => this.applyFromForm();
       q("tlSave").onclick = () => this.saveFromForm();
       q("tlRestore").onclick = () => { this.restoreBuiltin(); this.close(); };
-    } catch (e) {}
-    try { m.addEventListener("input", () => this.updateDerived()); } catch (e) {}
+    } catch (e) { console.warn("TIRE_LAB modal bind failed:", e); }
+    try { m.addEventListener("input", () => this.updateDerived()); } catch (e) { console.warn("TIRE_LAB modal bind failed:", e); }
     return m;
   },
 
@@ -317,8 +317,12 @@ const TIRE_LAB = {
     if (!name) return;
     this.applyToState(cfg);
     const r = this.saveCustom(name);
-    if (!r.ok && r.error === "limit") { if (typeof alert === "function") alert("自定义预设已达 20 条上限，请先删除旧条目。"); }
-    if (!r.ok && r.error === "dup") { if (typeof alert === "function") alert("名称已存在。"); }
+    if (!r.ok) {
+      /* G29-P7：失败不关窗——用户可改名/删除旧条目后在表单内直接重试 */
+      if (r.error === "limit" && typeof alert === "function") alert("自定义预设已达 20 条上限，请先删除旧条目。");
+      else if (r.error === "dup" && typeof alert === "function") alert("名称已存在。");
+      return;
+    }
     this.close();
   },
 
