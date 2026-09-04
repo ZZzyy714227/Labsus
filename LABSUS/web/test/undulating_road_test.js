@@ -200,6 +200,23 @@ ctx.SLOPE_STAGE.camOrbit.elv = Math.max(-1.1, Math.min(1.1, ctx.SLOPE_STAGE.drag
 assert(Math.abs(ctx.SLOPE_STAGE.camOrbit.az) > 1.0, 'Azimuth rotates freely with mouse drag');
 assert(ctx.SLOPE_STAGE.camOrbit.elv > 0.65, `Elevation expands to wide range (elv: ${ctx.SLOPE_STAGE.camOrbit.elv.toFixed(2)} rad)`);
 
+console.log('\n=== 5. G28-fix Regression: Scenario Isolation, Vehicle Restore & Gentle Defaults ===');
+// 5a. 离开 undulating 后 buildTrack 必须清空 undulatingSections（不得叠加到其他场景）
+ctx.S.vehicleType = 'gt3';
+ctx.SLOPE_STAGE.switchScenario('undulating_road', false);
+assert(ctx.S.vehicleType === 'baja', 'Entering undulating_road swaps to baja');
+ctx.SLOPE_STAGE.switchScenario('bumps_cleats', false);
+assert(ctx.straightTestPath.undulatingSections.length === 0,
+  'Leaving undulating_road clears undulatingSections (no cross-scenario wave residue)');
+// 5b. 离开时还原进入前车型并重建引擎（S 不得被 baja 永久污染）
+assert(ctx.S.vehicleType === 'gt3', `Leaving undulating_road restores previous vehicle (got: ${ctx.S.vehicleType})`);
+// 5c. 默认参数必须物理平顺：垂向加速度峰值 a = A·(2πv/λ)² < g，否则波峰必飞车
+const spGentle = new ctx.StraightPath(12.5, 'undulating_road', {});
+const gAmp = spGentle.params.undulatingAmplitude, gWl = spGentle.params.undulatingWavelength;
+const aMax = gAmp * Math.pow(2 * Math.PI * 12.5 / gWl, 2);
+assert(gAmp <= 0.05 && gWl >= 8.0, `Gentle defaults (amp: ${(gAmp*1000).toFixed(0)}mm, wavelength: ${gWl.toFixed(1)}m)`);
+assert(aMax < 9.81, `Peak vertical acceleration below 1g at 45km/h (a = ${aMax.toFixed(2)} m/s²)`);
+
 console.log(`\n========================================`);
 console.log(`All ${passed}/${total} Staggered Moguls & Baja Articulation Tests Passed!`);
 console.log(`========================================`);

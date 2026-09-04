@@ -941,7 +941,7 @@ const SLOPE_STAGE = {
     accel_brake: { speedKmh: 0.0, repeatCount: 1, accelBrakeTriggerY: 75.0 },
     split_mu: { speedKmh: 70.0, repeatCount: 1, muLeft: 1.35, muRight: 0.28 },
     slope_climb: { speedKmh: 65.0, repeatCount: 1, grade: 0.18 },
-    undulating_road: { speedKmh: 36.0, repeatCount: 12, undulatingWavelength: 4.8, undulatingAmplitude: 0.14, undulatingCrossAmp: 0.14, undulatingPhase: 180, undulatingType: "staggered_moguls", hillStartActive: false },
+    undulating_road: { speedKmh: 45.0, repeatCount: 12, undulatingWavelength: 9.0, undulatingAmplitude: 0.035, undulatingCrossAmp: 0.035, undulatingPhase: 180, undulatingType: "staggered_moguls", hillStartActive: false },
     custom: { speedKmh: 85.0, repeatCount: 10, customSegments: [] }
   },
   
@@ -1090,6 +1090,8 @@ const SLOPE_STAGE = {
     }
     
     if (scId === "undulating_road") {
+      // G28-fix：记录进入前车型，离开时还原——undulating 专用 baja 不允许污染其他场景
+      if (S.vehicleType !== "baja") this._preUndulVehicle = S.vehicleType;
       if (typeof loadVehiclePreset === "function") {
         loadVehiclePreset("baja");
       } else if (typeof VEHICLE_PRESETS !== "undefined" && VEHICLE_PRESETS.baja) {
@@ -1113,6 +1115,25 @@ const SLOPE_STAGE = {
       this.camOrbit = { az: 0, elv: 0, distFactor: 1.0 };
       const camBtns = document.querySelectorAll(".slope-cam-btn");
       camBtns.forEach(b => b.classList.toggle("on", b.dataset.cam === "front_low"));
+    } else if (this._preUndulVehicle && scId !== "undulating_road") {
+      // G28-fix：离开起伏路面，还原进入前车型并同步重建引擎/车手（S 已被 baja 覆写）
+      const prevType = this._preUndulVehicle;
+      this._preUndulVehicle = null;
+      if (typeof VEHICLE_PRESETS !== "undefined" && VEHICLE_PRESETS[prevType]) {
+        if (typeof loadVehiclePreset === "function") {
+          loadVehiclePreset(prevType);
+        } else {
+          S.vehicleType = prevType;
+        }
+        if (typeof VehicleDynamics15DOF === "function" && typeof SIM !== "undefined") {
+          window.physicsEngine = new VehicleDynamics15DOF(S, SIM, targetMs);
+        }
+        if (typeof UniversalAutoPilot === "function") {
+          window.slopePilot = new UniversalAutoPilot(S);
+          if (window.straightTestPath) window.slopePilot.setPath(window.straightTestPath);
+          window.slopePilot.active = true;
+        }
+      }
     }
 
     // Always keep slopeVehName HUD element in sync with the current active vehicle preset
@@ -1572,11 +1593,17 @@ function renderSlopeScene(alpha, st){
   if (isUndulating && pathObj) {
     // 🌊 自然非铺装旷野 · 越野连续交错波浪起伏地表 (Universal Depth-Sorted Moguls Terrain)
     const xHalfW = 9600;  // 19.2m wide terrain
-    const xCols = 16;
-    const dxStep = (xHalfW * 2) / xCols;
+    // G28-fix 非均匀横向采样：左右反相过渡带仅 ±0.9m，旧均匀 1.2m 粗格把
+    // 整段交叉轴结构抹进同一列；赛道区(|x|≤2.4m)用 0.4m 细格，外围 1.6m 粗格
+    const xEdges = [];
+    const pushEdgeBand = (a, b, step) => { for (let x = a; x <= b + 1e-6; x += step) xEdges.push(Math.round(x)); };
+    pushEdgeBand(-xHalfW, -3200, 1600);
+    pushEdgeBand(-2400, 2400, 400);
+    pushEdgeBand(3200, xHalfW, 1600);
+    const xCols = xEdges.length - 1;
     const yBack = -22000;  // 22m behind vehicle
     const yFront = 32000;  // 32m in front of vehicle
-    const dyStep = 1250;   // 1.25m steps (43 rows)
+    const dyStep = 900;    // 0.9m steps（λ≥4m 时每波 ≥4.4 行，保证波峰波谷可见）
 
     const z_ground_car = (pathObj.getRoadElevation(carX, carY).z_road || 0);
     const slp_car = (typeof pathObj.getRoadSlope === "function") ? pathObj.getRoadSlope(carX, carY) : { slopeAngle: 0 };
@@ -1591,7 +1618,7 @@ function renderSlopeScene(alpha, st){
       const worldY = carY + yRel / 1000;
       const row = [];
       for (let c = 0; c <= xCols; c++) {
-        const xRel = -xHalfW + c * dxStep;
+        const xRel = xEdges[c];
         const worldX = carX + xRel / 1000;
         const elevInfo = pathObj.getRoadElevation(worldX, worldY);
         const zWorld = (elevInfo.z_road || 0);
@@ -1623,14 +1650,17 @@ function renderSlopeScene(alpha, st){
           if (avgZc > 60) {
             // Normal vector & sunlight calculation
             const dz_y = (nBL.z - nTL.z) / dyStep;
-            const dz_x = (nTR.z - nTL.z) / dxStep;
+            const dz_x = (nTR.z - nTL.z) / Math.max(1, nTR.x - nTL.x);
             // Sun vector: from front-right-above (0.35, -0.55, 0.75)
             const sunDot = (-dz_x * 0.35 - dz_y * (-0.55) + 0.75) / Math.hypot(dz_x, dz_y, 1.0);
             const diffuse = Math.max(0.25, Math.min(1.0, 0.55 + sunDot * 0.45));
 
             // Elevation highlight (peaks catch more sun)
             const avgZ = (nTL.zWorld + nTR.zWorld + nBR.zWorld + nBL.zWorld) * 0.25;
-            const elevNorm = Math.max(-1, Math.min(1, avgZ / 0.16));
+            // G28-fix：高光归一化尺度随实际浪幅自适应，避免旧固定 /0.16 夸张
+            const elevRef = (pathObj.undulatingSections && pathObj.undulatingSections[0])
+              ? Math.max(0.04, pathObj.undulatingSections[0].amp * 1.4) : 0.16;
+            const elevNorm = Math.max(-1, Math.min(1, avgZ / elevRef));
 
             // Off-road slate / desert earth palette
             const rCol = Math.round(56 * diffuse + elevNorm * 16);
