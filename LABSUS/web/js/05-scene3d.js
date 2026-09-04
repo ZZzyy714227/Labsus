@@ -260,13 +260,13 @@ function buildGT3Spaceframe(sc, yF, yR){
 /* ================================ C. SAE Baja 巴哈越野赛车管架 ================================ */
 function buildBajaSpaceframe(sc, yF, yR){
   const hF = S.front.hp, hR = S.rear.hp;
-  const T = (a, b, r, col) => cylinder(sc, a, b, r||14, col||"#d23535", 1.3, 12); 
-  const D = (a, b, r, col) => cylinder(sc, a, b, r||11, col||"#a82a2a", 1.1, 10);
+  const T = (a, b, r, col) => cylinder(sc, a, b, r||15, col||"#334155", 1.4, 12, "rgba(30, 41, 59, 0.90)"); 
+  const D = (a, b, r, col) => cylinder(sc, a, b, r||11, col||"#1e293b", 1.2, 10, "rgba(20, 30, 45, 0.90)");
 
-  /* 真实大学生 SAE Baja 越野车紧凑管架模型：
+  /* 真实越野 SAE Baja 空间管架与副车架结构：
      轴距 wb = 1400 mm (yF = +700, yR = -700)
      轮心半轮距 WC.X = 620 mm (总轮距 1240 mm)
-     纯轻量化越野空间桁架，无任何多余封闭底板 */
+     深黑结构钢大梁 + 前下护板 + 前悬横梁 */
   const Y_front_bulk = yF + 220;   // 前舱鼻锥横隔 (机舱/前防撞盒)
   const Y_front_hoop = yF - 240;   // 前防滚环 (方向机与踏板上方)
   const Y_main_hoop  = yR + 240;   // 主防滚环 (车手头枕/防滚架最高点)
@@ -367,6 +367,10 @@ function buildBajaSpaceframe(sc, yF, yR){
     T(R_DMP_F, FHO_TR, 14, sfC); T(L_DMP_F, FHO_TL, 14, sfC);
     T(R_DMP_F, FBM_TR, 14, sfC); T(L_DMP_F, FBM_TL, 14, sfC);
     T(R_DMP_F, L_DMP_F, 16, sfC);
+
+    // 前轴下摆臂安装横梁与防护底板 (Front Axle Crossmember & Bash Skid Plate)
+    box3D(sc, [0, yF, 190], [420, 80, 45], "#334155", 1.5, "rgba(30, 41, 59, 0.95)");
+    PL(sc, [FBM_TL, FBM_TR, FBM_BR, FBM_BL, FBM_TL], "#475569", 1.4, null, "rgba(30, 41, 59, 0.85)");
   }
 
   // 5. 后悬架与后机舱悬架安装支柱 (Rear Suspension Integration)
@@ -388,6 +392,9 @@ function buildBajaSpaceframe(sc, yF, yR){
     T(R_DMP_R, RHO_TR, 14, sfC); T(L_DMP_R, RHO_TL, 14, sfC);
     T(R_DMP_R, RR_TR, 14, sfC);  T(L_DMP_R, RR_TL, 14, sfC);
     T(R_DMP_R, L_DMP_R, 16, sfC);
+
+    // 后轴副车架横梁
+    box3D(sc, [0, yR, 185], [420, 80, 45], "#334155", 1.5, "rgba(30, 41, 59, 0.95)");
   }
 }
 
@@ -793,9 +800,16 @@ function addAxleAssemblyPRO(sc, M, m, sx, yOff, axis){
   const eV = add(mul(_eU0, -_sinS), mul(_eV0, _cosS));
 
   if(S.show.face){
-    PL(sc,[LAF,LBJ,LAR,LAF],EC("lca",SYSTEM_COLORS.rigArm),1,null,EC("lcaFill",SYSTEM_COLORS.arm));
-    PL(sc,[UAF,UBJ,UAR,UAF],EC("uca",SYSTEM_COLORS.rigArm),1,null,EC("ucaFill",SYSTEM_COLORS.arm));
-    PL(sc,[LBJ,UBJ,WC,LBJ],EC("knu",SYSTEM_COLORS.knu),1,null,EC("knuFill",SYSTEM_COLORS.knuF));
+    const isBaja = S.vehicleType === "baja";
+    const lcaCol = isBaja ? "#cbd5e1" : EC("lca",SYSTEM_COLORS.rigArm);
+    const lcaFill = isBaja ? "rgba(180, 195, 210, 0.70)" : EC("lcaFill",SYSTEM_COLORS.arm);
+    const ucaCol = isBaja ? "#cbd5e1" : EC("uca",SYSTEM_COLORS.rigArm);
+    const ucaFill = isBaja ? "rgba(180, 195, 210, 0.70)" : EC("ucaFill",SYSTEM_COLORS.arm);
+    const knuCol = isBaja ? "#94a3b8" : EC("knu",SYSTEM_COLORS.knu);
+    const knuFill = isBaja ? "rgba(130, 150, 170, 0.65)" : EC("knuFill",SYSTEM_COLORS.knuF);
+    PL(sc,[LAF,LBJ,LAR,LAF],lcaCol,1.5,null,lcaFill);
+    PL(sc,[UAF,UBJ,UAR,UAF],ucaCol,1.5,null,ucaFill);
+    PL(sc,[LBJ,UBJ,WC,LBJ],knuCol,1.5,null,knuFill);
   }
 
   if(state.arch === "direct"){
@@ -872,15 +886,43 @@ function addAxleAssemblyPRO(sc, M, m, sx, yOff, axis){
   if(S.show.wheel){
     const ci=add(WC,mul(ax,-tW/2)), co=add(WC,mul(ax,tW/2));
     const ro=add(WC,mul(ax,tW/2-14));
-    PL(sc,circPts(ci,ax,tR,36,eU,eV),EC("tire",SYSTEM_COLORS.tire),1.3);
-    PL(sc,circPts(co,ax,tR,36,eU,eV),EC("tire",SYSTEM_COLORS.tire),1.3);
-    for(let k=0;k<18;k++){const an=2*PI*k/18;
-      const o=add(mul(eU,tR*cos(an)),mul(eV,tR*sin(an)));
-      L3(sc,add(ci,o),add(co,o),EC("tread",SYSTEM_COLORS.tread),1);}
-    PL(sc,circPts(ro,ax,rimR,28,eU,eV),EC("rim",SYSTEM_COLORS.rim),1.2);
-    for(let k=0;k<5;k++){const an=2*PI*k/5;
-      const o=add(mul(eU,rimR*0.88*cos(an)),mul(eV,rimR*0.88*sin(an)));
-      L3(sc,add(ro,mul(ax,-6)),add(ro,o),EC("rim",SYSTEM_COLORS.rim),1.5);}
+    const isBaja = S.vehicleType === "baja";
+
+    if(isBaja || S.show.tirefill){
+      // 实体 3D 全地形越野厚胎 (Solid 3D All-Terrain Tire with Tread Blocks)
+      const segs = 20;
+      const ptsI = circPts(ci, ax, tR, segs, eU, eV);
+      const ptsO = circPts(co, ax, tR, segs, eU, eV);
+      const tireRubberCol = "rgba(18, 22, 28, 0.96)";
+      const tireStroke = isBaja ? "#374151" : EC("tire", SYSTEM_COLORS.tire);
+
+      for(let k = 0; k < segs; k++){
+        const kNext = (k + 1) % segs;
+        PL(sc, [ptsI[k], ptsO[k], ptsO[kNext], ptsI[kNext], ptsI[k]], tireStroke, 1.0, null, tireRubberCol);
+      }
+      PL(sc, ptsO, tireStroke, 1.3, null, tireRubberCol);
+      PL(sc, ptsI, tireStroke, 1.1, null, tireRubberCol);
+
+      // 铝合金轮毂与多辐条 (Alloy Wheel Rim Disc)
+      const rimCol = isBaja ? "#94a3b8" : EC("rim", SYSTEM_COLORS.rim);
+      const rimFill = isBaja ? "rgba(40, 50, 62, 0.95)" : "rgba(30, 36, 44, 0.90)";
+      PL(sc, circPts(ro, ax, rimR, 24, eU, eV), rimCol, 1.5, null, rimFill);
+      for(let k = 0; k < 6; k++){
+        const an = 2 * PI * k / 6;
+        const o = add(mul(eU, rimR * 0.85 * cos(an)), mul(eV, rimR * 0.85 * sin(an)));
+        L3(sc, add(ro, mul(ax, -6)), add(ro, o), isBaja ? "#cbd5e1" : EC("rim", SYSTEM_COLORS.rim), 2.2);
+      }
+    } else {
+      PL(sc,circPts(ci,ax,tR,36,eU,eV),EC("tire",SYSTEM_COLORS.tire),1.3);
+      PL(sc,circPts(co,ax,tR,36,eU,eV),EC("tire",SYSTEM_COLORS.tire),1.3);
+      for(let k=0;k<18;k++){const an=2*PI*k/18;
+        const o=add(mul(eU,tR*cos(an)),mul(eV,tR*sin(an)));
+        L3(sc,add(ci,o),add(co,o),EC("tread",SYSTEM_COLORS.tread),1);}
+      PL(sc,circPts(ro,ax,rimR,28,eU,eV),EC("rim",SYSTEM_COLORS.rim),1.2);
+      for(let k=0;k<5;k++){const an=2*PI*k/5;
+        const o=add(mul(eU,rimR*0.88*cos(an)),mul(eV,rimR*0.88*sin(an)));
+        L3(sc,add(ro,mul(ax,-6)),add(ro,o),EC("rim",SYSTEM_COLORS.rim),1.5);}
+    }
   }
 
   // 防倾杆力臂与端部连杆 (Anti-Roll Bar Arm & Drop Link)
