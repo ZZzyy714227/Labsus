@@ -689,16 +689,22 @@ function chassisPayload(){
   const halfF=Math.abs(f.hp.WC[0]),halfR=Math.abs(r.hp.WC[0]);
   const kwCurve=sw=>(sw&&sw.rows&&sw.rows.length>=2)
     ?{travel:sw.rows.map(q=>q.tr),kw:sw.rows.map(q=>q.kw)}:undefined;
+  /* G29 轮胎工坊：自定义激活时注入 MF 参数与胎压（读 SIM.userTire，LS 已含
+     胎压修正）；未激活时 undefined——JSON.stringify 丢弃 undefined 键，
+     payload 与未自定义时逐字节一致（回归安全） */
+  const ut = (typeof SIM !== "undefined" && SIM.userTire) ? SIM.userTire : null;
   return {
     vehicle:{
       wheelbase_mm:S.wb,mass_kg:S.mTotal,sprung_mass_kg:S.mSprung,hcg_mm:S.hcg,hs_mm:S.hs,
       front:{points:JSON.parse(JSON.stringify(f.hp)),arch:f.arch,camber_deg:f.cam0,toe_deg:f.toe0,
-        tire_radius:f.tire.R,spring_rate:f.kS,spring_mass_kg:f.mS,unsprung_kg:f.mU,
+        tire_radius:f.tire.R,tire_rim_w:f.tire.rimW,tire_et:f.tire.et,
+        spring_rate:f.kS,spring_mass_kg:f.mS,unsprung_kg:f.mU,
         motion_ratio:SIM.mrRefF||0.75,
         kw_curve:kwCurve(SIM.swF),
         arb:{d:f.arb.d,t:f.arb.t,dy:f.arb.dy,dz:f.arb.dz,G:f.arb.G}},
       rear:{points:JSON.parse(JSON.stringify(r.hp)),arch:r.arch,camber_deg:r.cam0,toe_deg:r.toe0,
-        tire_radius:r.tire.R,spring_rate:r.kS,spring_mass_kg:r.mS,unsprung_kg:r.mU,
+        tire_radius:r.tire.R,tire_rim_w:r.tire.rimW,tire_et:r.tire.et,
+        spring_rate:r.kS,spring_mass_kg:r.mS,unsprung_kg:r.mU,
         motion_ratio:SIM.mrRefR||0.78,
         kw_curve:kwCurve(SIM.swR),
         arb:{d:r.arb.d,t:r.arb.t,dy:r.arb.dy,dz:r.arb.dz,G:r.arb.G}}
@@ -707,7 +713,8 @@ function chassisPayload(){
     travel:{fl:travelL(halfF,S.roll),fr:travelR(halfF,S.roll),
             rl:travelL(halfR,S.roll),rr:travelR(halfR,S.roll)},
     rack:S.rack,
-    sweep:{min:CH.sweep.min,max:CH.sweep.max,n:CH.sweep.n}
+    sweep:{min:CH.sweep.min,max:CH.sweep.max,n:CH.sweep.n},
+    tire: ut ? { Fy0:ut.Fy0, FzNom:ut.FzNom, By:ut.By, Cy:ut.Cy, Ey:ut.Ey, LS:ut.LS, Cg:ut.Cg, p:ut.p } : undefined
   };
 }
 function setChStatus(t,c){const e=document.getElementById("chStatus");if(e){e.textContent=t;e.style.color=c||C.txt3;}}

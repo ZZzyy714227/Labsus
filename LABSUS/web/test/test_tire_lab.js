@@ -220,6 +220,24 @@ T("var eng = new VehicleDynamics15DOF(S, SIM, 10);");
 assert(T("eng.resolveTireParams().Fy0") === 5250, "defaults intact (anchor 5250)");
 assert(T("eng.resolveTireParams().By") === 20, "defaults intact (anchor By=20)");
 
+/* ═══ 4. chassisPayload 注入 ═══ */
+console.log("=== 4. chassisPayload Injection ===");
+T("SIM.userTire = null; TIRE_LAB.active = null;");
+T("loadVehiclePreset('gt3');");
+let pay0 = T("chassisPayload()");
+assert(pay0.tire === undefined, "payload has no tire block when no custom active");
+T(`TIRE_LAB.active = { name:null, front:{R:300,W:265,rim:228.6,rimW:190,et:0,p:252},
+   rear:{R:310,W:285,rim:228.6,rimW:200,et:0,p:168},
+   mf:{Fy0:6000,FzNom:3500,By:22,Cy:1.2,Ey:-0.5,LS:0.10,Cg:6.0} };
+   TIRE_LAB.applyToState(TIRE_LAB.active);`);
+const pay = T("chassisPayload()");
+assert(pay.tire && pay.tire.Fy0 === 6000 && pay.tire.p === 252, "payload.tire injected with MF + pressure");
+assert(pay.tire.LS !== undefined && Math.abs(pay.tire.LS - 0.10 * 0.95) < 1e-9, "payload.tire.LS pressure-adjusted");
+assert(pay.vehicle.front.tire_rim_w === 190 && pay.vehicle.rear.tire_et === 0,
+  "vehicle axle tire_rim_w/et injected");
+T("TIRE_LAB.restoreBuiltin();");
+assert(T("chassisPayload().tire") === undefined, "tire block absent again after restore");
+
 console.log(`\n[cumulative] ${passed}/${total} passed`);
 
 process.exit(passed === total ? 0 : 1);
