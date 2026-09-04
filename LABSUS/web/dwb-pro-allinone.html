@@ -5185,6 +5185,281 @@ simulate(0.016);
 simulate(0.016);
 VW.forEach(v=>{sizeView(v);fitView(v);});
 requestAnimationFrame(loop);
+
+/* ===================== 13-engine-sound.js 内联（P2-Sound 2026-09-02）=====
+   与 js/13-engine-sound.js 同源拷贝（allinone 自含单文件约定）；改动须双写。 */
+"use strict";
+const ENGINE_SOUND_PROFILES = {
+  formula:   { label: "FSAE I4",    cyl: 4, idle: 3000, redline: 11000, baseMul: 1.0,
+               ratios: [2.80, 2.00, 1.60, 1.30], final: 3.90, shiftUp: 0.95, shiftDown: 0.55 },
+  gt3:       { label: "V8 NA",      cyl: 8, idle: 950,  redline: 9000,  baseMul: 0.5,
+               ratios: [3.00, 2.20, 1.75, 1.40, 1.15, 0.98], final: 3.70, shiftUp: 0.94, shiftDown: 0.50 },
+  gt3_sport: { label: "I4 Turbo",   cyl: 4, idle: 850,  redline: 7200,  baseMul: 1.0,
+               ratios: [3.00, 2.20, 1.75, 1.40, 1.15, 0.98], final: 3.70, shiftUp: 0.93, shiftDown: 0.50 },
+  baja:      { label: "Single 450", cyl: 1, idle: 1500, redline: 8200,  baseMul: 2.0,
+               ratios: [3.00, 2.10, 1.50], final: 4.30, shiftUp: 0.94, shiftDown: 0.55 }
+};
+window.ENGINE_SOUND_PROFILES = ENGINE_SOUND_PROFILES;
+
+const ENGINE_SOUND_MAX_GEAR_SHIFT_COOLDOWN = 0.30;
+const ENGINE_SOUND_CUT_T = 0.13;
+const ENGINE_SOUND_RPM_INERTIA = 12.0;
+
+class EngineAudioModel {
+  constructor(profileKey) {
+    this.setProfile(profileKey);
+    this.gear = 1;
+    this.rpm = this.p ? this.p.idle : 900;
+    this.cutT = 0;
+    this.shiftCooldown = 0;
+    this.t = 0;
+  }
+  setProfile(profileKey) {
+    this.profileKey = ENGINE_SOUND_PROFILES[profileKey] ? profileKey : "gt3";
+    this.p = ENGINE_SOUND_PROFILES[this.profileKey];
+  }
+  update(dt, sig) {
+    const p = this.p;
+    this.t += dt;
+    this.cutT = Math.max(0, this.cutT - dt);
+    this.shiftCooldown = Math.max(0, this.shiftCooldown - dt);
+    const thr = Math.max(0, Math.min(1, sig.throttle || 0));
+    const brk = Math.max(0, Math.min(1, sig.brake || 0));
+    const wheelOmega = Math.max(0, sig.wheelOmega || 0);
+    const ratio = p.ratios[this.gear - 1] * p.final;
+    let rpmRaw = wheelOmega * ratio * 60.0 / (2.0 * Math.PI);
+    if (!isFinite(rpmRaw) || rpmRaw < p.idle * 0.6) rpmRaw = p.idle;
+    let events = null;
+    if (this.shiftCooldown <= 0) {
+      const upRpm = p.redline * p.shiftUp;
+      const downRpm = p.redline * p.shiftDown;
+      if (this.gear < p.ratios.length && rpmRaw > upRpm && thr > 0.2) {
+        this.gear++; this.cutT = ENGINE_SOUND_CUT_T;
+        this.shiftCooldown = ENGINE_SOUND_MAX_GEAR_SHIFT_COOLDOWN;
+        (events = events || []).push("shift");
+      } else if (this.gear > 1 && (rpmRaw < p.idle * 1.6 || (brk > 0.1 && rpmRaw < downRpm))) {
+        this.gear--; this.cutT = ENGINE_SOUND_CUT_T;
+        this.shiftCooldown = ENGINE_SOUND_MAX_GEAR_SHIFT_COOLDOWN;
+        (events = events || []).push("shift");
+        if (brk > 0.1) (events = events || []).push("pop");
+      }
+    }
+    const ratioNew = p.ratios[this.gear - 1] * p.final;
+    let rpmTarget = wheelOmega * ratioNew * 60.0 / (2.0 * Math.PI);
+    if (!isFinite(rpmTarget) || rpmTarget < p.idle) rpmTarget = p.idle;
+    rpmTarget = Math.min(p.redline * 1.04, rpmTarget);
+    this.rpm += (rpmTarget - this.rpm) * Math.min(1.0, dt * ENGINE_SOUND_RPM_INERTIA);
+    const cutK = this.cutT > 0 ? 0.25 : 1.0;
+    const thrEff = thr * (this.cutT > 0 ? 0.3 : 1.0);
+    const loadK = Math.max(thrEff, brk * 0.25);
+    const fFiring = (this.rpm / 60.0) * (p.cyl / 2.0) * p.baseMul;
+    const rpmK = this.rpm / p.redline;
+    let gain = 0.10 + 0.30 * loadK + 0.10 * rpmK;
+    if (sig.isKerb) gain *= 1.0 + 0.15 * Math.sin(this.t * 55.0);
+    const kappa = Math.abs(sig.kappaMax || 0);
+    const slip = Math.max(0, Math.min(1.0, (kappa - 0.12) * 1.2));
+    return {
+      f1: fFiring * 0.5, f2: fFiring, f3: fFiring * 2.0,
+      h1: 1.0, h2: 0.5 + 0.4 * thrEff, h3: 0.25 + 0.5 * thrEff,
+      gain: Math.max(0, gain) * cutK,
+      bright: 800 + 4500 * thrEff + rpmK * 1500,
+      noiseGain: 0.02 + 0.10 * thrEff,
+      slipGain: slip * 0.3,
+      gear: this.gear, rpm: this.rpm,
+      events: events || []
+    };
+  }
+}
+window.EngineAudioModel = EngineAudioModel;
+
+class EngineAudioSink {
+  constructor() {
+    this.ok = false; this.ctx = null; this.muted = true; this._noiseBuf = null;
+  }
+  unlock() {
+    if (this.ok) { if (this.ctx.state === "suspended") this.ctx.resume(); return true; }
+    const AC = (typeof window !== "undefined") && (window.AudioContext || window.webkitAudioContext);
+    if (!AC) return false;
+    try {
+      const ctx = new AC();
+      const mk = (type) => { const o = ctx.createOscillator(); o.type = type; return o; };
+      this.o1 = mk("sawtooth"); this.o2 = mk("sawtooth"); this.o3 = mk("triangle");
+      this.g1 = ctx.createGain(); this.g2 = ctx.createGain(); this.g3 = ctx.createGain();
+      this.g1.gain.value = 1.0; this.g2.gain.value = 0.5; this.g3.gain.value = 0.25;
+      this.shaper = ctx.createWaveShaper(); this._setDrive(2.0);
+      this.lp = ctx.createBiquadFilter(); this.lp.type = "lowpass"; this.lp.frequency.value = 1200;
+      this.master = ctx.createGain(); this.master.gain.value = 0.0;
+      this.comp = ctx.createDynamicsCompressor();
+      this._noiseBuf = this._makeNoise(ctx, 2.0);
+      this.nSrc = ctx.createBufferSource(); this.nSrc.buffer = this._noiseBuf; this.nSrc.loop = true;
+      this.nBP = ctx.createBiquadFilter(); this.nBP.type = "bandpass"; this.nBP.Q.value = 0.8;
+      this.nBP.frequency.value = 900; this.nGain = ctx.createGain(); this.nGain.gain.value = 0.0;
+      this.sSrc = ctx.createBufferSource(); this.sSrc.buffer = this._noiseBuf; this.sSrc.loop = true;
+      this.sHP = ctx.createBiquadFilter(); this.sHP.type = "highpass"; this.sHP.frequency.value = 2000;
+      this.sGain = ctx.createGain(); this.sGain.gain.value = 0.0;
+      this.o1.connect(this.g1); this.g1.connect(this.shaper);
+      this.o2.connect(this.g2); this.g2.connect(this.shaper);
+      this.o3.connect(this.g3); this.g3.connect(this.shaper);
+      this.shaper.connect(this.lp); this.lp.connect(this.master);
+      this.nSrc.connect(this.nBP); this.nBP.connect(this.nGain); this.nGain.connect(this.master);
+      this.sSrc.connect(this.sHP); this.sHP.connect(this.sGain); this.sGain.connect(this.master);
+      this.master.connect(this.comp); this.comp.connect(ctx.destination);
+      this.o1.start(); this.o2.start(); this.o3.start(); this.nSrc.start(); this.sSrc.start();
+      this.ctx = ctx; this.ok = true;
+      return true;
+    } catch (e) { return false; }
+  }
+  _makeNoise(ctx, sec) {
+    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * sec), ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+  _setDrive(k) {
+    const n = 256, curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1;
+      curve[i] = Math.tanh(k * x) / Math.tanh(k);
+    }
+    this.shaper.curve = curve;
+  }
+  update(p) {
+    if (!this.ok) return;
+    const t = this.ctx.currentTime;
+    const S = (param, v, tau) => param.setTargetAtTime(v, t, tau);
+    S(this.o1.frequency, p.f1, 0.02); S(this.o2.frequency, p.f2, 0.02); S(this.o3.frequency, p.f3, 0.02);
+    S(this.g2.gain, p.h2, 0.03); S(this.g3.gain, p.h3, 0.03);
+    S(this.lp.frequency, Math.max(200, Math.min(9000, p.bright)), 0.04);
+    this._setDrive(1.5 + 2.5 * Math.min(1, Math.max(0, (p.bright - 800) / 4500)));
+    S(this.nBP.frequency, Math.max(200, Math.min(5000, p.bright * 0.6)), 0.05);
+    S(this.nGain.gain, this.muted ? 0 : p.noiseGain, 0.03);
+    S(this.sGain.gain, this.muted ? 0 : p.slipGain, 0.05);
+    S(this.master.gain, this.muted ? 0 : p.gain * 0.5, 0.03);
+    this._lastP = p;
+    for (const ev of p.events) if (ev === "pop") this.pop();
+  }
+  pop() {
+    if (!this.ok || this.muted) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const o = ctx.createOscillator(); o.type = "sawtooth";
+    o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.09);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
+    o.connect(g); g.connect(this.comp);
+    o.start(t); o.stop(t + 0.11);
+  }
+  setMuted(m) {
+    this.muted = m;
+    if (this.ok) this.master.gain.setTargetAtTime(m ? 0 : (this._lastP ? this._lastP.gain * 0.5 : 0.1),
+      this.ctx.currentTime, 0.05);
+  }
+}
+
+const EngineSound = {
+  model: new EngineAudioModel("gt3"),
+  sink: new EngineAudioSink(),
+  muted: (function () {
+    try { return localStorage.getItem("labsus-sound-muted") !== "0"; } catch (e) { return true; }
+  })(),
+  lastFeed: 0,
+  ensure(vehicleType) {
+    if (this.model.profileKey !== vehicleType && ENGINE_SOUND_PROFILES[vehicleType]) {
+      const wasMuted = this.muted;
+      this.model = new EngineAudioModel(vehicleType);
+      this.muted = wasMuted;
+    }
+  },
+  update(dt, st, tel, ctrl) {
+    const now = (typeof performance !== "undefined") ? performance.now() : Date.now();
+    this.lastFeed = now;
+    const vt = (typeof S !== "undefined" && S && S.vehicleType)
+      || (typeof window !== "undefined" && window.S && window.S.vehicleType) || "gt3";
+    this.ensure(vt);
+    const kappa = tel && tel.kappa
+      ? Math.max(Math.abs(tel.kappa.FL || 0), Math.abs(tel.kappa.FR || 0),
+                 Math.abs(tel.kappa.RL || 0), Math.abs(tel.kappa.RR || 0)) : 0;
+    const isKerb = !!(tel && tel.isKerb && (tel.isKerb.FL || tel.isKerb.FR || tel.isKerb.RL || tel.isKerb.RR));
+    const wheelOmega = st && st.omega ? ((st.omega.RL || 0) + (st.omega.RR || 0)) / 2 : 0;
+    const p = this.model.update(dt, {
+      wheelOmega, throttle: (ctrl && ctrl.throttle) || 0, brake: (ctrl && ctrl.brake) || 0,
+      kappaMax: kappa, isKerb
+    });
+    this.sink.update(p);
+    return p;
+  },
+  toggle() {
+    this.muted = !this.muted;
+    if (!this.muted) this.sink.unlock();
+    this.sink.setMuted(this.muted);
+    try { localStorage.setItem("labsus-sound-muted", this.muted ? "1" : "0"); } catch (e) {}
+    return !this.muted;
+  }
+};
+window.EngineSound = EngineSound;
+
+if (!EngineSound.muted) {
+  EngineSound.sink.unlock();
+  const _resumeSnd = () => {
+    if (EngineSound.sink.ok && EngineSound.sink.ctx.state === "suspended") EngineSound.sink.ctx.resume();
+  };
+  if (typeof document !== "undefined" && document.addEventListener) {
+    document.addEventListener("pointerdown", _resumeSnd);
+    document.addEventListener("keydown", _resumeSnd);
+  }
+}
+
+let _sndBtn = null;
+if (typeof setInterval === "function") {
+  setInterval(() => {
+    const now = (typeof performance !== "undefined") ? performance.now() : Date.now();
+    if (now - EngineSound.lastFeed > 250 && EngineSound.sink.ok) {
+      EngineSound.sink.update({
+        f1: 20, f2: 40, f3: 80, h1: 1, h2: 0.5, h3: 0.25,
+        gain: 0, bright: 800, noiseGain: 0, slipGain: 0, events: []
+      });
+    }
+    if (_sndBtn) {
+      const inCircuit = (typeof CIRCUIT_STAGE !== "undefined" && CIRCUIT_STAGE && CIRCUIT_STAGE.active);
+      _sndBtn.style.display = inCircuit ? "" : "none";
+    }
+  }, 120);
+}
+
+(function _bindEngineSoundBtn() {
+  const refresh = (b) => {
+    b.textContent = EngineSound.muted ? "声浪 OFF" : "声浪 ON";
+    b.style.color = EngineSound.muted ? "#8FA1B8" : "#E8A04C";
+  };
+  const ensureBtn = () => {
+    let b = (typeof document !== "undefined") ? document.getElementById("engineSoundTg") : null;
+    if (!b && typeof document !== "undefined" && document.body && document.createElement) {
+      b = document.createElement("button");
+      b.id = "engineSoundTg";
+      b.title = "引擎声浪：随转速/油门/换挡/打滑工况联动（首次点击解锁浏览器音频）";
+      b.style.cssText = "position:fixed;top:10px;right:10px;z-index:100000;padding:4px 10px;" +
+        "background:#0E1520;border:1px solid #2A3646;cursor:pointer;opacity:0.85;" +
+        "font:600 12px/1.4 system-ui,sans-serif;letter-spacing:0.5px;";
+      b.onmouseenter = () => { b.style.opacity = "1"; };
+      b.onmouseleave = () => { b.style.opacity = "0.85"; };
+      document.body.appendChild(b);
+    }
+    if (b && !b._sndBound) {
+      b._sndBound = true;
+      b.onclick = () => { EngineSound.toggle(); refresh(b); };
+      refresh(b);
+      _sndBtn = b;
+      const inCircuit0 = (typeof CIRCUIT_STAGE !== "undefined" && CIRCUIT_STAGE && CIRCUIT_STAGE.active);
+      b.style.display = inCircuit0 ? "" : "none";
+    }
+  };
+  if (typeof document !== "undefined") {
+    if (document.readyState === "loading" && document.addEventListener) {
+      document.addEventListener("DOMContentLoaded", ensureBtn);
+    } else {
+      ensureBtn();
+    }
+  }
+})();
 </script>
 </body>
 </html>
