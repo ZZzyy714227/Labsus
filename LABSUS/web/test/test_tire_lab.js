@@ -112,8 +112,8 @@ assert(T("typeof TIRE_LAB === 'object'"), "TIRE_LAB namespace exists");
 assert(T("TIRE_LAB.pressureBase('baja')") === 140, "Baja base pressure 140kPa");
 assert(T("TIRE_LAB.pressureBase('gt3')") === 210, "GT3 base pressure 210kPa");
 assert(T("TIRE_LAB.pressureBase('unknown')") === 180, "Unknown type falls back to 180kPa");
-assert(Math.abs(T("TIRE_LAB.kTFactor(252, 210)") - 1.11) < 1e-9, "kT factor +10% pressure => +5.5% stiffness");
-assert(Math.abs(T("TIRE_LAB.lSFactor(252, 210)") - 0.95) < 1e-9, "LS factor +10% pressure => -2.5% LS");
+assert(Math.abs(T("TIRE_LAB.kTFactor(252, 210)") - 1.11) < 1e-9, "kT factor +20% pressure => +11% stiffness");
+assert(Math.abs(T("TIRE_LAB.lSFactor(252, 210)") - 0.95) < 1e-9, "LS factor +20% pressure => -5% LS");
 
 /* 存取与上限 */
 T(`TIRE_LAB.customs = {}; TIRE_LAB.active = null;`);
@@ -136,6 +136,15 @@ assert(!T(`TIRE_LAB.validate({front:{R:99,W:265,rim:228.6,rimW:190,et:0,p:210},r
   "R out of range fails validate");
 assert(!T(`TIRE_LAB.validate({front:{R:300,W:265,rim:228.6,rimW:190,et:0,p:210},rear:{R:310,W:285,rim:228.6,rimW:200,et:0,p:210},mf:{Fy0:5250,FzNom:0,By:20,Cy:1.2,Ey:-0.5,LS:0.1,Cg:6}}).ok`),
   "FzNom<=0 fails validate");
+
+/* 分流路径：loadVehiclePreset("tirecustom:名") 必须落到 activateCustom（slice off-by-one 回归） */
+T(`loadVehiclePreset("gt3"); TIRE_LAB.active = { name:null,
+  front:{R:300,W:265,rim:228.6,rimW:190,et:0,p:210}, rear:{R:310,W:285,rim:228.6,rimW:200,et:0,p:210},
+  mf:{Fy0:5250,FzNom:3500,By:20,Cy:1.2,Ey:-0.5,LS:0.10,Cg:6.0} }; TIRE_LAB.saveCustom("分流胎");`);
+T('loadVehiclePreset("gt3"); TIRE_LAB.active = null; SIM.userTire = null;');
+T('loadVehiclePreset("tirecustom:分流胎");');
+assert(T("TIRE_LAB.active.name") === "分流胎", "tirecustom: prefix routes to activateCustom (slice(11))");
+assert(T("TIRE_LAB.active.front.R") === 300, "routed activation re-applies stored tire");
 
 console.log(`\n[Part1] ${passed}/${total} passed`);
 
