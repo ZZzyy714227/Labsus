@@ -785,6 +785,8 @@ function addAxleAssemblyPRO(sc, M, m, sx, yOff, axis){
   const ax=nrm([m.ax[0]*sx, m.ax[1], m.ax[2]]);
   const kg=T(m.kg);
   const tR=state.tire.R, tW=state.tire.W, rimR=state.tire.rim, dR=state.tire.disc;
+  const rimHalf = Math.max(18, (state.tire.rimW || Math.round(tW * 0.72)) * 0.30); // G29 轮辋深度随轮毂宽度
+  const etOff = state.tire.et || 0;                                                 // G29 偏距：轮面沿轴向外移
     const _eU0=nrm(sub([0,0,1],mul(ax,dot([0,0,1],ax)))), _eV0=cross(ax,_eU0);
   let _spin = 0;
   if(window._tireSpinAngles) {
@@ -906,11 +908,11 @@ function addAxleAssemblyPRO(sc, M, m, sx, yOff, axis){
       // 铝合金轮毂与多辐条 (Alloy Wheel Rim Disc)
       const rimCol = isBaja ? "#94a3b8" : EC("rim", SYSTEM_COLORS.rim);
       const rimFill = isBaja ? "rgba(40, 50, 62, 0.95)" : "rgba(30, 36, 44, 0.90)";
-      PL(sc, circPts(ro, ax, rimR, 24, eU, eV), rimCol, 1.5, null, rimFill);
+      PL(sc, circPts(add(ro, mul(ax, etOff)), ax, rimR, 24, eU, eV), rimCol, 1.5, null, rimFill);
       for(let k = 0; k < 6; k++){
         const an = 2 * PI * k / 6;
         const o = add(mul(eU, rimR * 0.85 * cos(an)), mul(eV, rimR * 0.85 * sin(an)));
-        L3(sc, add(ro, mul(ax, -6)), add(ro, o), isBaja ? "#cbd5e1" : EC("rim", SYSTEM_COLORS.rim), 2.2);
+        L3(sc, add(ro, mul(ax, etOff - rimHalf)), add(ro, o), isBaja ? "#cbd5e1" : EC("rim", SYSTEM_COLORS.rim), 2.2);
       }
     } else {
       PL(sc,circPts(ci,ax,tR,36,eU,eV),EC("tire",SYSTEM_COLORS.tire),1.3);
@@ -918,10 +920,10 @@ function addAxleAssemblyPRO(sc, M, m, sx, yOff, axis){
       for(let k=0;k<18;k++){const an=2*PI*k/18;
         const o=add(mul(eU,tR*cos(an)),mul(eV,tR*sin(an)));
         L3(sc,add(ci,o),add(co,o),EC("tread",SYSTEM_COLORS.tread),1);}
-      PL(sc,circPts(ro,ax,rimR,28,eU,eV),EC("rim",SYSTEM_COLORS.rim),1.2);
+      PL(sc,circPts(add(ro,mul(ax,etOff)),ax,rimR,28,eU,eV),EC("rim",SYSTEM_COLORS.rim),1.2);
       for(let k=0;k<5;k++){const an=2*PI*k/5;
         const o=add(mul(eU,rimR*0.88*cos(an)),mul(eV,rimR*0.88*sin(an)));
-        L3(sc,add(ro,mul(ax,-6)),add(ro,o),EC("rim",SYSTEM_COLORS.rim),1.5);}
+        L3(sc,add(ro,mul(ax,etOff - rimHalf)),add(ro,o),EC("rim",SYSTEM_COLORS.rim),1.5);}
     }
   }
 
