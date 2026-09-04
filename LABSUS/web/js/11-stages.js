@@ -941,6 +941,7 @@ const SLOPE_STAGE = {
     accel_brake: { speedKmh: 0.0, repeatCount: 1, accelBrakeTriggerY: 75.0 },
     split_mu: { speedKmh: 70.0, repeatCount: 1, muLeft: 1.35, muRight: 0.28 },
     slope_climb: { speedKmh: 65.0, repeatCount: 1, grade: 0.18 },
+    undulating_road: { speedKmh: 36.0, repeatCount: 12, undulatingWavelength: 4.8, undulatingAmplitude: 0.14, undulatingCrossAmp: 0.14, undulatingPhase: 180, undulatingType: "staggered_moguls", hillStartActive: false },
     custom: { speedKmh: 85.0, repeatCount: 10, customSegments: [] }
   },
   
@@ -971,6 +972,18 @@ const SLOPE_STAGE = {
     sparks: []
   },
 
+  hillStart: {
+    active: false,
+    state: "idle", // "idle" | "approaching" | "stopping" | "holding" | "launching" | "completed"
+    holdTimer: 0,
+    stopY: 0,
+    rollbackDist: 0,
+    launchStartTime: 0,
+    timeTo25Kmh: 0,
+    score: 100,
+    verdict: ""
+  },
+
   recordChassisScrape: function(x, y, z) {
     if (this.stats.sparks.length > 35) return;
     for (let i = 0; i < 6; i++) {
@@ -988,6 +1001,12 @@ const SLOPE_STAGE = {
 
   resetVehicle: function() {
     this.distTraveled = 0;
+    if (this.hillStart) {
+      this.hillStart.state = "idle";
+      this.hillStart.rollbackDist = 0;
+      this.hillStart.holdTimer = 0;
+      this.hillStart.verdict = "";
+    }
     const cfg = this.scenarioConfigs[this.scenario] || {};
     const initSpeedKmh = (this.scenario === "accel_brake") ? 0 : (cfg.speedKmh || this.speedKmh || 85);
     const initSpeedMs = (initSpeedKmh * 1000) / 3600;
@@ -1070,6 +1089,38 @@ const SLOPE_STAGE = {
       window.slopePilot.setPath(window.straightTestPath);
     }
     
+    if (scId === "undulating_road") {
+      if (typeof loadVehiclePreset === "function") {
+        loadVehiclePreset("baja");
+      } else if (typeof VEHICLE_PRESETS !== "undefined" && VEHICLE_PRESETS.baja) {
+        S.vehicleType = "baja";
+        const bp = VEHICLE_PRESETS.baja;
+        S.wb = bp.wb; S.hcg = bp.hcg;
+        if (bp.limF) { S.trMin = bp.limF[0]; S.trMax = bp.limF[1]; }
+      }
+      // Re-instantiate 15DOF physics engine with the loaded Baja off-road preset
+      if (typeof VehicleDynamics15DOF === "function" && typeof SIM !== "undefined") {
+        window.physicsEngine = new VehicleDynamics15DOF(S, SIM, targetMs);
+      }
+      if (typeof UniversalAutoPilot === "function") {
+        window.slopePilot = new UniversalAutoPilot(S);
+        if (window.straightTestPath) window.slopePilot.setPath(window.straightTestPath);
+        window.slopePilot.active = true;
+      }
+      this.cachedScene = null;
+      this.rebuildCadence = 0;
+      this.camMode = "front_low";
+      this.camOrbit = { az: 0, elv: 0, distFactor: 1.0 };
+      const camBtns = document.querySelectorAll(".slope-cam-btn");
+      camBtns.forEach(b => b.classList.toggle("on", b.dataset.cam === "front_low"));
+    }
+
+    // Always keep slopeVehName HUD element in sync with the current active vehicle preset
+    const elName = document.getElementById("slopeVehName");
+    if (elName && typeof VEHICLE_PRESETS !== "undefined" && VEHICLE_PRESETS[S.vehicleType]) {
+      elName.textContent = VEHICLE_PRESETS[S.vehicleType].name;
+    }
+    
     this.resetVehicle();
     if (updateUI) syncSlopeScenarioUI();
   }
@@ -1106,6 +1157,7 @@ function paintStageError(canvasId, tag, err){
 
 const SLOPE_CAMS_CONFIG = {
   behind:     { dx: 0,     dy: -3800, dz: 950,  lookDy: 600,  lookDz: 300, fov: 1.6 },
+  front_low:  { dx: 0,     dy: 2350,  dz: 270,  lookDy: -350, lookDz: 220, fov: 1.55 },
   front:      { dx: 0,     dy: 3200,  dz: 700,  lookDy: -400, lookDz: 250, fov: 1.6 },
   suspension: { dx: -1800, dy: 600,   dz: 320,  lookDy: 800,  lookDz: 250, fov: 1.9 },
   threeq:     { dx: 3000,  dy: -3400, dz: 1400, lookDy: 400,  lookDz: 300, fov: 1.5 },
@@ -1113,6 +1165,7 @@ const SLOPE_CAMS_CONFIG = {
   side:       { dx: 3800,  dy: 0,     dz: 650,  lookDy: 0,    lookDz: 300, fov: 1.6 },
   side_track: { dx: 4500,  dy: -1200, dz: 1100, lookDy: 1200, lookDz: 350, fov: 1.5 }
 };
+window.SLOPE_CAMS_CONFIG = SLOPE_CAMS_CONFIG;
 
 function openSlopeStage(){
   const modal = document.getElementById("slopeStageModal");
@@ -1176,8 +1229,17 @@ function slopeStageLoop(now){
   SLOPE_STAGE.lastTime = now;
   const dt = rawDt * (SLOPE_STAGE.timeScale || 1.0);
 
+  const curSt = window.physicsEngine ? window.physicsEngine.state : { X: 0, Y: 0 };
+  let currentGrade = 0;
+  if (SLOPE_STAGE.scenario === "slope_climb") {
+    currentGrade = Math.atan(SLOPE_STAGE.grade);
+  } else if (window.straightTestPath && typeof window.straightTestPath.getRoadSlope === "function") {
+    const slp = window.straightTestPath.getRoadSlope(curSt.X, curSt.Y);
+    currentGrade = slp.slopeAngle || 0;
+  }
+
   const env = { 
-    grade: (SLOPE_STAGE.scenario === "slope_climb") ? Math.atan(SLOPE_STAGE.grade) : 0, 
+    grade: currentGrade, 
     path: window.straightTestPath,
     bumpNoise: 0
   };
@@ -1207,6 +1269,58 @@ function slopeStageLoop(now){
         window.slopePilot.setPath(window.straightTestPath || new StraightPath(targetSpeedMs, SLOPE_STAGE.scenario));
       }
       ctrl = window.slopePilot.drive(window.physicsEngine.state, dt);
+    }
+  }
+
+  // Hill Start & Launch Test controller intervention
+  if (SLOPE_STAGE.scenario === "undulating_road" && SLOPE_STAGE.hillStart && SLOPE_STAGE.hillStart.active && !isUserManual) {
+    const slp = window.straightTestPath ? window.straightTestPath.getRoadSlope(curSt.X, curSt.Y) : { isUphill: false, slopePct: 0 };
+    const hs = SLOPE_STAGE.hillStart;
+
+    if (hs.state === "idle" || hs.state === "approaching") {
+      hs.state = "approaching";
+      hs.verdict = `正在驶向坡道 (当前坡度: ${slp.slopePct.toFixed(1)}%)...`;
+      if (slp.isUphill && slp.slopePct >= 10.0 && curSt.Y >= 8.0) {
+        hs.state = "stopping";
+      }
+    } else if (hs.state === "stopping") {
+      ctrl.throttle = 0;
+      ctrl.brake = 1.0;
+      hs.verdict = `坡道刹停中... 车速 ${(curSt.u * 3.6).toFixed(1)} km/h`;
+      if (Math.abs(curSt.u) < 0.08) {
+        hs.state = "holding";
+        hs.holdTimer = 2.0;
+        hs.stopY = curSt.Y;
+        hs.rollbackDist = 0;
+        hs.launchStartTime = now;
+      }
+    } else if (hs.state === "holding") {
+      ctrl.throttle = 0;
+      ctrl.brake = 1.0;
+      hs.holdTimer -= dt;
+      hs.verdict = `坡道静止保持中... 剩余 ${Math.max(0, hs.holdTimer).toFixed(1)}s`;
+      if (hs.holdTimer <= 0) {
+        hs.state = "launching";
+        hs.launchStartTime = now;
+      }
+    } else if (hs.state === "launching") {
+      ctrl.brake = 0;
+      const launchElapsed = Math.max(0.01, (now - hs.launchStartTime) / 1000);
+      ctrl.throttle = Math.min(1.0, 0.45 + launchElapsed * 0.6);
+      if (curSt.Y < hs.stopY) {
+        hs.rollbackDist = Math.max(hs.rollbackDist, (hs.stopY - curSt.Y) * 100);
+      }
+      hs.verdict = `全力起步爬坡中！车速: ${(curSt.u * 3.6).toFixed(1)} km/h | 溜车量: ${hs.rollbackDist.toFixed(1)} cm`;
+      if (curSt.u * 3.6 >= 25.0) {
+        hs.state = "completed";
+        hs.timeTo25Kmh = launchElapsed.toFixed(1);
+        hs.score = Math.max(10, Math.round(100 - hs.rollbackDist * 3.0 - Math.max(0, launchElapsed - 2.0) * 10));
+        hs.verdict = (hs.rollbackDist < 2.0)
+          ? `🏆 完美起步！零溜车 (${hs.rollbackDist.toFixed(1)}cm) · 启动用时: ${hs.timeTo25Kmh}s · 得分: ${hs.score}`
+          : (hs.rollbackDist < 8.0)
+          ? `🟡 良好起步！微量溜车 (${hs.rollbackDist.toFixed(1)}cm) · 启动用时: ${hs.timeTo25Kmh}s · 得分: ${hs.score}`
+          : `🔴 溜车严重 (${hs.rollbackDist.toFixed(1)}cm) · 启动用时: ${hs.timeTo25Kmh}s · 得分: ${hs.score}`;
+      }
     }
   }
 
@@ -1293,9 +1407,10 @@ function slopeStageLoop(now){
     const st = window.physicsEngine.state;
     const tel = window.physicsEngine.telemetry;
     
-    // 2. Multibody Suspension Kinematics (3-frame cadence)
+    // 2. Multibody Suspension Kinematics (60fps on undulating terrain)
     SLOPE_STAGE.rebuildCadence++;
-    if(SLOPE_STAGE.rebuildCadence % 3 === 0 || !SLOPE_STAGE.cachedScene) {
+    const cadenceRate = (SLOPE_STAGE.scenario === "undulating_road") ? 1 : 2;
+    if(SLOPE_STAGE.rebuildCadence % cadenceRate === 0 || !SLOPE_STAGE.cachedScene) {
       const isFormula = S.vehicleType === "formula";
       const rackRatio = isFormula ? -0.55 : -1.5;
       const rackMax = isFormula ? 18 : 38;
@@ -1356,10 +1471,18 @@ function renderSlopeScene(alpha, st){
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   // Background Sky / Atmosphere Gradient
+  const isUndulStage = (SLOPE_STAGE.scenario === "undulating_road");
   const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
-  skyGrad.addColorStop(0, "#070a10");
-  skyGrad.addColorStop(0.55, "#0d1420");
-  skyGrad.addColorStop(1, "#040608");
+  if(isUndulStage){
+    skyGrad.addColorStop(0, "#111827");    // Atmospheric twilight / natural outdoor sky
+    skyGrad.addColorStop(0.48, "#1f2937"); // Soft horizon transition
+    skyGrad.addColorStop(0.56, "#2e394b"); // Horizon haze
+    skyGrad.addColorStop(1, "#18202c");    // Distant terrain base
+  } else {
+    skyGrad.addColorStop(0, "#070a10");
+    skyGrad.addColorStop(0.55, "#0d1420");
+    skyGrad.addColorStop(1, "#040608");
+  }
   ctx.fillStyle = skyGrad;
   ctx.fillRect(0, 0, w, h);
 
@@ -1441,68 +1564,172 @@ function renderSlopeScene(alpha, st){
   };
 
   // 1. Draw 3D Dynamic Road
-  const roadHalfW = 4400;
-  const roadNearY = -15000, roadFarY = 140000;
-  const roadGridStep = 3000;
-  const animOffset = (SLOPE_STAGE.distTraveled % roadGridStep);
+  const carY = (st && st.Y ? st.Y : 0); // in meters
+  const carX = (st && st.X ? st.X : 0); // in meters
+  const pathObj = window.straightTestPath;
+  const isUndulating = (SLOPE_STAGE.scenario === "undulating_road" || (pathObj && pathObj.undulatingSections && pathObj.undulatingSections.length > 0));
 
-  const pL_near = projFast(-roadHalfW, roadNearY, 0), pR_near = projFast(roadHalfW, roadNearY, 0);
-  const pR_far  = projFast(roadHalfW, roadFarY, 0),  pL_far  = projFast(-roadHalfW, roadFarY, 0);
+  if (isUndulating && pathObj) {
+    // 🌊 自然非铺装旷野 · 越野连续交错波浪起伏地表 (Universal Depth-Sorted Moguls Terrain)
+    const xHalfW = 9600;  // 19.2m wide terrain
+    const xCols = 16;
+    const dxStep = (xHalfW * 2) / xCols;
+    const yBack = -22000;  // 22m behind vehicle
+    const yFront = 32000;  // 32m in front of vehicle
+    const dyStep = 1250;   // 1.25m steps (43 rows)
 
-  if(pL_near && pR_near && pR_far && pL_far){
-    ctx.beginPath();
-    ctx.moveTo(pL_near[0], pL_near[1]); ctx.lineTo(pR_near[0], pR_near[1]);
-    ctx.lineTo(pR_far[0], pR_far[1]); ctx.lineTo(pL_far[0], pL_far[1]);
-    ctx.closePath();
-    const roadGrad = ctx.createLinearGradient(halfW, h, halfW, 0);
-    roadGrad.addColorStop(0, "#191f2a");
-    roadGrad.addColorStop(0.6, "#121720");
-    roadGrad.addColorStop(1, "#0a0e14");
-    ctx.fillStyle = roadGrad;
-    ctx.fill();
-    ctx.strokeStyle = "rgba(78,161,211,0.25)";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-  }
+    const z_ground_car = (pathObj.getRoadElevation(carX, carY).z_road || 0);
+    const slp_car = (typeof pathObj.getRoadSlope === "function") ? pathObj.getRoadSlope(carX, carY) : { slopeAngle: 0 };
+    const alpha_car = slp_car.slopeAngle || 0;
+    const cosA_c = Math.cos(alpha_car), sinA_c = Math.sin(alpha_car);
 
-  // Red and White Track Kerbs & Centerlines
-  for(let y = roadNearY; y <= roadFarY; y += roadGridStep){
-    const curY = y - animOffset;
-    const nextY = curY + roadGridStep;
-    const isRed = (Math.floor((curY + SLOPE_STAGE.distTraveled) / roadGridStep) % 2 === 0);
-    const kerbCol = isRed ? "#e74c3c" : "#ecf0f1";
+    // 1. Generate 2D Grid Vertices with 3D positions in vehicle coordinate frame
+    const gridNodes = [];
+    const nRows = Math.round((yFront - yBack) / dyStep);
+    for (let r = 0; r <= nRows; r++) {
+      const yRel = yBack + r * dyStep;
+      const worldY = carY + yRel / 1000;
+      const row = [];
+      for (let c = 0; c <= xCols; c++) {
+        const xRel = -xHalfW + c * dxStep;
+        const worldX = carX + xRel / 1000;
+        const elevInfo = pathObj.getRoadElevation(worldX, worldY);
+        const zWorld = (elevInfo.z_road || 0);
+        const dZ_m = zWorld - z_ground_car;
+        const dY_m = yRel / 1000;
 
-    const kL1 = projFast(-roadHalfW, curY, 15),       kL2 = projFast(-roadHalfW-650, curY, 25);
-    const kL3 = projFast(-roadHalfW-650, nextY, 25),  kL4 = projFast(-roadHalfW, nextY, 15);
-    if(kL1 && kL2 && kL3 && kL4){
-      ctx.beginPath();
-      ctx.moveTo(kL1[0], kL1[1]); ctx.lineTo(kL2[0], kL2[1]); ctx.lineTo(kL3[0], kL3[1]); ctx.lineTo(kL4[0], kL4[1]);
-      ctx.closePath();
-      ctx.fillStyle = kerbCol; ctx.fill();
+        const y_veh_mm = (dY_m * cosA_c + dZ_m * sinA_c) * 1000;
+        const z_veh_mm = (-dY_m * sinA_c + dZ_m * cosA_c) * 1000;
+
+        // Camera space depth: zc = m31*x + m32*y + m33*z + v0z
+        const zc = m31 * xRel + m32 * y_veh_mm + m33 * z_veh_mm + v0z;
+        const p2d = projFast(xRel, y_veh_mm, z_veh_mm);
+        row.push({ x: xRel, y: y_veh_mm, z: z_veh_mm, zc, p2d, zWorld });
+      }
+      gridNodes.push(row);
     }
 
-    const kR1 = projFast(roadHalfW, curY, 15),       kR2 = projFast(roadHalfW+650, curY, 25);
-    const kR3 = projFast(roadHalfW+650, nextY, 25),  kR4 = projFast(roadHalfW, nextY, 15);
-    if(kR1 && kR2 && kR3 && kR4){
-      ctx.beginPath();
-      ctx.moveTo(kR1[0], kR1[1]); ctx.lineTo(kR2[0], kR2[1]); ctx.lineTo(kR3[0], kR3[1]); ctx.lineTo(kR4[0], kR4[1]);
-      ctx.closePath();
-      ctx.fillStyle = kerbCol; ctx.fill();
+    // 2. Build Terrain Quads & Depth Sort (Universal Painter's Algorithm)
+    const terrainQuads = [];
+    for (let r = 0; r < nRows; r++) {
+      for (let c = 0; c < xCols; c++) {
+        const nTL = gridNodes[r][c];
+        const nTR = gridNodes[r][c + 1];
+        const nBR = gridNodes[r + 1][c + 1];
+        const nBL = gridNodes[r + 1][c];
+
+        if (nTL.p2d && nTR.p2d && nBR.p2d && nBL.p2d) {
+          const avgZc = (nTL.zc + nTR.zc + nBR.zc + nBL.zc) * 0.25;
+          if (avgZc > 60) {
+            // Normal vector & sunlight calculation
+            const dz_y = (nBL.z - nTL.z) / dyStep;
+            const dz_x = (nTR.z - nTL.z) / dxStep;
+            // Sun vector: from front-right-above (0.35, -0.55, 0.75)
+            const sunDot = (-dz_x * 0.35 - dz_y * (-0.55) + 0.75) / Math.hypot(dz_x, dz_y, 1.0);
+            const diffuse = Math.max(0.25, Math.min(1.0, 0.55 + sunDot * 0.45));
+
+            // Elevation highlight (peaks catch more sun)
+            const avgZ = (nTL.zWorld + nTR.zWorld + nBR.zWorld + nBL.zWorld) * 0.25;
+            const elevNorm = Math.max(-1, Math.min(1, avgZ / 0.16));
+
+            // Off-road slate / desert earth palette
+            const rCol = Math.round(56 * diffuse + elevNorm * 16);
+            const gCol = Math.round(66 * diffuse + elevNorm * 18);
+            const bCol = Math.round(80 * diffuse + elevNorm * 22);
+
+            terrainQuads.push({
+              zc: avgZc,
+              pts: [nTL.p2d, nTR.p2d, nBR.p2d, nBL.p2d],
+              fill: `rgb(${rCol},${gCol},${bCol})`,
+              stroke: `rgba(125, 155, 190, ${Math.max(0.08, Math.min(0.35, 12000 / avgZc)).toFixed(2)})`
+            });
+          }
+        }
+      }
     }
 
-    // Center Dash Line
-    const d1 = projFast(0, curY + 600, 2);
-    const d2 = projFast(0, curY + 2200, 2);
-    if(d1 && d2){
-      ctx.beginPath(); ctx.moveTo(d1[0], d1[1]); ctx.lineTo(d2[0], d2[1]);
-      ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 3; ctx.stroke();
+    // Sort from furthest to nearest
+    terrainQuads.sort((a, b) => b.zc - a.zc);
+
+    // Draw all visible quads
+    for (let i = 0; i < terrainQuads.length; i++) {
+      const q = terrainQuads[i];
+      ctx.beginPath();
+      ctx.moveTo(q.pts[0][0], q.pts[0][1]);
+      ctx.lineTo(q.pts[1][0], q.pts[1][1]);
+      ctx.lineTo(q.pts[2][0], q.pts[2][1]);
+      ctx.lineTo(q.pts[3][0], q.pts[3][1]);
+      ctx.closePath();
+      ctx.fillStyle = q.fill;
+      ctx.fill();
+      ctx.strokeStyle = q.stroke;
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+  } else {
+    // Normal flat road rendering
+    const roadHalfW = 4400;
+    const isFrontFacing = fw[1] < -0.1;
+    const roadNearY = isFrontFacing ? 2000 : -15000;
+    const roadFarY = isFrontFacing ? -60000 : 140000;
+    const roadGridStep = 3000;
+    const animOffset = (SLOPE_STAGE.distTraveled % roadGridStep);
+
+    const pL_near = projFast(-roadHalfW, roadNearY, 0), pR_near = projFast(roadHalfW, roadNearY, 0);
+    const pR_far  = projFast(roadHalfW, roadFarY, 0),  pL_far  = projFast(-roadHalfW, roadFarY, 0);
+
+    if(pL_near && pR_near && pR_far && pL_far){
+      ctx.beginPath();
+      ctx.moveTo(pL_near[0], pL_near[1]); ctx.lineTo(pR_near[0], pR_near[1]);
+      ctx.lineTo(pR_far[0], pR_far[1]); ctx.lineTo(pL_far[0], pL_far[1]);
+      ctx.closePath();
+      const roadGrad = ctx.createLinearGradient(halfW, h, halfW, 0);
+      roadGrad.addColorStop(0, "#191f2a");
+      roadGrad.addColorStop(0.6, "#121720");
+      roadGrad.addColorStop(1, "#0a0e14");
+      ctx.fillStyle = roadGrad;
+      ctx.fill();
+      ctx.strokeStyle = "rgba(78,161,211,0.25)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    // Red and White Track Kerbs & Centerlines
+    for(let y = roadNearY; y <= roadFarY; y += roadGridStep){
+      const curY = y - animOffset;
+      const nextY = curY + roadGridStep;
+      const isRed = (Math.floor((curY + SLOPE_STAGE.distTraveled) / roadGridStep) % 2 === 0);
+      const kerbCol = isRed ? "#e74c3c" : "#ecf0f1";
+
+      const kL1 = projFast(-roadHalfW, curY, 15),       kL2 = projFast(-roadHalfW-650, curY, 25);
+      const kL3 = projFast(-roadHalfW-650, nextY, 25),  kL4 = projFast(-roadHalfW, nextY, 15);
+      if(kL1 && kL2 && kL3 && kL4){
+        ctx.beginPath();
+        ctx.moveTo(kL1[0], kL1[1]); ctx.lineTo(kL2[0], kL2[1]); ctx.lineTo(kL3[0], kL3[1]); ctx.lineTo(kL4[0], kL4[1]);
+        ctx.closePath();
+        ctx.fillStyle = kerbCol; ctx.fill();
+      }
+
+      const kR1 = projFast(roadHalfW, curY, 15),       kR2 = projFast(roadHalfW+650, curY, 25);
+      const kR3 = projFast(roadHalfW+650, nextY, 25),  kR4 = projFast(roadHalfW, nextY, 15);
+      if(kR1 && kR2 && kR3 && kR4){
+        ctx.beginPath();
+        ctx.moveTo(kR1[0], kR1[1]); ctx.lineTo(kR2[0], kR2[1]); ctx.lineTo(kR3[0], kR3[1]); ctx.lineTo(kR4[0], kR4[1]);
+        ctx.closePath();
+        ctx.fillStyle = kerbCol; ctx.fill();
+      }
+
+      // Center Dash Line
+      const d1 = projFast(0, curY + 600, 2);
+      const d2 = projFast(0, curY + 2200, 2);
+      if(d1 && d2){
+        ctx.beginPath(); ctx.moveTo(d1[0], d1[1]); ctx.lineTo(d2[0], d2[1]);
+        ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 3; ctx.stroke();
+      }
     }
   }
 
   // 2. Render 3D Obstacles from Active Track Compiler
-  const carY = st.Y; // in meters
-  const pathObj = window.straightTestPath;
-
   if (pathObj) {
     // 2.1 Render Jump Ramps (Supports 10x consecutive jumps!)
     if (pathObj.ramps && pathObj.ramps.length) {
@@ -1694,7 +1921,19 @@ function renderSlopeScene(alpha, st){
   const projShad = (lx, ly) => {
     const rx = cY_shad * (lx * shadowScale) - sY_shad * (ly * shadowScale) + cX_shad;
     const ry = sY_shad * (lx * shadowScale) + cY_shad * (ly * shadowScale);
-    return projFast(rx, ry, 2);
+    if (isUndulating && pathObj) {
+      const zWorld = (pathObj.getRoadElevation(carX + rx / 1000, carY + ry / 1000).z_road || 0);
+      const z_ground_car = (pathObj.getRoadElevation(carX, carY).z_road || 0);
+      const dZ_m = zWorld - z_ground_car;
+      const dY_m = ry / 1000;
+      const slp_car = (typeof pathObj.getRoadSlope === "function") ? pathObj.getRoadSlope(carX, carY) : { slopeAngle: 0 };
+      const aC = slp_car.slopeAngle || 0;
+      const y_veh = (dY_m * Math.cos(aC) + dZ_m * Math.sin(aC)) * 1000;
+      const z_veh = (-dY_m * Math.sin(aC) + dZ_m * Math.cos(aC)) * 1000 + 4;
+      return projFast(rx, y_veh, z_veh);
+    }
+    const gZ = pathObj ? (pathObj.getRoadElevation(rx / 1000, carY + ry / 1000).z_road * 1000 + 4) : 2;
+    return projFast(rx, ry, gZ);
   };
 
   const s1 = projShad(-shadowW/2, -shadowL/2);
@@ -1878,6 +2117,16 @@ function updateSlopeHUD(st, alpha, tel){
       elAirborne.innerHTML = `0-100 加速: <b>${t0100}</b> | 100-0 制动距离: <b>${bDist}</b> | 减速峰值: <b>${(SLOPE_STAGE.stats.peakBrakeG/9.81).toFixed(2)}g</b>`;
     } else if (SLOPE_STAGE.scenario === "split_mu") {
       elAirborne.innerHTML = `左附着力: <b>1.35</b> | 右附着力: <b>0.28</b> | 偏摆自回正力矩: <b>+145 N·m</b>`;
+    } else if (SLOPE_STAGE.scenario === "undulating_road") {
+      const crossDiff_F = Math.abs(((tr.FL || 0) - (tr.FR || 0)) * 1000).toFixed(0);
+      const crossDiff_R = Math.abs(((tr.RL || 0) - (tr.RR || 0)) * 1000).toFixed(0);
+      const rollDeg = ((st.phi || 0) * (180 / Math.PI)).toFixed(1);
+      const fzFL = Math.round((tel.Fz.FL || 0) / 9.81);
+      const fzFR = Math.round((tel.Fz.FR || 0) / 9.81);
+      const fzRL = Math.round((tel.Fz.RL || 0) / 9.81);
+      const fzRR = Math.round((tel.Fz.RR || 0) / 9.81);
+
+      elAirborne.innerHTML = `🌊 <b>越野连续交错波浪</b> | 车身侧倾: <b>${rollDeg}°</b> | 悬架铰接差: <b>前${crossDiff_F}mm / 后${crossDiff_R}mm</b> | 轮荷: <b>FL:${fzFL}kg FR:${fzFR}kg RL:${fzRL}kg RR:${fzRR}kg</b>`;
     } else {
       elAirborne.innerHTML = `连续爬坡坡度: <b>${(SLOPE_STAGE.grade*100).toFixed(0)}%</b> | 重力分量: <b>${(Math.sin(alpha)).toFixed(2)}g</b>`;
     }
@@ -1928,6 +2177,30 @@ function syncSlopeScenarioUI() {
   if (pBumpH) pBumpH.style.display = (sc === "bumps_cleats") ? "flex" : "none";
   if (pSpeed) pSpeed.style.display = (sc === "accel_brake") ? "none" : "flex";
   if (pRepeat) pRepeat.style.display = (sc === "comprehensive" || sc === "custom") ? "none" : "flex";
+
+  const pUndul = document.getElementById("slopeParamUndulWrap");
+  if (pUndul) pUndul.style.display = (sc === "undulating_road") ? "flex" : "none";
+
+  const sldWl = document.getElementById("slopeUndulWlSlider");
+  if (sldWl && cfg.undulatingWavelength !== undefined) {
+    sldWl.value = cfg.undulatingWavelength;
+    const el = document.getElementById("slopeUndulWlVal");
+    if (el) el.textContent = cfg.undulatingWavelength.toFixed(1) + "m";
+  }
+
+  const sldAmp = document.getElementById("slopeUndulAmpSlider");
+  if (sldAmp && cfg.undulatingAmplitude !== undefined) {
+    sldAmp.value = cfg.undulatingAmplitude;
+    const el = document.getElementById("slopeUndulAmpVal");
+    if (el) el.textContent = Math.round(cfg.undulatingAmplitude * 1000) + "mm";
+  }
+
+  const sldCross = document.getElementById("slopeUndulCrossSlider");
+  if (sldCross && cfg.undulatingCrossAmp !== undefined) {
+    sldCross.value = Math.round(cfg.undulatingCrossAmp * 1000);
+    const el = document.getElementById("slopeUndulCrossVal");
+    if (el) el.textContent = Math.round(cfg.undulatingCrossAmp * 1000) + "mm";
+  }
 
   const sldSpd = document.getElementById("slopeSpeedSlider");
   if (sldSpd) {
@@ -2080,6 +2353,61 @@ function initSlopeStageEvents(){
     };
   }
 
+  const undulWlSlider = document.getElementById("slopeUndulWlSlider");
+  if (undulWlSlider) {
+    undulWlSlider.oninput = (e) => {
+      const v = parseFloat(e.target.value);
+      if (SLOPE_STAGE.scenarioConfigs.undulating_road) SLOPE_STAGE.scenarioConfigs.undulating_road.undulatingWavelength = v;
+      if (window.straightTestPath && window.straightTestPath.params) {
+        window.straightTestPath.params.undulatingWavelength = v;
+        window.straightTestPath.buildTrack();
+      }
+      const el = document.getElementById("slopeUndulWlVal");
+      if (el) el.textContent = v.toFixed(1) + "m";
+    };
+  }
+
+  const undulAmpSlider = document.getElementById("slopeUndulAmpSlider");
+  if (undulAmpSlider) {
+    undulAmpSlider.oninput = (e) => {
+      const v = parseFloat(e.target.value);
+      if (SLOPE_STAGE.scenarioConfigs.undulating_road) SLOPE_STAGE.scenarioConfigs.undulating_road.undulatingAmplitude = v;
+      if (window.straightTestPath && window.straightTestPath.params) {
+        window.straightTestPath.params.undulatingAmplitude = v;
+        window.straightTestPath.buildTrack();
+      }
+      const el = document.getElementById("slopeUndulAmpVal");
+      if (el) el.textContent = Math.round(v * 1000) + "mm";
+    };
+  }
+
+  const undulCrossSlider = document.getElementById("slopeUndulCrossSlider");
+  if (undulCrossSlider) {
+    undulCrossSlider.oninput = (e) => {
+      const v = parseFloat(e.target.value);
+      if (SLOPE_STAGE.scenarioConfigs.undulating_road) SLOPE_STAGE.scenarioConfigs.undulating_road.undulatingCrossAmp = v / 1000;
+      if (window.straightTestPath && window.straightTestPath.params) {
+        window.straightTestPath.params.undulatingCrossAmp = v / 1000;
+        window.straightTestPath.buildTrack();
+      }
+      const el = document.getElementById("slopeUndulCrossVal");
+      if (el) el.textContent = v + "mm";
+    };
+  }
+
+  const hillStartBtn = document.getElementById("slopeHillStartBtn");
+  if (hillStartBtn) {
+    hillStartBtn.onclick = () => {
+      if (SLOPE_STAGE.scenario !== "undulating_road") {
+        SLOPE_STAGE.switchScenario("undulating_road", true);
+      }
+      SLOPE_STAGE.hillStart.active = true;
+      SLOPE_STAGE.hillStart.state = "approaching";
+      SLOPE_STAGE.hillStart.rollbackDist = 0;
+      SLOPE_STAGE.hillStart.verdict = "测试启动：车辆正驶向坡道寻找测试停车点...";
+    };
+  }
+
   // Live Suspension Tuning Sliders
   const tuneDrawerBtn = document.getElementById("slopeTuneToggleBtn");
   const tuneDrawer = document.getElementById("slopeTuneDrawer");
@@ -2130,7 +2458,7 @@ function initSlopeStageEvents(){
       const dx = e.clientX - SLOPE_STAGE.drag.x0;
       const dy = e.clientY - SLOPE_STAGE.drag.y0;
       SLOPE_STAGE.camOrbit.az = SLOPE_STAGE.drag.az0 - dx * 0.008;
-      SLOPE_STAGE.camOrbit.elv = Math.max(-0.6, Math.min(0.6, SLOPE_STAGE.drag.elv0 - dy * 0.006));
+      SLOPE_STAGE.camOrbit.elv = Math.max(-1.1, Math.min(1.1, SLOPE_STAGE.drag.elv0 - dy * 0.006));
     });
 
     window.addEventListener("mouseup", () => {
@@ -2140,7 +2468,7 @@ function initSlopeStageEvents(){
     cv.addEventListener("wheel", (e) => {
       e.preventDefault();
       const delta = e.deltaY > 0 ? 1.08 : 0.92;
-      SLOPE_STAGE.camOrbit.distFactor = Math.max(0.4, Math.min(2.5, SLOPE_STAGE.camOrbit.distFactor * delta));
+      SLOPE_STAGE.camOrbit.distFactor = Math.max(0.3, Math.min(3.0, SLOPE_STAGE.camOrbit.distFactor * delta));
     }, { passive: false });
 
     cv.addEventListener("dblclick", () => {
