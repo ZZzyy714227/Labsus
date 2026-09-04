@@ -113,47 +113,74 @@
 
 <!-- ================================ 综合赛道测试 3D 动力学舞台模态窗口 ================================ -->
 <div id="circuitStageModal" class="circuit-stage-modal-backdrop">
-  <!-- 顶部状态栏 -->
-  <div class="skidpad-stage-topbar">
-    <div class="skidpad-top-left" style="display:flex; align-items:center;">
-      <span class="skidpad-stage-logo" style="color:#58a6ff;">🏁 上海国际赛车场 (SIC 5.45km) · F1 GRAND PRIX</span>
-      <span id="c_hud_corner_badge" style="background:rgba(23,42,69,0.9); border:1px solid #388bfd; border-radius:999px; padding:4px 14px; color:#58a6ff; font-weight:bold; font-size:12px; margin-left:15px; letter-spacing:0.5px;">🏁 [S1] 发车主直道 (起终点)</span>
-      <span id="c_hud_gear_badge" style="background:#238636; color:#fff; border-radius:4px; padding:2px 8px; font-weight:bold; font-size:11px; margin-left:8px; font-family:monospace;">6 档</span>
-      <span id="c_hud_drs_badge" style="background:#8957e5; color:#fff; border-radius:4px; padding:2px 8px; font-weight:bold; font-size:11px; margin-left:8px; font-family:monospace;">🟢 DRS 开启</span>
-      <span id="c_hud_kerb_badge" style="display:none; background:#d97706; color:#fff; border-radius:4px; padding:2px 8px; font-weight:bold; font-size:11px; margin-left:8px; font-family:monospace;">💥 压路肩振动</span>
-      <div class="circuit-cam-group" style="margin-left: 15px;">
-        <button class="circuit-cam-btn on" data-cam="behind" title="追尾跟拍 (默认跟随视角)">🏎️ 追尾跟拍</button>
-        <button class="circuit-cam-btn" data-cam="cockpit" title="驾驶舱第一人称视角">💺 驾驶舱</button>
-        <button class="circuit-cam-btn" data-cam="nose" title="前鼻锥与悬架连杆特写">🔭 悬架鼻锥</button>
-        <button class="circuit-cam-btn" data-cam="wheel" title="右前轮跳动与悬架摆臂特写">🛞 车轮特写</button>
-        <button class="circuit-cam-btn" data-cam="rear" title="尾翼后视视角">🏁 尾翼后视</button>
-        <button class="circuit-cam-btn" data-cam="heli" title="直升机全景跟踪">🚁 直升机航拍</button>
-        <button class="circuit-cam-btn" data-cam="tv" title="赛道电视转播机位">📺 电视转播</button>
-        <button class="circuit-cam-btn" data-cam="blimp" title="沙盘全景顶视">🌐 沙盘俯瞰</button>
-      </div>
-    </div>
-    <div class="skidpad-top-right">
-      <div style="display:inline-flex; align-items:center; gap:10px; margin-right:12px; font-size:11px; font-family:monospace; color:#8b949e;">
-        <span>S1 <b style="color:#58a6ff;">27.8s</b></span>
-        <span>S2 <b style="color:#f0883e;">24.7s</b></span>
-        <span>S3 <b style="color:#bc8cff;">41.5s</b></span>
-        <span>基准 <b style="color:#7ee787;">1:34.00</b></span>
-      </div>
-      
-      <!-- 面板显示/隐藏控制组 -->
-      <div class="circuit-panel-toggles">
-        <span class="c-toggle-label">面板:</span>
-        <button class="c-toggle-panel-btn on" id="btn_toggle_hud" data-panel="hud" title="切换左下悬浮迷你HUD (快捷键: H)">👁️ 悬浮HUD</button>
-        <button class="c-toggle-panel-btn on" id="btn_toggle_bottom" data-panel="bottom" title="切换底部快速调校控制台">⚙️ 底部调校</button>
-        <button class="c-toggle-panel-btn on" id="btn_toggle_right" data-panel="right" title="切换右侧全功能遥测面板">📊 右侧遥测</button>
-        <span class="c-toggle-sep"></span>
-        <button class="c-toggle-panel-btn" id="btn_open_telemetry_log" style="background:#1f6feb; color:#fff; border-color:#388bfd; font-weight:bold;" title="打开 MoTeC / F1 专业遥测波形 LOG 看板 (快捷键: L)">📈 遥测 LOG</button>
-        <span class="c-toggle-sep"></span>
-        <button class="c-toggle-panel-btn" id="btn_toggle_fullscreen" title="一键纯净全屏赛道 / 还原面板 (快捷键: F)">🔲 纯净全屏</button>
+  <!-- 2-Tier Clean Circuit Topbar (No wrapping, no overlapping, prominent lighting & sound) -->
+  <div class="circuit-stage-topbar" style="background:#0d1117; border-bottom:1px solid #30363d; display:flex; flex-direction:column; z-index:10;">
+    <!-- Row 1: Brand, status badges, Environment Lighting Presets, Action Buttons -->
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 16px; border-bottom:1px solid rgba(255,255,255,0.06); gap:10px; flex-wrap:nowrap;">
+      <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+        <span class="skidpad-stage-logo" style="color:#58a6ff; display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:800;">
+          <span style="font-size:16px;">🏁</span> 上海国际赛车场 (SIC 5.45km) · F1 GRAND PRIX
+        </span>
+        <span id="c_hud_corner_badge" style="background:rgba(23,42,69,0.9); border:1px solid #388bfd; border-radius:999px; padding:3px 12px; color:#58a6ff; font-weight:bold; font-size:11px; letter-spacing:0.5px;">🏁 [S1] 发车主直道 (起终点)</span>
+        <span id="c_hud_gear_badge" style="background:#238636; color:#fff; border-radius:4px; padding:2px 8px; font-weight:bold; font-size:11px; font-family:monospace;">6 档</span>
+        <span id="c_hud_drs_badge" style="background:#8957e5; color:#fff; border-radius:4px; padding:2px 8px; font-weight:bold; font-size:11px; font-family:monospace;">🟢 DRS 开启</span>
+        <span id="c_hud_kerb_badge" style="display:none; background:#d97706; color:#fff; border-radius:4px; padding:2px 8px; font-weight:bold; font-size:11px; font-family:monospace;">💥 压路肩振动</span>
       </div>
 
-      <button class="skidpad-action-btn" id="circuitPlayBtn">⏸ 暂停</button>
-      <button class="skidpad-action-btn skidpad-exit-btn" id="circuitExitBtn" onclick="closeCircuitStage()">✖ 退出舞台</button>
+      <!-- Environment Lighting Presets - Center & Prominent! -->
+      <div class="circuit-cam-group" style="display:flex; align-items:center; background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.16); padding:2px 6px; border-radius:4px; gap:4px;">
+        <span class="circuit-cam-label" style="color:#e6edf3; font-weight:800; font-size:11px; margin-right:4px;">💡 光照环境:</span>
+        <button class="circuit-light-btn on" data-light="day" title="明媚日光晴空 (高对比度与清澈蓝天)">☀️ 日光</button>
+        <button class="circuit-light-btn" data-light="sunset" title="电影级晚霞余晖 (低角度金色侧逆光与长投影)">🌇 晚霞</button>
+        <button class="circuit-light-btn" data-light="night" title="夜赛大灯模式 (高杆泛光灯与赛车聚光大灯)">🌙 夜赛</button>
+        <span style="width:1px; height:16px; background:rgba(255,255,255,0.15); margin:0 3px;"></span>
+        <button class="circuit-light-btn on" id="circuitSceneryToggle" title="切换赛道周边看台、植被、广告牌与安全区">🌲 周边景观</button>
+      </div>
+
+      <!-- Action Buttons: Sound, Pause, Exit -->
+      <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+        <button class="skidpad-action-btn circuit-sound-btn" id="engineSoundTg" title="引擎声浪：随转速/油门/换挡/打滑工况真实声学合成联动">🔊 声浪 OFF</button>
+        <button class="skidpad-action-btn" id="circuitPlayBtn">⏸ 暂停</button>
+        <button class="skidpad-action-btn skidpad-exit-btn" id="circuitExitBtn" onclick="closeCircuitStage()">✖ 退出舞台</button>
+      </div>
+    </div>
+
+    <!-- Row 2: Camera Views & Telemetry / Layout Controls -->
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 16px; background:rgba(0,0,0,0.35); gap:10px; flex-wrap:nowrap;">
+      <div style="display:flex; align-items:center; gap:6px;">
+        <span style="font-size:11px; color:#8b949e; font-weight:700; margin-right:2px;">视角机位:</span>
+        <div class="circuit-cam-group">
+          <button class="circuit-cam-btn on" data-cam="behind" title="追尾跟拍 (默认跟随视角)">🏎️ 追尾跟拍</button>
+          <button class="circuit-cam-btn" data-cam="cockpit" title="驾驶舱第一人称视角">💺 驾驶舱</button>
+          <button class="circuit-cam-btn" data-cam="nose" title="前鼻锥与悬架连杆特写">🔭 悬架鼻锥</button>
+          <button class="circuit-cam-btn" data-cam="wheel" title="右前轮跳动与悬架摆臂特写">🛞 车轮特写</button>
+          <button class="circuit-cam-btn" data-cam="rear" title="尾翼后视视角">🏁 尾翼后视</button>
+          <button class="circuit-cam-btn" data-cam="heli" title="直升机全景跟踪">🚁 直升机航拍</button>
+          <button class="circuit-cam-btn" data-cam="tv" title="赛道电视转播机位">📺 电视转播</button>
+          <button class="circuit-cam-btn" data-cam="blimp" title="沙盘全景顶视">🌐 沙盘俯瞰</button>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="display:inline-flex; align-items:center; gap:10px; font-size:11px; font-family:monospace; color:#8b949e;">
+          <span>S1 <b style="color:#58a6ff;">27.8s</b></span>
+          <span>S2 <b style="color:#f0883e;">24.7s</b></span>
+          <span>S3 <b style="color:#bc8cff;">41.5s</b></span>
+          <span>基准 <b style="color:#7ee787;">1:34.00</b></span>
+        </div>
+        
+        <!-- 面板显示/隐藏控制组 -->
+        <div class="circuit-panel-toggles">
+          <span class="c-toggle-label">面板:</span>
+          <button class="c-toggle-panel-btn on" id="btn_toggle_hud" data-panel="hud" title="切换左下悬浮迷你HUD (快捷键: H)">👁️ 悬浮HUD</button>
+          <button class="c-toggle-panel-btn on" id="btn_toggle_bottom" data-panel="bottom" title="切换底部快速调校控制台">⚙️ 底部调校</button>
+          <button class="c-toggle-panel-btn on" id="btn_toggle_right" data-panel="right" title="切换右侧全功能遥测面板">📊 右侧遥测</button>
+          <span class="c-toggle-sep"></span>
+          <button class="c-toggle-panel-btn" id="btn_open_telemetry_log" style="background:#1f6feb; color:#fff; border-color:#388bfd; font-weight:bold;" title="打开 MoTeC / F1 专业遥测波形 LOG 看板 (快捷键: L)">📈 遥测 LOG</button>
+          <span class="c-toggle-sep"></span>
+          <button class="c-toggle-panel-btn" id="btn_toggle_fullscreen" title="一键纯净全屏赛道 / 还原面板 (快捷键: F)">🔲 纯净全屏</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -722,6 +749,7 @@
       <!-- 工况预设模式胶囊组 -->
       <div class="slope-scenario-pills">
         <button class="slope-scenario-pill on" data-scenario="comprehensive" title="全工况综合连环大试验场 (连续7大工况大环线)">🏆 综合连环 (默认)</button>
+        <button class="slope-scenario-pill" data-scenario="undulating_road" title="连续对角与交叉轴起伏路面，逼真展现悬架四轮大行程跳动与车架姿态">🌊 起伏路面</button>
         <button class="slope-scenario-pill" data-scenario="jump_ramp" title="连续十连飞坡跳台极限测试">🚀 十连飞坡</button>
         <button class="slope-scenario-pill" data-scenario="moose_test" title="连续左右交替ISO 3888-2双移线麋鹿避障">🦌 连续麋鹿 (5x)</button>
         <button class="slope-scenario-pill" data-scenario="bumps_cleats" title="连续交错减速坎与凸块测试">🚧 连续过坎</button>
@@ -788,13 +816,32 @@
         <input type="range" id="slopeGradeSlider" min="-30" max="60" value="18" step="1">
         <b id="slopeGradeVal">18%</b>
       </div>
+
+      <div class="slope-control-item" id="slopeParamUndulWrap" style="display:none; gap:10px; align-items:center;">
+        <div style="display:flex; align-items:center; gap:5px;">
+          <label>波长 λ</label>
+          <input type="range" id="slopeUndulWlSlider" min="2.5" max="8.0" value="4.5" step="0.5" style="width:65px;">
+          <b id="slopeUndulWlVal">4.5m</b>
+        </div>
+        <div style="display:flex; align-items:center; gap:5px;">
+          <label>浪高 H</label>
+          <input type="range" id="slopeUndulAmpSlider" min="0.08" max="0.30" value="0.18" step="0.02" style="width:70px;">
+          <b id="slopeUndulAmpVal">180mm</b>
+        </div>
+        <div style="display:flex; align-items:center; gap:5px;">
+          <label>工况</label>
+          <span style="font-size:11px; color:#58a6ff; font-weight:600;">左右交错波浪 (180°反相)</span>
+        </div>
+        <span style="font-size:10px; color:#8b949e; margin-left:4px;" title="支持360°旋转/缩放/双击复位">🖱️ 自由视角：按住鼠标拖拽旋转 / 滚轮缩放 / 双击复位</span>
+      </div>
     </div>
 
     <div class="slope-t2-right">
       <!-- 多机位切换按钮组 -->
       <div class="slope-cam-group">
-        <button class="slope-cam-btn on" data-cam="behind">🏎️ 尾部跟随</button>
+        <button class="slope-cam-btn" data-cam="front_low" title="演示视频同款视角：迎面低角度特写">🎥 迎面低位</button>
         <button class="slope-cam-btn" data-cam="front">🎯 车头特写</button>
+        <button class="slope-cam-btn on" data-cam="behind">🏎️ 尾部跟随</button>
         <button class="slope-cam-btn" data-cam="suspension">📐 悬架特写</button>
         <button class="slope-cam-btn" data-cam="threeq">🏆 45° 鸟瞰</button>
         <button class="slope-cam-btn" data-cam="cockpit">💺 第一人称</button>
@@ -962,5 +1009,6 @@
 <script src="js/09-track.js"></script>
 <script src="js/10-eval.js"></script>
 <script src="js/11-stages.js"></script>
+<script src="js/13-engine-sound.js"></script>
 </body>
 </html>

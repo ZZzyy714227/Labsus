@@ -568,7 +568,7 @@ canvas.plot{display:block;width:100%;height:96px;background:var(--well);border:1
   padding: 2px;
   gap: 2px;
 }
-.circuit-cam-btn {
+.circuit-cam-btn, .circuit-light-btn {
   background: transparent;
   border: none;
   color: #8b949e;
@@ -580,14 +580,39 @@ canvas.plot{display:block;width:100%;height:96px;background:var(--well);border:1
   transition: all 0.15s ease;
   white-space: nowrap;
 }
-.circuit-cam-btn:hover {
+.circuit-cam-btn:hover, .circuit-light-btn:hover {
   color: #c9d1d9;
   background: rgba(255, 255, 255, 0.08);
 }
-.circuit-cam-btn.on {
+.circuit-cam-btn.on, .circuit-light-btn.on {
   background: #1f6feb;
   color: #ffffff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.circuit-sound-btn {
+  background: rgba(234, 160, 76, 0.15) !important;
+  border: 1px solid rgba(234, 160, 76, 0.45) !important;
+  color: #e8a04c !important;
+  padding: 4px 12px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.circuit-sound-btn:hover {
+  background: rgba(234, 160, 76, 0.30) !important;
+  border-color: #e8a04c !important;
+  color: #fbd38d !important;
+}
+.circuit-sound-btn.muted {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #8fa1b8 !important;
 }
 
 .skidpad-top-right { display: flex; align-items: center; gap: 12px; font-size: 11px; flex-wrap: wrap; }

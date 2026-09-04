@@ -296,6 +296,23 @@ function runChecks(webDir, ok, fail, opts) {
 
       ok(!rec.texts.some(t => /⚠/.test(t)),
         `G14: ${s.zh} 未触发错误横幅（否则说明渲染仍在抛错）`);
+
+      if (s.cv === 'circuitCanvas') {
+        let lightErr = null;
+        try {
+          vm.runInContext(`
+            CIRCUIT_STAGE.lightingMode = "sunset";
+            if (typeof circuitStageLoop === "function") circuitStageLoop(1000);
+            CIRCUIT_STAGE.lightingMode = "night";
+            if (typeof circuitStageLoop === "function") circuitStageLoop(1016);
+            CIRCUIT_STAGE.showScenery = false;
+            if (typeof circuitStageLoop === "function") circuitStageLoop(1033);
+            CIRCUIT_STAGE.showScenery = true;
+            CIRCUIT_STAGE.lightingMode = "day";
+          `, ctx);
+        } catch (e) { lightErr = e; }
+        ok(!lightErr, 'G14: 赛道 CIRCUIT 日光/晚霞/夜赛与景观开关切换测试无抛错');
+      }
     }
   }
 

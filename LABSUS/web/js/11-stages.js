@@ -3229,6 +3229,23 @@ function initCircuitStageEvents() {
       CIRCUIT_STAGE.camOrbit = { az: 0, elv: 0, distFactor: 1.0 };
     };
   });
+
+  const lightBtns = document.querySelectorAll("#circuitStageModal .circuit-light-btn:not(#circuitSceneryToggle)");
+  lightBtns.forEach(b => {
+    b.onclick = () => {
+      lightBtns.forEach(q => q.classList.remove("on"));
+      b.classList.add("on");
+      CIRCUIT_STAGE.lightingMode = b.dataset.light || "day";
+    };
+  });
+
+  const sceneryBtn = document.getElementById("circuitSceneryToggle");
+  if(sceneryBtn) {
+    sceneryBtn.onclick = () => {
+      CIRCUIT_STAGE.showScenery = !CIRCUIT_STAGE.showScenery;
+      sceneryBtn.classList.toggle("on", CIRCUIT_STAGE.showScenery);
+    };
+  }
 }
 
 window.openSkidpadStage = openSkidpadStage;
@@ -3264,6 +3281,8 @@ window.SKIDPAD_STAGE = SKIDPAD_STAGE;
    ===================================================================== */
 const CIRCUIT_STAGE = {
   camMode: "behind",
+  lightingMode: "day",
+  showScenery: true,
   active: false,
   playing: false,
   autoPilot: true,
@@ -3952,6 +3971,21 @@ function openCircuitStage() {
     b.classList.toggle("on", b.dataset.cam === (CIRCUIT_STAGE.camMode || "behind"));
   });
 
+  // Sync lighting and scenery buttons
+  const lightBtns = document.querySelectorAll("#circuitStageModal .circuit-light-btn:not(#circuitSceneryToggle)");
+  lightBtns.forEach(b => {
+    b.classList.toggle("on", b.dataset.light === (CIRCUIT_STAGE.lightingMode || "day"));
+  });
+  const sceneryBtn = document.getElementById("circuitSceneryToggle");
+  if(sceneryBtn) sceneryBtn.classList.toggle("on", CIRCUIT_STAGE.showScenery !== false);
+
+  // Sync engine sound button
+  const sndBtn = document.getElementById("engineSoundTg");
+  if (sndBtn && typeof EngineSound !== "undefined") {
+    sndBtn.textContent = EngineSound.muted ? "🔊 声浪 OFF" : "🔊 声浪 ON";
+    sndBtn.classList.toggle("muted", EngineSound.muted);
+  }
+
   // Sync vehicle buttons
   document.querySelectorAll(".c-veh-btn").forEach(b => {
     b.classList.toggle("on", b.dataset.veh === S.vehicleType);
@@ -4330,6 +4364,298 @@ function circuitStageLoop(now) {
   requestAnimationFrame(circuitStageLoop);
 }
 
+/* =====================================================================
+   CIRCUIT LIGHTING PRESETS & 3D REALISTIC SCENERY ENGINE
+   ===================================================================== */
+const CIRCUIT_LIGHTING = {
+  day: {
+    sunDir: [0.45, 0.35, 0.82],
+    skyStops: [
+      { p: 0.00, c: "#1d4ed8" }, // Deep azure blue
+      { p: 0.32, c: "#3b82f6" }, // Clear sky blue
+      { p: 0.60, c: "#60a5fa" }, // Soft cyan
+      { p: 0.82, c: "#bfdbfe" }, // Horizon haze
+      { p: 1.00, c: "#1f4a38" }  // Distant lush green horizon rim
+    ],
+    groundBase: "#143323",
+    grassLight: "#2d6a4f",
+    grassDark: "#1b4332",
+    gravel: "#a37b51",
+    gravelDark: "#855f36",
+    asphalt: "#181f28",
+    asphaltSun: "#2c3644",
+    asphaltGlint: 0.35,
+    guardrail: "#cbd5e1",
+    guardrailShade: "#64748b",
+    shadowCol: "rgba(10, 25, 18, 0.45)",
+    shadowLen: 0.65,
+    treeLeaves1: "#15803d",
+    treeLeaves2: "#166534",
+    treeLeaves3: "#14532d",
+    grandstandRoof: "#f8fafc",
+    grandstandBase: "#334155"
+  },
+  sunset: {
+    sunDir: [-0.75, 0.25, 0.28], // Low golden sunset
+    skyStops: [
+      { p: 0.00, c: "#1e1035" }, // Deep purple twilight
+      { p: 0.30, c: "#581c87" }, // Violet
+      { p: 0.55, c: "#c2410c" }, // Crimson amber
+      { p: 0.78, c: "#f97316" }, // Bright orange horizon
+      { p: 1.00, c: "#fde047" }  // Golden glowing rim
+    ],
+    groundBase: "#2b2914",
+    grassLight: "#3d421e",
+    grassDark: "#2b3015",
+    gravel: "#8c603b",
+    gravelDark: "#6b4526",
+    asphalt: "#1a1622",
+    asphaltSun: "#382932",
+    asphaltGlint: 0.65,
+    guardrail: "#f1f5f9",
+    guardrailShade: "#78716c",
+    shadowCol: "rgba(25, 12, 35, 0.62)",
+    shadowLen: 2.2,
+    treeLeaves1: "#3f5e28",
+    treeLeaves2: "#2d441c",
+    treeLeaves3: "#1e2e13",
+    grandstandRoof: "#ffedd5",
+    grandstandBase: "#44343f"
+  },
+  night: {
+    sunDir: [0, 0, 1.0], // Moonlight
+    skyStops: [
+      { p: 0.00, c: "#020617" }, // Pitch midnight black
+      { p: 0.45, c: "#0b1222" }, // Navy blue
+      { p: 0.70, c: "#111827" }, // Dark slate
+      { p: 1.00, c: "#09121a" }  // Distant illuminated horizon glow
+    ],
+    groundBase: "#07120c",
+    grassLight: "#0c1f15",
+    grassDark: "#07140d",
+    gravel: "#3f3325",
+    gravelDark: "#2a2218",
+    asphalt: "#0f141c",
+    asphaltSun: "#1a222e",
+    asphaltGlint: 0.15,
+    guardrail: "#475569",
+    guardrailShade: "#1e293b",
+    shadowCol: "rgba(0, 0, 0, 0.75)",
+    shadowLen: 0.3,
+    treeLeaves1: "#0b2e17",
+    treeLeaves2: "#071e0f",
+    treeLeaves3: "#041209",
+    grandstandRoof: "#334155",
+    grandstandBase: "#1e293b"
+  }
+};
+
+function renderCircuitLandmarks(ctx, projFast, E_x, E_y, lightCfg, lightMode) {
+  // 1. Main Grandstand & White Lotus Canopy (发车主看台与荷花飞翼顶棚)
+  const distToMainStand = Math.hypot(E_x - 16000, E_y - 99000) / 1000;
+  if (distToMainStand < 700) {
+    const u = [0.316, 0.948];
+    const n = [0.948, -0.316];
+    const getSFPt = (s, offN, z) => [(s * u[0] + offN * n[0]) * 1000, (s * u[1] + offN * n[1]) * 1000, z];
+
+    const tiers = [
+      { z: 1500, off: -16 },
+      { z: 6500, off: -23 },
+      { z: 12500, off: -30 },
+      { z: 18000, off: -38 }
+    ];
+
+    // Ground shadow of Main Grandstand
+    if (lightMode !== "night") {
+      const sLen = lightCfg.shadowLen;
+      const shX = -lightCfg.sunDir[0] * 24000 * sLen;
+      const shY = -lightCfg.sunDir[1] * 24000 * sLen;
+      const b1 = getSFPt(-40, -16, 0), b2 = getSFPt(240, -16, 0);
+      const b3 = getSFPt(240, -42, 0), b4 = getSFPt(-40, -42, 0);
+      const sb1 = projFast(b1[0], b1[1], 0);
+      const sb2 = projFast(b2[0], b2[1], 0);
+      const st3 = projFast(b3[0] + shX, b3[1] + shY, 0);
+      const st4 = projFast(b4[0] + shX, b4[1] + shY, 0);
+      if (sb1 && sb2 && st3 && st4) {
+        ctx.beginPath();
+        ctx.moveTo(sb1[0], sb1[1]); ctx.lineTo(sb2[0], sb2[1]);
+        ctx.lineTo(st3[0], st3[1]); ctx.lineTo(st4[0], st4[1]);
+        ctx.closePath();
+        ctx.fillStyle = lightCfg.shadowCol;
+        ctx.fill();
+      }
+    }
+
+    // Concrete stepped tiers & crowds
+    for (let t = 0; t < tiers.length - 1; t++) {
+      const t1 = tiers[t], t2 = tiers[t + 1];
+      const pA1 = projFast(...getSFPt(-40, t1.off, t1.z));
+      const pB1 = projFast(...getSFPt(240, t1.off, t1.z));
+      const pB2 = projFast(...getSFPt(240, t2.off, t2.z));
+      const pA2 = projFast(...getSFPt(-40, t2.off, t2.z));
+      if (pA1 && pB1 && pB2 && pA2) {
+        ctx.beginPath();
+        ctx.moveTo(pA1[0], pA1[1]); ctx.lineTo(pB1[0], pB1[1]);
+        ctx.lineTo(pB2[0], pB2[1]); ctx.lineTo(pA2[0], pA2[1]);
+        ctx.closePath();
+        const tierColors = ["#1e293b", "#334155", "#475569"];
+        ctx.fillStyle = tierColors[t % tierColors.length];
+        ctx.fill();
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.4)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Crowd dotting
+        if (distToMainStand < 250) {
+          ctx.beginPath();
+          const nDots = 18;
+          for (let d = 0; d < nDots; d++) {
+            const frac = (d + 0.5) / nDots;
+            const pt = [pA1[0] * (1 - frac) + pB1[0] * frac, pA1[1] * (1 - frac) + pB1[1] * frac - 2];
+            ctx.arc(pt[0], pt[1], 1.5, 0, 2 * Math.PI);
+          }
+          ctx.fillStyle = (t % 2 === 0) ? "#ef4444" : "#3b82f6";
+          ctx.fill();
+        }
+      }
+    }
+
+    // Iconic Cantilevered Lotus Canopy (荷花白张拉膜顶棚)
+    const roofP1 = projFast(...getSFPt(-45, -12, 24000));
+    const roofP2 = projFast(...getSFPt(245, -12, 24000));
+    const roofP3 = projFast(...getSFPt(245, -45, 29000));
+    const roofP4 = projFast(...getSFPt(-45, -45, 29000));
+    if (roofP1 && roofP2 && roofP3 && roofP4) {
+      ctx.beginPath();
+      ctx.moveTo(roofP1[0], roofP1[1]); ctx.lineTo(roofP2[0], roofP2[1]);
+      ctx.lineTo(roofP3[0], roofP3[1]); ctx.lineTo(roofP4[0], roofP4[1]);
+      ctx.closePath();
+      ctx.fillStyle = lightCfg.grandstandRoof;
+      ctx.fill();
+      ctx.strokeStyle = "#94a3b8";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      for (let sPos = -30; sPos <= 230; sPos += 65) {
+        const pylonBase = projFast(...getSFPt(sPos, -45, 0));
+        const pylonTop = projFast(...getSFPt(sPos, -45, 34000));
+        const roofEdge = projFast(...getSFPt(sPos, -12, 24000));
+        if (pylonBase && pylonTop && roofEdge) {
+          ctx.beginPath();
+          ctx.moveTo(pylonBase[0], pylonBase[1]); ctx.lineTo(pylonTop[0], pylonTop[1]);
+          ctx.strokeStyle = "#475569"; ctx.lineWidth = 3.5; ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(pylonTop[0], pylonTop[1]); ctx.lineTo(roofEdge[0], roofEdge[1]);
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.75)"; ctx.lineWidth = 1.5; ctx.stroke();
+        }
+      }
+    }
+
+    // 2. Pit Building Complex & FIA Timing Tower (发车直道右侧维修站大楼与计时塔)
+    const pitP1 = projFast(...getSFPt(-20, 16, 0));
+    const pitP2 = projFast(...getSFPt(220, 16, 0));
+    const pitP1_t = projFast(...getSFPt(-20, 16, 9500));
+    const pitP2_t = projFast(...getSFPt(220, 16, 9500));
+
+    if (pitP1 && pitP2 && pitP1_t && pitP2_t) {
+      ctx.beginPath();
+      ctx.moveTo(pitP1[0], pitP1[1]); ctx.lineTo(pitP2[0], pitP2[1]);
+      ctx.lineTo(pitP2_t[0], pitP2_t[1]); ctx.lineTo(pitP1_t[0], pitP1_t[1]);
+      ctx.closePath();
+      ctx.fillStyle = (lightMode === "night") ? "#111827" : "#e2e8f0";
+      ctx.fill();
+      ctx.strokeStyle = "#475569"; ctx.lineWidth = 1.5; ctx.stroke();
+
+      if (distToMainStand < 350) {
+        const nGarages = 16;
+        for (let g = 0; g < nGarages; g++) {
+          const frac1 = g / nGarages, frac2 = (g + 0.85) / nGarages;
+          const g1 = [pitP1[0]*(1-frac1) + pitP2[0]*frac1, pitP1[1]*(1-frac1) + pitP2[1]*frac1];
+          const g2 = [pitP1[0]*(1-frac2) + pitP2[0]*frac2, pitP1[1]*(1-frac2) + pitP2[1]*frac2];
+          const gt1 = [pitP1_t[0]*(1-frac1) + pitP2_t[0]*frac1, pitP1_t[1]*(1-frac1) + pitP2_t[1]*frac1];
+          ctx.beginPath();
+          ctx.moveTo(g1[0], g1[1]); ctx.lineTo(g2[0], g2[1]);
+          ctx.lineTo(gt1[0]*0.5 + g1[0]*0.5, gt1[1]*0.5 + g1[1]*0.5);
+          ctx.fillStyle = "#1e293b"; ctx.fill();
+        }
+      }
+    }
+
+    // FIA Timing Tower (尖顶计时塔) at s = 200m
+    const twBase = projFast(...getSFPt(200, 26, 0));
+    const twTop = projFast(...getSFPt(200, 26, 24000));
+    if (twBase && twTop) {
+      ctx.beginPath();
+      ctx.moveTo(twBase[0] - 5, twBase[1]); ctx.lineTo(twBase[0] + 5, twBase[1]);
+      ctx.lineTo(twTop[0] + 2, twTop[1]); ctx.lineTo(twTop[0] - 2, twTop[1]);
+      ctx.closePath();
+      ctx.fillStyle = "#0f172a"; ctx.fill();
+      ctx.strokeStyle = "#38bdf8"; ctx.lineWidth = 1.5; ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(twTop[0], twTop[1], 4, 0, 2*Math.PI);
+      ctx.fillStyle = "#ef4444"; ctx.fill();
+    }
+  }
+
+  // 3. Back Straight Overhead Sponsor Bridge (1.17km 漫长后直道巨型跨线立交天桥)
+  const distToBackBridge = Math.hypot(E_x - 180000, E_y - (-295000)) / 1000;
+  if (distToBackBridge < 550) {
+    const brX = 180000, brY = -295000;
+    const pL_b = projFast(brX, brY + 8500, 0);
+    const pL_t = projFast(brX, brY + 8500, 7500);
+    const pR_b = projFast(brX, brY - 8500, 0);
+    const pR_t = projFast(brX, brY - 8500, 7500);
+    const pL_deck = projFast(brX, brY + 8500, 5600);
+    const pR_deck = projFast(brX, brY - 8500, 5600);
+
+    if (pL_b && pL_t && pR_b && pR_t && pL_deck && pR_deck) {
+      ctx.beginPath();
+      ctx.moveTo(pL_b[0] - 4, pL_b[1]); ctx.lineTo(pL_b[0] + 4, pL_b[1]);
+      ctx.lineTo(pL_t[0] + 4, pL_t[1]); ctx.lineTo(pL_t[0] - 4, pL_t[1]);
+      ctx.fillStyle = "#334155"; ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(pR_b[0] - 4, pR_b[1]); ctx.lineTo(pR_b[0] + 4, pR_b[1]);
+      ctx.lineTo(pR_t[0] + 4, pR_t[1]); ctx.lineTo(pR_t[0] - 4, pR_t[1]);
+      ctx.fillStyle = "#334155"; ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(pL_deck[0], pL_deck[1]); ctx.lineTo(pR_deck[0], pR_deck[1]);
+      ctx.lineTo(pR_t[0], pR_t[1]); ctx.lineTo(pL_t[0], pL_t[1]);
+      ctx.closePath();
+      ctx.fillStyle = "#dc2626";
+      ctx.fill();
+      ctx.strokeStyle = "#facc15"; ctx.lineWidth = 2; ctx.stroke();
+
+      const brMid = [(pL_deck[0] + pR_deck[0] + pL_t[0] + pR_t[0]) * 0.25, (pL_deck[1] + pR_deck[1] + pL_t[1] + pR_t[1]) * 0.25];
+      const brScale = Math.max(8, Math.min(22, 180 / (distToBackBridge + 15)));
+      ctx.fillStyle = "#facc15";
+      ctx.font = `900 ${Math.round(brScale)}px "Arial Black", sans-serif`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("PIRELLI", brMid[0], brMid[1]);
+    }
+  }
+
+  // 4. T14 Heavy Braking Hairpin Grandstand (T14重刹发卡弯外侧巨型看台)
+  const distToT14Stand = Math.hypot(E_x - (-620000), E_y - (-290000)) / 1000;
+  if (distToT14Stand < 500) {
+    const t14_c1 = projFast(-650000, -320000, 0);
+    const t14_c2 = projFast(-580000, -320000, 0);
+    const t14_c3 = projFast(-580000, -345000, 16000);
+    const t14_c4 = projFast(-650000, -345000, 16000);
+    if (t14_c1 && t14_c2 && t14_c3 && t14_c4) {
+      ctx.beginPath();
+      ctx.moveTo(t14_c1[0], t14_c1[1]); ctx.lineTo(t14_c2[0], t14_c2[1]);
+      ctx.lineTo(t14_c3[0], t14_c3[1]); ctx.lineTo(t14_c4[0], t14_c4[1]);
+      ctx.closePath();
+      ctx.fillStyle = lightCfg.grandstandBase;
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.35)"; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+  }
+}
+
 function renderCircuitScene(st, tel, ctrl) {
   if (!st || !isFinite(st.X) || !isFinite(st.Y) || !isFinite(st.psi)) return;
   const cv = document.getElementById("circuitCanvas");
@@ -4342,13 +4668,15 @@ function renderCircuitScene(st, tel, ctrl) {
   const w = cv.width / dpr, h = cv.height / dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  // Atmospheric Twilight Sky & Horizon Glow
+  // Atmospheric Sky & Dynamic Lighting
+  const lightMode = CIRCUIT_STAGE.lightingMode || "day";
+  const lightCfg = CIRCUIT_LIGHTING[lightMode] || CIRCUIT_LIGHTING.day;
+  const isScenery = (CIRCUIT_STAGE.showScenery !== false);
+
   const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
-  skyGrad.addColorStop(0.0, "#050811");
-  skyGrad.addColorStop(0.40, "#0a1324");
-  skyGrad.addColorStop(0.55, "#13213a");
-  skyGrad.addColorStop(0.72, "#182a48");
-  skyGrad.addColorStop(1.0, "#080c14");
+  for (const stop of lightCfg.skyStops) {
+    skyGrad.addColorStop(stop.p, stop.c);
+  }
   ctx.fillStyle = skyGrad;
   ctx.fillRect(0, 0, w, h);
   
@@ -4487,8 +4815,12 @@ function renderCircuitScene(st, tel, ctrl) {
     }
     
     // Crucial: Sort segments from FARTHEST to CLOSEST (Painter's Algorithm)
-    // This completely prevents distant looping track sections from overdrawing the foreground
     segs.sort((a, b) => b.distToCam - a.distToCam);
+
+    // Render 3D Circuit Landmarks (Main Grandstand, Lotus Canopy, Pit Building & Timing Tower, Back Straight Bridge)
+    if (isScenery) {
+      renderCircuitLandmarks(ctx, projFast, E_x, E_y, lightCfg, lightMode);
+    }
     
     for (const seg of segs) {
       const { i, p1, p2, p1x_mm, p1y_mm, p2x_mm, p2y_mm, distToCam } = seg;
@@ -4499,13 +4831,66 @@ function renderCircuitScene(st, tel, ctrl) {
       const pl2 = projFast(p2x_mm - p2.nx * hw, p2y_mm - p2.ny * hw, 0);
       
       if (!pl1 || !pr1 || !pr2 || !pl2) continue;
+
+      let vergeW_L = 18000, vergeW_R = 18000;
+      const isGravel = (p1.runoff === "gravel");
+      const isStripes = (p1.runoff === "asphalt_stripes");
+      const kSide = p1.kerbSide || ((p1.curvature || 0) > 0 ? "right" : "left");
       
-      // Clean Seamless Dark Asphalt Ribbon
+      if (isGravel) {
+        if (kSide === "left") vergeW_L = 28000; else vergeW_R = 28000;
+      } else if (isStripes) {
+        if (kSide === "left") vergeW_L = 22000; else vergeW_R = 22000;
+      }
+
+      // 1. Verges (草坪修剪条纹 / 砂石避险区 / 彩色减速带)
+      if (isScenery) {
+        const pl_out1 = projFast(p1x_mm - p1.nx * (hw + vergeW_L), p1y_mm - p1.ny * (hw + vergeW_L), 0);
+        const pl_out2 = projFast(p2x_mm - p2.nx * (hw + vergeW_L), p2y_mm - p2.ny * (hw + vergeW_L), 0);
+        const pr_out1 = projFast(p1x_mm + p1.nx * (hw + vergeW_R), p1y_mm + p1.ny * (hw + vergeW_R), 0);
+        const pr_out2 = projFast(p2x_mm + p2.nx * (hw + vergeW_R), p2y_mm + p2.ny * (hw + vergeW_R), 0);
+
+        if (pl_out1 && pl_out2) {
+          ctx.beginPath();
+          ctx.moveTo(pl1[0], pl1[1]); ctx.lineTo(pl_out1[0], pl_out1[1]);
+          ctx.lineTo(pl_out2[0], pl_out2[1]); ctx.lineTo(pl2[0], pl2[1]);
+          ctx.closePath();
+          if (isGravel && kSide === "left") {
+            ctx.fillStyle = (i % 2 === 0) ? lightCfg.gravel : lightCfg.gravelDark;
+          } else if (isStripes && kSide === "left") {
+            ctx.fillStyle = (Math.floor(i / 3) % 2 === 0) ? "#2563eb" : "#dc2626";
+          } else {
+            ctx.fillStyle = (Math.floor(i / 6) % 2 === 0) ? lightCfg.grassLight : lightCfg.grassDark;
+          }
+          ctx.fill();
+        }
+
+        if (pr_out1 && pr_out2) {
+          ctx.beginPath();
+          ctx.moveTo(pr1[0], pr1[1]); ctx.lineTo(pr_out1[0], pr_out1[1]);
+          ctx.lineTo(pr_out2[0], pr_out2[1]); ctx.lineTo(pr2[0], pr2[1]);
+          ctx.closePath();
+          if (isGravel && kSide === "right") {
+            ctx.fillStyle = (i % 2 === 0) ? lightCfg.gravel : lightCfg.gravelDark;
+          } else if (isStripes && kSide === "right") {
+            ctx.fillStyle = (Math.floor(i / 3) % 2 === 0) ? "#2563eb" : "#dc2626";
+          } else {
+            ctx.fillStyle = (Math.floor(i / 6) % 2 === 0) ? lightCfg.grassLight : lightCfg.grassDark;
+          }
+          ctx.fill();
+        }
+      }
+
+      // 2. Clean Asphalt Ribbon with Sunlight Shading
+      const tLen = Math.hypot(p2x_mm - p1x_mm, p2y_mm - p1y_mm) || 1;
+      const tx = (p2x_mm - p1x_mm) / tLen, ty = (p2y_mm - p1y_mm) / tLen;
+      const sunAlign = Math.abs(tx * lightCfg.sunDir[0] + ty * lightCfg.sunDir[1]);
+
       ctx.beginPath();
       ctx.moveTo(pl1[0], pl1[1]); ctx.lineTo(pr1[0], pr1[1]);
       ctx.lineTo(pr2[0], pr2[1]); ctx.lineTo(pl2[0], pl2[1]);
       ctx.closePath();
-      ctx.fillStyle = "#111722"; // Premium Dark Track Asphalt
+      ctx.fillStyle = (sunAlign > 0.45 && lightMode !== "night") ? lightCfg.asphaltSun : lightCfg.asphalt;
       ctx.fill();
       
       // Dynamic Rubber Skid Mark Grooves on racing line
@@ -4526,7 +4911,6 @@ function renderCircuitScene(st, tel, ctrl) {
       const hasKerb = p1.kerbSide || (Math.abs(p1.curvature || 0) > 0.006);
       if (hasKerb) {
         const kerbCol = (i % 6 < 3) ? "#e11d48" : "#f8fafc";
-        const kSide = p1.kerbSide || ((p1.curvature || 0) > 0 ? "right" : "left");
         const kw = 1350; // 1.35m kerb width
         const kh = 38;   // 38mm bevel elevation
         
@@ -4560,7 +4944,7 @@ function renderCircuitScene(st, tel, ctrl) {
         }
       }
       
-      // Outer Track Asphalt Clean Border Lines (No Blue-White Boundary Walls)
+      // Outer Track Asphalt Clean Border Lines
       ctx.beginPath();
       ctx.moveTo(pl1[0], pl1[1]); ctx.lineTo(pl2[0], pl2[1]);
       ctx.strokeStyle = "rgba(255, 255, 255, 0.35)"; ctx.lineWidth = 2.0; ctx.stroke();
@@ -4576,6 +4960,174 @@ function renderCircuitScene(st, tel, ctrl) {
         if(pc1 && pc2) {
           ctx.beginPath(); ctx.moveTo(pc1[0], pc1[1]); ctx.lineTo(pc2[0], pc2[1]);
           ctx.strokeStyle = "rgba(255,255,255,0.40)"; ctx.lineWidth = 2.5; ctx.stroke();
+        }
+      }
+
+      // 3. Double-Corrugated Armco Guardrails (防撞金属钢护栏)
+      if (isScenery && distToCam < 260) {
+        const railZ = 850;
+        const rl_top1 = projFast(p1x_mm - p1.nx * (hw + vergeW_L), p1y_mm - p1.ny * (hw + vergeW_L), railZ);
+        const rl_bot1 = projFast(p1x_mm - p1.nx * (hw + vergeW_L), p1y_mm - p1.ny * (hw + vergeW_L), 250);
+        const rl_top2 = projFast(p2x_mm - p2.nx * (hw + vergeW_L), p2y_mm - p2.ny * (hw + vergeW_L), railZ);
+        const rl_bot2 = projFast(p2x_mm - p2.nx * (hw + vergeW_L), p2y_mm - p2.ny * (hw + vergeW_L), 250);
+        if (rl_top1 && rl_bot1 && rl_top2 && rl_bot2) {
+          ctx.beginPath();
+          ctx.moveTo(rl_bot1[0], rl_bot1[1]); ctx.lineTo(rl_top1[0], rl_top1[1]);
+          ctx.lineTo(rl_top2[0], rl_top2[1]); ctx.lineTo(rl_bot2[0], rl_bot2[1]);
+          ctx.closePath();
+          ctx.fillStyle = lightCfg.guardrail; ctx.fill();
+          ctx.strokeStyle = lightCfg.guardrailShade; ctx.lineWidth = 1; ctx.stroke();
+        }
+
+        const rr_top1 = projFast(p1x_mm + p1.nx * (hw + vergeW_R), p1y_mm + p1.ny * (hw + vergeW_R), railZ);
+        const rr_bot1 = projFast(p1x_mm + p1.nx * (hw + vergeW_R), p1y_mm + p1.ny * (hw + vergeW_R), 250);
+        const rr_top2 = projFast(p2x_mm + p2.nx * (hw + vergeW_R), p2y_mm + p2.ny * (hw + vergeW_R), railZ);
+        const rr_bot2 = projFast(p2x_mm + p2.nx * (hw + vergeW_R), p2y_mm + p2.ny * (hw + vergeW_R), 250);
+        if (rr_top1 && rr_bot1 && rr_top2 && rr_bot2) {
+          ctx.beginPath();
+          ctx.moveTo(rr_bot1[0], rr_bot1[1]); ctx.lineTo(rr_top1[0], rr_top1[1]);
+          ctx.lineTo(rr_top2[0], rr_top2[1]); ctx.lineTo(rr_bot2[0], rr_bot2[1]);
+          ctx.closePath();
+          ctx.fillStyle = lightCfg.guardrail; ctx.fill();
+          ctx.strokeStyle = lightCfg.guardrailShade; ctx.lineWidth = 1; ctx.stroke();
+        }
+      }
+
+      // 4. Trackside Sponsor Billboards (FIA 赞助商长板广告牌)
+      if (isScenery && (i % 12 === 0) && distToCam < 200) {
+        const sponsors = [
+          { name: "PIRELLI", bg: "#dc2626", fg: "#facc15" },
+          { name: "ROLEX", bg: "#064e3b", fg: "#f59e0b" },
+          { name: "Mobil 1", bg: "#ffffff", fg: "#dc2626" },
+          { name: "SHELL", bg: "#facc15", fg: "#dc2626" },
+          { name: "PETRONAS", bg: "#0d9488", fg: "#ffffff" },
+          { name: "DHL", bg: "#eab308", fg: "#dc2626" }
+        ];
+        const sp = sponsors[Math.floor(i / 12) % sponsors.length];
+        const sideSign = (i % 24 === 0) ? -1 : 1;
+        const sideW = (sideSign < 0) ? vergeW_L : vergeW_R;
+        const bPos_x = p1x_mm + sideSign * p1.nx * (hw + sideW + 600);
+        const bPos_y = p1y_mm + sideSign * p1.ny * (hw + sideW + 600);
+        
+        const bP1_x = bPos_x - tx * 4500, bP1_y = bPos_y - ty * 4500;
+        const bP2_x = bPos_x + tx * 4500, bP2_y = bPos_y + ty * 4500;
+        
+        const b_b1 = projFast(bP1_x, bP1_y, 400);
+        const b_t1 = projFast(bP1_x, bP1_y, 1800);
+        const b_t2 = projFast(bP2_x, bP2_y, 1800);
+        const b_b2 = projFast(bP2_x, bP2_y, 400);
+        
+        if (b_b1 && b_t1 && b_t2 && b_b2) {
+          const post1_b = projFast(bP1_x + tx * 1500, bP1_y + ty * 1500, 0);
+          const post1_t = projFast(bP1_x + tx * 1500, bP1_y + ty * 1500, 1600);
+          const post2_b = projFast(bP2_x - tx * 1500, bP2_y - ty * 1500, 0);
+          const post2_t = projFast(bP2_x - tx * 1500, bP2_y - ty * 1500, 1600);
+          if (post1_b && post1_t) {
+            ctx.beginPath(); ctx.moveTo(post1_b[0], post1_b[1]); ctx.lineTo(post1_t[0], post1_t[1]);
+            ctx.strokeStyle = "#475569"; ctx.lineWidth = 2.5; ctx.stroke();
+          }
+          if (post2_b && post2_t) {
+            ctx.beginPath(); ctx.moveTo(post2_b[0], post2_b[1]); ctx.lineTo(post2_t[0], post2_t[1]);
+            ctx.strokeStyle = "#475569"; ctx.lineWidth = 2.5; ctx.stroke();
+          }
+
+          ctx.beginPath();
+          ctx.moveTo(b_b1[0], b_b1[1]); ctx.lineTo(b_t1[0], b_t1[1]);
+          ctx.lineTo(b_t2[0], b_t2[1]); ctx.lineTo(b_b2[0], b_b2[1]);
+          ctx.closePath();
+          ctx.fillStyle = sp.bg; ctx.fill();
+          ctx.strokeStyle = "#1e293b"; ctx.lineWidth = 1.2; ctx.stroke();
+
+          const bMid = [(b_t1[0] + b_t2[0] + b_b1[0] + b_b2[0]) * 0.25, (b_t1[1] + b_t2[1] + b_b1[1] + b_b2[1]) * 0.25];
+          const bAng = Math.atan2(b_t2[1] - b_t1[1], b_t2[0] - b_t1[0]);
+          const fontSize = Math.max(7, Math.min(18, 140 / (distToCam + 15)));
+
+          ctx.save();
+          ctx.translate(bMid[0], bMid[1]);
+          ctx.rotate(bAng);
+          ctx.fillStyle = sp.fg;
+          ctx.font = `900 ${Math.round(fontSize)}px "Arial Black", sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(sp.name, 0, 0);
+          ctx.restore();
+        }
+      }
+
+      // 5. 3D Trees & Foliage (防护林)
+      if (isScenery && (i % 8 === 0) && distToCam < 320) {
+        const tSide = (i % 16 === 0) ? -1 : 1;
+        const tOffset = (tSide < 0 ? vergeW_L : vergeW_R) + 5000 + ((i * 1337) % 14000);
+        const tx_pos = p1x_mm + tSide * p1.nx * (hw + tOffset);
+        const ty_pos = p1y_mm + tSide * p1.ny * (hw + tOffset);
+        const treeH = 7500 + ((i * 7919) % 3500);
+
+        const pTrunkBase = projFast(tx_pos, ty_pos, 0);
+        const pTrunkTop = projFast(tx_pos, ty_pos, treeH * 0.35);
+        const pTier1 = projFast(tx_pos, ty_pos, treeH * 0.60);
+        const pTier2 = projFast(tx_pos, ty_pos, treeH * 0.85);
+        const pApex = projFast(tx_pos, ty_pos, treeH);
+
+        if (pTrunkBase && pApex) {
+          if (lightMode !== "night") {
+            const sLen = lightCfg.shadowLen;
+            const sDx = -lightCfg.sunDir[0] * treeH * sLen;
+            const sDy = -lightCfg.sunDir[1] * treeH * sLen;
+            const pShadTip = projFast(tx_pos + sDx, ty_pos + sDy, 0);
+            if (pShadTip) {
+              ctx.beginPath();
+              ctx.moveTo(pTrunkBase[0] - 4, pTrunkBase[1]); ctx.lineTo(pShadTip[0], pShadTip[1]);
+              ctx.lineTo(pTrunkBase[0] + 4, pTrunkBase[1]); ctx.closePath();
+              ctx.fillStyle = lightCfg.shadowCol; ctx.fill();
+            }
+          }
+
+          ctx.beginPath();
+          ctx.moveTo(pTrunkBase[0], pTrunkBase[1]);
+          ctx.lineTo(pTrunkTop ? pTrunkTop[0] : pApex[0], pTrunkTop ? pTrunkTop[1] : pApex[1]);
+          ctx.strokeStyle = "#452b1e";
+          ctx.lineWidth = Math.max(1.5, Math.min(6, 4000 / distToCam));
+          ctx.stroke();
+
+          const crownR1 = Math.max(3, Math.min(22, 14000 / distToCam));
+          const crownR2 = crownR1 * 0.75;
+          const crownR3 = crownR1 * 0.50;
+
+          if (pTier1) {
+            ctx.beginPath(); ctx.arc(pTier1[0], pTier1[1], crownR1, 0, 2*Math.PI);
+            ctx.fillStyle = lightCfg.treeLeaves3; ctx.fill();
+          }
+          if (pTier2) {
+            ctx.beginPath(); ctx.arc(pTier2[0], pTier2[1], crownR2, 0, 2*Math.PI);
+            ctx.fillStyle = lightCfg.treeLeaves2; ctx.fill();
+          }
+          ctx.beginPath(); ctx.arc(pApex[0], pApex[1], crownR3, 0, 2*Math.PI);
+          ctx.fillStyle = lightCfg.treeLeaves1; ctx.fill();
+        }
+      }
+
+      // 6. Night Mode Floodlight Towers & Ground Illumination
+      if (lightMode === "night" && (i % 20 === 0) && distToCam < 250) {
+        const mastX = p1x_mm - p1.nx * (hw + vergeW_L + 2000);
+        const mastY = p1y_mm - p1.ny * (hw + vergeW_L + 2000);
+        const mastBase = projFast(mastX, mastY, 0);
+        const mastTop = projFast(mastX, mastY, 14000);
+        if (mastBase && mastTop) {
+          ctx.beginPath(); ctx.moveTo(mastBase[0], mastBase[1]); ctx.lineTo(mastTop[0], mastTop[1]);
+          ctx.strokeStyle = "#475569"; ctx.lineWidth = 3; ctx.stroke();
+
+          ctx.beginPath(); ctx.arc(mastTop[0], mastTop[1], 5, 0, 2*Math.PI);
+          ctx.fillStyle = "#fef08a"; ctx.fill();
+
+          const pPool = projFast(p1x_mm, p1y_mm, 2);
+          if (pPool) {
+            const poolR = Math.max(8, Math.min(60, 22000 / distToCam));
+            const poolGrad = ctx.createRadialGradient(pPool[0], pPool[1], 0, pPool[0], pPool[1], poolR);
+            poolGrad.addColorStop(0, "rgba(254, 240, 138, 0.28)");
+            poolGrad.addColorStop(1, "rgba(254, 240, 138, 0.0)");
+            ctx.beginPath(); ctx.arc(pPool[0], pPool[1], poolR, 0, 2*Math.PI);
+            ctx.fillStyle = poolGrad; ctx.fill();
+          }
         }
       }
       
@@ -4643,9 +5195,11 @@ function renderCircuitScene(st, tel, ctrl) {
   // 2. Soft Contact Ground Shadow under the car
   const shadowW = Math.max(1200, (S.front.tire.R || 300) * 3);
   const shadowL = (S.wb || 2600) + 800;
+  const sOffX = (lightMode !== "night") ? -lightCfg.sunDir[0] * 350 * lightCfg.shadowLen : 0;
+  const sOffY = (lightMode !== "night") ? -lightCfg.sunDir[1] * 350 * lightCfg.shadowLen : 0;
   const projShad = (lx, ly) => {
-    const rx = cY * lx - sY * ly + carX_mm;
-    const ry = sY * lx + cY * ly + carY_mm;
+    const rx = cY * lx - sY * ly + carX_mm + sOffX;
+    const ry = sY * lx + cY * ly + carY_mm + sOffY;
     return projFast(rx, ry, 2);
   };
   const s1 = projShad(-shadowW/2, -shadowL/2);
@@ -4656,8 +5210,30 @@ function renderCircuitScene(st, tel, ctrl) {
     ctx.beginPath();
     ctx.moveTo(s1[0], s1[1]); ctx.lineTo(s2[0], s2[1]); ctx.lineTo(s3[0], s3[1]); ctx.lineTo(s4[0], s4[1]);
     ctx.closePath();
-    ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+    ctx.fillStyle = lightCfg.shadowCol;
     ctx.fill();
+  }
+
+  // Night Mode Dual Vehicle Headlight Projectors
+  if (lightMode === "night") {
+    const fwHead_x = -sY, fwHead_y = cY;
+    const rtHead_x = cY, rtHead_y = sY;
+    const hBeamL1 = projFast(carX_mm - rtHead_x * 700, carY_mm - rtHead_y * 700, 300);
+    const hBeamR1 = projFast(carX_mm + rtHead_x * 700, carY_mm + rtHead_y * 700, 300);
+    const hBeamL2 = projFast(carX_mm + fwHead_x * 55000 - rtHead_x * 9000, carY_mm + fwHead_y * 55000 - rtHead_y * 9000, 10);
+    const hBeamR2 = projFast(carX_mm + fwHead_x * 55000 + rtHead_x * 9000, carY_mm + fwHead_y * 55000 + rtHead_y * 9000, 10);
+    if (hBeamL1 && hBeamR1 && hBeamL2 && hBeamR2) {
+      ctx.beginPath();
+      ctx.moveTo(hBeamL1[0], hBeamL1[1]); ctx.lineTo(hBeamR1[0], hBeamR1[1]);
+      ctx.lineTo(hBeamR2[0], hBeamR2[1]); ctx.lineTo(hBeamL2[0], hBeamL2[1]);
+      ctx.closePath();
+      const hGrad = ctx.createLinearGradient(hBeamL1[0], hBeamL1[1], hBeamL2[0], hBeamL2[1]);
+      hGrad.addColorStop(0, "rgba(254, 240, 138, 0.45)");
+      hGrad.addColorStop(0.35, "rgba(254, 240, 138, 0.22)");
+      hGrad.addColorStop(1, "rgba(254, 240, 138, 0.0)");
+      ctx.fillStyle = hGrad;
+      ctx.fill();
+    }
   }
 
   // 3. Draw 3D Vehicle Multibody Chassis & Suspension
