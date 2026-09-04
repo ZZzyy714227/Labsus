@@ -777,6 +777,7 @@
       <!-- 工况预设模式胶囊组 -->
       <div class="slope-scenario-pills">
         <button class="slope-scenario-pill on" data-scenario="comprehensive" title="全工况综合连环大试验场 (连续7大工况大环线)">🏆 综合连环 (默认)</button>
+        <button class="slope-scenario-pill" data-scenario="undulating_road" title="连续对角与交叉轴起伏路面，逼真展现悬架四轮大行程跳动与车架姿态">🌊 起伏路面</button>
         <button class="slope-scenario-pill" data-scenario="jump_ramp" title="连续十连飞坡跳台极限测试">🚀 十连飞坡</button>
         <button class="slope-scenario-pill" data-scenario="moose_test" title="连续左右交替ISO 3888-2双移线麋鹿避障">🦌 连续麋鹿 (5x)</button>
         <button class="slope-scenario-pill" data-scenario="bumps_cleats" title="连续交错减速坎与凸块测试">🚧 连续过坎</button>
@@ -843,13 +844,32 @@
         <input type="range" id="slopeGradeSlider" min="-30" max="60" value="18" step="1">
         <b id="slopeGradeVal">18%</b>
       </div>
+
+      <div class="slope-control-item" id="slopeParamUndulWrap" style="display:none; gap:10px; align-items:center;">
+        <div style="display:flex; align-items:center; gap:5px;">
+          <label>波长 λ</label>
+          <input type="range" id="slopeUndulWlSlider" min="2.5" max="8.0" value="4.5" step="0.5" style="width:65px;">
+          <b id="slopeUndulWlVal">4.5m</b>
+        </div>
+        <div style="display:flex; align-items:center; gap:5px;">
+          <label>浪高 H</label>
+          <input type="range" id="slopeUndulAmpSlider" min="0.08" max="0.30" value="0.18" step="0.02" style="width:70px;">
+          <b id="slopeUndulAmpVal">180mm</b>
+        </div>
+        <div style="display:flex; align-items:center; gap:5px;">
+          <label>工况</label>
+          <span style="font-size:11px; color:#58a6ff; font-weight:600;">左右交错波浪 (180°反相)</span>
+        </div>
+        <span style="font-size:10px; color:#8b949e; margin-left:4px;" title="支持360°旋转/缩放/双击复位">🖱️ 自由视角：按住鼠标拖拽旋转 / 滚轮缩放 / 双击复位</span>
+      </div>
     </div>
 
     <div class="slope-t2-right">
       <!-- 多机位切换按钮组 -->
       <div class="slope-cam-group">
-        <button class="slope-cam-btn on" data-cam="behind">🏎️ 尾部跟随</button>
+        <button class="slope-cam-btn" data-cam="front_low" title="演示视频同款视角：迎面低角度特写">🎥 迎面低位</button>
         <button class="slope-cam-btn" data-cam="front">🎯 车头特写</button>
+        <button class="slope-cam-btn on" data-cam="behind">🏎️ 尾部跟随</button>
         <button class="slope-cam-btn" data-cam="suspension">📐 悬架特写</button>
         <button class="slope-cam-btn" data-cam="threeq">🏆 45° 鸟瞰</button>
         <button class="slope-cam-btn" data-cam="cockpit">💺 第一人称</button>
