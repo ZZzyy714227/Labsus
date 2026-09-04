@@ -222,6 +222,11 @@ assert(ctx.SLOPE_STAGE.scenario === "accel_brake", "Switched scenario to accel_b
 ctx.SLOPE_STAGE.switchScenario("split_mu", false);
 assert(ctx.SLOPE_STAGE.scenario === "split_mu", "Switched scenario to split_mu");
 
+ctx.SLOPE_STAGE.switchScenario("undulating_road", false);
+assert(ctx.SLOPE_STAGE.scenario === "undulating_road", "Switched scenario to undulating_road");
+assert(ctx.SLOPE_STAGE.camMode === "front_low", "Auto-switched camera to front_low for undulating_road");
+
 console.log(`\n========================================`);
 console.log(`All ${passed}/${total} Proving Ground Unit Tests Passed!`);
 console.log(`========================================`);
+process.exit(0);
