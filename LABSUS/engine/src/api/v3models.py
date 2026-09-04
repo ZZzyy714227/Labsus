@@ -218,6 +218,8 @@ class AxleSpec(BaseModel):
     unsprung_kg: float = 38.0               # mU 单侧
     motion_ratio: float | None = None       # 缺省 → 引擎 mr_at_zero 数值推导
     kw_curve: KwCurve | None = None         # 缺省 → 常数 kw = kS·mr²（见 KwCurve）
+    tire_rim_w: float | None = None        # G29 轮胎工坊：轮毂宽度 mm（可选，缺省不参与计算）
+    tire_et: float | None = None           # G29 轮胎工坊：偏距 mm（可选）
     arb: ArbSpec = Field(default_factory=ArbSpec)
 
 
@@ -368,6 +370,11 @@ class TireParams(BaseModel):
                                    #   叠加会顶破 μ·Fz（transient.wheel_force 用
                                    #   lat_avail=sqrt(μfz²-fx²) 钳位，前端 11-stages.js 同式）。
     Ls: float = 0.35               # 侧偏松弛长度 m（瞬态一阶滞后）
+    p: float | None = Field(default=None, exclude=True)
+    # ↑ G29 轮胎工坊：胎压 kPa（信息字段，引擎不改缺省行为）。exclude=True：
+    #   请求验证仍接受 p，但 model_dump() 不输出——transient.py 把 TireParams
+    #   dump 后逐键 float 化（tire_mf.load_tir_params），None 会炸，且引擎内部
+    #   不消费 p，序列化排除即可保持参数表与未自定义时逐键一致。
 
     @model_validator(mode="after")
     def _check(self):
