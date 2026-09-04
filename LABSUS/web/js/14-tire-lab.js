@@ -83,7 +83,7 @@ const TIRE_LAB = {
         R: a[ax].R, W: a[ax].W, rim: a[ax].rim, rimW: a[ax].rimW, et: a[ax].et,
         label: `CUSTOM ${a[ax].W}/${Math.round((a[ax].R - a[ax].rim / 2) / a[ax].W * 100)}R${Math.round(a[ax].rim / 25.4)}`
       });
-      A.kT = Math.round(A._kTBase * this.kTFactor(a[ax].p, p0));
+      A.kT = A._kTBase * this.kTFactor(a[ax].p, p0);
     });
     // MF 单组共用；LS 按前轴胎压修正
     SIM.userTire = Object.assign(deepClone(a.mf), { p: a.front.p, LS: a.mf.LS * this.lSFactor(a.front.p, p0) });

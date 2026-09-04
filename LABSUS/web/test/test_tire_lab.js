@@ -146,6 +146,20 @@ T('loadVehiclePreset("tirecustom:分流胎");');
 assert(T("TIRE_LAB.active.name") === "分流胎", "tirecustom: prefix routes to activateCustom (slice(11))");
 assert(T("TIRE_LAB.active.front.R") === 300, "routed activation re-applies stored tire");
 
+/* 上限与降级路径（头注释声明项） */
+T(`for (let i = 0; i < 19; i++) { TIRE_LAB.active = { name:null, front:{R:300,W:265,rim:228.6,rimW:190,et:0,p:210}, rear:{R:310,W:285,rim:228.6,rimW:200,et:0,p:210}, mf:{Fy0:5250,FzNom:3500,By:20,Cy:1.2,Ey:-0.5,LS:0.10,Cg:6.0} }; TIRE_LAB.saveCustom("批_" + i); }`);
+// 此前已存 1 条（分流胎），循环 19 条后达到上限 20
+assert(T(`TIRE_LAB.active.name=null; TIRE_LAB.saveCustom("超限胎").error`) === "limit", "saveCustom rejects beyond MAX_CUSTOMS=20");
+T(`TIRE_LAB.deleteCustom("超限胎");`);
+// localStorage 抛错 → 降级：storageOk=false、customs 回退 {}
+T(`const _g = localStorage.getItem, _s = localStorage.setItem;
+   localStorage.getItem = () => { throw new Error("boom"); };
+   localStorage.setItem = () => { throw new Error("boom"); };
+   TIRE_LAB.storageOk = true; TIRE_LAB.loadAll();`);
+assert(T("TIRE_LAB.storageOk") === false, "localStorage failure degrades storageOk flag");
+assert(T("typeof TIRE_LAB.customs === 'object'"), "loadAll degrades customs to object without throwing");
+T(`localStorage.getItem = _g; localStorage.setItem = _s; TIRE_LAB.storageOk = true; TIRE_LAB.loadAll();`);
+
 console.log(`\n[Part1] ${passed}/${total} passed`);
 
 /* Part2-7 占位（后续任务追加） */
