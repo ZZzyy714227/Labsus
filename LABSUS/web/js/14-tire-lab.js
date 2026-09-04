@@ -97,7 +97,6 @@ const TIRE_LAB = {
     const c = this.customs[name]; if (!c) return;
     this.applyToState({ front: deepClone(c.front), rear: deepClone(c.rear), mf: deepClone(c.mf) });
     this.active.name = name; this.persistActive();
-    if (typeof rebuild === "function") { try { rebuild(); } catch (e) {} }
   },
 
   saveCustom(name) {

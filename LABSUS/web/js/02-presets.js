@@ -214,7 +214,7 @@ const S={
 function loadVehiclePreset(type) {
   /* G29：tirecustom: 前缀 → 轮胎工坊自定义条目（预设下拉复用同一 select） */
   if (typeof type === "string" && type.indexOf("tirecustom:") === 0) {
-    if (typeof TIRE_LAB !== "undefined") TIRE_LAB.activateCustom(type.slice(10));
+    if (typeof TIRE_LAB !== "undefined") TIRE_LAB.activateCustom(type.slice("tirecustom:".length));
     return;
   }
   const p = VEHICLE_PRESETS[type];
