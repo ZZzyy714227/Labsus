@@ -785,8 +785,8 @@ function addAxleAssemblyPRO(sc, M, m, sx, yOff, axis){
   const ax=nrm([m.ax[0]*sx, m.ax[1], m.ax[2]]);
   const kg=T(m.kg);
   const tR=state.tire.R, tW=state.tire.W, rimR=state.tire.rim, dR=state.tire.disc;
-  const rimHalf = Math.max(18, (state.tire.rimW || Math.round(tW * 0.72)) * 0.30); // G29 轮辋深度随轮毂宽度
-  const etOff = state.tire.et || 0;                                                 // G29 偏距：轮面沿轴向外移
+  const rimHalf = state.tire.rimW ? Math.max(18, state.tire.rimW * 0.30) : 6; // G29 自定义轮毂宽度→轮辋深度；预设态保持原 6mm 浅盘观感
+  const etOff = -(state.tire.et || 0); // G29 偏距：ET 正值轮面缩进（ISO ET 语义），负值外凸
     const _eU0=nrm(sub([0,0,1],mul(ax,dot([0,0,1],ax)))), _eV0=cross(ax,_eU0);
   let _spin = 0;
   if(window._tireSpinAngles) {
