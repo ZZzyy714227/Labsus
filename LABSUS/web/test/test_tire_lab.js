@@ -272,6 +272,35 @@ assert(Math.abs(T("window.physicsEngine.ReF") - 0.300) < 1e-9,
   `SLOPE engine rebuilt with new rolling radius (ReF=${T("window.physicsEngine.ReF")})`);
 T("SLOPE_STAGE.active = false;");
 
+/* ═══ 6. 启动恢复 / 删除入口 / 标定置灰 ═══ */
+console.log("=== 6. Startup Restore / Delete UI / Calib Disable ===");
+// I-1：loadAll 后重放（模拟刷新：清 S/SIM 后仅 loadAll）
+T(`TIRE_LAB.customs = {}; TIRE_LAB.active = null; SIM.userTire = null; loadVehiclePreset("gt3");
+   TIRE_LAB.active = { name:null, front:{R:300,W:265,rim:228.6,rimW:190,et:0,p:210}, rear:{R:310,W:285,rim:228.6,rimW:200,et:0,p:210},
+     mf:{Fy0:6000,FzNom:3500,By:20,Cy:1.2,Ey:-0.5,LS:0.10,Cg:6.0} };
+   TIRE_LAB.applyToState(TIRE_LAB.active); TIRE_LAB.active = null; SIM.userTire = null;`);
+// memStore 为 Node 侧闭包变量不可见，经 localStorage 桩写入（等价 memStore["labsus-tire-active"]=...）
+T(`localStorage.setItem("labsus-tire-active", JSON.stringify({ name:null, front:{R:300,W:265,rim:228.6,rimW:190,et:0,p:210}, rear:{R:310,W:285,rim:228.6,rimW:200,et:0,p:210}, mf:{Fy0:6000,FzNom:3500,By:20,Cy:1.2,Ey:-0.5,LS:0.10,Cg:6.0} }));
+   TIRE_LAB.loadAll();`);
+// 重放逻辑：模拟文件尾启动路径（与 14-tire-lab.js 尾部恢复代码相同的两行）
+T(`if (TIRE_LAB.active) TIRE_LAB.applyToState(deepClone(TIRE_LAB.active));`);
+assert(T("SIM.userTire && SIM.userTire.Fy0 === 6000"), "startup restore re-applies active overlay");
+// I-2：renderSavedList 与删除
+T(`TIRE_LAB.saveCustom("待删胎");`);
+assert(T("!!TIRE_LAB.customs['待删胎']"), "seed custom for delete UI");
+T("TIRE_LAB.open(); TIRE_LAB.renderSavedList();");
+assert(T("String(document.getElementById('tlSavedList').innerHTML).indexOf('data-tl-del')") >= 0,
+  "saved-list renders per-preset delete buttons");
+T(`TIRE_LAB.deleteCustom("待删胎"); TIRE_LAB.renderSavedList();`);
+assert(T("!TIRE_LAB.customs['待删胎']"), "deleteCustom removes via saved-list path");
+// M-3：标定置灰
+T("SIM.tireCalib = { Fy0:4800, FzNom:3400, By:18, Cy:1.3, Ey:-0.6, LS:0.15, Cg:5.0 }; TIRE_LAB.renderForm();");
+assert(T("document.getElementById('tl_mf_Fy0').disabled") === true, "MF inputs disabled when calibration exists");
+assert(T("document.getElementById('tl_mf_By').disabled") === true, "all MF inputs disabled as a group");
+T("SIM.tireCalib = null; TIRE_LAB.renderForm();");
+assert(T("document.getElementById('tl_mf_Fy0').disabled") === false, "MF inputs re-enabled when calibration cleared");
+T("TIRE_LAB.close();");
+
 console.log(`\n[cumulative] ${passed}/${total} passed`);
 
 process.exit(passed === total ? 0 : 1);

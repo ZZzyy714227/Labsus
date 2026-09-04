@@ -387,7 +387,8 @@ class VehicleDynamics15DOF {
       return D[k];                          // ③ 引擎缺省（对拍锚，不改值）
     };
     const FzNom = pick('FzNom', 0), By = pick('By', 0), Fy0 = pick('Fy0');
-    // Ey 不在 TIRE_MF_QS 里，单独走 SIM.tireCalibEy（与引擎侧 payload 同口径）
+    // Ey 不在 TIRE_MF_QS 里，单独走 SIM.tireCalibEy（与引擎侧 payload 同口径）；
+    // G29 后 pick('Ey') 链含 userTire 层（tireCalibEy 仍最优先）。
     const eySim = (this.SIM && typeof this.SIM.tireCalibEy === 'number') ? this.SIM.tireCalibEy : NaN;
     const Ey = isFinite(eySim) ? eySim : pick('Ey');
     const p = {
