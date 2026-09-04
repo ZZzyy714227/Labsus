@@ -385,9 +385,9 @@ class StraightPath extends TrackPath {
       washboardWavelength: 1.25,
       washboardAmplitude: 0.035,
       potholeDepth: -0.055,
-      undulatingWavelength: 4.8,
-      undulatingAmplitude: 0.14,
-      undulatingCrossAmp: 0.14,
+      undulatingWavelength: 9.0,
+      undulatingAmplitude: 0.035,
+      undulatingCrossAmp: 0.035,
       undulatingPhase: 180,
       undulatingType: "staggered_moguls",
       muLeft: 1.35,
@@ -424,6 +424,7 @@ class StraightPath extends TrackPath {
     this.bumps = [];
     this.mooseSections = [];
     this.washboardSections = [];
+    this.undulatingSections = []; // G28-fix：必须随场景重建清空，否则波浪永久叠加到其他所有场景
     this.splitMuSections = [];
     this.slopeSections = [];
     this.gantries = [];
@@ -647,9 +648,11 @@ class StraightPath extends TrackPath {
 
     } else if (sc === "undulating_road") {
       // 🌊 越野连续交错波浪起伏荒原 (Off-Road Staggered Moguls & Articulation)
-      const wL = this.params.undulatingWavelength || 4.5;
-      const amp = this.params.undulatingAmplitude !== undefined ? this.params.undulatingAmplitude : 0.18;
-      const crossAmp = this.params.undulatingCrossAmp !== undefined ? this.params.undulatingCrossAmp : 0.18;
+      // G28-fix 参数重标定：波浪必须满足 a = A·(2πv/λ)² < g 才不会把车抛飞；
+      // 默认 0.035m/9m @45km/h ≈ 2.7m/s²（舒缓旷野起伏），旧 0.14m/4.8m ≈ 2.4g 必飞车
+      const wL = this.params.undulatingWavelength || 9.0;
+      const amp = this.params.undulatingAmplitude !== undefined ? this.params.undulatingAmplitude : 0.035;
+      const crossAmp = this.params.undulatingCrossAmp !== undefined ? this.params.undulatingCrossAmp : 0.035;
       const phaseDeg = this.params.undulatingPhase !== undefined ? this.params.undulatingPhase : 180;
       const uType = this.params.undulatingType || "staggered_moguls";
       const uY0 = 3.0;
@@ -661,13 +664,13 @@ class StraightPath extends TrackPath {
         repeatCount: rCount
       });
 
-      this.gantries.push({ y: 0, text: `🌊 OFF-ROAD MOGULS · 越野连续交错起伏包 (波长 ${wL.toFixed(1)}m · 浪高 ${(amp*2000).toFixed(0)}mm)` });
+      this.gantries.push({ y: 0, text: `🌊 OFF-ROAD MOGULS · 越野连续交错起伏包 (波长 ${wL.toFixed(1)}m · 浪高 ${(amp*1000).toFixed(0)}mm)` });
 
       for (let i = 0; i < rCount; i++) {
         const segY = uY0 + i * wL;
         this.segments.push({
           id: `seg_undul_${i}`, type: "undulating_road",
-          name: `🌊 越野交错起伏包 (${i + 1}/${rCount}) · 左右反相铰接 · 浪高 ${(amp*2000).toFixed(0)}mm`,
+          name: `🌊 越野交错起伏包 (${i + 1}/${rCount}) · 左右反相铰接 · 浪高 ${(amp*1000).toFixed(0)}mm`,
           yStart: segY, yEnd: segY + wL, targetSpeed: this.targetSpeed
         });
       }
@@ -890,7 +893,9 @@ class StraightPath extends TrackPath {
           let localZ = leftWave * (1.0 - smoothBlend) + rightWave * smoothBlend;
 
           // 叠加细微的自然荒原旷野微地形质感 (波长较长的平缓地貌)
-          localZ += 0.04 * Math.sin(0.35 * k_y * dy + x * 0.4);
+          // G28-fix：微地形幅值随浪高设置自适应，否则 H 调小时固定 40mm 微项反成主波形
+          const microAmp = Math.min(0.04, u.amp * 0.6);
+          localZ += microAmp * Math.sin(0.35 * k_y * dy + x * 0.4);
 
           // 边缘平缓渐变融入外围自然地表
           const absX = Math.abs(x);
