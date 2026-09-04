@@ -239,6 +239,28 @@ T("TIRE_LAB.restoreBuiltin();");
 assert(T("chassisPayload().tire") === undefined, "tire block absent again after restore");
 assert(JSON.stringify(T("chassisPayload()")) === JSON.stringify(pay0), "payload byte-identical after restore");
 
+/* ═══ 5. 弹窗表单 ═══ */
+console.log("=== 5. Modal Form ===");
+T("TIRE_LAB.open();");
+assert(T("!!TIRE_LAB._modal"), "open() builds modal");
+assert(T("TIRE_LAB._form.front.R") > 0, "renderForm seeds from current preset tire");
+// 表单读入：非法值拦截
+T(`document.getElementById("tl_F_R").value = "99999"; TIRE_LAB.applyFromForm();`);
+assert(T("TIRE_LAB.active") === null || T("TIRE_LAB.active.front.R") !== 99999,
+  "out-of-range input blocked by validate");
+// 合法值走通
+T(`["tl_F_R","tl_F_W","tl_F_rim","tl_F_rimW","tl_F_et","tl_F_p"].forEach((k,i)=>{document.getElementById(k).value=["300","265","228.6","190","10","252"][i];});
+   ["tl_R_R","tl_R_W","tl_R_rim","tl_R_rimW","tl_R_et","tl_R_p"].forEach((k,i)=>{document.getElementById(k).value=["310","285","228.6","200","10","168"][i];});
+   ["tl_mf_Fy0","tl_mf_FzNom","tl_mf_By","tl_mf_Cy","tl_mf_Ey","tl_mf_LS","tl_mf_Cg"].forEach((k,i)=>{document.getElementById(k).value=["6000","3500","22","1.2","-0.5","0.10","6"][i];});
+   TIRE_LAB.applyFromForm();`);
+assert(T("S.front.tire.R") === 300 && T("SIM.userTire.Fy0") === 6000, "applyFromForm applies valid form");
+// 峰值侧偏角换算（By=22, Cy=1.2, Ey=-0.5）
+const aPeak = T("TIRE_LAB.alphaPeakDeg(22, 1.2, -0.5)");
+assert(aPeak > 6 && aPeak < 9, `alphaPeakDeg plausible (${aPeak.toFixed(2)}deg, By=22 → ~7.5deg)`);
+// 关闭再开：保留激活状态回填
+T("TIRE_LAB.close(); TIRE_LAB.open();");
+assert(T("TIRE_LAB._form.front.R") === 300, "reopen keeps applied custom values (active overlay)");
+
 console.log(`\n[cumulative] ${passed}/${total} passed`);
 
 process.exit(passed === total ? 0 : 1);
