@@ -246,7 +246,7 @@ assert(T("!!TIRE_LAB._modal"), "open() builds modal");
 assert(T("TIRE_LAB._form.front.R") > 0, "renderForm seeds from current preset tire");
 // 表单读入：非法值拦截
 T(`document.getElementById("tl_F_R").value = "99999"; TIRE_LAB.applyFromForm();`);
-assert(T("TIRE_LAB.active") === null || T("TIRE_LAB.active.front.R") !== 99999,
+assert(T("TIRE_LAB.active === null || TIRE_LAB.active.front.R !== 99999"),
   "out-of-range input blocked by validate");
 // 合法值走通
 T(`["tl_F_R","tl_F_W","tl_F_rim","tl_F_rimW","tl_F_et","tl_F_p"].forEach((k,i)=>{document.getElementById(k).value=["300","265","228.6","190","10","252"][i];});
@@ -260,6 +260,17 @@ assert(aPeak > 6 && aPeak < 9, `alphaPeakDeg plausible (${aPeak.toFixed(2)}deg, 
 // 关闭再开：保留激活状态回填
 T("TIRE_LAB.close(); TIRE_LAB.open();");
 assert(T("TIRE_LAB._form.front.R") === 300, "reopen keeps applied custom values (active overlay)");
+// C1 回归：SLOPE 打开时应用表单必须重建引擎（新 ReF 反映自定义外径）
+T(`SLOPE_STAGE.active = true; SLOPE_STAGE.scenario = "comprehensive";
+   SIM.userTire = null; TIRE_LAB.active = null; loadVehiclePreset("gt3");`);
+T(`TIRE_LAB.open();
+   ["tl_F_R","tl_F_W","tl_F_rim","tl_F_rimW","tl_F_et","tl_F_p"].forEach((k,i)=>{document.getElementById(k).value=["300","265","228.6","190","10","210"][i];});
+   ["tl_R_R","tl_R_W","tl_R_rim","tl_R_rimW","tl_R_et","tl_R_p"].forEach((k,i)=>{document.getElementById(k).value=["310","285","228.6","200","10","210"][i];});
+   ["tl_mf_Fy0","tl_mf_FzNom","tl_mf_By","tl_mf_Cy","tl_mf_Ey","tl_mf_LS","tl_mf_Cg"].forEach((k,i)=>{document.getElementById(k).value=["5250","3500","20","1.2","-0.5","0.10","6"][i];});
+   TIRE_LAB.applyFromForm();`);
+assert(Math.abs(T("window.physicsEngine.ReF") - 0.300) < 1e-9,
+  `SLOPE engine rebuilt with new rolling radius (ReF=${T("window.physicsEngine.ReF")})`);
+T("SLOPE_STAGE.active = false;");
 
 console.log(`\n[cumulative] ${passed}/${total} passed`);
 
