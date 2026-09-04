@@ -115,6 +115,10 @@ function loadReal(webDir) {
     '\nwindow.UniversalAutoPilot = UniversalAutoPilot;\nwindow.VehicleDynamics15DOF = VehicleDynamics15DOF;',
     ctx, { filename: '11-stages.js#pilot+engine' });
 
+  // G30：MPC 控制器（opts.pilotType === 'mpc' 时由 runLaps 选用）
+  const mpcSrc = fs.readFileSync(path.join(webDir, 'js', '15-mpc.js'), 'utf8');
+  vm.runInContext(mpcSrc, ctx, { filename: '15-mpc.js' });
+
   const mech = fs.readFileSync(path.join(webDir, 'js', '03-mechanism.js'), 'utf8');
   const sS = mech.indexOf('function sampleSweep(sw,tr,key){');
   const sE = mech.indexOf('/* ================================ 5.');
@@ -129,7 +133,8 @@ function loadReal(webDir) {
 }
 
 /* ── 真 15-DOF 全闭环 ─────────────────────────────────────────── */
-function runLaps(ctx, wp, sim, nLaps) {
+function runLaps(ctx, wp, sim, nLaps, opts) {
+  const useMPC = opts && opts.pilotType === 'mpc';
   const P = new ctx.window.CircuitPath(wp, 1.35, 1.0);
   const pts = P.pts, N = pts.length;
   const S = makeS();
@@ -140,8 +145,10 @@ function runLaps(ctx, wp, sim, nLaps) {
     u: 5, v: 0, w: 0, p: 0, q: 0, r: 0,
     omega: { FL: 5 / 0.30, FR: 5 / 0.30, RL: 5 / 0.30, RR: 5 / 0.30 }
   });
-  const pilot = new ctx.window.UniversalAutoPilot(S);
+  const pilot = useMPC ? new ctx.window.UniversalAutoPilotMPC(S)
+                       : new ctx.window.UniversalAutoPilot(S);
   pilot.setPath(P); pilot.active = true;
+  pilot.eng = eng;   // G30：ABS 输出级与滑移护栏需引擎遥测
   if (pilot.initLapLearning) pilot.initLapLearning(P.cornerCount || 0);
   P._hintCtrl = 0; P._hintRoad = 0;
 
@@ -215,7 +222,8 @@ function runChecks(webDir, ok, fail, opts) {
 
   const SIM_A = { mrRefF: 0.75, mrRefR: 0.78, rcH_F: 52, rcH_R: 63,
                   swF: makeSweep(1.0), swR: makeSweep(1.0) };
-  const r = runLaps(R.ctx, R.wp, SIM_A, T.N_LAPS);
+  const pilotType = (opts && opts.pilotType) || 'stanley';
+  const r = runLaps(R.ctx, R.wp, SIM_A, T.N_LAPS, { pilotType });
 
   log(`  [G24] 包络理论圈速 ${r.envT.toFixed(1)}s | 实际 ${r.lapTimes.map(x => x.toFixed(1)).join('/')}s | ` +
       `倍率 ${r.lapRatio.toFixed(2)}x | 最大偏 ${r.maxLat.toFixed(2)}m | 出界 ${r.overEdge} | ` +
@@ -245,7 +253,7 @@ function runChecks(webDir, ok, fail, opts) {
      "设计几何 → 影响车辆行为"这条链在驾驶层真的通了。 */
   const SIM_B = { mrRefF: 0.75, mrRefR: 0.78, rcH_F: 52, rcH_R: 63,
                   swF: makeSweep(1.9), swR: makeSweep(1.9) };
-  const rB = runLaps(R.ctx, R.wp, SIM_B, T.N_LAPS);
+  const rB = runLaps(R.ctx, R.wp, SIM_B, T.N_LAPS, { pilotType });
   // 口径 = 学习完成后的一圈（lapTimes 末位，两车同圈数同学习状态）：
   // 首圈 margin=0.85 保守驾驶会遮蔽几何差异（实测首圈 Δ 仅 0.0105%）。
   const lastA = r.lapTimes.length ? r.lapTimes[r.lapTimes.length - 1] : NaN;
@@ -261,6 +269,7 @@ module.exports = runChecks;
 /* 单独运行（ok 回调必须尊重 cond） */
 if (require.main === module) {
   const webDir = path.join(__dirname, '..');
+  const mpc = process.argv.includes('--mpc');
   let checks = 0;
   const failures = [];
   const t0 = Date.now();
@@ -271,7 +280,7 @@ if (require.main === module) {
       else { failures.push(msg); console.log(`\x1b[31m[FAIL]\x1b[0m ${msg}`); }
     },
     msg => { checks++; failures.push(msg); console.log(`\x1b[31m[FAIL]\x1b[0m ${msg}`); },
-    { log: m => console.log(m) });
+    { log: m => console.log(m), pilotType: mpc ? 'mpc' : 'stanley' });
   console.log(`\n耗时 ${((Date.now() - t0) / 1000).toFixed(1)}s`);
   if (failures.length) {
     console.error(`\x1b[31m15-DOF 圈速检查 FAIL：${failures.length}/${checks}\x1b[0m`);

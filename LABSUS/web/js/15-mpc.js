@@ -98,7 +98,7 @@ const MPCModel = {
 
   /* CEM 求解：返回 { W, J }。Wprev 热启动（平移），含其自身候选 → 代价单调不升 */
   solve(x0, Wprev, ref, p) {
-    const N = ref.length, K = 48, ITERS = 2, ELITE = 12;
+    const N = ref.length, K = 24, ITERS = 1, ELITE = 8;
     const rnd = () => (Math.random() * 2 - 1);
     let mu = Wprev.map(w => w.slice());
     let sig = Wprev.map(() => [0.05, 1.0]);
@@ -229,6 +229,16 @@ class UniversalAutoPilotMPC {
   drive(state, dt) {
     if (!this.path || !this.active) return { steer: 0, throttle: 0, brake: 0, target: null };
 
+    // G30 性能：隔帧求解（控制保持 2 帧 = 8ms，真实 ECU 量级），偶发帧复用上帧控制
+    this._f = (this._f || 0) + 1;
+    const reSolve = (this._f % 2 === 1) || !this._lastCtrl;
+    if (!reSolve) {
+      const c = this._lastCtrl;
+      const tgt = this.path.getLookahead(
+        state.X - this.a * Math.sin(state.psi), state.Y + this.a * Math.cos(state.psi), state.u);
+      return { steer: c.steer, throttle: c.throttle, brake: c.brake, drs: c.drs, target: tgt };
+    }
+
     const u = Math.max(0.1, state.u || 0);
     const fx = state.X - this.a * Math.sin(state.psi);
     const fy = state.Y + this.a * Math.cos(state.psi);
@@ -258,8 +268,15 @@ class UniversalAutoPilotMPC {
     });
 
     // ── CEM 求解 ──
+    // 误差态注入：符号由 _errSign 校准（模型 ISO 系 vs 引擎约定的跨系映射，
+    //   手推易错，采用经验校准：scratch/calib_mpc_signs.cjs 网格搜索 4 种组合）
+    const es = this._errSign || { ey: -1, epsi: 1 };
     if (!this._W || this._W.length !== N) this._W = ref.map(() => [0, 0]);
-    const sol = MPCModel.solve([u, state.v || 0, state.r || 0, 0, 0], this._W, ref, p);
+    const e_y0 = (target && typeof target.lineError === "number" && isFinite(target.lineError)) ? es.ey * target.lineError : 0;
+    let e_psi0 = (target ? es.epsi * (state.psi - target.targetHeading) : 0);
+    while (e_psi0 > Math.PI) e_psi0 -= 2 * Math.PI;
+    while (e_psi0 < -Math.PI) e_psi0 += 2 * Math.PI;
+    const sol = MPCModel.solve([u, state.v || 0, state.r || 0, e_y0, e_psi0], this._W, ref, p);
     this._W = sol.W.map(w => w.slice());
     // 热启动平移（下一帧从 t=1 起步，尾部补常值）
     this._W.shift();
@@ -322,7 +339,9 @@ class UniversalAutoPilotMPC {
     const drsVMin = (typeof qsD.drsVms === 'number' && isFinite(qsD.drsVms)) ? qsD.drsVms : 40.0;
     const ctrl_drs = !!(target && target.isDRS && u > drsVMin);
 
-    return { steer: ctrl_steer, throttle: ctrl_throttle, brake: ctrl_brake, drs: ctrl_drs, target: target };
+    const out = { steer: ctrl_steer, throttle: ctrl_throttle, brake: ctrl_brake, drs: ctrl_drs, target: target };
+    this._lastCtrl = { steer: ctrl_steer, throttle: ctrl_throttle, brake: ctrl_brake, drs: ctrl_drs };
+    return out;
   }
 }
 
