@@ -371,15 +371,19 @@ class VehicleDynamics15DOF {
      数据源优先级：SIM.tireCalib（由 applyTireCalib 写入，即 /api/v3/tire/fit 辨识结果）
      → 引擎缺省。Ey 单独存于 SIM.tireCalibEy（03-mechanism.js 注释就写了
      “仅赛道瞬态用”、09-track.js 也确实在发给引擎，但前端实时引擎从未消费）。
-     逐项校验：非法值（NaN / FzNom≤0 / By≤0）逐项回退缺省，不整体报废。 */
+     逐项校验：非法值（NaN / FzNom≤0 / By≤0）逐项回退缺省，不整体报废。
+     G29（2026-09-04）：优先级链插入 SIM.userTire（轮胎工坊自定义参数，14-tire-lab.js
+     写入）；实测标定仍最高。缺省 D 表未动，test_dom.js:217 正则锁与 tphys_parity 不受影响。 */
   resolveTireParams() {
     const D = { Fy0: 5250.0, By: 20.0, Cy: 1.2, Ey: -0.5, FzNom: 3500.0, LS: 0.10, Cg: 6.0 };
     const tc = (this.SIM && this.SIM.tireCalib) ? this.SIM.tireCalib : null;
+    const ut = (this.SIM && this.SIM.userTire) ? this.SIM.userTire : null;   // G29 轮胎工坊
     const pick = (k, minExclusive) => {
-      const v = tc ? tc[k] : undefined;
-      if (typeof v !== 'number' || !isFinite(v)) return D[k];
-      if (minExclusive !== undefined && v <= minExclusive) return D[k];
-      return v;
+      const ok = v => (typeof v === 'number' && isFinite(v) &&
+                       (minExclusive === undefined || v > minExclusive));
+      if (tc && ok(tc[k])) return tc[k];   // ① 实测标定最高
+      if (ut && ok(ut[k])) return ut[k];   // ② G29 用户自定义次之
+      return D[k];                          // ③ 引擎缺省（对拍锚，不改值）
     };
     const FzNom = pick('FzNom', 0), By = pick('By', 0), Fy0 = pick('Fy0');
     // Ey 不在 TIRE_MF_QS 里，单独走 SIM.tireCalibEy（与引擎侧 payload 同口径）
