@@ -1385,6 +1385,47 @@ class CircuitPath extends TrackPath {
     };
   }
 
+  /* G30（2026-09-04）：参考线等距采样——MPC 预测时域用。从弧长 sStart 起、
+     沿赛车线每 ds 取一个参考点，共 n 个（闭合赛道对 totalLength 取模）。
+     返回字段与 pts/赛车线同源：x/y（赛车线）、heading、curvature（赛车线）、
+     v_max、cornerId、isDRS、s。StraightPath/CirclePath 等无 refX 的路径回退中心线。 */
+  samplePath(sStart, n, ds = 2.0) {
+    const L = this.totalLength || 0;
+    const out = [];
+    if (L <= 0) return out;
+    for (let k = 0; k < n; k++) {
+      const s = (((sStart + k * ds) % L) + L) % L;
+      const idx = this._idxAtS(s);
+      const p = this.pts[idx];
+      out.push({
+        x: p.refX !== undefined ? p.refX : p.x,
+        y: p.refY !== undefined ? p.refY : p.y,
+        heading: p.refHeading !== undefined ? p.refHeading : p.heading,
+        curvature: p.refCurvature !== undefined ? p.refCurvature : (p.curvature || 0),
+        v_max: p.v_max,
+        cornerId: p.cornerId !== undefined ? p.cornerId : -1,
+        isDRS: !!p.isDRS,
+        s
+      });
+    }
+    return out;
+  }
+
+  /* 弧长 → pts 索引（pts[i].s 沿环单调递增；s ∈ [0, L) 环形归属）。
+     二分 + 端部回绕：pts[0].s 为首段长（非 0），首段覆盖 s ∈ [0, pts[0].s)。 */
+  _idxAtS(s) {
+    const pts = this.pts, N = pts.length;
+    if (N === 0) return 0;
+    // 首段 [0, pts[0].s) 归属：s 超过半段就近 pts[0]，否则回绕到 pts[N-1]
+    if (s <= pts[0].s) return (s > pts[0].s * 0.5) ? 0 : N - 1;
+    let lo = 0, hi = N - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (pts[mid].s <= s) lo = mid; else hi = mid - 1;
+    }
+    return lo;
+  }
+
   getRoadElevation(x, y) {
     // G22：热路径——VehicleDynamics15DOF.step() 以 1000Hz 子步对四轮各调一次，
     // 单帧 ~64 次。旧的 O(P) 全量遍历在 P=2884 时是 ~18万次距离计算/帧，
