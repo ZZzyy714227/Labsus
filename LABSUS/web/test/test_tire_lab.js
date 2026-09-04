@@ -1,7 +1,7 @@
 /* G29 轮胎工坊测试：headless vm（沙箱模式照抄 undulating_road_test.js）。
-   1. 数据层：存储 CRUD/上限/降级  2. 校验  3. 胎压映射
-   4. 应用层：applyToState/restore/车型切换保持  5. resolveTireParams 优先级
-   6. chassisPayload 注入  7. 弹窗表单读入与非法拦截  */
+   覆盖主题（对应节标 === 1./2./3.）：数据层（存储 CRUD/上限/降级/校验/胎压映射）、
+   应用层（applyToState/restore/车型切换保持）、resolveTireParams 优先级链、
+   chassisPayload 注入、弹窗表单读入与非法拦截。 */
 "use strict";
 const fs = require("fs"), path = require("path"), vm = require("vm");
 
@@ -200,14 +200,21 @@ assert(T("S.front.kT === S.front._kTBase"), "kT restored to preset base");
 console.log("=== 3. resolveTireParams Priority Chain ===");
 T(`SIM.tireCalib = null; SIM.tireCalibEy = undefined;
    SIM.userTire = { Fy0:6000, FzNom:3500, By:22, Cy:1.25, Ey:-0.4, LS:0.2, Cg:7.0, p:252 };`);
+// 每场景重建 eng，杜绝实例态串扰（缓存键虽覆盖全部输入，重建更防未来构造期状态）
 T("var eng = new VehicleDynamics15DOF(S, SIM, 10);");
 assert(T("eng.resolveTireParams().Fy0") === 6000, "userTire.Fy0 wins over default");
 assert(T("eng.resolveTireParams().By") === 22, "userTire.By wins over default");
 assert(T("eng.resolveTireParams().gripScale") > 1.0, "gripScale reflects custom mu>default");
+// userTire 沿用上组值（6000/22），验证被标定压制
 T(`SIM.tireCalib = { Fy0:4800, FzNom:3400, By:18, Cy:1.3, Ey:-0.6, LS:0.15, Cg:5.0 };`);
 T("var eng = new VehicleDynamics15DOF(S, SIM, 10);");
 assert(T("eng.resolveTireParams().Fy0") === 4800, "tireCalib outranks userTire");
 assert(T("eng.resolveTireParams().By") === 18, "tireCalib.By outranks userTire.By");
+T("SIM.tireCalib.By = 0;");   // 标定层非法值 → 应下探 userTire（缓存键含 By，改后重解析，无需重建）
+assert(T("eng.resolveTireParams().By") === 22, "invalid calib value falls through to userTire");
+T("SIM.tireCalib.By = 18;");  // 恢复，供后续锚定场景语义
+assert(T("eng.resolveTireParams().Ey") === -0.6, "tireCalib.Ey outranks userTire.Ey");
+assert(T("eng.resolveTireParams().gripScale") < 1.0, "gripScale derives from winning source (calib 4800/3400)");
 T("SIM.tireCalib = null; SIM.userTire = null;");
 T("var eng = new VehicleDynamics15DOF(S, SIM, 10);");
 assert(T("eng.resolveTireParams().Fy0") === 5250, "defaults intact (anchor 5250)");
