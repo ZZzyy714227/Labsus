@@ -690,8 +690,9 @@ function chassisPayload(){
   const kwCurve=sw=>(sw&&sw.rows&&sw.rows.length>=2)
     ?{travel:sw.rows.map(q=>q.tr),kw:sw.rows.map(q=>q.kw)}:undefined;
   /* G29 轮胎工坊：自定义激活时注入 MF 参数与胎压（读 SIM.userTire，LS 已含
-     胎压修正）；未激活时 undefined——JSON.stringify 丢弃 undefined 键，
-     payload 与未自定义时逐字节一致（回归安全） */
+     胎压修正，p 为前轴胎压单值）；未激活时 undefined——JSON.stringify 丢弃
+     undefined 键，payload 与未自定义时逐字节一致（回归安全）。vehicle 轴的
+     tire_rim_w/tire_et 无条件注入，同样依赖"预设态无此键→undefined→JSON 丢弃" */
   const ut = (typeof SIM !== "undefined" && SIM.userTire) ? SIM.userTire : null;
   return {
     vehicle:{
