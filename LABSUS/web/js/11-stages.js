@@ -733,6 +733,10 @@ class VehicleDynamics15DOF {
          动态扭矩矢量（按横摆/侧偏目标解算前后左右分配）待后续波次接入。 */
       _pd.tvBias = ctrl.tvBias;
       _pd.tcsRear = (this._tcsEstimate !== undefined) ? this._tcsEstimate : 1;   // I-3：一帧滞后（上一子步末尾算出）
+      /* G31-P10-1：差速器轮端分配所需的各轮垂直载荷——取 this.telemetry.Fz（上一子步轮循环末写入），
+         step() 在本轮循环【之前】调用 → 天然一子步滞后（与 tcsRear 能量通道同风格）。缺省/未加载
+         时为静态设计载荷；open 差速器不读 fz（50/50），仅 locked 按载荷分配、lsd/awd_center 不受影响。 */
+      _pd.wheelLoads = this.telemetry.Fz;
       _pw.FL = st.omega.FL; _pw.FR = st.omega.FR; _pw.RL = st.omega.RL; _pw.RR = st.omega.RR;
       const ptOut = (typeof POWERTRAIN !== "undefined" && POWERTRAIN.spec) ?
         POWERTRAIN.step(dt, _pd, _pw) : null;
