@@ -53,6 +53,11 @@ const POWERTRAIN = {
     }
     for (const k of ["motorF", "motorR"]) if (sp[k]) {
       if (!(sp[k].peakTorqueNm > 0) || !(sp[k].peakPowerKw > 0) || !(sp[k].maxRpm > 0)) errs.push(k);
+      /* I-1：baseRpm 一致性校验——若提供则必须与 P/T 拐点匹配（±5%） */
+      if (sp[k].baseRpm !== undefined && sp[k].peakTorqueNm > 0 && sp[k].peakPowerKw > 0) {
+        const knee = 30 * sp[k].peakPowerKw * 1000 / (Math.PI * sp[k].peakTorqueNm);
+        if (Math.abs(sp[k].baseRpm - knee) / sp[k].baseRpm >= 0.05) errs.push(`${k}.baseRpm(inconsistent with P/T)`);
+      }
     }
     if (sp.battery) {
       if (!(sp.battery.capacityKwh > 0)) errs.push("battery.capacityKwh");
@@ -94,35 +99,39 @@ const POWERTRAIN = {
      断油（rpm>fuelCut）后驱动=0 但摩擦保留 → 负扭矩=发动机制动。
      摩擦随油门减小而占比升高（泵气损失在节气门关闭时最大）：
        fric_eff = fric × (0.35 + 0.65×(1−c_eff))
-     断油时节气门视为全关（c_eff=0）→ 满泵气损失，与“节气门关闭时最大”一致。 */
+     M-3：0.35 = WOT 机械摩擦占比经验值；0.65 = 泵气损失占比，可后续替换为 MAP 模型。
+     断油时节气门视为全关（c_eff=0）→ 满泵气损失，与"节气门关闭时最大"一致。 */
   iceTorque(rpm, cmd) {
     const ice = this.spec ? this.spec.ice : null;
     if (!ice) return 0;
     const c = Math.max(0, Math.min(1, cmd));
-    const T_map = this.mapLookup(ice.map, rpm);
+    const tMap = this.mapLookup(ice.map, rpm);
     const fric = (ice.fricA || 0) + (ice.fricB || 0) * rpm + (ice.fricC || 0) * rpm * rpm;
     const cut = rpm > (ice.fuelCutRpm !== undefined ? ice.fuelCutRpm : 1e9);
-    const drive = cut ? 0 : T_map * c;
+    const drive = cut ? 0 : tMap * c;
     const c_eff = cut ? 0 : c;
     return drive - fric * (0.35 + 0.65 * (1 - c_eff));
   },
   /* Motor 扭矩：恒扭矩区(rpm<base)→恒功率区(T=P/ω)。
      cmd<0 = 回收：受 regenMaxKw 与 SOC 双重限制。
-     SOC 降额：放电 soc<0.2 线性降额至 0（soc=0.05 截止）；回收 soc>0.95 线性降额。 */
-  motorTorque(ms, rpm, cmd, soc) {
-    if (!ms) return 0;
-    const w = Math.max(1, rpm * Math.PI / 30);
-    const Tp = ms.peakPowerKw * 1000 / w;
-    const cap = Math.min(ms.peakTorqueNm, Tp);
+     SOC 降额：放电 soc<0.2 线性降额至 0（soc=0.05 截止）；回收 soc>0.95 线性降额。
+     M-2：支持负 rpm（反转）——ω 取绝对值，扭矩乘 sgn(rpm)。 */
+  motorTorque(motor, rpm, cmd, soc) {
+    /* I-2：NaN 防护——缺少有效 peakTorqueNm/peakPowerKw 时直接返回 0 */
+    if (!motor || !(motor.peakTorqueNm > 0) || !(motor.peakPowerKw > 0)) return 0;
+    const wAbs = Math.max(1, Math.abs(rpm) * Math.PI / 30);
+    const sgn = (rpm < 0) ? -1 : 1;
+    const Tp = motor.peakPowerKw * 1000 / wAbs;
+    const cap = Math.min(motor.peakTorqueNm, Tp);
     if (cmd >= 0) {
       let derate = 1;
       if (soc !== undefined && soc < 0.2) derate = Math.max(0, (soc - 0.05) / 0.15);
-      return cap * Math.min(1, cmd) * derate;
+      return cap * Math.min(1, cmd) * derate * sgn;
     }
-    const Rcap = Math.min(cap, (ms.regenMaxKw !== undefined ? ms.regenMaxKw : ms.peakPowerKw) * 1000 / w);
+    const Rcap = Math.min(cap, (motor.regenMaxKw !== undefined ? motor.regenMaxKw : motor.peakPowerKw) * 1000 / wAbs);
     let derate = 1;
     if (soc !== undefined && soc > 0.95) derate = Math.max(0, (1 - soc) / 0.05);
-    return -Rcap * Math.min(1, -cmd) * derate;
+    return -Rcap * Math.min(1, -cmd) * derate * sgn;
   }
 };
 if (typeof window !== "undefined") window.POWERTRAIN = POWERTRAIN;

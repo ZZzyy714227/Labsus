@@ -183,9 +183,59 @@ assert(Math.abs(T(`POWERTRAIN.motorTorque(${JSON.stringify(mSpec)}, 8000, 1.0, 0
 // 回收：cmd=-1 → 负扭矩，受 regenMaxKw 限制
 const regCap = 100000 / (4000 * Math.PI / 30);
 assert(Math.abs(T(`POWERTRAIN.motorTorque(${JSON.stringify(mSpec)}, 4000, -1.0, 0.5)`) + regCap) < 1e-6, "regen capped by regenMaxKw");
-// SOC 降额：soc=0.06 放电降额；soc=0.99 回收降额
-assert(T(`POWERTRAIN.motorTorque(${JSON.stringify(mSpec)}, 2000, 1.0, 0.06)`) < 300 * 0.5, "low SOC derates discharge");
-assert(Math.abs(T(`POWERTRAIN.motorTorque(${JSON.stringify(mSpec)}, 4000, -1.0, 0.99)`) ) < regCap * 0.5, "high SOC derates regen");
+// I-3 SOC 降额精确等式断言：soc=0.06 放电 = 300×(0.06−0.05)/0.15 = 20
+assert(Math.abs(T(`POWERTRAIN.motorTorque(${JSON.stringify(mSpec)}, 2000, 1.0, 0.06)`) - 20) < 1e-6, "I-3 soc=0.06 discharge exact = 20");
+// I-3：soc=0.99 回收 = −regCap×(1−0.99)/0.05 = −regCap×0.2
+const regCapExact = Math.min(Math.min(mSpec.peakTorqueNm, mSpec.peakPowerKw*1000/(4000*Math.PI/30)), mSpec.regenMaxKw*1000/(4000*Math.PI/30));
+assert(Math.abs(T(`POWERTRAIN.motorTorque(${JSON.stringify(mSpec)}, 4000, -1.0, 0.99)`) + regCapExact*0.2) < 1e-6, "I-3 soc=0.99 regen exact = -regCap*0.2");
+
+/* ═══ 2b. 审查修复 G31-P2 ═══ */
+console.log("=== 2b. G31-P2 Review Fixes ===");
+// I-1 baseRpm 一致性校验（motor 段）
+const mBad = { peakTorqueNm: 300, peakPowerKw: 150, baseRpm: 4000, maxRpm: 12000 };
+const mGood = { peakTorqueNm: 300, peakPowerKw: 150, baseRpm: 4775, maxRpm: 12000 };
+assert(T(`POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',ice:null,motorF:${JSON.stringify(mBad)},motorR:null})).ok`) === false, "I-1 baseRpm=4000 inconsistent → rejected");
+assert(T(`POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',ice:null,motorF:${JSON.stringify(mBad)},motorR:null})).errors.join(',')`).includes("motorF.baseRpm(inconsistent with P/T)"), "I-1 baseRpm error string");
+assert(T(`POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',ice:null,motorF:${JSON.stringify(mGood)},motorR:null})).ok`) === true, "I-1 baseRpm=4775 consistent → accepted");
+// 无 baseRpm 不校验
+const mNoBase = { peakTorqueNm: 300, peakPowerKw: 150, maxRpm: 12000 };
+assert(T(`POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',ice:null,motorF:${JSON.stringify(mNoBase)},motorR:null})).ok`) === true, "I-1 no baseRpm → skip check");
+
+// I-2 motorTorque NaN 防护
+assert(T(`POWERTRAIN.motorTorque(null, 4000, 1, 0.8)`) === 0, "I-2 motorTorque(null) === 0");
+assert(T(`POWERTRAIN.motorTorque({}, 4000, 1, 0.8)`) === 0, "I-2 motorTorque({}) === 0");
+assert(T(`POWERTRAIN.motorTorque({peakTorqueNm:0,peakPowerKw:150,maxRpm:12000}, 4000, 1, 0.8)`) === 0, "I-2 motorTorque(peakTorque=0) === 0");
+assert(T(`POWERTRAIN.motorTorque({peakTorqueNm:300,peakPowerKw:0,maxRpm:12000}, 4000, 1, 0.8)`) === 0, "I-2 motorTorque(peakPower=0) === 0");
+
+// M-2 负 rpm 符号
+const mNeg = { peakTorqueNm: 300, peakPowerKw: 150, maxRpm: 12000, regenMaxKw: 100 };
+const wNeg = Math.abs(-4000) * Math.PI / 30;
+const expNeg = -Math.min(300, 150000 / wNeg);
+assert(Math.abs(T(`POWERTRAIN.motorTorque(${JSON.stringify(mNeg)}, -4000, 1.0, 0.8)`) - expNeg) < 1e-6, "M-2 negative rpm → negative torque (reverse drive)");
+assert(Math.abs(T(`POWERTRAIN.motorTorque(${JSON.stringify(mNeg)}, -4000, -1.0, 0.8)`) - Math.min(Math.min(300, 150000/wNeg), 100000/wNeg)) < 1e-6, "M-2 negative rpm regen → positive torque");
+
+// M-4 边界断言
+// motorTorque soc=0.05 → derate=0 → 0
+assert(Math.abs(T(`POWERTRAIN.motorTorque(${JSON.stringify(mSpec)}, 2000, 1.0, 0.05)`)) < 1e-9, "M-4 soc=0.05 discharge → 0");
+// motorTorque soc=0.2 → full (condition is soc<0.2, 0.2 not <0.2)
+assert(Math.abs(T(`POWERTRAIN.motorTorque(${JSON.stringify(mSpec)}, 2000, 1.0, 0.2)`) - 300) < 1e-6, "M-4 soc=0.2 discharge → full 300");
+// motorTorque soc=0.95 regen → full (condition is soc>0.95, 0.95 not >0.95)
+const regCap95 = Math.min(Math.min(mSpec.peakTorqueNm, mSpec.peakPowerKw*1000/(4000*Math.PI/30)), mSpec.regenMaxKw*1000/(4000*Math.PI/30));
+assert(Math.abs(T(`POWERTRAIN.motorTorque(${JSON.stringify(mSpec)}, 4000, -1.0, 0.95)`) + regCap95) < 1e-6, "M-4 soc=0.95 regen → full");
+// motorTorque soc=1.0 regen → derate=0 → 0
+assert(Math.abs(T(`POWERTRAIN.motorTorque(${JSON.stringify(mSpec)}, 4000, -1.0, 1.0)`)) < 1e-9, "M-4 soc=1.0 regen → 0");
+// iceTorque spec.ice=null → 0
+T("POWERTRAIN.setSpec(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',ice:null,motorF:{peakTorqueNm:300,peakPowerKw:150,maxRpm:16000}}));");
+assert(T("POWERTRAIN.iceTorque(3000, 1.0)") === 0, "M-4 iceTorque with spec.ice=null → 0");
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+// iceTorque cmd=0, fric=0 → 0
+assert(Math.abs(T("POWERTRAIN.iceTorque(3000, 0.0)")) < 1e-9, "M-4 iceTorque cmd=0 fric=0 → 0");
+// fuelCutRpm undefined → 不断油（高 rpm 仍输出 map 值）
+const noCutSpec = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()"))); delete noCutSpec.ice.fuelCutRpm;
+T(`POWERTRAIN.setSpec(${JSON.stringify(noCutSpec)});`);
+assert(Math.abs(T("POWERTRAIN.iceTorque(10000, 1.0)") - 1200) < 1e-9, "M-4 fuelCutRpm undefined → no cut at high rpm");
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+
 // 恢复默认
 T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
 
