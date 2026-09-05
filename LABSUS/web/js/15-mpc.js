@@ -36,7 +36,11 @@ const MPCModel = {
       mu: 1.35, g: 9.81,
       Cf: 95000, Cr: 110000,          // N/rad（前/后轴合成侧偏刚度，真实量级 15~25kN/rad 按轴)
       axMax: 8.5, brkMax: 12.0,        // m/s²
-      N: 30, dt: 0.05,                 // 时域 1.5s
+      N: 40, dt: 0.1,                  // 时域 4s ≈ 200m@50m/s——必须覆盖制动距离
+      // （旧 N=30×0.05=1.5s≈75m 短于 T1 制动距离 ~95m，MPC 看不到弯 → 晚刹车冲出）
+      brkEnv: 11.0,                    // 制动包络减速度（≈0.85·μg）
+      vScale: 0.85,                    // 弯速安全系数：v_max 按 0.85·μg 算，但真车含载荷
+      // 转移/轮胎载荷敏感只能 ~1.0g——diag 实测每弯 α 20~28° 滑过去的根因
       weights: { q_ey: 8, q_epsi: 1.5, q_v: 0.6, r_delta: 0.02, r_ax: 0.01, r_ddelta: 0.0005, q_soft: 40 }
     };
   },
@@ -98,10 +102,10 @@ const MPCModel = {
 
   /* CEM 求解：返回 { W, J }。Wprev 热启动（平移），含其自身候选 → 代价单调不升 */
   solve(x0, Wprev, ref, p) {
-    const N = ref.length, K = 24, ITERS = 1, ELITE = 8;
+    const N = ref.length, K = 32, ITERS = 1, ELITE = 10;
     const rnd = () => (Math.random() * 2 - 1);
     let mu = Wprev.map(w => w.slice());
-    let sig = Wprev.map(() => [0.05, 1.0]);
+    let sig = Wprev.map(() => [0.02, 0.8]);
     let bestW = null, bestJ = Infinity;
 
     for (let it = 0; it < ITERS; it++) {
@@ -229,9 +233,9 @@ class UniversalAutoPilotMPC {
   drive(state, dt) {
     if (!this.path || !this.active) return { steer: 0, throttle: 0, brake: 0, target: null };
 
-    // G30 性能：隔帧求解（控制保持 2 帧 = 8ms，真实 ECU 量级），偶发帧复用上帧控制
+    // G30 性能：每帧求解（旧隔帧保持 8ms 在高速下与植物滞后叠加引发 2-3Hz 摆振）
     this._f = (this._f || 0) + 1;
-    const reSolve = (this._f % 2 === 1) || !this._lastCtrl;
+    const reSolve = true;
     if (!reSolve) {
       const c = this._lastCtrl;
       const tgt = this.path.getLookahead(
@@ -250,22 +254,39 @@ class UniversalAutoPilotMPC {
     if (!this._prm) this._prm = MPCModel.params(this.Scfg || {});
     const p = this._prm;
 
-    // ── 参考采样（时域：变步长 = u·dt，至少 1.5m）──
+    // ── 参考采样（一致时域）：按热启动预测速度积分弧长逐点采样。
+    //   旧实现 dsStep = max(1.5, u·dt) 的下限在低速时把参考线拉到车实际行程的
+    //   数倍之外（u=5 时模型 30 步只走 7.5m，参考却采到 45m 外）——远处弯角的
+    //   低 v_max 会让 MPC 主动爬行失速（calib 实测 12s 内 u 卡在 ~6m/s 的根因）。
     const N = p.N;
-    const dsStep = Math.max(1.5, u * p.dt);
-    const ref = this.path.samplePath(this._s, N, dsStep).map((rp, k) => {
-      const cid = rp.cornerId;
-      const margin = (cid >= 0 && this.cornerMargins[cid] !== undefined) ? this.cornerMargins[cid] : 1.0;
-      // G30 滑移护栏：发生侧滑的弯不再被 margin 推到更高目标速（endLap 冻结/回退）
-      const slid = this.cornerSlide[cid] !== undefined && this.cornerSlide[cid] > 0;
-      let uRef = rp.v_max * (slid ? Math.min(margin, 0.88) : margin);
-      return {
-        u_ref: uRef,
-        kappa: (rp.curvature || 0),        // 模型与路径同约定：正 = 左转（ISO r 正）
-        bnd: (this.path.hw_m || 4.9) + (this.path.kerb_m || 1.35) - 0.5,
-        kIdx: k
-      };
-    });
+    const ref = [];
+    {
+      let sAcc = this._s;
+      let uPred = u;
+      for (let k = 0; k < N; k++) {
+        sAcc += Math.max(0.5, uPred) * p.dt;
+        const rp = this.path.samplePath(sAcc, 1, 1)[0];
+        const cid = rp.cornerId;
+        const margin = (cid >= 0 && this.cornerMargins[cid] !== undefined) ? this.cornerMargins[cid] : 1.0;
+        // G30 滑移护栏：发生侧滑的弯不再被 margin 推到更高目标速（endLap 冻结/回退）
+        const slid = this.cornerSlide[cid] !== undefined && this.cornerSlide[cid] > 0;
+        ref.push({
+          u_ref: rp.v_max * (slid ? Math.min(margin, 0.88) : margin) * p.vScale,
+          kappa: (rp.curvature || 0),        // 模型与路径同约定：正 = 左转（ISO r 正）
+          bnd: (this.path.hw_m || 4.9) + (this.path.kerb_m || 1.35) - 0.5,
+          s: sAcc,
+          kIdx: k
+        });
+        uPred = MPCModel.clamp(uPred + ((this._W && this._W[k]) ? this._W[k][1] : 0) * p.dt, 1, 60);
+      }
+      // 制动距离反向包络：u_ref[k] = min(u_ref[k], sqrt(u_ref[k+1]² + 2·a_brk·Δs))
+      // ——让 MPC 在制动点就开始减速，而不是等弯进入时域
+      for (let k = N - 2; k >= 0; k--) {
+        const ds = Math.max(0, ref[k + 1].s - ref[k].s);
+        const vCap = Math.sqrt(Math.max(0, ref[k + 1].u_ref * ref[k + 1].u_ref + 2 * p.brkEnv * ds));
+        if (vCap < ref[k].u_ref) ref[k].u_ref = vCap;
+      }
+    }
 
     // ── CEM 求解 ──
     // 误差态注入：符号由 _errSign 校准（模型 ISO 系 vs 引擎约定的跨系映射，
@@ -276,7 +297,30 @@ class UniversalAutoPilotMPC {
     let e_psi0 = (target ? es.epsi * (state.psi - target.targetHeading) : 0);
     while (e_psi0 > Math.PI) e_psi0 -= 2 * Math.PI;
     while (e_psi0 < -Math.PI) e_psi0 += 2 * Math.PI;
-    const sol = MPCModel.solve([u, state.v || 0, state.r || 0, e_y0, e_psi0], this._W, ref, p);
+
+    // ── 解析热启动（CEM 只做精修，不做发现）──
+    // 纯采样搜索在 5 维问题上发现能力不足（探针实测：e_y→δ 几乎无响应、
+    // 纵向因横向失败主动降速失速）。横向用 Stanley 型前馈+反馈（符号经单步
+    // 探针验证：e_y>0/e_ψ>0 → δ<0；κ>0 左弯 → δ>0），纵向用速度误差比例。
+    const seed = [];
+    {
+      let ey = e_y0, epsi = e_psi0, uu2 = u;
+      // G30 整定：增益随速度调度（高速降权威，防延迟诱导 PIO——起步直道 u≈28 摆振）
+      const gSched = Math.min(1.0, 20 / Math.max(8, u));
+      const K_E = 0.35 * gSched, K_PSI = 0.9 * gSched;
+      for (let k = 0; k < N; k++) {
+        const dff = Math.atan(this.wb * (ref[k].kappa || 0));
+        const dLat = -K_E * ey - K_PSI * epsi;
+        const dSeed = MPCModel.clamp(dff + dLat, -0.15, 0.15);
+        const aSeed = MPCModel.clamp((ref[k].u_ref - uu2) * 1.5, -p.brkMax, p.axMax);
+        seed.push([dSeed, aSeed]);
+        // 沿时域传播误差（运动学自行车近似）
+        ey += (uu2 * Math.sin(epsi) + (state.v || 0)) * p.dt;
+        epsi += (uu2 * dSeed / this.wb - uu2 * (ref[k].kappa || 0)) * p.dt;
+        uu2 = MPCModel.clamp(uu2 + aSeed * p.dt, 1, 60);
+      }
+    }
+    const sol = MPCModel.solve([u, state.v || 0, state.r || 0, e_y0, e_psi0], seed, ref, p);
     this._W = sol.W.map(w => w.slice());
     // 热启动平移（下一帧从 t=1 起步，尾部补常值）
     this._W.shift();
@@ -297,10 +341,12 @@ class UniversalAutoPilotMPC {
       target_throttle = Math.max(0, target_throttle - (v_lat - 0.40) * 2.2);
     }
 
-    // ── 转向：模型 δ → 引擎 steer（反号）+ 速率限制 ──
+    // ── 转向：模型 δ → 引擎 steer（反号）+ 低通 + 速率限制（防 CEM 抖动与 PIO）──
     let steerDeg = -deltaM * (180 / Math.PI);
     steerDeg = Math.max(-28, Math.min(28, steerDeg));
-    const max_steer_rate = 140.0;
+    const steer_alpha = Math.min(1.0, dt / 0.06);
+    steerDeg = this.last_steer + (steerDeg - this.last_steer) * steer_alpha;
+    const max_steer_rate = 100.0;   // deg/s（Stanley 用 140，MPC 权威更大需更紧）
     const d_steer = Math.max(-max_steer_rate * dt, Math.min(max_steer_rate * dt, steerDeg - this.last_steer));
     const ctrl_steer = this.last_steer + d_steer;
     this.last_steer = ctrl_steer;
@@ -338,6 +384,9 @@ class UniversalAutoPilotMPC {
     const qsD = (this.Scfg && this.Scfg.qs) || {};
     const drsVMin = (typeof qsD.drsVms === 'number' && isFinite(qsD.drsVms)) ? qsD.drsVms : 40.0;
     const ctrl_drs = !!(target && target.isDRS && u > drsVMin);
+
+    // G30 修复：踏板平滑状态必须回写（此前丢失导致每帧从 0 起步，thr 恒为单步平滑值 0.09）
+    this.last_throttle = ctrl_throttle;
 
     const out = { steer: ctrl_steer, throttle: ctrl_throttle, brake: ctrl_brake, drs: ctrl_drs, target: target };
     this._lastCtrl = { steer: ctrl_steer, throttle: ctrl_throttle, brake: ctrl_brake, drs: ctrl_drs };

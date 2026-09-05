@@ -1,8 +1,8 @@
-/* G30 符号校准：4 种 (e_y, e_ψ) 符号组合各跑 12s 闭环，报告最大 |横向偏差|
-   与是否自旋——取偏差最小且无自旋的组合。 */
+﻿/* G30 绗﹀彿鏍″噯锛? 绉?(e_y, e_蠄) 绗﹀彿缁勫悎鍚勮窇 12s 闂幆锛屾姤鍛婃渶澶?|妯悜鍋忓樊|
+   涓庢槸鍚﹁嚜鏃嬧€斺€斿彇鍋忓樊鏈€灏忎笖鏃犺嚜鏃嬬殑缁勫悎銆?*/
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
-const lapSrc = fs.readFileSync(path.join(__dirname, '..', 'web', 'test', 'test_lap_15dof.js'), 'utf8');
+const lapSrc = fs.readFileSync(path.join(__dirname, 'test_lap_15dof.js'), 'utf8');
 const lines = lapSrc.split(/\r?\n/);
 const keep = []; let g = null;
 for (const ln of lines) {
@@ -14,7 +14,7 @@ for (const ln of lines) {
 const loadReal = new Function('vm', 'fs', 'path', keep.join('\n') + '\nreturn loadReal;')(vm, fs, path);
 
 function runCombo(eyS, epsiS) {
-  const R = loadReal(path.join(__dirname, '..', 'web'));
+  const R = loadReal(path.join(__dirname, '..'));
   const ctx = R.ctx;
   const mkSweep = new Function('return function makeSweep(k){const rows=[];for(const tr of [-55,-30,-10,0,10,30,60])rows.push({tr,cam:-(3.20+0.0225*tr*k)+0.000040*tr*tr,toe:-0.15+0.0028*tr*k,mr:0.75+0.0004*tr,kw:67500,rcH:52+0.06*tr});return {rows,min:-55,max:60};}')();
   const makeS = new Function('return function makeS(){return { mTotal: 1250, mSprung: 1100, wb: 2600, hcg: 290, vehicleType: "gt3", limF: [-55, 60], limR: [-55, 60], qs: { gx: 0.0, gy: 1.8, speed: 220, aeroF: 3600, aeroBias: 0.45 }, front: { arch: "direct", hp: { WC: [772, 0, 300] }, tire: { R: 300, W: 265 }, cam0: -3.20, toe0: -0.15, mS: 320, mU: 45, kS: 120, kT: 260, cB: 9, cR: 14, mr: 0.75, arb: { d: 28 } }, rear: { arch: "direct", hp: { WC: [740, 0, 300] }, tire: { R: 310, W: 285 }, cam0: -2.20, toe0: 0.05, mS: 300, mU: 48, kS: 130, kT: 280, cB: 9, cR: 15, mr: 0.78, arb: { d: 24 } } };}')();
@@ -62,6 +62,7 @@ function runCombo(eyS, epsiS) {
 const combos = [[-1, 1], [1, 1], [-1, -1], [1, -1]];
 for (const [ey, epsi] of combos) {
   const r = runCombo(ey, epsi);
-  console.log(`e_y=${ey >= 0 ? '+' : ''}${ey} e_ψ=${epsi >= 0 ? '+' : ''}${epsi}: ` +
+  console.log(`e_y=${ey >= 0 ? '+' : ''}${ey} e_蠄=${epsi >= 0 ? '+' : ''}${epsi}: ` +
     `maxLat=${r.maxLat.toFixed(2)}m spun=${r.spun} u_end=${r.uEnd.toFixed(1)} s_end=${r.sEnd.toFixed(0)}m`);
 }
+

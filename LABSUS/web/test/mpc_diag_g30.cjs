@@ -1,17 +1,17 @@
-/* G29 诊断：实证核验 test_lap_15dof 两项先验 FAIL 的根因
-   ——峰值侧偏角（注释称 T12 入弯、学习 margin 0.92+ 超包络）
-   ——峰值纵向滑移率（注释称 T14 trail-brake 内侧前轮卸荷抱死）
-   方法：复用 test_lap_15dof 的 loadReal/runLaps 骨架，捕获越限事件上下文 */
+﻿/* G29 璇婃柇锛氬疄璇佹牳楠?test_lap_15dof 涓ら」鍏堥獙 FAIL 鐨勬牴鍥?
+   鈥斺€斿嘲鍊间晶鍋忚锛堟敞閲婄О T12 鍏ュ集銆佸涔?margin 0.92+ 瓒呭寘缁滐級
+   鈥斺€斿嘲鍊肩旱鍚戞粦绉荤巼锛堟敞閲婄О T14 trail-brake 鍐呬晶鍓嶈疆鍗歌嵎鎶辨锛?
+   鏂规硶锛氬鐢?test_lap_15dof 鐨?loadReal/runLaps 楠ㄦ灦锛屾崟鑾疯秺闄愪簨浠朵笂涓嬫枃 */
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
-const webDir = path.join(__dirname, '..', 'web');
-const lap = require(path.join(__dirname, '..', 'web', 'test', 'test_lap_15dof.js'));
+const webDir = path.join(__dirname, '..');
+const lap = require(path.join(__dirname, 'test_lap_15dof.js'));
 
-// 复用其内部函数：直接 require 拿不到（未导出），故重抄 loadReal 骨架
-/* 直接内联 test_lap_15dof 的 makeS/makeSweep/loadReal（避免括号配平提取的字符串陷阱） */
+// 澶嶇敤鍏跺唴閮ㄥ嚱鏁帮細鐩存帴 require 鎷夸笉鍒帮紙鏈鍑猴級锛屾晠閲嶆妱 loadReal 楠ㄦ灦
+/* 鐩存帴鍐呰仈 test_lap_15dof 鐨?makeS/makeSweep/loadReal锛堥伩鍏嶆嫭鍙烽厤骞虫彁鍙栫殑瀛楃涓查櫡闃憋級 */
 const loaderSrc = [];
 {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'web', 'test', 'test_lap_15dof.js'), 'utf8');
+  const src = fs.readFileSync(path.join(__dirname, 'test_lap_15dof.js'), 'utf8');
   const lines = src.split(/\r?\n/);
   let grabbing = null;
   for (const ln of lines) {
@@ -20,7 +20,7 @@ const loaderSrc = [];
       if (m) { grabbing = m[1]; loaderSrc.push(ln); }
     } else {
       loaderSrc.push(ln);
-      if (ln === "}") grabbing = null;   // 三个函数均以顶格 "}" 结束
+      if (ln === "}") grabbing = null;   // 涓変釜鍑芥暟鍧囦互椤舵牸 "}" 缁撴潫
     }
   }
 }
@@ -43,7 +43,7 @@ Object.assign(eng.state, {
 });
 const pilot = new R.ctx.window.UniversalAutoPilotMPC(S);
 pilot.setPath(P); pilot.active = true;
-pilot.eng = eng;   // G30：与产品/test 同口径
+pilot.eng = eng;   // G30锛氫笌浜у搧/test 鍚屽彛寰?
 if (pilot.initLapLearning) pilot.initLapLearning(P.cornerCount || 0);
 P._hintCtrl = 0; P._hintRoad = 0;
 
@@ -53,7 +53,7 @@ let t = 0, ci = 0, lastS = 0, lapNo = 0;
 const events = [];
 let lapMarks = [];
 const TH_SLIP = 14 * Math.PI / 180, TH_KAPPA = 0.45;
-// 按 弯×圈 聚合：峰值 α / κ / 触发时的 u / thr / brk
+// 鎸?寮楀湀 鑱氬悎锛氬嘲鍊?伪 / 魏 / 瑙﹀彂鏃剁殑 u / thr / brk
 const agg = {};
 function aggRec(cid, lap, tel, st) {
   const key = cid + '_L' + lap;
@@ -64,7 +64,7 @@ function aggRec(cid, lap, tel, st) {
     if (ka > a.kMax) { a.kMax = ka; a.uAtK = st.u; }
   }
 }
-// 事件窗口内的持续记录（前后 2s 采样）
+// 浜嬩欢绐楀彛鍐呯殑鎸佺画璁板綍锛堝墠鍚?2s 閲囨牱锛?
 const windows = [];
 let curWin = null;
 
@@ -93,13 +93,13 @@ for (let step = 0; step < 240 * 900; step++) {
   }
   const telNow = eng.telemetry;
   aggRec(p.cornerId, lapNo + 1, telNow, { u: s.u, throttle: ctrl.throttle, brake: ctrl.brake });
-  // 稠密时序：MPC 调试用，前 25s 每 0.5s 记录
-  if (t <= 25 && step % 120 === 0) {
+  // 绋犲瘑鏃跺簭锛歁PC 璋冭瘯鐢紝鍓?25s 姣?0.5s 璁板綍
+  if (t <= 45 && step % 60 === 0) {
     const aCG = S.wb * 0.46 / 1000;
     const tg2 = P.getLookahead(s.X - aCG * Math.sin(s.psi), s.Y + aCG * Math.cos(s.psi), s.u);
-    console.log(`M t=${t.toFixed(1)} cid=${p.cornerId} u=${s.u.toFixed(1)} v=${(s.v||0).toFixed(2)} r=${((s.r||0)*R2D).toFixed(1)} psi=${(s.psi*R2D).toFixed(1)} psiP=${(tg2.targetHeading*R2D).toFixed(1)} st=${ctrl.steer.toFixed(1)} brk=${ctrl.brake.toFixed(2)} thr=${ctrl.throttle.toFixed(2)} eL=${(pilot.last_line_error||0).toFixed(2)} lat=${(((s.X-p.refX)*p.refNx+(s.Y-p.refY)*p.refNy)).toFixed(2)} cte=${(((s.X-p.x)*p.nx+(s.Y-p.y)*p.ny)).toFixed(2)} s=${(p.s||0).toFixed(0)}`);
+    console.log(`M t=${t.toFixed(1)} cid=${p.cornerId} u=${s.u.toFixed(1)} v=${(s.v||0).toFixed(2)} r=${((s.r||0)*R2D).toFixed(1)} psi=${(s.psi*R2D).toFixed(1)} psiP=${(tg2.targetHeading*R2D).toFixed(1)} st=${ctrl.steer.toFixed(1)} brk=${ctrl.brake.toFixed(2)} thr=${ctrl.throttle.toFixed(2)} eL=${(pilot.last_line_error||0).toFixed(2)} lat=${(((s.X-p.refX)*p.refNx+(s.Y-p.refY)*p.refNy)).toFixed(2)} cte=${(((s.X-p.x)*p.nx+(s.Y-p.y)*p.ny)).toFixed(2)} s=${(p.s||0).toFixed(0)} W0ax=${(pilot._W?pilot._W[0][1]:NaN).toFixed(2)} W0d=${(pilot._W?pilot._W[0][0]:NaN).toFixed(3)} uRef0=${(tg2.targetSpeed||0).toFixed(1)}`);
   }
-  // 越限检测（每个事件开一个窗口，间隔 >1s 才重开）
+  // 瓒婇檺妫€娴嬶紙姣忎釜浜嬩欢寮€涓€涓獥鍙ｏ紝闂撮殧 >1s 鎵嶉噸寮€锛?
   let evKind = null, evW = null, evVal = 0;
   for (const w of ['FL', 'FR', 'RL', 'RR']) {
     const al = Math.abs(eng.telemetry.alpha[w] || 0);
@@ -139,8 +139,8 @@ for (let step = 0; step < 240 * 900; step++) {
 }
 if (curWin) windows.push(curWin);
 
-console.log(`圈: ${lapMarks.map(m => `#${m.lap}@${m.t}s`).join(' ')} | 弯数: ${P.cornerCount}`);
-console.log('\n===== 按弯×圈聚合（aMax 单位 °，kMax 比值）=====');
+console.log(`鍦? ${lapMarks.map(m => `#${m.lap}@${m.t}s`).join(' ')} | 寮暟: ${P.cornerCount}`);
+console.log('\n===== 鎸夊集脳鍦堣仛鍚堬紙aMax 鍗曚綅 掳锛宬Max 姣斿€硷級=====');
 const keys = Object.keys(agg).sort((x, y) => {
   const [cx, lx] = x.split('_'), [cy, ly] = y.split('_');
   return (+lx - +ly) || (+cx - +cy);
@@ -148,17 +148,18 @@ const keys = Object.keys(agg).sort((x, y) => {
 for (const k of keys) {
   const a = agg[k];
   const flag = (a.aMax * R2D > 14 || a.kMax > 0.45) ? ' <<<' : '';
-  console.log(`${k}: α=${(a.aMax * R2D).toFixed(1)}°@u=${a.uAtA.toFixed(1)}(thr=${a.thrAtA.toFixed(2)},brk=${a.brkAtA.toFixed(2)}) κ=${a.kMax.toFixed(2)}@u=${a.uAtK.toFixed(1)}${flag}`);
+  console.log(`${k}: 伪=${(a.aMax * R2D).toFixed(1)}掳@u=${a.uAtA.toFixed(1)}(thr=${a.thrAtA.toFixed(2)},brk=${a.brkAtA.toFixed(2)}) 魏=${a.kMax.toFixed(2)}@u=${a.uAtK.toFixed(1)}${flag}`);
 }
 for (const w of windows) {
-  console.log(`\n===== ${w.kind} 事件 · 峰值 ${w.kind === 'SLIP' ? (w.peakVal * R2D).toFixed(1) + '°' : w.peakVal.toFixed(2)} · 轮 ${w.wheel} · 采样 ${w.samples.length} =====`);
-  // 打印窗口首、峰、尾的代表性样本（每 24 条取 1 + 峰值样本）
+  console.log(`\n===== ${w.kind} 浜嬩欢 路 宄板€?${w.kind === 'SLIP' ? (w.peakVal * R2D).toFixed(1) + '掳' : w.peakVal.toFixed(2)} 路 杞?${w.wheel} 路 閲囨牱 ${w.samples.length} =====`);
+  // 鎵撳嵃绐楀彛棣栥€佸嘲銆佸熬鐨勪唬琛ㄦ€ф牱鏈紙姣?24 鏉″彇 1 + 宄板€兼牱鏈級
   const ss = w.samples;
   const stride = Math.max(1, Math.floor(ss.length / 14));
   for (let i = 0; i < ss.length; i += stride) {
     const x = ss[i];
-    console.log(`t=${x.t} s=${x.s} cid=${x.cid} L${x.lap} u=${x.u} v=${x.v} r=${x.psi_dot}°/s st=${x.steer} brk=${x.brk} thr=${x.thr} Fz=${x.aFz} κ=${x.kappas} α=${x.alphas} ay=${x.ay} m=${x.margin}`);
+    console.log(`t=${x.t} s=${x.s} cid=${x.cid} L${x.lap} u=${x.u} v=${x.v} r=${x.psi_dot}掳/s st=${x.steer} brk=${x.brk} thr=${x.thr} Fz=${x.aFz} 魏=${x.kappas} 伪=${x.alphas} ay=${x.ay} m=${x.margin}`);
   }
   const last = ss[ss.length - 1];
-  console.log(`t=${last.t} s=${last.s} cid=${last.cid} L${last.lap} u=${last.u} st=${last.steer} brk=${last.brk} Fz=${last.aFz} κ=${last.kappas} α=${last.alphas} m=${last.margin}  [窗口尾]`);
+  console.log(`t=${last.t} s=${last.s} cid=${last.cid} L${last.lap} u=${last.u} st=${last.steer} brk=${last.brk} Fz=${last.aFz} 魏=${last.kappas} 伪=${last.alphas} m=${last.margin}  [绐楀彛灏綸`);
 }
+
