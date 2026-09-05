@@ -568,8 +568,13 @@ const POWERTRAIN = {
     if (!tWheel) {
       const wl = dm.wheelLoads || {};
       const df = sp.diff || { type: "open" };
-      const pf = this.distributeAxle(Tf, wo.FL || 0, wo.FR || 0, wl.FL || 0, wl.FR || 0, df);
-      const pr = this.distributeAxle(Tr, wo.RL || 0, wo.RR || 0, wl.RL || 0, wl.RR || 0, df);
+      /* 非通过扭矩轴强制 open：lsd/locked 的转移需有输入扭矩路径才物理成立。
+         tAxle=0 时若应用 lsd 会产生 ±X 自消力偶，且在 ωL≠ωR 下净功率 = X·Δω ≠ 0
+         （能量凭空产生）。判据：仅 |tAxle|>1e−12（有通过扭矩）的轴应用 diff。 */
+      const dfF = (Math.abs(Tf) > 1e-12) ? df : { type: "open" };
+      const dfR = (Math.abs(Tr) > 1e-12) ? df : { type: "open" };
+      const pf = this.distributeAxle(Tf, wo.FL || 0, wo.FR || 0, wl.FL || 0, wl.FR || 0, dfF);
+      const pr = this.distributeAxle(Tr, wo.RL || 0, wo.RR || 0, wl.RL || 0, wl.RR || 0, dfR);
       if (Math.abs(pf[0] + pf[1] - Tf) > 1e-12 || Math.abs(pr[0] + pr[1] - Tr) > 1e-12) {
         pf[0] = pf[1] = Tf / 2; pr[0] = pr[1] = Tr / 2;
       }

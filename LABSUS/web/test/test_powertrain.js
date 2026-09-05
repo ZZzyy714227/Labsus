@@ -1779,6 +1779,17 @@ T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
   const [f1, r1] = T("POWERTRAIN.distributeCenter(1000,28,32,0.4,{lockNm:300,slipRefRadS:8})");
   assert(f1 > 400 && Math.abs(f1 + r1 - 1000) < 1e-12, "9.11 distributeCenter 后轴快 → 前轴增且守恒");
 }
+// ── 9.13 零通过扭矩轴强制 open（无 lsd 自消力偶/无净功率凭空产生）──
+{
+  const s = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+  s.drive = "rwd"; s.splitFront = 0; s.diff = { type: "lsd", bias: 3, lockNm: 500, slipRefRadS: 8 };
+  T(`POWERTRAIN.setSpec(${JSON.stringify(s)}); POWERTRAIN.resetState();`);
+  // 前轴 tAxle=0 且无速差分量输入 → 即使轮速不同也不得产生 ±X 力偶
+  const o = T("POWERTRAIN.step(0.004,{throttle:1,brake:0},{FL:20,FR:35,RL:0,RR:10})");
+  assert(o.tFront === 0 && o.tWheel[0] === 0 && o.tWheel[1] === 0,
+    "9.13 前轴 tAxle=0（非通过扭矩轴）→ 强制 open，无 ±X 自消力偶");
+  // 能量守恒角：转移仅发生在有通过扭矩的轴上，和恒等轴扭矩已由 9.9 锁定
+}
 // ── 9.12 11-stages 接线源扫描：_pd.wheelLoads 传入 + 一子步滞后声明 ──
 assert(stSrc.indexOf("_pd.wheelLoads = this.telemetry.Fz") >= 0, "9.12 接线：_pd.wheelLoads = this.telemetry.Fz");
 assert(/一子步滞后/.test(stSrc), "9.12 接线：wheelLoads 一子步滞后注释");
