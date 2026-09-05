@@ -248,8 +248,10 @@ T("POWERTRAIN.requestShift(1);");
 assert(T("POWERTRAIN.state.shiftT") > 0 && T("POWERTRAIN.state.shiftDir") === 1, "shift requested");
 // 换挡进行中 advanceGearbox 返回 true（扭矩中断标记，供段5 组合器置零输出）
 assert(T("POWERTRAIN.advanceGearbox(0.004, 20)") === true, "advanceGearbox returns true during shift");
-// 推进 120ms → 完成换挡
-for (let i = 0; i < 31; i++) T("POWERTRAIN.advanceGearbox(0.004, 20)");
+// P3：cut 窗口长度 = shiftTimeMs/dt = 120/4 = 30 次 true（已消耗 1 次，继续计数）
+let cutCount = 1;
+while (T("POWERTRAIN.advanceGearbox(0.004, 20)") === true) cutCount++;
+assert(cutCount === 30, "P3 cut window length === shiftTimeMs/dt = 30 substeps");
 assert(T("POWERTRAIN.state.gearIdx") === 2, "gear advanced after shiftTime");
 assert(T("POWERTRAIN.state.shiftT") === 0 && T("POWERTRAIN.state.shiftDir") === 0, "shift state cleared");
 const wIce = 20 * 1.5 * 3.9;
@@ -315,7 +317,127 @@ assert(T("POWERTRAIN.state.shiftT") === 0, "single-speed gearbox never shifts");
 // 无 gearbox / 无 spec 时的防御返回（不抛异常）
 T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
 assert(T("POWERTRAIN.reflectedInertia()") === 0 && T("POWERTRAIN.advanceGearbox(0.004, 20)") === false, "legacy single-ratio gearbox: no inertia, no shift activity");
+// P3：真置 spec=null（T 直接赋值）后，四个方法必须安全返回 0/false，不抛异常
+T("POWERTRAIN.spec = null;");
+let nullThrew = null;
+try {
+  assert(T("POWERTRAIN.reflectedInertia()") === 0, "P3 spec=null: reflectedInertia === 0");
+  assert(T("POWERTRAIN.advanceGearbox(0.004, 20)") === false, "P3 spec=null: advanceGearbox === false");
+  T("POWERTRAIN.requestShift(1);");   // 无返回值，只需不抛
+  T("POWERTRAIN.autoShift(9000);");   // 无返回值，只需不抛
+  assert(true, "P3 spec=null: requestShift/autoShift 不抛异常");
+} catch (e) { nullThrew = e; }
+assert(nullThrew === null, "P3 spec=null: 四方法全部不抛异常");
 T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+
+// 恢复默认
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+
+/* ═══ 3b. G31-P3 Review Fixes ═══ */
+console.log("=== 3b. G31-P3 Review Fixes ===");
+
+// ── P3-Major: requestShift(dir) 定义域守卫（仅 +1/−1）──
+const gb6 = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+gb6.gearbox = { type: "manual", ratios: [3, 2, 1.5, 1.2, 1, 0.85], finalDrive: 3.9, shiftTimeMs: 120, eff: 0.97, autoUpFrac: 0.92, autoDownFrac: 0.55 };
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(gb6)})`).ok === true, "P3 gb6 spec valid");
+// dir=0 → 拒绝（避免 shiftDir=0 的“永久换挡中”死锁）
+T("POWERTRAIN.state.gearIdx = 1; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;");
+T("POWERTRAIN.requestShift(0);");
+assert(T("POWERTRAIN.state.shiftT") === 0 && T("POWERTRAIN.state.shiftDir") === 0, "P3 requestShift(0) → shiftT===0 且 shiftDir===0");
+// dir=2 → 拒绝（不允许从 gear1 直接跳到 gear3）
+T("POWERTRAIN.state.gearIdx = 1; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;");
+T("POWERTRAIN.requestShift(2);");
+assert(T("POWERTRAIN.state.shiftT") === 0 && T("POWERTRAIN.state.shiftDir") === 0, "P3 requestShift(2) from gear1 → 不允许跳两挡");
+// dir=-2 / NaN / undefined / null / "1" / 1.5 / true / {} → 全部拒绝
+const badLits = [["-2", "-2"], ["NaN", "NaN"], ["undefined", "undefined"], ["null", "null"], ["\"1\"", "\"1\""], ["1.5", "1.5"], ["true", "true"], ["{}", "{}"]];
+for (const [label, lit] of badLits) {
+  T("POWERTRAIN.state.gearIdx = 2; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;");
+  T(`POWERTRAIN.requestShift(${lit});`);
+  assert(T("POWERTRAIN.state.shiftT") === 0 && T("POWERTRAIN.state.shiftDir") === 0,
+    `P3 requestShift(${label}) rejected`);
+}
+// dir=+1/−1 仍正常接受（无回归）
+T("POWERTRAIN.state.gearIdx = 2; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0; POWERTRAIN.requestShift(1);");
+assert(T("POWERTRAIN.state.shiftT") > 0 && T("POWERTRAIN.state.shiftDir") === 1, "P3 requestShift(+1) accepted");
+T("POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0; POWERTRAIN.requestShift(-1);");
+assert(T("POWERTRAIN.state.shiftT") > 0 && T("POWERTRAIN.state.shiftDir") === -1, "P3 requestShift(-1) accepted");
+T("POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;");
+
+// ── P3-Moderate: autoShift 白名单语义 ──
+// type=undefined → 拒绝（白名单外）
+const tuSpec = JSON.parse(JSON.stringify(gb6)); delete tuSpec.gearbox.type;
+T(`POWERTRAIN.setSpec(${JSON.stringify(tuSpec)}); POWERTRAIN.state.gearIdx = 1; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;`);
+T("POWERTRAIN.autoShift(0.99 * 9000);");
+assert(T("POWERTRAIN.state.shiftT") === 0 && T("POWERTRAIN.state.shiftDir") === 0, "P3 autoShift type=undefined → no shift");
+// type="cvt" → 拒绝（未知类型不在白名单）
+const cvtSpec = JSON.parse(JSON.stringify(gb6)); cvtSpec.gearbox.type = "cvt";
+T(`POWERTRAIN.setSpec(${JSON.stringify(cvtSpec)}); POWERTRAIN.state.gearIdx = 1; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;`);
+T("POWERTRAIN.autoShift(0.99 * 9000);");
+assert(T("POWERTRAIN.state.shiftT") === 0, "P3 autoShift type=cvt → no shift (白名单外)");
+// type="AUTO" → 拒绝（大小写敏感，不在白名单）
+const ucSpec = JSON.parse(JSON.stringify(gb6)); ucSpec.gearbox.type = "AUTO";
+T(`POWERTRAIN.setSpec(${JSON.stringify(ucSpec)}); POWERTRAIN.state.gearIdx = 1; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;`);
+T("POWERTRAIN.autoShift(0.99 * 9000);");
+assert(T("POWERTRAIN.state.shiftT") === 0, "P3 autoShift type=AUTO → no shift (大小写敏感)");
+// type="dct" → 接受（白名单内）
+const dctSpec = JSON.parse(JSON.stringify(gb6)); dctSpec.gearbox.type = "dct";
+T(`POWERTRAIN.setSpec(${JSON.stringify(dctSpec)}); POWERTRAIN.state.gearIdx = 1; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;`);
+T("POWERTRAIN.autoShift(0.95 * 9000);");
+assert(T("POWERTRAIN.state.shiftDir") === 1 && T("POWERTRAIN.state.shiftT") > 0, "P3 autoShift type=dct → upshift");
+
+// ── P3-Minor: advanceGearbox dt 有限性守卫 ──
+T(`POWERTRAIN.setSpec(${JSON.stringify(gb6)}); POWERTRAIN.state.gearIdx = 1; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;`);
+T("POWERTRAIN.requestShift(1);");
+const shiftTBefore = T("POWERTRAIN.state.shiftT");
+assert(shiftTBefore > 0, "P3 dt guard: precondition shiftT>0");
+assert(T("POWERTRAIN.advanceGearbox(undefined, 20)") === false, "P3 advanceGearbox(undefined,20) → false");
+assert(T("POWERTRAIN.state.shiftT") === shiftTBefore && Number.isFinite(T("POWERTRAIN.state.shiftT")),
+  "P3 advanceGearbox(undefined) 不修改 shiftT（不 NaN）");
+assert(T("POWERTRAIN.advanceGearbox(NaN, 20)") === false, "P3 advanceGearbox(NaN,20) → false");
+assert(T("POWERTRAIN.state.shiftT") === shiftTBefore, "P3 advanceGearbox(NaN) 不修改 shiftT");
+assert(T("POWERTRAIN.advanceGearbox(Infinity, 20)") === false, "P3 advanceGearbox(Infinity,20) → false");
+assert(T("POWERTRAIN.state.shiftT") === shiftTBefore, "P3 advanceGearbox(Infinity) 不修改 shiftT");
+// 有限 dt 仍正常工作（无回归）
+T("POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0; POWERTRAIN.state.gearIdx = 1;");
+T("POWERTRAIN.requestShift(1);");
+assert(T("POWERTRAIN.advanceGearbox(0.004, 20)") === true, "P3 advanceGearbox(finite dt) still returns true during shift");
+T("POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;");
+
+// ── P3-Minor: EV 红线回退到 motorR/motorF.maxRpm ──
+// EV+auto：ice=null，motorR.maxRpm=16000 → rr 应按 16000 计算
+const evAuto = JSON.parse(JSON.stringify(gb6));
+evAuto.architecture = "ev"; evAuto.ice = null;
+evAuto.motorR = { peakTorqueNm: 400, peakPowerKw: 200, maxRpm: 16000 };
+evAuto.motorF = null;
+evAuto.gearbox.type = "auto";
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(evAuto)})`).ok === true, "P3 EV+auto spec valid");
+// 转速 15200 = 0.95×16000 → 应升挡
+T("POWERTRAIN.state.gearIdx = 1; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;");
+T("POWERTRAIN.autoShift(15200);");
+assert(T("POWERTRAIN.state.shiftDir") === 1, "P3 EV autoShift @15200/16000=0.95 → upshift (红线=motorR.maxRpm)");
+// 转速 14000 ≈ 0.875×16000 → 中间带，不换挡（若错误地用 9000，rr=1.55 会错误升挡）
+T("POWERTRAIN.state.gearIdx = 1; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;");
+T("POWERTRAIN.autoShift(14000);");
+assert(T("POWERTRAIN.state.shiftT") === 0 && T("POWERTRAIN.state.shiftDir") === 0, "P3 EV autoShift @14000/16000=0.875 → mid-band no shift");
+// 转速 8000 = 0.5×16000 → 低于 0.55，应降挡
+T("POWERTRAIN.state.gearIdx = 2; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;");
+T("POWERTRAIN.autoShift(8000);");
+assert(T("POWERTRAIN.state.shiftDir") === -1, "P3 EV autoShift @8000/16000=0.5 → downshift");
+// 仅 motorF 时（motorR=null）：回退到 motorF.maxRpm
+const evF = JSON.parse(JSON.stringify(evAuto));
+evF.motorR = null; evF.motorF = { peakTorqueNm: 300, peakPowerKw: 150, maxRpm: 12000 };
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(evF)})`).ok === true, "P3 EV motorF-only spec valid");
+T("POWERTRAIN.state.gearIdx = 1; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;");
+T("POWERTRAIN.autoShift(11400);");  // 0.95×12000
+assert(T("POWERTRAIN.state.shiftDir") === 1, "P3 EV motorF-only autoShift → 红线=motorF.maxRpm=12000");
+// ICE 优先：同时存在 ice.redlineRpm 与 motorR.maxRpm 时，红线仍取 ice.redlineRpm
+const hybAuto = JSON.parse(JSON.stringify(gb6));
+hybAuto.architecture = "p2"; hybAuto.gearbox.type = "auto";
+hybAuto.motorR = { peakTorqueNm: 200, peakPowerKw: 100, maxRpm: 20000 };  // 远大于 ice.redlineRpm=9000
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(hybAuto)})`).ok === true, "P3 p2+auto spec valid");
+T("POWERTRAIN.state.gearIdx = 1; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;");
+T("POWERTRAIN.autoShift(0.95 * 9000);");  // 8550：若按 ice.redline 算 rr=0.95 → 升挡
+assert(T("POWERTRAIN.state.shiftDir") === 1, "P3 hybrid autoShift 优先用 ice.redlineRpm");
 
 // 恢复默认
 T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");

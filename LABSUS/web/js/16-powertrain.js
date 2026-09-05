@@ -153,6 +153,8 @@ const POWERTRAIN = {
   advanceGearbox(dt, wheelOmegaAxle) {
     const sp = this.spec, st = this.state;
     if (!sp || !st || !sp.gearbox) return false;
+    /* M：dt 必须有限，否则 shiftT -= NaN 会把状态机推入 NaN 死锁 */
+    if (!Number.isFinite(dt)) return false;
     if (st.shiftT > 0) {
       st.shiftT -= dt * 1000;
       if (st.shiftT <= 0) {
@@ -167,19 +169,25 @@ const POWERTRAIN = {
   /* 换挡请求（dir=+1 升 / −1 降）。越界或正在换挡时忽略（幂等，无副作用）。 */
   requestShift(dir) {
     const sp = this.spec, st = this.state;
+    /* M：dir 定义域守卫——仅允许 +1/−1，其他值（0/2/NaN/字符串）一律拒绝，
+       避免 ni = gearIdx + 2 造成的跳挡与 shiftDir=0 的“永久换挡中”死锁。 */
+    if (dir !== 1 && dir !== -1) return;
     if (!sp || !st || !sp.gearbox || st.shiftT > 0) return;
     const ni = st.gearIdx + dir;
     if (ni < 0 || ni >= sp.gearbox.ratios.length) return;
     st.shiftDir = dir;
     st.shiftT = Math.max(1, sp.gearbox.shiftTimeMs || 1);
   },
-  /* 自动换挡策略（type=auto/dct）：rpm/redline 超 autoUpFrac 升、低于 autoDownFrac 降。
-     manual/single 不自动换挡（manual 由 requestShift 显式驱动）。 */
+  /* 自动换挡策略（白名单：仅 type=auto/dct）：rpm/redline 超 autoUpFrac 升、低于 autoDownFrac 降。
+     白名单语义：未知/未声明的 gearbox.type（undefined、"cvt"、"AUTO" 等）一律不自动换挡，
+     由 requestShift 显式驱动；EV 无 ICE 时红线回退到 motorR/motorF 的 maxRpm。 */
   autoShift(iceRpm) {
     const sp = this.spec, st = this.state;
     if (!sp || !st || !sp.gearbox) return;
-    if (sp.gearbox.type === "single" || sp.gearbox.type === "manual" || st.shiftT > 0) return;
-    const rr = iceRpm / (sp.ice ? sp.ice.redlineRpm : 9000);
+    if (sp.gearbox.type !== "auto" && sp.gearbox.type !== "dct") return;
+    if (st.shiftT > 0) return;
+    const red = (sp.ice ? sp.ice.redlineRpm : (sp.motorR ? sp.motorR.maxRpm : (sp.motorF ? sp.motorF.maxRpm : 9000)));
+    const rr = iceRpm / red;
     if (rr > (sp.gearbox.autoUpFrac !== undefined ? sp.gearbox.autoUpFrac : 0.92) &&
         st.gearIdx < sp.gearbox.ratios.length - 1) this.requestShift(1);
     else if (rr < (sp.gearbox.autoDownFrac !== undefined ? sp.gearbox.autoDownFrac : 0.55) && st.gearIdx > 0) this.requestShift(-1);
