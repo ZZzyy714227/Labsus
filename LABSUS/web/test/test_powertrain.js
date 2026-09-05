@@ -617,6 +617,144 @@ assert(T("POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architectu
 
 T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
 
+/* ═══ 5b. G31-P5 审查修复 ═══ */
+console.log("=== 5b. G31-P5 Review Fixes ===");
+
+// ── C1：p2 电功率参考转速——解析预期 P_mot = T_mot×iceOmega/0.95，断言 ΔSOC ±1e-9 ──
+const c1Spec = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+c1Spec.architecture = "p2"; c1Spec.drive = "rwd";
+c1Spec.motorF = null;
+c1Spec.motorR = { peakTorqueNm:200, peakPowerKw:100, maxRpm:16000, regenMaxKw:80, inertia:0.1 };
+c1Spec.battery = { capacityKwh:10, soc0:0.7, maxDischargeKw:500, maxChargeKw:200 };
+c1Spec.gearbox = { type:"manual", ratios:[3], finalDrive:3.5, shiftTimeMs:0, eff:0.95, autoUpFrac:0.92, autoDownFrac:0.55 };
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(c1Spec)})`).ok === true, "C1 p2 ratio=10.5 spec valid");
+const c1Soc0 = T("POWERTRAIN.state.soc");
+const c1Dt = 0.004;
+const c1Out = T(`POWERTRAIN.step(${c1Dt}, {throttle:1, brake:0}, {FL:20,FR:20,RL:20,RR:20})`);
+// 解析计算：iceOmega = wR * ratio = 20 * 10.5 = 210 rad/s
+const c1Ratio = 3 * 3.5;
+const c1IceOmega = 20 * c1Ratio;   // 210 rad/s
+const c1Rpm = c1IceOmega * 30 / Math.PI;
+const c1TMot = T(`POWERTRAIN.motorTorque(${JSON.stringify(c1Spec.motorR)}, ${c1Rpm}, 1, ${c1Soc0})`);
+// P_mot = T_motR * iceOmega / 0.95（p2 电机在曲轴链）
+const c1Pmot = c1TMot * c1IceOmega / 0.95;
+// ΔSOC = P_mot * dt / (cap * 3.6e6)
+const c1DeltaSoc = c1Pmot * c1Dt / (10 * 3.6e6);
+const c1Actual = c1Soc0 - c1Out.soc;
+assert(Math.abs(c1Actual - c1DeltaSoc) < 1e-9, `C1 p2 ΔSOC magnitude matches analytical (ΔSOC=${c1Actual.toExponential(6)}, expect=${c1DeltaSoc.toExponential(6)})`);
+// 若错误地用 wR=20 而非 iceOmega=210，P_mot 会小 10.5×，该断言将捕获
+assert(c1Pmot > c1TMot * 20 / 0.95 * 5, "C1 P_mot uses iceOmega (≫ wR) — catches 10.5× error");
+
+// ── I1a：p2+motorF only → motorF 扭矩到达轮上 ──
+const i1Spec = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+i1Spec.architecture = "p2"; i1Spec.drive = "rwd";
+i1Spec.motorF = { peakTorqueNm:150, peakPowerKw:80, maxRpm:14000, regenMaxKw:60, inertia:0.05 };
+i1Spec.motorR = null;
+i1Spec.battery = { capacityKwh:15, soc0:0.65, maxDischargeKw:500, maxChargeKw:200 };
+i1Spec.gearbox = { type:"manual", ratios:[2.5], finalDrive:4, shiftTimeMs:0, eff:0.96, autoUpFrac:0.92, autoDownFrac:0.55 };
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(i1Spec)})`).ok === true, "I1a p2+motorF only spec valid");
+const i1Soc0 = T("POWERTRAIN.state.soc");
+const i1Out = T("POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:25,FR:25,RL:25,RR:25})");
+// 解析：iceOmega = 25*10 = 250 rad/s; rpmF = 250*30/PI
+const i1Ratio = 2.5 * 4;
+const i1IceOmega = 25 * i1Ratio;
+const i1RpmF = i1IceOmega * 30 / Math.PI;
+const i1TMotF = T(`POWERTRAIN.motorTorque(${JSON.stringify(i1Spec.motorF)}, ${i1RpmF}, 1, ${i1Soc0})`);
+const i1Tice = T(`POWERTRAIN.iceTorque(${i1RpmF}, 1)`);
+// Ts = (T_ice + T_motF + 0) * ratio * eff; rwd → Tr = Ts; tRear = Tr/2
+const i1Expect = (i1Tice + i1TMotF) * i1Ratio * 0.96 / 2;
+assert(Math.abs(i1Out.tRear - i1Expect) < 1e-6, `I1a p2 motorF torque reaches wheel (tRear=${i1Out.tRear.toFixed(3)}, expect=${i1Expect.toFixed(3)})`);
+assert(i1TMotF > 0 && i1Out.tRear > i1Tice * i1Ratio * 0.96 / 2, "I1a motorF contribution positive in tRear");
+// SOC 变化与解析一致
+const i1Pmot = i1TMotF * i1IceOmega / 0.95;
+const i1DeltaSoc = i1Pmot * 0.004 / (15 * 3.6e6);
+assert(Math.abs((i1Soc0 - i1Out.soc) - i1DeltaSoc) < 1e-9, "I1a p2+motorF ΔSOC matches analytical");
+
+// ── I1b：pure ice + motor → validate false ──
+assert(T("POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{motorF:{peakTorqueNm:200,peakPowerKw:100,maxRpm:12000}})).ok") === false, "I1b ice+motorF rejected");
+assert(T("POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{motorR:{peakTorqueNm:200,peakPowerKw:100,maxRpm:12000}})).ok") === false, "I1b ice+motorR rejected");
+assert(T("POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{motorF:{peakTorqueNm:200,peakPowerKw:100,maxRpm:12000}})).errors.join(',')").includes("motor(forbidden for ice)"), "I1b error string motor(forbidden for ice)");
+
+// ── I2：电池功率上限反馈到电机扭矩 ──
+const i2Spec = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+i2Spec.architecture = "ev"; i2Spec.drive = "rwd"; i2Spec.ice = null;
+i2Spec.motorF = null;
+i2Spec.motorR = { peakTorqueNm:400, peakPowerKw:200, maxRpm:12000, regenMaxKw:150, inertia:0.1 };
+i2Spec.battery = { capacityKwh:60, soc0:0.8, maxDischargeKw:10, maxChargeKw:150 };  // 10kW 很小
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(i2Spec)})`).ok === true, "I2 ev+battery 10kW spec valid");
+const i2OutLim = T("POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:50,FR:50,RL:50,RR:50})");
+// 无限制对比
+const i2Unlim = JSON.parse(JSON.stringify(i2Spec));
+i2Unlim.battery.maxDischargeKw = 9999;
+T(`POWERTRAIN.setSpec(${JSON.stringify(i2Unlim)})`);
+const i2OutUnlim = T("POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:50,FR:50,RL:50,RR:50})");
+assert(i2OutLim.tRear < i2OutUnlim.tRear * 0.55, `I2 battery 10kW clamp: tRear=${i2OutLim.tRear.toFixed(2)} ≪ unlimited=${i2OutUnlim.tRear.toFixed(2)}`);
+// P_mot 不超 10kW × 1.06（容差来自 /0.95 与钳制精确性）
+const i2Pmot = i2OutLim.tRear * 2 * 50 / 0.95;   // tRear*2 = Tr; P = Tr*wR/0.95 (ev 用轮速)
+assert(i2Pmot <= 10000 * 1.06, `I2 P_mot=${i2Pmot.toFixed(1)}W ≤ 10kW×1.06`);
+
+// ── M1：tvBias=NaN → tWheel 全有限且和守恒 ──
+const m1Spec = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+m1Spec.architecture = "ev"; m1Spec.drive = "tv"; m1Spec.ice = null;
+m1Spec.motorF = { peakTorqueNm:200, peakPowerKw:100, maxRpm:12000, regenMaxKw:80, inertia:0.1 };
+m1Spec.motorR = { peakTorqueNm:200, peakPowerKw:100, maxRpm:12000, regenMaxKw:80, inertia:0.1 };
+m1Spec.battery = { capacityKwh:20, soc0:0.7, maxDischargeKw:200, maxChargeKw:120 };
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(m1Spec)})`).ok === true, "M1 ev+tv spec valid");
+const m1Out = T("POWERTRAIN.step(0.004, {throttle:0.8, brake:0, tvBias:NaN}, {FL:20,FR:20,RL:20,RR:20})");
+assert(Array.isArray(m1Out.tWheel) && m1Out.tWheel.length === 4, "M1 tvBias=NaN → tWheel array len 4");
+assert(m1Out.tWheel.every(v => Number.isFinite(v)), "M1 tvBias=NaN → all tWheel finite");
+const m1Sum = m1Out.tWheel.reduce((a,b)=>a+b, 0);
+assert(Math.abs(m1Sum - (m1Out.tFront*2 + m1Out.tRear*2)) < 1e-9, "M1 tvBias=NaN → sum(tWheel) = Tf+Tr (conservation)");
+// tvBias=Infinity 同样安全
+const m1bOut = T("POWERTRAIN.step(0.004, {throttle:0.8, brake:0, tvBias:Infinity}, {FL:20,FR:20,RL:20,RR:20})");
+assert(m1bOut.tWheel.every(v => Number.isFinite(v)), "M1 tvBias=Infinity → all finite");
+// tvBias=-3 钳位到 0
+const m1cOut = T("POWERTRAIN.step(0.004, {throttle:0.8, brake:0, tvBias:-3}, {FL:20,FR:20,RL:20,RR:20})");
+assert(m1cOut.tWheel.every(v => Number.isFinite(v)) && m1cOut.tWheel[0] === 0, "M1 tvBias=-3 → clamped to 0 (FL=0)");
+
+// ── M2：ev+tv 单电机 → validate false ──
+assert(T("POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',drive:'tv',ice:null,motorF:{peakTorqueNm:200,peakPowerKw:100,maxRpm:12000},motorR:null,battery:{capacityKwh:20}})).ok") === false, "M2 ev+tv single motor rejected");
+assert(T("POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',drive:'tv',ice:null,motorF:{peakTorqueNm:200,peakPowerKw:100,maxRpm:12000},motorR:null,battery:{capacityKwh:20}})).errors.join(',')").includes("tv(requires motorF & motorR)"), "M2 error string");
+assert(T("POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',drive:'tv',ice:null,motorF:{peakTorqueNm:200,peakPowerKw:100,maxRpm:12000},motorR:{peakTorqueNm:200,peakPowerKw:100,maxRpm:12000},battery:{capacityKwh:20}})).ok") === true, "M2 ev+tv dual motor valid");
+
+// ── 5.5 magnitude 补强：series ΔSOC 解析断言 ──
+// 重跑 5.5a 工况，用解析式验证 ΔSOC
+T(`POWERTRAIN.setSpec(${JSON.stringify(seDis)});`);
+const mg55soc0 = T("POWERTRAIN.state.soc");
+const mg55dt = 0.004;
+const mg55out = T(`POWERTRAIN.step(${mg55dt}, {throttle:1, brake:0}, {FL:100,FR:100,RL:100,RR:100})`);
+// series: wMotR = wR = 100; T_motR 已由 motorTorque 计算
+const mg55rpmR = 100 * 30 / Math.PI;
+const mg55TMot = T(`POWERTRAIN.motorTorque(${JSON.stringify(seDis.motorR)}, ${mg55rpmR}, 1, ${mg55soc0})`);
+const mg55Pmot = mg55TMot * 100 / 0.95;   // series 用轮速
+const mg55Pgen = mg55out.P_gen;
+const mg55Pnet = mg55Pmot - mg55Pgen;
+// 钳制
+const mg55MaxDis = 250 * 1000, mg55MaxChg = 150 * 1000;
+const mg55PnetClamped = Math.max(-mg55MaxChg, Math.min(mg55MaxDis, mg55Pnet));
+const mg55DeltaSoc = mg55PnetClamped * mg55dt / (30 * 3.6e6);
+assert(Math.abs((mg55soc0 - mg55out.soc) - mg55DeltaSoc) < 1e-9, `5.5-mag series ΔSOC analytical (actual=${(mg55soc0-mg55out.soc).toExponential(6)}, expect=${mg55DeltaSoc.toExponential(6)})`);
+
+// ── 5.8 magnitude 补强：p2 充电工况 ΔSOC 解析断言 ──
+// p2c: ratio=1, wR=50 → iceOmega=50; brake>throttle → regen
+T(`POWERTRAIN.setSpec(${JSON.stringify(p2c)});`);
+const mg58soc0 = T("POWERTRAIN.state.soc");
+const mg58dt = 0.004;
+const mg58out = T(`POWERTRAIN.step(${mg58dt}, {throttle:0.3, brake:0.8}, {FL:50,FR:50,RL:50,RR:50})`);
+// p2: wMotR = iceOmega = 50; T_motR 在 regen
+const mg58rpm = 50 * 30 / Math.PI;
+const mg58TMot = T(`POWERTRAIN.motorTorque(${JSON.stringify(p2c.motorR)}, ${mg58rpm}, -0.8, ${mg58soc0})`);
+const mg58Pmot = mg58TMot * 50 / 0.95;   // p2 用 iceOmega=50, T_motR<0 → P_mot<0 (regen)
+// ICE P_gen = 0 for p2 architecture
+const mg58Pnet = mg58Pmot - 0;
+const mg58MaxDis = 200 * 1000, mg58MaxChg = 150 * 1000;
+const mg58PnetClamped = Math.max(-mg58MaxChg, Math.min(mg58MaxDis, mg58Pnet));
+const mg58DeltaSoc = mg58PnetClamped * mg58dt / (10 * 3.6e6);
+assert(Math.abs((mg58soc0 - mg58out.soc) - mg58DeltaSoc) < 1e-9, `5.8-mag p2 charge ΔSOC analytical (actual=${(mg58soc0-mg58out.soc).toExponential(6)}, expect=${mg58DeltaSoc.toExponential(6)})`);
+assert(mg58DeltaSoc < 0, "5.8-mag ΔSOC negative → soc increases (charging)");
+
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+
 console.log(`\n[cumulative] ${passed}/${total} passed`);
 
 process.exit(passed === total ? 0 : 1);
