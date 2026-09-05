@@ -22,7 +22,8 @@ const POWERTRAIN = {
       battery: null,
       gearbox: { type: "manual", ratios: [1], finalDrive: 1, shiftTimeMs: 0, eff: 1.0,
                  autoUpFrac: 0.92, autoDownFrac: 0.55 },
-      diff: { type: "open", bias: 1.0, lockNm: 0 }
+      diff: { type: "open", bias: 1.0, lockNm: 0, slipRefRadS: 8 },
+      centerDiff: null
     };
   },
   validate(sp) {
@@ -70,6 +71,12 @@ const POWERTRAIN = {
     if (sp.architecture === "ev" && !sp.battery) errs.push("battery(required for electrified)");
     if (["p2","p3","p4","series","powersplit"].includes(sp.architecture) &&
         (sp.motorF || sp.motorR) && !sp.battery) errs.push("battery(required for electrified)");
+    /* G31-P10-1：中央差速可选——缺省 null（awd_fixed/其他）不校验；
+       携带时 lockNm 必须 ≥0（负预紧无物理意义），slipRefRadS（若给）必须 >0。 */
+    if (sp.centerDiff !== null && sp.centerDiff !== undefined) {
+      if (!(sp.centerDiff.lockNm >= 0)) errs.push("centerDiff.lockNm");
+      if (sp.centerDiff.slipRefRadS !== undefined && !(sp.centerDiff.slipRefRadS > 0)) errs.push("centerDiff.slipRefRadS");
+    }
     return { ok: errs.length === 0, errors: errs };
   },
   setSpec(sp) {
@@ -328,13 +335,62 @@ const POWERTRAIN = {
     if (!Number.isFinite(st.soc)) return;
     st.soc = Math.max(0, Math.min(1, st.soc - P_net_W * dt / (b.capacityKwh * 3.6e6)));
   },
+  /* ═══ 段4b 差速器分配（G31-P10-1）═══
+     distributeAxle：把【一根轴】的扭矩分到左右轮 → [tL, tR]（N·m/轮）。
+       open/缺省：[tAxle/2, tAxle/2]（legacy 语义，逐位不变，忽略 fz 与速差）。
+       locked：两轮锁死同速 → 按垂直载荷分配 [tAxle·fzL/(fzL+fzR), …]；fz 和 ≤0 退化 50/50。
+       lsd：开式基础上从快轮向慢轮转移，转移量
+              Ttrans = min(lockNm, ((bias−1)/(bias+1))·|tAxle|/2 + lockNm·min(1,|Δω|/slipRef))
+            Δω = wR − wL（正 = 右轮快 → 向左轮转移）；slipRef = diff.slipRefRadS ?? 8 rad/s 满锁。
+            Tsign：Δω≥0 → +1（向左轮，右连续约定）；否则 −1（向右轮）。
+       守恒：tR ≡ tAxle − tL（逐位），任意输入 |tL+tR−tAxle| < 1e−12。 */
+  distributeAxle(tAxle, wL, wR, fzL, fzR, diff) {
+    const ty = diff ? diff.type : "open";
+    if (ty === "locked") {
+      const fl = fzL || 0, fr = fzR || 0, fs = fl + fr;
+      if (fs > 0) { const tL = tAxle * fl / fs; return [tL, tAxle - tL]; }
+      return [tAxle / 2, tAxle / 2];
+    }
+    if (ty === "lsd") {
+      const bias = (Number.isFinite(diff.bias) && diff.bias >= 1) ? diff.bias : 1;
+      const lockNm = (Number.isFinite(diff.lockNm) && diff.lockNm > 0) ? diff.lockNm : 0;
+      const slipRef = (Number.isFinite(diff.slipRefRadS) && diff.slipRefRadS > 0) ? diff.slipRefRadS : 8;
+      const dW = (wR || 0) - (wL || 0);
+      const ramp = lockNm * Math.min(1, Math.abs(dW) / Math.max(1e-3, slipRef));
+      const Ttrans = Math.min(lockNm, ((bias - 1) / (bias + 1)) * Math.abs(tAxle) / 2 + ramp);
+      const Tsign = dW >= 0 ? 1 : -1;   // 右轮快(含零速差)→向左轮转移；对 Δω>0 右连续
+      const tL = tAxle / 2 + Tsign * Ttrans;
+      return [tL, tAxle - tL];
+    }
+    return [tAxle / 2, tAxle / 2];   // open / 未知类型 → 对称（失效安全）
+  },
+  /* distributeCenter：中央差速——单源【总扭矩】按 splitFront 前后分裂，速差时向慢轴转移。
+     返回 [tFrontAxle, tRearAxle]（N·m/轴，未 /2）。cd = spec.centerDiff（缺省 lockNm 0 → 纯
+     splitFront）。当前后轴轮速不等且有 lockNm：向慢轴转移 min(lockNm, lockNm·min(1,|Δω|/slipRef))。
+     守恒：tR ≡ tTotal − tF（逐位）。awd_fixed 不经此路（组合器保持现状纯 splitFront，逐位不变）。 */
+  distributeCenter(tTotal, wF, wR, splitFront, cd) {
+    const tF0 = tTotal * splitFront;
+    let tF = tF0;
+    const lock = (cd && Number.isFinite(cd.lockNm) && cd.lockNm > 0) ? cd.lockNm : 0;
+    if (lock > 0) {
+      const slipRef = (cd && Number.isFinite(cd.slipRefRadS) && cd.slipRefRadS > 0) ? cd.slipRefRadS : 8;
+      const dW = wF - wR;   // 正 = 前轴快 → 借向后轴（前减）；负 = 后轴快 → 前增（向慢轴）
+      if (dW !== 0) {
+        const Ttrans = Math.min(lock, lock * Math.min(1, Math.abs(dW) / Math.max(1e-3, slipRef)));
+        const sgn = dW > 0 ? -1 : 1;
+        tF = tF0 + sgn * Ttrans;
+      }
+    }
+    return [tF, tTotal - tF];
+  },
   /* ═══ 段5 组合器 + step 主循环 ═══
      step(dt, demand, wheelOmega)：每子步调用一次（在 15-DOF 轮循环之前）。
        demand     = { throttle, brake, shiftCmd?, tvBias?, tcsRear? }
        wheelOmega = { FL, FR, RL, RR }（rad/s）
      返回 { tFront, tRear, tWheel|null, iceRpm, shiftRpm, gearIdx, soc, shifting, P_gen }
        tFront/tRear = 单轮驱动扭矩（轴扭矩 / 2，与 legacy 常数 480/120 同量纲，未乘 drivePowerFactor）
-       tWheel       = 仅 drive==='tv' 时逐轮 [FL,FR,RL,RR]，否则 null
+       tWheel       = 逐轮 [FL,FR,RL,RR]：drive==='tv'（tvBias 分裂）或差速器产出左/右非对称
+                      （locked 按载荷 / lsd 速差转移）时；否则 null（对称，走 tFront/tRear）
        shiftRpm     = C3(G31-FR) 架构感知换挡转速源（ev/series/powersplit → 电机 rpm，
                       其余 → iceRpm）；接线层的换挡生产者与 HUD/声浪应统一取此值
        P_gen        = ICE 发电功率（W，仅 series/powersplit > 0）
@@ -488,6 +544,12 @@ const POWERTRAIN = {
         break;
       }
     }
+    /* G31-P10-1：awd_center 中央差速——用前后轴平均轮速差把总轴扭矩(Tf+Tr)向慢轴转移。
+       awd_fixed/fwd/rwd/tv 不经此路（组合器现状逐位不变）。 */
+    if (sp.drive === "awd_center") {
+      const cSplit = this.distributeCenter(Tf + Tr, wF, wR, sp.splitFront, sp.centerDiff);
+      Tf = cSplit[0]; Tr = cSplit[1];
+    }
     /* tv 逐轮：tvBias 将前/后电机轮端扭矩分裂到左右轮（守恒：四轮和 = T_motF_w + T_motR_w） */
     let tWheel = null;
     if (sp.drive === "tv" && sp.motorF && sp.motorR) {
@@ -497,6 +559,23 @@ const POWERTRAIN = {
       const b = Math.max(0, Math.min(1, Number.isFinite(dm.tvBias) ? dm.tvBias : 0.5));
       tWheel = [T_motF_w * b, T_motF_w * (1 - b), T_motR_w * b, T_motR_w * (1 - b)];
       Tf = T_motF_w; Tr = T_motR_w;
+    }
+    /* G31-P10-1：差速器轮端分配——把每轴扭矩(Tf/Tr)分到左右轮（open/locked/lsd）。
+       tv 已由上方 tv 块逐轮分配（tWheel 非 null），此处跳过（tvBias 优先，diff 不重复分配）。
+       仅当某轴左/右非对称（|tL−tR|>1e−12）才产出 tWheel，否则维持 null（tFront/tRear 对称，
+       legacy 等价锚逐位不变）。fz 取 demand.wheelLoads（接线层传上一子步各轮垂直载荷，缺省 0 →
+       locked 退化 50/50、open/lsd 不受影响）。守恒自检：违反即回退对称，绝不容忍扭矩凭空产生。 */
+    if (!tWheel) {
+      const wl = dm.wheelLoads || {};
+      const df = sp.diff || { type: "open" };
+      const pf = this.distributeAxle(Tf, wo.FL || 0, wo.FR || 0, wl.FL || 0, wl.FR || 0, df);
+      const pr = this.distributeAxle(Tr, wo.RL || 0, wo.RR || 0, wl.RL || 0, wl.RR || 0, df);
+      if (Math.abs(pf[0] + pf[1] - Tf) > 1e-12 || Math.abs(pr[0] + pr[1] - Tr) > 1e-12) {
+        pf[0] = pf[1] = Tf / 2; pr[0] = pr[1] = Tr / 2;
+      }
+      if (Math.abs(pf[0] - pf[1]) > 1e-12 || Math.abs(pr[0] - pr[1]) > 1e-12) {
+        tWheel = [pf[0], pf[1], pr[0], pr[1]];
+      }
     }
     /* 电池能量流：P_net = 电机耗电 − ICE 发电；按 maxDischargeKw/maxChargeKw 钳制后积分 SOC */
     let P_net = P_mot - P_gen;
@@ -551,6 +630,8 @@ const POWERTRAIN = {
   /* 表单缺省块：勾选启用时填入 sane 值（不写 baseRpm——由 P/T 拐点导出） */
   MOTOR_DEF: { peakTorqueNm: 300, peakPowerKw: 150, maxRpm: 12000, regenMaxKw: 100, inertia: 0.1 },
   BAT_DEF: { capacityKwh: 20, soc0: 0.8, maxDischargeKw: 0, maxChargeKw: 0 },   // 0 = 不限
+  /* 中央差速表单缺省（编辑时填入；lockNm=0 = 纯 splitFront，slipRefRadS = 满锁速差） */
+  defaultCenterDiff() { return { lockNm: 0, slipRefRadS: 8 }; },
 
   archZh(k) { const a = this.ARCHS.filter(x => x.k === k)[0]; return a ? a.zh + " " + a.en : String(k || "?"); },
   /* 电机恒扭矩→恒功率拐点（rpm）= 30·P·1000/(π·T) = 9549.3·P/T，与 validate 的 I-1 同式 */
@@ -676,8 +757,14 @@ const POWERTRAIN = {
       this._numRow("pt_gb_autoDownFrac", "自动降挡转速比", 0.01, 0.02, 1, "×红线");
     const diffBody = this._selRow("pt_diff_type", "差速器类型", this.DIFF_TYPES) +
       this._numRow("pt_diff_bias", "扭矩偏置比", 0.1, 1, 10, "") +
-      this._numRow("pt_diff_lockNm", "锁止预紧", 1, 0, 3000, "N·m");
-    const centerBody = this._numRow("pt_splitFront", "前轴扭矩分配", 0.01, 0, 1, "0–1");
+      this._numRow("pt_diff_lockNm", "锁止预紧", 1, 0, 3000, "N·m") +
+      `<div id="ptRowDiffSlipRef">${this._numRow("pt_diff_slipRefRadS", "满锁速差", 0.5, 0.1, 100, "rad/s")}</div>`;
+    const centerBody = this._numRow("pt_splitFront", "前轴扭矩分配", 0.01, 0, 1, "0–1") +
+      `<div id="ptSecCenterDiff">` +
+      `<div style="font:10px var(--font-ui);color:#8b949e;margin:5px 0 2px;">中央差速锁止（仅 awd_center 生效）</div>` +
+      this._numRow("pt_cd_lockNm", "中央锁止扭矩", 1, 0, 3000, "N·m") +
+      this._numRow("pt_cd_slipRefRadS", "中央满锁速差", 0.5, 0.1, 100, "rad/s") +
+      `</div>`;
     return `${this._secBox("", "内置预设 BUILTIN", presetBody)}
       ${this._secBox("", "变速箱 GEARBOX", gbBody)}
       ${this._secBox("", "差速器 DIFF", diffBody)}
@@ -735,9 +822,14 @@ const POWERTRAIN = {
        沙箱无 requestAnimationFrame 时回退直接调用（typeof 守卫）。 */
     try {
       const onEdit = () => {
-        const before = this._draft ? this._draft.architecture : null;
+        const bArch = this._draft ? this._draft.architecture : null;
+        const bDrive = this._draft ? this._draft.drive : null;
+        const bDiff = (this._draft && this._draft.diff) ? this._draft.diff.type : null;
         this.readForm();
-        if (this._draft && this._draft.architecture !== before) { this.renderForm(); return; }
+        const dd = this._draft;
+        /* 架构 / 驱动形式 / 差速器类型变更 → 重建栏位（刷新 centerDiff、slipRefRadS 显隐）；
+           三者均为下拉选择，重建不丢文本焦点。 */
+        if (dd && (dd.architecture !== bArch || dd.drive !== bDrive || (dd.diff ? dd.diff.type : null) !== bDiff)) { this.renderForm(); return; }
         if (typeof requestAnimationFrame === "function") {
           if (this._rafPending) return;
           this._rafPending = true;
@@ -816,6 +908,10 @@ const POWERTRAIN = {
     const df = d.diff || this.defaultSpec().diff;
     this._setVal("pt_diff_type", df.type); this._setVal("pt_diff_bias", df.bias);
     this._setVal("pt_diff_lockNm", df.lockNm || 0);
+    this._setVal("pt_diff_slipRefRadS", df.slipRefRadS !== undefined ? df.slipRefRadS : 8);
+    const cd = d.centerDiff || this.defaultCenterDiff();
+    this._setVal("pt_cd_lockNm", cd.lockNm || 0);
+    this._setVal("pt_cd_slipRefRadS", cd.slipRefRadS !== undefined ? cd.slipRefRadS : 8);
     this._setVal("pt_splitFront", d.splitFront);
     this.bindFormButtons();
     this.syncVisibility();
@@ -850,6 +946,9 @@ const POWERTRAIN = {
     this._show("ptSecMotorR", elec);
     this._show("ptSecBat", elec);
     this._show("ptSecCenter", d.drive === "awd_fixed" || d.drive === "awd_center");
+    /* G31-P10-1：中央差速锁止字段仅 awd_center；差速器满锁速差仅 lsd（locked 用载荷分配、open 用 50/50，均不需 slipRef） */
+    this._show("ptSecCenterDiff", d.drive === "awd_center");
+    this._show("ptRowDiffSlipRef", !!(d.diff && d.diff.type === "lsd"));
   },
 
   /* ── readForm：DOM → 草稿（带自愈：空值回退旧值、红线/断油/分配比钳位）── */
@@ -941,8 +1040,18 @@ const POWERTRAIN = {
     d.diff = {
       type: this.DIFF_TYPES.some(x => x[0] === dt) ? dt : (this.DIFF_TYPES.some(x => x[0] === dp.type) ? dp.type : "open"),
       bias: Math.max(1, this._num("pt_diff_bias", dp.bias)),
-      lockNm: Math.max(0, this._num("pt_diff_lockNm", dp.lockNm || 0))
+      lockNm: Math.max(0, this._num("pt_diff_lockNm", dp.lockNm || 0)),
+      slipRefRadS: Math.max(1e-3, this._num("pt_diff_slipRefRadS", dp.slipRefRadS !== undefined ? dp.slipRefRadS : 8))
     };
+    /* G31-P10-1：中央差速仅在 awd_center 时构建（其余驱动形式无轴间分配）；
+       lockNm=0 = 纯 splitFront，slipRefRadS 为满锁速差。 */
+    if (d.drive === "awd_center") {
+      const cp = d.centerDiff || this.defaultCenterDiff();
+      d.centerDiff = {
+        lockNm: Math.max(0, this._num("pt_cd_lockNm", cp.lockNm || 0)),
+        slipRefRadS: Math.max(1e-3, this._num("pt_cd_slipRefRadS", cp.slipRefRadS !== undefined ? cp.slipRefRadS : 8))
+      };
+    }
     return d;
   },
   /* map textarea → 控制点数组：非法 JSON / 点数<2 / rpm 重复 → 保留旧值并提示（失效安全）；

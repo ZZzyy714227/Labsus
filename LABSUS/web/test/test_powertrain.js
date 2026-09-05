@@ -1678,6 +1678,112 @@ assert(stSrc.indexOf("手动箱自动离合") >= 0, "8.8 C3 接线：转速律�
 assert(stSrc.indexOf("TODO(G31-P10)") >= 0, "8.8 C3 接线：tvBias 动态扭矩矢量 TODO 标注");
 assert(ptSrc.indexOf("TODO(G31-P10)") >= 0, "8.8 C3 动力层：tv 块 TODO(G31-P10) 标注");
 
+/* ═══ 9. G31-P10-1 差速器接线（open/locked/lsd 轮端分配 + awd_center 中央速差转移）═══
+   distributeAxle/distributeCenter 为 POWERTRAIN 纯方法；step() 只在【左/右非对称】时产出
+   tWheel，否则维持 null（legacy 等价锚与既有 tv 断言不能破）。 */
+console.log("=== 9. G31-P10-1 Differential Wiring ===");
+const DA = (t, wL, wR, fzL, fzR, df) =>
+  T(`POWERTRAIN.distributeAxle(${t},${wL},${wR},${fzL},${fzR},${JSON.stringify(df)})`);
+
+// ── 9.1 open 逐位对称（忽略 fz / 速差）+ 负扭矩守恒 ──
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+{
+  const [l, r] = DA(1000, 30, 30, 4000, 1000, { type: "open" });
+  assert(l === 500 && r === 500, "9.1 open 逐位对称 50/50（fz/速差不影响）");
+  const [l2, r2] = DA(-640, 10, 40, 0, 0, { type: "open" });
+  assert(l2 === -320 && r2 === -320 && Math.abs(l2 + r2 + 640) < 1e-12, "9.1 open 负扭矩逐位对称 + 守恒");
+}
+// ── 9.2 locked 按 fz 4:1 分配且守恒；fz 和 ≤0 退化 50/50 ──
+{
+  const [l, r] = DA(1000, 30, 30, 4000, 1000, { type: "locked" });
+  assert(Math.abs(l - 800) < 1e-9 && Math.abs(r - 200) < 1e-9 && Math.abs(l + r - 1000) < 1e-12,
+    "9.2 locked fz 4000/1000 → 4:1(800/200) 且守恒");
+  const [l0, r0] = DA(1000, 30, 20, 0, 0, { type: "locked" });
+  assert(l0 === 500 && r0 === 500, "9.2 locked fz 和 ≤0 → 退化 50/50");
+}
+// ── 9.3 lsd 速差 10 rad/s（RL 慢）→ tRL>tRR、和=tAxle、转移量 ≤lockNm、等于公式值 ──
+{
+  const df = { type: "lsd", bias: 3, lockNm: 200, slipRefRadS: 8 };
+  const [l, r] = DA(1000, 0, 10, 3000, 3000, df);   // 后轴 RL=wL=0(慢) / RR=wR=10(快) → 向左转移
+  const expTrans = Math.min(200, ((3 - 1) / (3 + 1)) * 500 + 200 * Math.min(1, 10 / 8));
+  assert(l > r && Math.abs(l + r - 1000) < 1e-12, "9.3 lsd 速差10(RL慢) → tRL>tRR 且守恒");
+  assert(Math.abs((l - 500) - expTrans) < 1e-9 && expTrans <= 200 + 1e-9,
+    "9.3 lsd 转移量 = min(lockNm, bias项+速差项) ≤ lockNm");
+}
+// ── 9.4 lsd 零速差 → 仅 bias 项（无速差项，lockNm 大到不成钳位）──
+{
+  const df = { type: "lsd", bias: 3, lockNm: 1000, slipRefRadS: 8 };
+  const [l, r] = DA(1000, 25, 25, 3000, 3000, df);
+  const expBias = ((3 - 1) / (3 + 1)) * Math.abs(1000) / 2;   // 250
+  assert(Math.abs((l - 500) - expBias) < 1e-9 && Math.abs(l + r - 1000) < 1e-12,
+    "9.4 lsd 零速差 → 转移=仅 bias 项（无速差项）且守恒");
+}
+// ── 9.5 awd_center 速差 2 rad/s（后轴快）→ 前轴扭矩增加 + 总和守恒 ──
+{
+  const s = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+  s.drive = "awd_center"; s.splitFront = 0.4; s.centerDiff = { lockNm: 300, slipRefRadS: 8 };
+  assert(T(`POWERTRAIN.setSpec(${JSON.stringify(s)})`).ok === true, "9.5 awd_center spec valid");
+  const o = T("POWERTRAIN.step(0.004,{throttle:1,brake:0},{FL:30,FR:30,RL:32,RR:32})");
+  const baseFront = 1200 * 0.4 / 2;   // 无中央差速时前轴轮扭矩 240
+  assert(o.tFront > baseFront && Math.abs((o.tFront + o.tRear) - 1200 / 2) < 1e-6,
+    "9.5 awd_center 后轴快 → 前轴扭矩增加 且 前后轴和=总轴/2 守恒");
+}
+// ── 9.6 awd_fixed 逐位不变（step 级）──
+{
+  T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec()); POWERTRAIN.resetState();");
+  const o = T("POWERTRAIN.step(0.004,{throttle:1,brake:0},{FL:30,FR:30,RL:30,RR:30})");
+  assert(o.tRear === 480 && o.tFront === 120 && o.tWheel === null,
+    "9.6 awd_fixed 逐位不变（tRear480/tFront120/tWheel null）");
+}
+// ── 9.7 legacy 锚：wheelLoads 非对称但 diff=open → 仍对称（tWheel null / 480 / 120 逐位）──
+{
+  T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec()); POWERTRAIN.resetState();");
+  const o = T("POWERTRAIN.step(0.004,{throttle:1,brake:0,wheelLoads:{FL:5000,FR:100,RL:4000,RR:50}},{FL:30,FR:30,RL:30,RR:30})");
+  assert(o.tWheel === null && o.tRear === 480 && o.tFront === 120,
+    "9.7 legacy 锚 wheelLoads 非对称 + diff=open → tWheel null / 480 / 120 逐位");
+}
+// ── 9.8 locked 经 step 产出非对称 tWheel（rwd 后轴 4:1）──
+{
+  const s = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+  s.drive = "rwd"; s.splitFront = 0; s.diff = { type: "locked", bias: 1, lockNm: 0 };
+  T(`POWERTRAIN.setSpec(${JSON.stringify(s)}); POWERTRAIN.resetState();`);
+  const o = T("POWERTRAIN.step(0.004,{throttle:1,brake:0,wheelLoads:{FL:0,FR:0,RL:4000,RR:1000}},{FL:30,FR:30,RL:30,RR:30})");
+  assert(Array.isArray(o.tWheel) && Math.abs(o.tWheel[2] - 960) < 1e-6 && Math.abs(o.tWheel[3] - 240) < 1e-6,
+    "9.8 locked rwd RL/RR 载荷 4:1 → tWheel[RL]=960/[RR]=240");
+  assert(Math.abs(o.tWheel[2] + o.tWheel[3] - 1200) < 1e-9, "9.8 locked 后轴 tWheel 和=轴扭矩1200 守恒");
+}
+// ── 9.9 lsd 经 step 产出非对称 tWheel，前轴无驱动 tFront=0 ──
+{
+  const s = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+  s.drive = "rwd"; s.splitFront = 0; s.diff = { type: "lsd", bias: 2, lockNm: 100, slipRefRadS: 8 };
+  T(`POWERTRAIN.setSpec(${JSON.stringify(s)}); POWERTRAIN.resetState();`);
+  const o = T("POWERTRAIN.step(0.004,{throttle:1,brake:0},{FL:30,FR:30,RL:0,RR:10})");
+  assert(Array.isArray(o.tWheel) && o.tWheel[2] > o.tWheel[3], "9.9 lsd rwd 速差 → tWheel RL>RR");
+  assert(o.tFront === 0, "9.9 lsd rwd 前轴无驱动 → tFront=0");
+}
+// ── 9.10 validate 拒 centerDiff.lockNm<0，接受 lockNm=0 ──
+{
+  const s = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+  s.drive = "awd_center"; s.centerDiff = { lockNm: -5, slipRefRadS: 8 };
+  const v = T(`POWERTRAIN.validate(${JSON.stringify(s)})`);
+  assert(v.ok === false && v.errors.join(",").includes("centerDiff.lockNm"), "9.10 validate 拒 centerDiff.lockNm<0");
+  const s2 = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+  s2.drive = "awd_center"; s2.centerDiff = { lockNm: 0, slipRefRadS: 8 };
+  assert(T(`POWERTRAIN.validate(${JSON.stringify(s2)})`).ok === true, "9.10 validate 接受 centerDiff.lockNm=0");
+}
+// ── 9.11 distributeCenter 直接：lockNm=0 → 纯 splitFront；速差 → 向慢轴转移 + 守恒 ──
+{
+  const [f0, r0] = T("POWERTRAIN.distributeCenter(1000,30,30,0.4,{lockNm:0,slipRefRadS:8})");
+  assert(Math.abs(f0 - 400) < 1e-9 && Math.abs(f0 + r0 - 1000) < 1e-12,
+    "9.11 distributeCenter lockNm=0 → 纯 splitFront(400/600)");
+  const [f1, r1] = T("POWERTRAIN.distributeCenter(1000,28,32,0.4,{lockNm:300,slipRefRadS:8})");
+  assert(f1 > 400 && Math.abs(f1 + r1 - 1000) < 1e-12, "9.11 distributeCenter 后轴快 → 前轴增且守恒");
+}
+// ── 9.12 11-stages 接线源扫描：_pd.wheelLoads 传入 + 一子步滞后声明 ──
+assert(stSrc.indexOf("_pd.wheelLoads = this.telemetry.Fz") >= 0, "9.12 接线：_pd.wheelLoads = this.telemetry.Fz");
+assert(/一子步滞后/.test(stSrc), "9.12 接线：wheelLoads 一子步滞后注释");
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+
 console.log(`\n[cumulative] ${passed}/${total} passed`);
 
 process.exit(passed === total ? 0 : 1);
