@@ -75,3 +75,20 @@
 2. TPHYS ↔ transient.py：summary 五字段相对差 <5%（test_tphys_parity）。
 3. v3 设计位自洽：travel=0 必须精确返回设计 cam/toe（test_w4_consistency）。
 4. 前端 F-01..F-57 已修复项：node web/test/test_dom.js 断言回访。
+## G31 动力系统双内核分叉（2026-09-05 登记）
+
+- **前端全动力模型 vs Python 粗略等效**：web/js/16-powertrain.js 实现七架构组合器
+  （ice/ev/p2/p3/p4/series/powersplit）+ 轴系动力学（换挡状态机/反射惯量/电池 SOC/
+  电机恒扭矩-恒功率/回收）；Python 端 engine/src/api/v3models.py PowertrainSpec 仅
+  消费 ice.map 峰值×ratios[0]×finalDrive×eff 推导等效轮上扭矩覆盖 T_max/P_kw
+  （transient.py 门控 req.powertrain.ice is not None），**不实现混动组合器/换挡/电池**。
+- **缺省锚**：PowertrainSpec=None 时 transient 走旧 T_max=250/P_kw=80/drive_split_f=0.0/
+  brake_split_f=0.60（与旧 PowertrainParams 缺省逐位一致，tphys_parity 哈希不变）。
+- **前端 legacy 等价锚**：defaultSpec（ice/awd_fixed/splitFront0.2/ratios[1]/final1/
+  平直 1200N·m）轮上扭矩后 480/前 120 == 旧常数；集成级 parity maxΔ=0.00e+0。
+- **allinone 不内联**：dwb-pro-allinone.html 为 TPHYS 对拍锚，不含 POWERTRAIN →
+  接线回退 legacy 常数，与对拍逐位一致（有意不内联以避免锚漂移）。
+- **双端未打通项（G31-P10）**：前端 09-track.js payload 仍只发 legacy 标量
+  （T_max/P_kw/…），未发 PowertrainSpec → Python 引擎收不到工坊自定义规格；
+  diff/lsd/awd_center、motor maxRpm 硬截止、ev/series 电机反射惯量、HUD 真实功率、
+  声浪挡位状态统一 均为前端待补。
