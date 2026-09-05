@@ -39,6 +39,9 @@ const MPCModel = {
       N: 40, dt: 0.1,                  // 时域 4s ≈ 200m@50m/s——必须覆盖制动距离
       // （旧 N=30×0.05=1.5s≈75m 短于 T1 制动距离 ~95m，MPC 看不到弯 → 晚刹车冲出）
       brkEnv: 11.0,                    // 制动包络减速度（≈0.85·μg）
+      aLatLim: 8.5,                    // 参考速度的模型自摩擦极限（≈0.87g）：
+      // 路径 v_max 对真车不忠实（diag 实测 s≈3970 高速小曲率弯 u=47.4 滑出）——
+      // MPC 应信任自己模型的摩擦极限而非路径乐观包络
       vScale: 0.85,                    // 弯速安全系数：v_max 按 0.85·μg 算，但真车含载荷
       // 转移/轮胎载荷敏感只能 ~1.0g——diag 实测每弯 α 20~28° 滑过去的根因
       weights: { q_ey: 8, q_epsi: 1.5, q_v: 0.6, r_delta: 0.02, r_ax: 0.01, r_ddelta: 0.0005, q_soft: 40 }
@@ -101,9 +104,17 @@ const MPCModel = {
   },
 
   /* CEM 求解：返回 { W, J }。Wprev 热启动（平移），含其自身候选 → 代价单调不升 */
-  solve(x0, Wprev, ref, p) {
+  solve(x0, Wprev, ref, p, rngState) {
     const N = ref.length, K = 32, ITERS = 1, ELITE = 10;
-    const rnd = () => (Math.random() * 2 - 1);
+    // G30：种子化 PRNG（mulberry32）——Math.random 使每次运行行为不同，
+    // 摆振冲出无法复现/定位；确定性采样让整定可迭代
+    let rs = (rngState === undefined ? 123456789 : rngState) >>> 0;
+    const rnd = () => {
+      rs |= 0; rs = (rs + 0x6D2B79F5) | 0;
+      let t = Math.imul(rs ^ (rs >>> 15), 1 | rs);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return (((t ^ (t >>> 14)) >>> 0) / 4294967296) * 2 - 1;
+    };
     let mu = Wprev.map(w => w.slice());
     let sig = Wprev.map(() => [0.02, 0.8]);
     let bestW = null, bestJ = Infinity;
@@ -139,7 +150,7 @@ const MPCModel = {
         sig[t][1] = Math.max(0.10, Math.sqrt(s1 / ELITE));
       }
     }
-    return { W: bestW, J: bestJ };
+    return { W: bestW, J: bestJ, rng: rs >>> 0 };
   },
 
   rolloutCost(x0, W, ref, p) {
@@ -270,8 +281,9 @@ class UniversalAutoPilotMPC {
         const margin = (cid >= 0 && this.cornerMargins[cid] !== undefined) ? this.cornerMargins[cid] : 1.0;
         // G30 滑移护栏：发生侧滑的弯不再被 margin 推到更高目标速（endLap 冻结/回退）
         const slid = this.cornerSlide[cid] !== undefined && this.cornerSlide[cid] > 0;
+        const uCapK = Math.sqrt(p.aLatLim / Math.max(1e-4, Math.abs(rp.curvature || 0)));
         ref.push({
-          u_ref: rp.v_max * (slid ? Math.min(margin, 0.88) : margin) * p.vScale,
+          u_ref: Math.min(rp.v_max * (slid ? Math.min(margin, 0.88) : margin) * p.vScale, uCapK),
           kappa: (rp.curvature || 0),        // 模型与路径同约定：正 = 左转（ISO r 正）
           bnd: (this.path.hw_m || 4.9) + (this.path.kerb_m || 1.35) - 0.5,
           s: sAcc,
@@ -308,9 +320,13 @@ class UniversalAutoPilotMPC {
       // G30 整定：增益随速度调度（高速降权威，防延迟诱导 PIO——起步直道 u≈28 摆振）
       const gSched = Math.min(1.0, 20 / Math.max(8, u));
       const K_E = 0.35 * gSched, K_PSI = 0.9 * gSched;
+      // 横摆率阻尼：δ 补偿 (r − u·κ_ref)——参考曲率已正确后此项安全
+      // （早期尝试发散是因为当时用了前视点曲率，前置条件已消除）
+      const K_R = 0.25 * gSched;
+      const rErr0 = (state.r || 0) - u * (ref[0].kappa || 0);
       for (let k = 0; k < N; k++) {
         const dff = Math.atan(this.wb * (ref[k].kappa || 0));
-        const dLat = -K_E * ey - K_PSI * epsi;
+        const dLat = -K_E * ey - K_PSI * epsi - K_R * rErr0;
         const dSeed = MPCModel.clamp(dff + dLat, -0.15, 0.15);
         const aSeed = MPCModel.clamp((ref[k].u_ref - uu2) * 1.5, -p.brkMax, p.axMax);
         seed.push([dSeed, aSeed]);
@@ -320,7 +336,8 @@ class UniversalAutoPilotMPC {
         uu2 = MPCModel.clamp(uu2 + aSeed * p.dt, 1, 60);
       }
     }
-    const sol = MPCModel.solve([u, state.v || 0, state.r || 0, e_y0, e_psi0], seed, ref, p);
+    const sol = MPCModel.solve([u, state.v || 0, state.r || 0, e_y0, e_psi0], seed, ref, p, this._rng);
+    this._rng = sol.rng;
     this._W = sol.W.map(w => w.slice());
     // 热启动平移（下一帧从 t=1 起步，尾部补常值）
     this._W.shift();
