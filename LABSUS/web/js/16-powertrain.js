@@ -86,6 +86,9 @@ const POWERTRAIN = {
          下游组合器（段5）不得对该值做除法或扭矩计算 */
       iceOmega: (sp.architecture !== "ev" && sp.ice) ? sp.ice.idleRpm * Math.PI / 30 : 0,
       gearIdx: 0, shiftT: 0, shiftDir: 0,
+      /* C3(G31-FR)：换挡完成后的【反向】锁止窗口（剩余 ms）与刚完成的换挡方向。
+         防大齿比间隔箱升挡后转速直接落到 downFrac 以下造成的 1↔2 挡往复振荡。 */
+      shiftLockT: 0, shiftLockDir: 0,
       soc: sp.battery ? (sp.battery.soc0 !== undefined ? sp.battery.soc0 : 0.8) : 1,
       thrSm: 0
     };
@@ -158,11 +161,33 @@ const POWERTRAIN = {
       (this.spec.architecture === "ev" || this.hasRealDrivetrain()));
   },
   /* ═══ 段3 传动链：gearbox 换挡状态机 + 反射惯量 ═══
-     反射到轮端的旋转惯量（kg·m²/轮）：(I_ice + I_motCoupled)×(ratio×final)²/nDrive。
+     I1(G31-FR)：驱动轮判定——反射惯量只应加到【实际接收驱动扭矩】的轮上。
+     fwd → FL/FR；rwd → RL/RR；awd_fixed/awd_center/tv → 四轮。
+     未知 wheelId / spec 缺失 → false（失效安全，接线层按 0 处理，不污染 Iw）。 */
+  isDriveWheel(wheelId) {
+    const d = this.spec ? this.spec.drive : null;
+    if (d === "awd_fixed" || d === "awd_center" || d === "tv") return true;
+    const isF = (wheelId === "FL" || wheelId === "FR");
+    const isR = (wheelId === "RL" || wheelId === "RR");
+    if (!isF && !isR) return false;
+    if (d === "fwd") return isF;
+    if (d === "rwd") return isR;
+    return false;
+  },
+  /* I1(G31-FR)：驱动轮数（归一分母）。spec/drive 缺失 → 0。 */
+  driveWheelCount() {
+    const d = this.spec ? this.spec.drive : null;
+    if (d === "awd_fixed" || d === "awd_center" || d === "tv") return 4;
+    if (d === "fwd" || d === "rwd") return 2;
+    return 0;
+  },
+  /* 反射到【单个驱动轮】的旋转惯量（kg·m²/轮）：(I_ice + I_motCoupled)×(ratio×final)²/nDrive。
      I-2(G31-P6)：nDrive 按驱动轮数归一——awd/tv=4 轮、fwd/rwd=2 轮。
+     I1(G31-FR)：本值只应加到 isDriveWheel(id)===true 的轮上（接线层负责筛选）；
+       旧接线把它加到全 4 轮 → 非驱动轮 Iw 被无物理依据地放大、且驱动轴等效质量翻倍。
      legacy 默认 inertia=0 → 0，15-DOF 的 Iw 不变（等价锚）。
      p2 架构电机在 ICE 与 gearbox 之间同轴 → 计入；p3/p4/ev 电机不在曲轴链 → 不计。 */
-  reflectedInertia() {
+  reflectedInertiaPerDriveWheel() {
     const sp = this.spec, st = this.state;
     if (!sp || !st || !sp.gearbox) return 0;
     const r = (sp.gearbox.ratios[st.gearIdx] || 1) * sp.gearbox.finalDrive;
@@ -170,9 +195,11 @@ const POWERTRAIN = {
     if (sp.architecture === "p2") {
       I += (sp.motorF ? (sp.motorF.inertia || 0) : 0) + (sp.motorR ? (sp.motorR.inertia || 0) : 0);
     }
-    const nDrive = (sp.drive === "awd_fixed" || sp.drive === "awd_center" || sp.drive === "tv") ? 4 : 2;
+    const nDrive = Math.max(1, this.driveWheelCount());
     return I * r * r / nDrive;
   },
+  /* 向后兼容别名（既有调用点/测试沿用）——语义即“每驱动轮”反射惯量。 */
+  reflectedInertia() { return this.reflectedInertiaPerDriveWheel(); },
   /* 换挡状态机推进（每子步调用）。返回 true = 本子步处于扭矩中断期。
      完成时：gearIdx += shiftDir、iceOmega 跳变 = wheelOmegaAxle×ratio_new×final
      （刚性传动链运动学耦合；离合器结合瞬态不做半联动物理，见设计非目标）。 */
@@ -181,12 +208,20 @@ const POWERTRAIN = {
     if (!sp || !st || !sp.gearbox) return false;
     /* M：dt 必须有限，否则 shiftT -= NaN 会把状态机推入 NaN 死锁 */
     if (!Number.isFinite(dt)) return false;
+    /* C3(G31-FR)：反向锁止窗口递减（与换挡计时同源，每子步一次） */
+    if (st.shiftLockT > 0) {
+      st.shiftLockT -= dt * 1000;
+      if (st.shiftLockT <= 0) { st.shiftLockT = 0; st.shiftLockDir = 0; }
+    }
     if (st.shiftT > 0) {
       st.shiftT -= dt * 1000;
       if (st.shiftT <= 0) {
+        const dirDone = st.shiftDir;
         st.gearIdx = Math.max(0, Math.min(sp.gearbox.ratios.length - 1, st.gearIdx + st.shiftDir));
         st.shiftDir = 0; st.shiftT = 0;
         st.iceOmega = (wheelOmegaAxle || 0) * (sp.gearbox.ratios[st.gearIdx] || 1) * sp.gearbox.finalDrive;
+        /* C3：换挡完成 → 开启反向锁止窗口（只挡反向，同向与 requestShift 不受影响） */
+        st.shiftLockDir = dirDone; st.shiftLockT = this.SHIFT_LOCK_MS;
       }
       return true;
     }
@@ -204,19 +239,79 @@ const POWERTRAIN = {
     st.shiftDir = dir;
     st.shiftT = Math.max(1, sp.gearbox.shiftTimeMs || 1);
   },
-  /* 自动换挡策略（白名单：仅 type=auto/dct）：rpm/redline 超 autoUpFrac 升、低于 autoDownFrac 降。
-     白名单语义：未知/未声明的 gearbox.type（undefined、"cvt"、"AUTO" 等）一律不自动换挡，
-     由 requestShift 显式驱动；EV 无 ICE 时红线回退到 motorR/motorF 的 maxRpm。 */
-  autoShift(iceRpm) {
+  /* C3(G31-FR)：自动换挡白名单——auto/dct/seq/cvt 四类具备自动换挡能力；
+     manual 仍为纯手动（由 shiftCmdFromRpm 转速律或 UI 显式驱动）。
+     白名单外（undefined、"single"、"AUTO" 大小写不符等）一律不自动换挡，
+     由 requestShift 显式驱动。
+     终审缺陷：旧白名单仅 auto/dct → 6 内置预设里 5 个（GT3=manual、FSAE=seq、
+     THS=cvt，以及 EV/串联的转速源缺失）全部卡 1 挡，极速被齿比封顶。
+     说明：cvt（e-CVT）通常 ratios.length===1 → 天然不越界换挡，纳入白名单只为
+     多速比 e-CVT/模拟挡位留口子，不改变 THS 预设行为。 */
+  AUTO_GB_TYPES: ["auto", "dct", "seq", "cvt"],
+  /* C3：换挡完成后的反向锁止窗口（ms）。齿比间隔大的箱（如 P3 预设 3.5→2.1）
+     升挡后转速比直接落到 autoDownFrac 以下 → 1↔2 挡往复振荡、永远升不上去
+     （终审实测 P3 极速卡在 ~49 km/h）。锁止只挡【反向】、不挡同向，
+     也不影响 requestShift 的显式请求（驾驶员意图优先）。 */
+  SHIFT_LOCK_MS: 400,
+  /* C3(G31-FR)：架构感知红线（换挡判据的分母）。
+     ev/series/powersplit：驱动电机不经曲轴 → 用驱动电机 maxRpm（取轴与 shiftRpm
+       一致：fwd 看前电机、其余看后电机）；EV 的 iceOmega≡0、series/powersplit 的
+       iceOmega 是发电控制律转速，二者均不可用作换挡判据。
+     ice/p2/p3/p4：曲轴经齿轮刚性耦合 → ice.redlineRpm。
+     缺失时逐级回退，最后回退 9000（防御，不抛错）。 */
+  shiftRedlineRpm() {
+    const sp = this.spec;
+    if (!sp) return 0;
+    const motRed = (sp.drive === "fwd")
+      ? (sp.motorF ? sp.motorF.maxRpm : (sp.motorR ? sp.motorR.maxRpm : 0))
+      : (sp.motorR ? sp.motorR.maxRpm : (sp.motorF ? sp.motorF.maxRpm : 0));
+    const iceRed = sp.ice ? (sp.ice.redlineRpm || 0) : 0;
+    if (sp.architecture === "ev") return motRed || 9000;
+    if (sp.architecture === "series" || sp.architecture === "powersplit") return motRed || iceRed || 9000;
+    return iceRed || motRed || 9000;
+  },
+  /* 自动换挡策略（白名单 AUTO_GB_TYPES）：rpm/红线 超 autoUpFrac 升、低于 autoDownFrac 降。
+     入参 rpm 由 step() 传入 shiftRpm（架构感知转速源），也可由外部直接调用。
+     C3：受 SHIFT_LOCK_MS 反向锁止约束（只挡反向）。 */
+  autoShift(rpm) {
     const sp = this.spec, st = this.state;
     if (!sp || !st || !sp.gearbox) return;
-    if (sp.gearbox.type !== "auto" && sp.gearbox.type !== "dct") return;
+    if (!Number.isFinite(rpm) || !(rpm >= 0)) return;
+    if (this.AUTO_GB_TYPES.indexOf(sp.gearbox.type) < 0) return;
     if (st.shiftT > 0) return;
-    const red = (sp.ice ? sp.ice.redlineRpm : (sp.motorR ? sp.motorR.maxRpm : (sp.motorF ? sp.motorF.maxRpm : 9000)));
-    const rr = iceRpm / red;
-    if (rr > (sp.gearbox.autoUpFrac !== undefined ? sp.gearbox.autoUpFrac : 0.92) &&
-        st.gearIdx < sp.gearbox.ratios.length - 1) this.requestShift(1);
-    else if (rr < (sp.gearbox.autoDownFrac !== undefined ? sp.gearbox.autoDownFrac : 0.55) && st.gearIdx > 0) this.requestShift(-1);
+    const red = this.shiftRedlineRpm();
+    if (!(red > 0)) return;
+    const rr = rpm / red;
+    const up = (sp.gearbox.autoUpFrac !== undefined ? sp.gearbox.autoUpFrac : 0.92);
+    const dn = (sp.gearbox.autoDownFrac !== undefined ? sp.gearbox.autoDownFrac : 0.55);
+    const locked = (st.shiftLockT > 0);
+    if (rr > up && st.gearIdx < sp.gearbox.ratios.length - 1) {
+      if (!(locked && st.shiftLockDir === -1)) this.requestShift(1);
+    } else if (rr < dn && st.gearIdx > 0) {
+      if (!(locked && st.shiftLockDir === 1)) this.requestShift(-1);
+    }
+  },
+  /* C3(G31-FR)：手动/序列箱的换挡生产者——简单转速律（“手动箱自动离合”简化）。
+     设计取舍：UI 换挡键需要键盘焦点管理 + 三处舞台 ctrl 构造改造，成本高；
+     本律由接线层（11-stages.js VehicleDynamics15DOF.step）每子步调用并写入
+     demand.shiftCmd；驾驶员显式换挡（ctrl.shiftCmd=±1）优先级更高。
+     upFrac=0.95（近红线升挡）/ downFrac=0.55（低转降挡），中间带保持；
+     与 autoShift 同享 SHIFT_LOCK_MS 反向锁止。返回 +1/−1/0（不直接改状态）。 */
+  shiftCmdFromRpm(rpm, upFrac, downFrac) {
+    const sp = this.spec, st = this.state;
+    if (!sp || !st || !sp.gearbox) return 0;
+    if (!Number.isFinite(rpm) || !(rpm >= 0)) return 0;
+    const g = sp.gearbox;
+    const red = this.shiftRedlineRpm();
+    if (!(red > 0)) return 0;
+    if (st.shiftT > 0) return 0;
+    const up = Number.isFinite(upFrac) ? upFrac : 0.95;
+    const dn = Number.isFinite(downFrac) ? downFrac : 0.55;
+    const rr = rpm / red;
+    const locked = (st.shiftLockT > 0);
+    if (rr > up && st.gearIdx < g.ratios.length - 1) return (locked && st.shiftLockDir === -1) ? 0 : 1;
+    if (rr < dn && st.gearIdx > 0) return (locked && st.shiftLockDir === 1) ? 0 : -1;
+    return 0;
   },
   /* 电池 SOC 积分：dSoc = −P_net·dt/(cap×3.6e6)。P_net>0=放电、<0=充电。
      钳位 [0,1]；无 battery / 非有限输入 → no-op（失效安全）。
@@ -237,9 +332,11 @@ const POWERTRAIN = {
      step(dt, demand, wheelOmega)：每子步调用一次（在 15-DOF 轮循环之前）。
        demand     = { throttle, brake, shiftCmd?, tvBias?, tcsRear? }
        wheelOmega = { FL, FR, RL, RR }（rad/s）
-     返回 { tFront, tRear, tWheel|null, iceRpm, gearIdx, soc, shifting, P_gen }
+     返回 { tFront, tRear, tWheel|null, iceRpm, shiftRpm, gearIdx, soc, shifting, P_gen }
        tFront/tRear = 单轮驱动扭矩（轴扭矩 / 2，与 legacy 常数 480/120 同量纲，未乘 drivePowerFactor）
        tWheel       = 仅 drive==='tv' 时逐轮 [FL,FR,RL,RR]，否则 null
+       shiftRpm     = C3(G31-FR) 架构感知换挡转速源（ev/series/powersplit → 电机 rpm，
+                      其余 → iceRpm）；接线层的换挡生产者与 HUD/声浪应统一取此值
        P_gen        = ICE 发电功率（W，仅 series/powersplit > 0）
      tWheel 为逐轮扭矩（不再 /2）；tFront/tRear 为轴扭矩/2——接线层勿对 tWheel 再除 2。
      七架构功率流见各 case 注释。TCS 机械通道不在本层（接线层按轮滑移切轮扭矩）。
@@ -279,16 +376,27 @@ const POWERTRAIN = {
     if (!shifting && sp.ice && sp.architecture !== "series" && sp.architecture !== "powersplit") {
       st.iceOmega = iceAxleW * ratio;
     }
-    /* 电机转速（rpm）：p2 电机在曲轴链 → iceOmega 换算；其余电机直驱/箱后 → 对应轴轮速换算 */
-    const rpmF = (sp.architecture === "p2") ? st.iceOmega * 30 / Math.PI : wF * 30 / Math.PI;
-    const rpmR = (sp.architecture === "p2") ? st.iceOmega * 30 / Math.PI : wR * 30 / Math.PI;
+    /* C1(G31-FR)：电机是否位于减速器【上游】。
+       ev/series/powersplit：电机轴 → 减速器(ratios[gear]×finalDrive) → 半轴，
+         故轮端电机扭矩 = T_mot × ratio × eff，且电机角速度 = 轮速 × ratio。
+         终审缺陷：旧实现两者都取轮端 → 轮扭矩小一个齿比（EV 单速比 9.73 时
+         tRear 仅 175 N·m 而非 1652）；且电机转速被低估 → 恒功率拐点永不到达、
+         电池 maxDischargeKw 钳制形同虚设（EV 变成无限功率）、P_mot 与轮功率
+         不同源（能量不守恒）。p2/p3 早已成对处理，本修只补齐 ev/series/powersplit。
+       p2：电机在曲轴链（组合器内已统一乘 ratio×eff）→ motGeared=1；
+       p3/p4：电机在箱后直连轮轴 → motGeared=1。二者逐位不变（保既有断言/对拍锚）。 */
+    const MOTOR_GEARED = (sp.architecture === "ev" || sp.architecture === "series" || sp.architecture === "powersplit");
+    const motGeared = MOTOR_GEARED ? ratio * eff : 1;
+    /* 电机轴角速度（rad/s）：p2 → iceOmega；MOTOR_GEARED → 轮速×ratio；p3/p4 → 轮速 */
+    const wMotF = (sp.architecture === "p2") ? st.iceOmega : (MOTOR_GEARED ? wF * ratio : wF);
+    const wMotR = (sp.architecture === "p2") ? st.iceOmega : (MOTOR_GEARED ? wR * ratio : wR);
+    /* 电机转速（rpm）与 wMot* 严格同源（C1 前按架构分叉，现统一由 wMot* 导出） */
+    const rpmF = wMotF * 30 / Math.PI;
+    const rpmR = wMotR * 30 / Math.PI;
     let T_motF = 0, T_motR = 0;
     if (sp.motorF) T_motF = this.motorTorque(sp.motorF, rpmF, motCmd, st.soc);
     if (sp.motorR) T_motR = this.motorTorque(sp.motorR, rpmR, motCmd, st.soc);
-    /* C1：电机消耗电功率（W）：p2 电机在曲轴链 → 参考 iceOmega；其余在轮端 → wF/wR */
-    const wMotF = (sp.architecture === "p2") ? st.iceOmega : wF;
-    const wMotR = (sp.architecture === "p2") ? st.iceOmega : wR;
-    /* I2：电池功率上限反馈——在组合器前对电机扭矩做功率钳制 */
+    /* I2：电池功率上限反馈——在组合器前对电机扭矩做功率钳制（电机轴侧，与 P_mot 同源） */
     const pLim = (sp.battery && sp.battery.maxDischargeKw !== undefined) ? sp.battery.maxDischargeKw * 1000 : Infinity;
     const pMotRaw = Math.abs(T_motF * wMotF) + Math.abs(T_motR * wMotR);
     if (pMotRaw > pLim && pMotRaw > 0) {
@@ -296,6 +404,11 @@ const POWERTRAIN = {
       T_motF *= scale; T_motR *= scale;
     }
     const P_mot = (T_motF * wMotF + T_motR * tcsRear * wMotR) / 0.95;
+    /* C1：轮端电机扭矩（已过减速器）。非 MOTOR_GEARED 架构下 motGeared===1 → 与 T_mot* 同值，
+       组合器/tv 块统一只用 _w 版本，避免“某条路径忘乘齿比”类缺陷再次发生。
+       能量关系：P_wheel = P_mot × 0.95（电机/逆变器）× eff（齿轮），与下方 P_mot 严格同源。 */
+    const T_motF_w = T_motF * motGeared;
+    const T_motR_w = T_motR * motGeared;
     /* series/powersplit：ICE 转速不跟轮速，按增程/功率分流控制律。
        iceOmega = max(idle, min(redline, idle + (P_demand/P_rated)×(redline−idle)))，P_demand = 电机消耗功率估计。 */
     if ((sp.architecture === "series" || sp.architecture === "powersplit") && sp.ice) {
@@ -307,7 +420,13 @@ const POWERTRAIN = {
       st.iceOmega = Math.max(idle, Math.min(red, idle + (P_demand / P_rated) * (red - idle)));
     }
     const iceRpm = st.iceOmega * 30 / Math.PI;
-    this.autoShift(iceRpm);   // 自守卫：仅 gearbox.type=auto/dct 生效
+    /* C3(G31-FR)：架构感知换挡转速源——ev/series/powersplit 的电机不经曲轴，
+       iceOmega（EV≡0、series/powersplit 为发电控制律转速）不可用作换挡判据 →
+       改用驱动电机的电机轴 rpm（= 轮速×ratio）；其余架构 iceOmega 已含齿比 → 直接用。
+       本值同时回传（out.shiftRpm），供接线层换挡生产者与 HUD/声浪统一取用。 */
+    const wMotShift = (sp.drive === "fwd") ? wMotF : wMotR;
+    const shiftRpm = MOTOR_GEARED ? (wMotShift * 30 / Math.PI) : iceRpm;
+    this.autoShift(shiftRpm);   // 自守卫：仅 AUTO_GB_TYPES 生效（+ 反向锁止）
     /* ICE 曲轴扭矩（换挡中断期置 0） */
     const T_ice = (sp.ice && !shifting) ? this.iceTorque(iceRpm, cmd) : 0;
     const T_ice_wheel = shifting ? 0 : T_ice * ratio * eff;   // ICE 经变速箱到轴的扭矩
@@ -321,11 +440,12 @@ const POWERTRAIN = {
         else { Tf = T_ice_wheel * sp.splitFront; Tr = T_ice_wheel * (1 - sp.splitFront); }
         break;
       case "ev":
-        /* 电机直驱（无 ICE）；drive==='tv' 逐轮在下方 tv 块处理 */
+        /* 电机经单速减速器驱轮（无 ICE）；C1：扭矩用轮端值 T_mot*_w（已×ratio×eff）。
+           drive==='tv' 逐轮在下方 tv 块处理 */
         if (sp.drive === "tv") { /* 见下方 tv 块 */ }
-        else if (sp.drive === "fwd") Tf = T_motF;
-        else if (sp.drive === "rwd") Tr = T_motR;
-        else { Tf = T_motF; Tr = T_motR; }
+        else if (sp.drive === "fwd") Tf = T_motF_w;
+        else if (sp.drive === "rwd") Tr = T_motR_w;
+        else { Tf = T_motF_w; Tr = T_motR_w; }
         break;
       case "p2": {
         /* I1：电机在 ICE 与 gearbox 之间同轴：T_shaft = (T_ice + T_motF + T_motR)×ratio×eff；换挡期整轴切断 */
@@ -352,28 +472,31 @@ const POWERTRAIN = {
         break;
       }
       case "series":
-        /* 增程：轮只由电机驱动；ICE 仅发电 P_gen = max(0,T_ice)×iceOmega×0.9（不接轮） */
+        /* 增程：轮只由电机驱动（C1：×ratio×eff）；ICE 仅发电 P_gen = max(0,T_ice)×iceOmega×0.9（不接轮） */
         P_gen = Math.max(0, T_ice) * st.iceOmega * 0.9;
-        Tf = sp.motorF ? T_motF : 0;
-        Tr = sp.motorR ? T_motR : 0;
+        Tf = sp.motorF ? T_motF_w : 0;
+        Tr = sp.motorR ? T_motR_w : 0;
         break;
       case "powersplit": {
-        /* 功率分流（行星排简化）：72% 机械路径到轮，28% 发电；motorB 叠加到轮 */
+        /* 功率分流（行星排简化）：72% 机械路径到轮，28% 发电；
+           motorB（MG2）叠加到轮——C1：电机路径同样×ratio×eff（与机械路径共用主减） */
         const Tmech = T_ice * 0.72 * ratio * eff * (shifting ? 0 : 1);
         P_gen = Math.max(0, T_ice) * 0.28 * st.iceOmega * 0.9;
-        if (sp.drive === "fwd") { Tf = Tmech + (sp.motorF ? T_motF : 0); Tr = sp.motorR ? T_motR : 0; }
-        else if (sp.drive === "rwd") { Tr = Tmech + (sp.motorR ? T_motR : 0); Tf = sp.motorF ? T_motF : 0; }
-        else { Tf = Tmech * sp.splitFront + (sp.motorF ? T_motF : 0); Tr = Tmech * (1 - sp.splitFront) + (sp.motorR ? T_motR : 0); }
+        if (sp.drive === "fwd") { Tf = Tmech + (sp.motorF ? T_motF_w : 0); Tr = sp.motorR ? T_motR_w : 0; }
+        else if (sp.drive === "rwd") { Tr = Tmech + (sp.motorR ? T_motR_w : 0); Tf = sp.motorF ? T_motF_w : 0; }
+        else { Tf = Tmech * sp.splitFront + (sp.motorF ? T_motF_w : 0); Tr = Tmech * (1 - sp.splitFront) + (sp.motorR ? T_motR_w : 0); }
         break;
       }
     }
-    /* tv 逐轮：tvBias 将前/后电机扭矩分裂到左右轮（守恒：四轮和 = T_motF + T_motR） */
+    /* tv 逐轮：tvBias 将前/后电机轮端扭矩分裂到左右轮（守恒：四轮和 = T_motF_w + T_motR_w） */
     let tWheel = null;
     if (sp.drive === "tv" && sp.motorF && sp.motorR) {
-      /* M1：tvBias 钳位 [0,1]，NaN/undefined 回退 0.5 */
+      /* M1：tvBias 钳位 [0,1]，NaN/undefined 回退 0.5（C1：用轮端扭矩 T_mot*_w）
+         TODO(G31-P10)：动态扭矩矢量（按横摆角速度误差/前后轴侧偏分配 bias）尚未接入——
+         接线层恒传 undefined → 0.5 均分；生产者待后续操纵性波次落地。 */
       const b = Math.max(0, Math.min(1, Number.isFinite(dm.tvBias) ? dm.tvBias : 0.5));
-      tWheel = [T_motF * b, T_motF * (1 - b), T_motR * b, T_motR * (1 - b)];
-      Tf = T_motF; Tr = T_motR;
+      tWheel = [T_motF_w * b, T_motF_w * (1 - b), T_motR_w * b, T_motR_w * (1 - b)];
+      Tf = T_motF_w; Tr = T_motR_w;
     }
     /* 电池能量流：P_net = 电机耗电 − ICE 发电；按 maxDischargeKw/maxChargeKw 钳制后积分 SOC */
     let P_net = P_mot - P_gen;
@@ -384,7 +507,7 @@ const POWERTRAIN = {
       P_net = Math.max(-maxChg, Math.min(maxDis, P_net));
     }
     this.integrateBattery(P_net, dt);
-    return { tFront: Tf / 2, tRear: Tr / 2, tWheel, iceRpm, gearIdx: st.gearIdx,
+    return { tFront: Tf / 2, tRear: Tr / 2, tWheel, iceRpm, shiftRpm, gearIdx: st.gearIdx,
              soc: st.soc, shifting, P_gen };
   },
 

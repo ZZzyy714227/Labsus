@@ -710,13 +710,42 @@ class VehicleDynamics15DOF {
       if (!this._ptOmega) this._ptOmega = { FL: 0, FR: 0, RL: 0, RR: 0 };
       const _pd = this._ptDemand, _pw = this._ptOmega;
       _pd.throttle = ctrl.throttle; _pd.brake = ctrl.brake;
-      _pd.shiftCmd = ctrl.shiftCmd || 0; _pd.tvBias = ctrl.tvBias;
+      /* C3(G31-FR)：换挡指令【生产者】。
+         ctrl.shiftCmd（UI/键盘）优先；缺省时对 manual 箱用简单转速律代驾——
+         即“手动箱自动离合”简化（无离合器/无换挡杆物理，只是把驾驶员的换挡时机
+         用转速律近似）：rpm>0.95×红线 → +1 挡；rpm<0.55×红线 → −1 挡。
+         为何只管 manual：auto/dct/seq/cvt 四类已在 POWERTRAIN.AUTO_GB_TYPES 白名单内，
+         由 step() 内的 autoShift 按【spec 自带的 autoUpFrac/autoDownFrac】自换挡；
+         再叠一个硬编码 0.95/0.55 的外部生产者会覆盖用户规格（例如 FSAE seq 的
+         autoDownFrac=0.5）——双重生产者语义模糊，故单一职责：箱内自换的交给箱。
+         没有本生产者时 GT3（6MT manual）永远卡 1 挡，极速被 1 挡齿比钳在 ~93 km/h。
+         转速源 = 上一子步 step() 返回的 shiftRpm（架构感知：ev/series/powersplit
+         取电机 rpm，其余取曲轴 rpm），一帧滞后，与 TCS 能量通道同风格。 */
+      if (this._ptShiftRpm === undefined) this._ptShiftRpm = 0;
+      let _shiftCmd = (ctrl.shiftCmd === 1 || ctrl.shiftCmd === -1) ? ctrl.shiftCmd : 0;
+      if (_shiftCmd === 0 && this._ptShiftRpm > 0 &&
+          typeof POWERTRAIN !== "undefined" && typeof POWERTRAIN.shiftCmdFromRpm === "function") {
+        const _gbt = (POWERTRAIN.spec && POWERTRAIN.spec.gearbox) ? POWERTRAIN.spec.gearbox.type : "";
+        if (_gbt === "manual") _shiftCmd = POWERTRAIN.shiftCmdFromRpm(this._ptShiftRpm);
+      }
+      _pd.shiftCmd = _shiftCmd;
+      /* TODO(G31-P10)：tvBias 暂用默认 0.5（step() 内 dm.tvBias 非有限值即回退 0.5）；
+         动态扭矩矢量（按横摆/侧偏目标解算前后左右分配）待后续波次接入。 */
+      _pd.tvBias = ctrl.tvBias;
       _pd.tcsRear = (this._tcsEstimate !== undefined) ? this._tcsEstimate : 1;   // I-3：一帧滞后（上一子步末尾算出）
       _pw.FL = st.omega.FL; _pw.FR = st.omega.FR; _pw.RL = st.omega.RL; _pw.RR = st.omega.RR;
       const ptOut = (typeof POWERTRAIN !== "undefined" && POWERTRAIN.spec) ?
         POWERTRAIN.step(dt, _pd, _pw) : null;
-      const ptIw = ptOut ? POWERTRAIN.reflectedInertia() : 0;
+      /* I3(G31-FR)：drivePowerFactor 旁路。该系数是 legacy 常数扭矩（后 480/前 120 N·m）
+         下的质量补偿（min(1, m/1250×1.2)）；真实传动链的扭矩已由 spec 的功率/齿比/效率
+         物理推导出来，再乘一次等于凭空打折（GT3 类预设 ×0.576，动力少一半）。 */
+      const ptDriveScale = (ptOut && POWERTRAIN.hasRealDrivetrain()) ? 1 : drivePowerFactor;
+      /* I1(G31-FR)：反射惯量是“每【驱动】轮”值，只加到实际接收驱动扭矩的轮上
+         （fwd→前两轮、rwd→后两轮、awd_fixed/awd_center/tv→四轮）。旧接线加到全 4 轮，
+         使非驱动轮 Iw 被无物理依据地放大。 */
+      const ptIwDrive = ptOut ? POWERTRAIN.reflectedInertiaPerDriveWheel() : 0;
       this._ptOut = ptOut;   // G31：供 HUD（renderCircuitTelemetry）读挡位/rpm
+      this._ptShiftRpm = (ptOut && Number.isFinite(ptOut.shiftRpm)) ? ptOut.shiftRpm : 0;   // C3：下一子步换挡律的转速源
       let _tcsSumRear = 0, _tcsCntRear = 0;   // I-3：累计后轮 tcsScale 供子步末更新（能量通道，一帧滞后）
 
       for(const w of wheels) {
@@ -796,18 +825,25 @@ class VehicleDynamics15DOF {
         // G31-P6：TCS 切扭矩比例（ptOut 路径下 throttleCmd 已被 TCS 削减，除以原始
         //   ctrl.throttle 得比例，乘到轮扭矩上，与旧路径直接切 throttleCmd 等效）。
         //   M-2：用模块常量 WHEEL_IDX 替代内联字面量。
-        const tcsScale = (ctrl.throttle > 1e-6) ? (throttleCmd / ctrl.throttle) : 0;
+        /* C2(G31-FR)：松油门（throttle≤1e-6）时 tcsScale = 1，不是 0。
+           TCS 的语义是“给油驱动时切断打滑轮的驱动扭矩”，松油门根本没有驱动意图，
+           不存在 TCS 介入；旧写法把整条机械通道归零，连带抹掉了发动机制动与电机
+           回收（负扭矩），而 step() 内的 SOC/油耗积分照旧 → 轮上无阻力却在充电，
+           能量不守恒。现在负扭矩正常通过机械通道，与 P_mot 同源同符号。 */
+        const tcsScale = (ctrl.throttle > 1e-6) ? (throttleCmd / ctrl.throttle) : 1;
         // I-3：累计后轮 tcsScale 供子步末更新 _tcsEstimate
         if (w.axle === 'rear') { _tcsSumRear += tcsScale; _tcsCntRear++; }
         const T_drive = ptOut
           ? ((ptOut.tWheel ? ptOut.tWheel[WHEEL_IDX[w.id]]
-                           : (w.axle === 'rear' ? ptOut.tRear : ptOut.tFront)) * drivePowerFactor * tcsScale)
+                           : (w.axle === 'rear' ? ptOut.tRear : ptOut.tFront)) * ptDriveScale * tcsScale)
           : (w.axle === 'rear' ? (throttleCmd * 480.0 * drivePowerFactor)
                                : (throttleCmd * 120.0 * drivePowerFactor));
         const T_brake = (ctrl.brake * (w.axle === 'front' ? maxBrakeTorqueF * (bbias_eff / 0.58) : maxBrakeTorqueR * ((1.0 - bbias_eff) / 0.42)));
         const sgn_w = st.omega[w.id] >= 0 ? 1.0 : -1.0;
         const T_net = (ws.isAirborne ? (T_drive - T_brake * sgn_w) : (T_drive - T_brake * sgn_w - Fx_t * w.Re));
-        const d_omega = T_net / (this.Iw + ptIw);
+        /* I1(G31-FR)：只有驱动轮承担传动链反射惯量（每驱动轮值 ptIwDrive）。 */
+        const iwEff = this.Iw + ((ptIwDrive > 0 && POWERTRAIN.isDriveWheel(w.id)) ? ptIwDrive : 0);
+        const d_omega = T_net / iwEff;
         st.omega[w.id] += d_omega * dt;
         
         this.telemetry.Fz[w.id] = Fz_w;
