@@ -256,5 +256,53 @@ def test_powertrain_optional_field():
     assert d.get("powertrain") is None
 
 
+# ── G31-P7 审查修复：IceSpec.map 边界校验（畸形输入 → ValidationError/422，
+#    而非 transient 内 p[0]/p[1] 触发的 IndexError/500）。语义对齐前端
+#    16-powertrain.js validate 的 ice.map / ice.map(ascending)。──
+
+def test_icespec_map_malformed_raises_validation_error():
+    """三条畸形 map 各自触发 pydantic ValidationError（模型层）。"""
+    from pydantic import ValidationError
+    from src.api.v3models import IceSpec
+    # (1) 每项长度 != 2（缺扭矩分量）——transient 会 p[1] → IndexError
+    with pytest.raises(ValidationError):
+        IceSpec(map=[[800]])
+    # (2) rpm 非严格递增（重复 800 → 插值分母为零/负）
+    with pytest.raises(ValidationError):
+        IceSpec(map=[[800, 1], [800, 2]])
+    # (3) 含 NaN（pydantic 默认 allow_inf_nan=True → 需显式拒绝）
+    with pytest.raises(ValidationError):
+        IceSpec(map=[[800, float("nan")], [9000, 1200]])
+    # 附加：空 map 亦拒绝（断言 map 非空）
+    with pytest.raises(ValidationError):
+        IceSpec(map=[])
+
+
+def test_icespec_map_valid_passes():
+    """合法 map（非空 + 每项长度 2 + 全有限 + rpm 严格递增）通过校验。"""
+    from src.api.v3models import IceSpec
+    ice = IceSpec(map=[[800, 1200], [5000, 1400], [9000, 1100]])
+    assert ice.map == [[800, 1200], [5000, 1400], [9000, 1100]]
+    # 缺省 map 亦合法（[[800,1200],[9000,1200]]，rpm 严格递增）
+    assert IceSpec().map == [[800, 1200], [9000, 1200]]
+
+
+def test_icespec_map_malformed_422_not_500():
+    """端到端：畸形 ice.map 经 simulate_track 端点 → 422（ValidationError），
+    而非 500（IndexError）。这是本修复的核心验收口径。
+
+    只跑 JSON 可渲染的两种畸形：[[800]] 正是旧路径会在 transient
+    `p[1] for p in ice.map` 触发 IndexError（500）的用例。NaN 已在
+    test_icespec_map_malformed_raises_validation_error 模型层证实：它的
+    HTTP 回路会被 Starlette 阻断——JSONResponse.render 用 allow_nan=False
+    序列化 422 详情（回显非法输入），与引擎无关的框架限制。"""
+    for bad_map in ([[800]], [[800, 1], [800, 2]]):
+        r = client.post("/api/v3/chassis/simulate_track",
+                        json=_pt_min_body(powertrain={
+                            "architecture": "ice", "ice": {"map": bad_map}}))
+        assert r.status_code == 422, (bad_map, r.status_code, r.text)
+        assert "IndexError" not in r.text
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
