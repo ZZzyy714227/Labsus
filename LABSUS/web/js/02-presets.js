@@ -217,6 +217,11 @@ function loadVehiclePreset(type) {
     if (typeof TIRE_LAB !== "undefined") TIRE_LAB.activateCustom(type.slice("tirecustom:".length));
     return;
   }
+  /* G31：ptcustom: 前缀 → 动力工坊自定义条目（同一 select，模式同 tirecustom） */
+  if (typeof type === "string" && type.indexOf("ptcustom:") === 0) {
+    if (typeof POWERTRAIN !== "undefined") POWERTRAIN.activateCustom(type.slice("ptcustom:".length));
+    return;
+  }
   const p = VEHICLE_PRESETS[type];
   if(!p) return;
   S.vehicleType = type;
@@ -279,6 +284,8 @@ function loadVehiclePreset(type) {
   /* G29：换车型后重放自定义轮胎覆盖层（否则出厂胎覆盖用户胎） */
   if (typeof TIRE_LAB !== "undefined" && TIRE_LAB.active) TIRE_LAB.syncAfterPreset();
   if (typeof TIRE_LAB !== "undefined") TIRE_LAB.refreshPresetSelect();
+  /* G31：换车型会重建下拉 DOM 内容 → 重挂自定义动力 optgroup（覆盖层不受车型影响） */
+  if (typeof POWERTRAIN !== "undefined") POWERTRAIN.refreshPresetSelect();
 }
 
 function initData(){

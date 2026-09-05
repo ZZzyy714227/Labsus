@@ -852,6 +852,310 @@ assert(Math.abs(trAwDSoc05 / trAwDSoc1 - 0.75) < 1e-6,
 
 T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
 
+/* ═══ 7. 段6 UI：内置预设 / 弹窗表单 / 曲线 / 持久化 / 下拉集成 ═══
+   沙箱说明（与 test_tire_lab 同构）：document.getElementById 经 elCache 缓存
+   → 永远返回同一 fakeEl，故 renderForm 写值 / readForm 读值可在同一元素上往返；
+   canvas.getContext 返回 makeCtx2D(drawRec) 桩（arc/rect 为空实现）→ drawCurve
+   必须只用 moveTo/lineTo/stroke/fillText 一类桩内 API。 */
+console.log("=== 7. G31-P8 Powertrain Lab: Presets / Modal / Curve / Persistence / Select ===");
+
+/* ── 7.1 六条内置预设全部通过 validate 且可落地 ── */
+assert(T("typeof POWERTRAIN_PRESETS !== 'undefined'"), "7.1 POWERTRAIN_PRESETS 已定义");
+const ptNames = T("Object.keys(POWERTRAIN_PRESETS)");
+assert(ptNames.length === 6, `7.1 内置预设 6 条（实际 ${ptNames.length}）`);
+for (const n of ptNames) {
+  const v = T(`POWERTRAIN.validate(POWERTRAIN_PRESETS[${JSON.stringify(n)}])`);
+  assert(v.ok === true, `7.1 预设「${n}」validate ok${v.ok ? "" : " → " + v.errors.join(",")}`);
+  const r = T(`POWERTRAIN.setSpec(POWERTRAIN_PRESETS[${JSON.stringify(n)}]).ok`);
+  assert(r === true, `7.1 预设「${n}」setSpec 落地成功`);
+}
+// 规格抽检：架构 / 驱动形式 / 关键量级
+assert(T("POWERTRAIN_PRESETS['GT3 V8 RWD 6MT'].architecture") === "ice" &&
+       T("POWERTRAIN_PRESETS['GT3 V8 RWD 6MT'].drive") === "rwd", "7.1 GT3 预设 ice/rwd");
+assert(T("POWERTRAIN_PRESETS['GT3 V8 RWD 6MT'].gearbox.ratios.length") === 6 &&
+       Math.abs(T("POWERTRAIN_PRESETS['GT3 V8 RWD 6MT'].gearbox.finalDrive") - 3.9) < 1e-12,
+  "7.1 GT3 预设 6 挡 + finalDrive 3.9");
+assert(T("POWERTRAIN_PRESETS['GT3 V8 RWD 6MT'].battery") === null, "7.1 GT3 预设无 battery（纯 ICE）");
+const gt3Map = T("POWERTRAIN_PRESETS['GT3 V8 RWD 6MT'].ice.map");
+const gt3Pk = gt3Map.reduce((a, p) => (p[1] > a[1] ? p : a), gt3Map[0]);
+assert(Math.abs(gt3Pk[1] - 520) <= 20 && Math.abs(gt3Pk[0] - 6500) <= 500,
+  `7.1 GT3 峰值 ~520N·m@6500（实际 ${gt3Pk[1]}N·m@${gt3Pk[0]}）`);
+assert(T("POWERTRAIN_PRESETS['GT3 V8 RWD 6MT'].ice.redlineRpm") === 8500, "7.1 GT3 redline 8500");
+assert(T("POWERTRAIN_PRESETS['FSAE I4 RWD 5MT'].ice.redlineRpm") === 13000 &&
+       T("POWERTRAIN_PRESETS['FSAE I4 RWD 5MT'].gearbox.ratios.length") === 5 &&
+       Math.abs(T("POWERTRAIN_PRESETS['FSAE I4 RWD 5MT'].ice.dispL") - 0.6) < 1e-12,
+  "7.1 FSAE 预设 0.6L/redline 13000/5 挡");
+const fsaeMap = T("POWERTRAIN_PRESETS['FSAE I4 RWD 5MT'].ice.map");
+const fsaePk = fsaeMap.reduce((a, p) => (p[1] > a[1] ? p : a), fsaeMap[0]);
+assert(Math.abs(fsaePk[1] - 65) <= 5 && Math.abs(fsaePk[0] - 5500) <= 500,
+  `7.1 FSAE 峰值 ~65N·m@5500（实际 ${fsaePk[1]}N·m@${fsaePk[0]}）`);
+assert(T("POWERTRAIN_PRESETS['EV 双电机 AWD-TV'].architecture") === "ev" &&
+       T("POWERTRAIN_PRESETS['EV 双电机 AWD-TV'].drive") === "tv" &&
+       T("POWERTRAIN_PRESETS['EV 双电机 AWD-TV'].ice") === null, "7.1 EV 预设 ev/tv 且无 ice");
+assert(T("!!POWERTRAIN_PRESETS['EV 双电机 AWD-TV'].motorF && !!POWERTRAIN_PRESETS['EV 双电机 AWD-TV'].motorR"),
+  "7.1 EV 预设双电机（tv 前置条件）");
+assert(T("POWERTRAIN_PRESETS['EV 双电机 AWD-TV'].motorR.peakPowerKw") === 250 &&
+       T("POWERTRAIN_PRESETS['EV 双电机 AWD-TV'].motorR.peakTorqueNm") === 350 &&
+       T("POWERTRAIN_PRESETS['EV 双电机 AWD-TV'].battery.capacityKwh") === 80,
+  "7.1 EV 预设 250kW/350N·m/80kWh");
+assert(T("POWERTRAIN_PRESETS['P3 混动前驱'].architecture") === "p3" &&
+       T("POWERTRAIN_PRESETS['P3 混动前驱'].drive") === "fwd" &&
+       T("POWERTRAIN_PRESETS['P3 混动前驱'].motorR.peakPowerKw") === 100 &&
+       T("POWERTRAIN_PRESETS['P3 混动前驱'].battery.capacityKwh") === 15 &&
+       T("POWERTRAIN_PRESETS['P3 混动前驱'].gearbox.type") === "auto",
+  "7.1 P3 预设 p3/fwd/100kW/15kWh/auto");
+assert(T("POWERTRAIN_PRESETS['串联增程后驱'].architecture") === "series" &&
+       T("POWERTRAIN_PRESETS['串联增程后驱'].drive") === "rwd" &&
+       T("POWERTRAIN_PRESETS['串联增程后驱'].motorR.peakPowerKw") === 150 &&
+       T("POWERTRAIN_PRESETS['串联增程后驱'].battery.capacityKwh") === 40 &&
+       T("POWERTRAIN_PRESETS['串联增程后驱'].ice.cyl") === 3,
+  "7.1 串联增程预设 series/rwd/I3/150kW/40kWh");
+assert(T("POWERTRAIN_PRESETS['THS 功率分流'].architecture") === "powersplit" &&
+       T("POWERTRAIN_PRESETS['THS 功率分流'].drive") === "fwd" &&
+       T("POWERTRAIN_PRESETS['THS 功率分流'].motorF.peakPowerKw") === 60 &&
+       T("POWERTRAIN_PRESETS['THS 功率分流'].motorR.peakPowerKw") === 80 &&
+       T("POWERTRAIN_PRESETS['THS 功率分流'].battery.capacityKwh") === 6.5,
+  "7.1 THS 预设 powersplit/fwd/60kW+80kW/6.5kWh");
+// 预设不得污染出厂默认（legacy-equivalent 等价锚守门）
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+assert(T("POWERTRAIN.spec.ice.map[0][1]") === 1200 && T("POWERTRAIN.spec.gearbox.ratios.length") === 1,
+  "7.1 预设不污染 defaultSpec（等价锚 1200/单速比不变）");
+
+/* ── 7.2 open()/close() 沙箱冒烟 ── */
+let ptOpenErr = null;
+try { T("POWERTRAIN.open();"); } catch (e) { ptOpenErr = e; }
+assert(ptOpenErr === null, `7.2 open() 在 fakeEl 沙箱不抛错${ptOpenErr ? " → " + ptOpenErr.message : ""}`);
+assert(T("!!POWERTRAIN._modal"), "7.2 open() 懒构建 _modal");
+assert(T("POWERTRAIN._modal.style.display") === "flex", "7.2 open() 显示弹窗");
+assert(T("!!POWERTRAIN._draft"), "7.2 open() 由当前 spec 派生 _draft");
+T("POWERTRAIN._draft.ice.dispL = 9.99;");
+assert(T("POWERTRAIN.spec.ice.dispL") === 4.0, "7.2 _draft 为深拷贝（改草稿不污染 spec）");
+T("POWERTRAIN.close();");
+assert(T("POWERTRAIN._modal.style.display") === "none", "7.2 close() 隐藏弹窗");
+
+/* ── 7.3 renderForm / readForm 往返 ── */
+T(`POWERTRAIN._draft = POWERTRAIN.defaultSpec();
+   POWERTRAIN._draft.architecture = "p4";
+   POWERTRAIN._draft.drive = "awd_center";
+   POWERTRAIN._draft.splitFront = 0.42;
+   POWERTRAIN._draft.ice.cyl = 6; POWERTRAIN._draft.ice.layout = "V6";
+   POWERTRAIN._draft.ice.dispL = 3.5; POWERTRAIN._draft.ice.idleRpm = 900;
+   POWERTRAIN._draft.ice.redlineRpm = 7800; POWERTRAIN._draft.ice.fuelCutRpm = 8000;
+   POWERTRAIN._draft.ice.map = [[900,200],[3000,420],[6000,380],[7800,300]];
+   POWERTRAIN._draft.ice.fricA = 18; POWERTRAIN._draft.ice.fricB = 0.005;
+   POWERTRAIN._draft.ice.fricC = 0; POWERTRAIN._draft.ice.inertia = 0.28;
+   POWERTRAIN._draft.ice.throttleTau = 0.07;
+   POWERTRAIN._draft.motorR = { peakTorqueNm:320, peakPowerKw:180, maxRpm:15000, regenMaxKw:120, inertia:0.08 };
+   POWERTRAIN._draft.battery = { capacityKwh:12, soc0:0.7, maxDischargeKw:200, maxChargeKw:90 };
+   POWERTRAIN._draft.gearbox = { type:"dct", ratios:[3.4,2.3,1.7,1.3,1.0,0.82], finalDrive:3.6,
+                                 shiftTimeMs:60, eff:0.96, autoUpFrac:0.9, autoDownFrac:0.5 };
+   POWERTRAIN._draft.diff = { type:"lsd", bias:2.2, lockNm:80 };
+   POWERTRAIN.renderForm();
+   POWERTRAIN.readForm();`);
+assert(T("POWERTRAIN._draft.architecture") === "p4", "7.3 往返 architecture");
+assert(T("POWERTRAIN._draft.drive") === "awd_center", "7.3 往返 drive");
+assert(Math.abs(T("POWERTRAIN._draft.splitFront") - 0.42) < 1e-12, "7.3 往返 splitFront");
+assert(T("POWERTRAIN._draft.ice.cyl") === 6 && T("POWERTRAIN._draft.ice.layout") === "V6", "7.3 往返 ice.cyl/layout");
+assert(Math.abs(T("POWERTRAIN._draft.ice.dispL") - 3.5) < 1e-12, "7.3 往返 ice.dispL");
+assert(T("POWERTRAIN._draft.ice.redlineRpm") === 7800 && T("POWERTRAIN._draft.ice.fuelCutRpm") === 8000,
+  "7.3 往返 ice.redlineRpm/fuelCutRpm");
+assert(Math.abs(T("POWERTRAIN._draft.ice.inertia") - 0.28) < 1e-12 &&
+       Math.abs(T("POWERTRAIN._draft.ice.throttleTau") - 0.07) < 1e-12, "7.3 往返 ice.inertia/throttleTau");
+assert(T("POWERTRAIN._draft.ice.map.length") === 4 &&
+       Math.abs(T("POWERTRAIN._draft.ice.map[1][1]") - 420) < 1e-12, "7.3 往返 ice.map（textarea JSON）");
+assert(T("!!POWERTRAIN._draft.motorR") && Math.abs(T("POWERTRAIN._draft.motorR.peakTorqueNm") - 320) < 1e-12 &&
+       Math.abs(T("POWERTRAIN._draft.motorR.peakPowerKw") - 180) < 1e-12 &&
+       T("POWERTRAIN._draft.motorR.maxRpm") === 15000 &&
+       Math.abs(T("POWERTRAIN._draft.motorR.regenMaxKw") - 120) < 1e-12, "7.3 往返 motorR 全字段");
+assert(T("POWERTRAIN._draft.motorF") === null, "7.3 未勾选 motorF → null");
+assert(Math.abs(T("POWERTRAIN._draft.battery.capacityKwh") - 12) < 1e-12 &&
+       Math.abs(T("POWERTRAIN._draft.battery.soc0") - 0.7) < 1e-12 &&
+       Math.abs(T("POWERTRAIN._draft.battery.maxDischargeKw") - 200) < 1e-12 &&
+       Math.abs(T("POWERTRAIN._draft.battery.maxChargeKw") - 90) < 1e-12, "7.3 往返 battery 全字段");
+assert(T("POWERTRAIN._draft.gearbox.type") === "dct" &&
+       T("POWERTRAIN._draft.gearbox.ratios.length") === 6 &&
+       Math.abs(T("POWERTRAIN._draft.gearbox.ratios[3]") - 1.3) < 1e-12 &&
+       Math.abs(T("POWERTRAIN._draft.gearbox.ratios[5]") - 0.82) < 1e-12, "7.3 往返 gearbox 6 挡逐行 input");
+assert(Math.abs(T("POWERTRAIN._draft.gearbox.finalDrive") - 3.6) < 1e-12 &&
+       Math.abs(T("POWERTRAIN._draft.gearbox.shiftTimeMs") - 60) < 1e-12 &&
+       Math.abs(T("POWERTRAIN._draft.gearbox.eff") - 0.96) < 1e-12, "7.3 往返 finalDrive/shiftTimeMs/eff");
+assert(Math.abs(T("POWERTRAIN._draft.gearbox.autoUpFrac") - 0.9) < 1e-12 &&
+       Math.abs(T("POWERTRAIN._draft.gearbox.autoDownFrac") - 0.5) < 1e-12, "7.3 往返 autoUp/DownFrac");
+assert(T("POWERTRAIN._draft.diff.type") === "lsd" &&
+       Math.abs(T("POWERTRAIN._draft.diff.bias") - 2.2) < 1e-12 &&
+       Math.abs(T("POWERTRAIN._draft.diff.lockNm") - 80) < 1e-12, "7.3 往返 diff 全字段");
+assert(T("POWERTRAIN.validate(POWERTRAIN._draft).ok") === true, "7.3 表单产物通过 validate（p4 双轴混动）");
+// 架构过滤：切 ev → ice 置 null、勾选电机/电池后产物合法
+T(`POWERTRAIN._draft = POWERTRAIN.defaultSpec(); POWERTRAIN.renderForm();
+   document.getElementById("pt_arch_ice").checked = false;
+   document.getElementById("pt_arch_ev").checked = true;
+   document.getElementById("pt_motorR_on").checked = true;
+   document.getElementById("pt_bat_on").checked = true;
+   POWERTRAIN.readForm();`);
+assert(T("POWERTRAIN._draft.architecture") === "ev", "7.3 架构 radio → draft.architecture=ev");
+assert(T("POWERTRAIN._draft.ice") === null, "7.3 arch=ev → draft.ice=null（M-1 无曲轴）");
+assert(T("POWERTRAIN.validate(POWERTRAIN._draft).ok") === true, "7.3 arch=ev 表单产物通过 validate");
+// 驱动形式按架构过滤：ice 架构不得出现 tv
+T(`POWERTRAIN._draft = POWERTRAIN.defaultSpec(); POWERTRAIN._draft.architecture = "ice"; POWERTRAIN.renderForm();
+   document.getElementById("pt_drive").value = "tv"; POWERTRAIN.readForm();`);
+assert(T("POWERTRAIN._draft.drive") !== "tv", "7.3 ice 架构下 tv 不可选（readForm 回退合法值）");
+assert(T("POWERTRAIN.validate(POWERTRAIN._draft).ok") === true, "7.3 非法 drive 回退后 validate ok");
+// map textarea：非法 JSON 保留旧值；乱序自动升序
+T(`POWERTRAIN._draft = POWERTRAIN.defaultSpec(); POWERTRAIN.renderForm();
+   document.getElementById("pt_ice_map").value = "{oops"; POWERTRAIN.readForm();`);
+assert(T("POWERTRAIN._draft.ice.map.length") === 4 && T("POWERTRAIN._draft.ice.map[0][1]") === 1200,
+  "7.3 非法 map JSON → 保留旧 map（失效安全）");
+T(`document.getElementById("pt_ice_map").value = "[[6500,520],[900,200],[3000,430]]"; POWERTRAIN.readForm();`);
+assert(T("POWERTRAIN._draft.ice.map.length") === 3 && T("POWERTRAIN._draft.ice.map[0][0]") === 900 &&
+       T("POWERTRAIN._draft.ice.map[2][1]") === 520, "7.3 乱序 map 自动按 rpm 升序");
+assert(T("POWERTRAIN.validate(POWERTRAIN._draft).ok") === true, "7.3 排序后 map 通过 validate(ascending)");
+// M-8：map 校验失败的 ⚠ 提示必须活过 updateDerived（否则被概要覆盖 → 用户看不到错误）
+T(`POWERTRAIN._draft = POWERTRAIN.defaultSpec(); POWERTRAIN.renderForm();
+   document.getElementById("pt_ice_map").value = "{oops"; POWERTRAIN.readForm(); POWERTRAIN.updateDerived();`);
+assert(String(T(`document.getElementById("pt_ice_mapHint").textContent`)).indexOf("⚠") >= 0,
+  "7.3 非法 map 的 ⚠ 提示在 updateDerived 后仍可见");
+assert(T("POWERTRAIN._mapErr") !== null, "7.3 readForm 记录 _mapErr（供 UI 与诊断）");
+assert(T("POWERTRAIN._draft.ice.map[0][1]") === 1200, "7.3 ⚠ 分支下仍保留旧 map");
+T(`document.getElementById("pt_ice_map").value = "[[900,200],[6500,520]]"; POWERTRAIN.readForm(); POWERTRAIN.updateDerived();`);
+assert(T("POWERTRAIN._mapErr") === null, "7.3 map 修好后 _mapErr 清空");
+assert(String(T(`document.getElementById("pt_ice_mapHint").textContent`)).indexOf("⚠") < 0,
+  "7.3 map 修好后 ⚠ 消失（回到概要）");
+// 红线/断油自愈：fuelCut < redline 时 readForm 抬到 redline（validate M-2）
+T(`POWERTRAIN._draft = POWERTRAIN.defaultSpec(); POWERTRAIN.renderForm();
+   document.getElementById("pt_ice_redlineRpm").value = "9000";
+   document.getElementById("pt_ice_fuelCutRpm").value = "100";
+   POWERTRAIN.readForm();`);
+assert(T("POWERTRAIN._draft.ice.fuelCutRpm") >= T("POWERTRAIN._draft.ice.redlineRpm") &&
+       T("POWERTRAIN.validate(POWERTRAIN._draft).ok") === true, "7.3 fuelCut<redline 自愈（M-2）");
+// 挡位增删行
+T(`POWERTRAIN._draft = POWERTRAIN.defaultSpec(); POWERTRAIN.renderForm(); POWERTRAIN.readForm();
+   POWERTRAIN.changeRatioCount(1);`);
+assert(T("POWERTRAIN._draft.gearbox.ratios.length") === 2, "7.3 changeRatioCount(+1) 加挡");
+T("POWERTRAIN.deleteRatioRow(0);");
+assert(T("POWERTRAIN._draft.gearbox.ratios.length") === 1, "7.3 deleteRatioRow 删挡");
+T("POWERTRAIN.deleteRatioRow(0);");
+assert(T("POWERTRAIN._draft.gearbox.ratios.length") === 1, "7.3 最后一挡不可删（ratios ≥ 1）");
+
+/* ── 7.4 drawCurve 在 ctx 桩上跑通（不抛错且真的画了） ── */
+T("POWERTRAIN._draft = JSON.parse(JSON.stringify(POWERTRAIN_PRESETS['GT3 V8 RWD 6MT'])); POWERTRAIN.renderForm();");
+const dcS0 = drawRec.strokes, dcP0 = drawRec.pts.length, dcT0 = drawRec.texts.length;
+let dcErr = null;
+try { T("POWERTRAIN.drawCurve();"); } catch (e) { dcErr = e; }
+assert(dcErr === null, `7.4 drawCurve(ICE) 在 makeCtx2D 桩上不抛错${dcErr ? " → " + dcErr.message : ""}`);
+assert(drawRec.strokes > dcS0, `7.4 drawCurve 产生 stroke（+${drawRec.strokes - dcS0}）`);
+assert(drawRec.pts.length > dcP0 + 100, `7.4 drawCurve 绘制折线点（+${drawRec.pts.length - dcP0}）`);
+assert(drawRec.texts.length > dcT0, `7.4 drawCurve 绘制坐标轴/图例文字（+${drawRec.texts.length - dcT0}）`);
+// EV（无 ICE）分支 + 功率曲线叠加
+const dcS1 = drawRec.strokes;
+let dcErr2 = null;
+try {
+  T("POWERTRAIN._draft = JSON.parse(JSON.stringify(POWERTRAIN_PRESETS['EV 双电机 AWD-TV'])); POWERTRAIN.drawCurve();");
+} catch (e) { dcErr2 = e; }
+assert(dcErr2 === null && drawRec.strokes > dcS1, `7.4 drawCurve(EV 双电机/tv) 不抛错且有 stroke${dcErr2 ? " → " + dcErr2.message : ""}`);
+// 退化输入：空草稿 / 无动力源也不得抛错
+let dcErr3 = null;
+try { T("POWERTRAIN._draft = { architecture:'ice', ice:null, motorF:null, motorR:null, battery:null, gearbox:null, diff:null }; POWERTRAIN.drawCurve();"); } catch (e) { dcErr3 = e; }
+assert(dcErr3 === null, `7.4 drawCurve(退化草稿) 不抛错${dcErr3 ? " → " + dcErr3.message : ""}`);
+
+/* ── 7.5 activateCustom 往返 ── */
+T(`POWERTRAIN.customs = {};
+   POWERTRAIN.customs["沙箱动力"] = JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["FSAE I4 RWD 5MT"]));
+   POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());
+   POWERTRAIN.activateCustom("沙箱动力");`);
+assert(T("POWERTRAIN.spec.ice.redlineRpm") === 13000 && T("POWERTRAIN.spec.ice.layout") === "I4",
+  "7.5 activateCustom 落地保存的 spec");
+assert(T("POWERTRAIN.spec.gearbox.ratios.length") === 5 &&
+       Math.abs(T("POWERTRAIN.spec.gearbox.finalDrive") - 3.6) < 1e-12, "7.5 activateCustom 落地传动链");
+assert(T("POWERTRAIN._draft.ice.redlineRpm") === 13000, "7.5 activateCustom 同步 _draft（弹窗再开即所见）");
+T("POWERTRAIN.spec.ice.dispL = 9.99;");
+assert(T("POWERTRAIN.customs['沙箱动力'].ice.dispL") !== 9.99, "7.5 activateCustom 深拷贝隔离（customs 不被污染）");
+assert(T("POWERTRAIN.activateCustom('不存在的条目').ok") === false, "7.5 activateCustom 缺失条目返回 not-ok 且不抛错");
+
+/* ── 7.6 localStorage 持久化往返 ── */
+assert(T("POWERTRAIN.MAX_CUSTOMS") === 20, "7.6 MAX_CUSTOMS = 20");
+assert(T("POWERTRAIN.LS_KEY") === "labsus-powertrain-customs", "7.6 localStorage key 前缀 labsus-");
+T(`POWERTRAIN.customs = {};
+   POWERTRAIN.customs["持久化条目"] = JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["GT3 V8 RWD 6MT"]));
+   POWERTRAIN.persistCustoms();`);
+const lsRaw = T('localStorage.getItem("labsus-powertrain-customs")');
+assert(typeof lsRaw === "string" && lsRaw.indexOf("持久化条目") >= 0, "7.6 persistCustoms 写入 localStorage");
+T("POWERTRAIN.customs = {}; POWERTRAIN.loadCustoms();");
+assert(T("!!POWERTRAIN.customs['持久化条目']"), "7.6 loadCustoms 从 localStorage 恢复");
+assert(T("POWERTRAIN.customs['持久化条目'].gearbox.ratios.length") === 6 &&
+       T("POWERTRAIN.customs['持久化条目'].ice.layout") === "V8", "7.6 恢复的 spec 载荷完整");
+T('localStorage.setItem("labsus-powertrain-customs", "{bad json"); POWERTRAIN.loadCustoms();');
+assert(T("Object.keys(POWERTRAIN.customs).length") === 0, "7.6 损坏 JSON → 空表（失效安全）");
+T('localStorage.removeItem("labsus-powertrain-customs"); POWERTRAIN.loadCustoms();');
+assert(T("Object.keys(POWERTRAIN.customs).length") === 0, "7.6 无键 → 空表");
+// saveCustom 上限与重名
+T(`POWERTRAIN.customs = {}; POWERTRAIN._draft = POWERTRAIN.defaultSpec();
+   for (var i = 0; i < 20; i++) POWERTRAIN.customs["占位" + i] = POWERTRAIN.defaultSpec();`);
+assert(T("POWERTRAIN.saveCustom('第21条').ok") === false &&
+       T("POWERTRAIN.saveCustom('第21条').error") === "limit", "7.6 超 20 条上限被拒");
+T("POWERTRAIN.customs = {}; POWERTRAIN._draft = POWERTRAIN.defaultSpec();");
+assert(T("POWERTRAIN.saveCustom('首条').ok") === true, "7.6 saveCustom 首条成功");
+assert(T("POWERTRAIN.saveCustom('首条').error") === "dup", "7.6 重名被拒");
+assert(T('localStorage.getItem("labsus-powertrain-customs").indexOf("首条")') >= 0, "7.6 saveCustom 已持久化");
+T("POWERTRAIN.deleteCustom('首条');");
+assert(T("!POWERTRAIN.customs['首条']"), "7.6 deleteCustom 解除上限死锁");
+T('POWERTRAIN.customs = {}; POWERTRAIN.persistCustoms();');
+
+/* ── 7.7 refreshPresetSelect + loadVehiclePreset 分流 ── */
+T(`POWERTRAIN.customs = {};
+   POWERTRAIN.customs["下拉条目"] = JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["FSAE I4 RWD 5MT"]));
+   POWERTRAIN.refreshPresetSelect();`);
+T(`(function(){var s=document.getElementById("topVehSelect");var f=null;
+     for(var i=0;i<s.children.length;i++){ if(String(s.children[i].id)==="optgroup") f=s.children[i]; }
+     window.__ptGrp=f;})()`);
+assert(T("!!window.__ptGrp"), "7.7 refreshPresetSelect 向 topVehSelect 追加 optgroup");
+assert(T("window.__ptGrp.children.length") >= 1, "7.7 optgroup 内含自定义条目 option");
+assert(T("window.__ptGrp.children[0].value") === "ptcustom:下拉条目", "7.7 option.value 使用 ptcustom: 前缀");
+assert(String(T("window.__ptGrp.children[0].textContent")).indexOf("下拉条目") >= 0, "7.7 option 文本含条目名");
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec()); loadVehiclePreset('ptcustom:下拉条目');");
+assert(T("POWERTRAIN.spec.ice.redlineRpm") === 13000 && T("POWERTRAIN.spec.gearbox.ratios.length") === 5,
+  "7.7 loadVehiclePreset('ptcustom:…') 分流到 activateCustom");
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec()); loadVehiclePreset('ptcustom:不存在');");
+assert(T("POWERTRAIN.spec.architecture") === "ice" && T("POWERTRAIN.spec.ice.redlineRpm") === 9000,
+  "7.7 未知 ptcustom 条目不改动当前 spec");
+T("POWERTRAIN.customs = {}; POWERTRAIN.refreshPresetSelect();");
+
+/* ── 7.8 applyToVehicle：沙箱无舞台不抛错 ── */
+assert(T("typeof SLOPE_STAGE === 'undefined' && typeof VehicleDynamics15DOF === 'undefined'"),
+  "7.8 前置：本沙箱不加载 11-stages.js（无舞台/无引擎构造器）");
+T("POWERTRAIN._draft = JSON.parse(JSON.stringify(POWERTRAIN_PRESETS['GT3 V8 RWD 6MT']));");
+let apErr = null;
+try { T("POWERTRAIN.applyToVehicle();"); } catch (e) { apErr = e; }
+assert(apErr === null, `7.8 applyToVehicle 无舞台不抛错${apErr ? " → " + apErr.message : ""}`);
+assert(T("POWERTRAIN.spec.ice.layout") === "V8" && T("POWERTRAIN.spec.drive") === "rwd" &&
+       T("POWERTRAIN.spec.gearbox.ratios.length") === 6, "7.8 applyToVehicle = setSpec(_draft)");
+assert(T("S.ptSpec === POWERTRAIN.spec"), "7.8 applyToVehicle 写覆盖层引用 S.ptSpec");
+assert(T("POWERTRAIN.state.iceOmega") > 0, "7.8 applyToVehicle 后状态重置（曲轴怠速）");
+// 非法草稿 → 拒绝且不覆盖当前 spec
+T("POWERTRAIN._draft = Object.assign(POWERTRAIN.defaultSpec(), { architecture:'warp' });");
+let apErr2 = null;
+try { T("POWERTRAIN.applyToVehicle();"); } catch (e) { apErr2 = e; }
+assert(apErr2 === null && T("POWERTRAIN.applyToVehicle().ok") === false, "7.8 非法草稿 applyToVehicle 返回 not-ok 不抛错");
+assert(T("POWERTRAIN.spec.ice.layout") === "V8" && T("POWERTRAIN.spec.drive") === "rwd",
+  "7.8 非法草稿不覆盖已生效 spec");
+// applyFromForm（弹窗主按钮路径）
+T(`POWERTRAIN._draft = JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["THS 功率分流"]));
+   POWERTRAIN.renderForm(); POWERTRAIN.applyFromForm();`);
+assert(T("POWERTRAIN.spec.architecture") === "powersplit" && T("POWERTRAIN.spec.motorF.peakPowerKw") === 60,
+  "7.8 applyFromForm 走 readForm→applyToVehicle 全链");
+assert(T("POWERTRAIN._modal.style.display") === "none", "7.8 applyFromForm 成功后关窗");
+// restoreBuiltin → 回到 legacy-equivalent 默认（等价锚）
+T("POWERTRAIN._draft = JSON.parse(JSON.stringify(POWERTRAIN_PRESETS['EV 双电机 AWD-TV'])); POWERTRAIN.restoreBuiltin();");
+assert(T("POWERTRAIN.spec.architecture") === "ice" && T("POWERTRAIN.spec.ice.map[0][1]") === 1200 &&
+       T("POWERTRAIN.spec.gearbox.ratios.length") === 1 && T("POWERTRAIN.spec.gearbox.finalDrive") === 1,
+  "7.8 restoreBuiltin 回到 legacy-equivalent 默认（等价锚）");
+T("POWERTRAIN._draft = POWERTRAIN.defaultSpec(); POWERTRAIN.setSpec(POWERTRAIN.defaultSpec()); POWERTRAIN.close();");
+
+/* ── 7.9 等价锚回归：段6 落地后默认规格轮上扭矩逐位不变 ── */
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec()); POWERTRAIN.resetState();");
+const anchor7 = T("POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:100,FR:100,RL:100,RR:100})");
+assert(anchor7.tRear === 480 && anchor7.tFront === 120,
+  `7.9 段6 后 legacy-equivalent 等价锚不变（tRear=${anchor7.tRear}, tFront=${anchor7.tFront}）`);
+
 console.log(`\n[cumulative] ${passed}/${total} passed`);
 
 process.exit(passed === total ? 0 : 1);
