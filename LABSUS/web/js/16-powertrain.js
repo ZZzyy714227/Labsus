@@ -132,6 +132,57 @@ const POWERTRAIN = {
     let derate = 1;
     if (soc !== undefined && soc > 0.95) derate = Math.max(0, (1 - soc) / 0.05);
     return -Rcap * Math.min(1, -cmd) * derate * sgn;
+  },
+  /* ═══ 段3 传动链：gearbox 换挡状态机 + 反射惯量 ═══
+     反射到轮端的旋转惯量（kg·m²/轮）：(I_ice + I_motCoupled)×(ratio×final)²/2轮。
+     legacy 默认 inertia=0 → 0，15-DOF 的 Iw 不变（等价锚）。
+     p2 架构电机在 ICE 与 gearbox 之间同轴 → 计入；p3/p4/ev 电机不在曲轴链 → 不计。 */
+  reflectedInertia() {
+    const sp = this.spec, st = this.state;
+    if (!sp || !st || !sp.gearbox) return 0;
+    const r = (sp.gearbox.ratios[st.gearIdx] || 1) * sp.gearbox.finalDrive;
+    let I = sp.ice ? (sp.ice.inertia || 0) : 0;
+    if (sp.architecture === "p2") {
+      I += (sp.motorF ? (sp.motorF.inertia || 0) : 0) + (sp.motorR ? (sp.motorR.inertia || 0) : 0);
+    }
+    return I * r * r / 2;
+  },
+  /* 换挡状态机推进（每子步调用）。返回 true = 本子步处于扭矩中断期。
+     完成时：gearIdx += shiftDir、iceOmega 跳变 = wheelOmegaAxle×ratio_new×final
+     （刚性传动链运动学耦合；离合器结合瞬态不做半联动物理，见设计非目标）。 */
+  advanceGearbox(dt, wheelOmegaAxle) {
+    const sp = this.spec, st = this.state;
+    if (!sp || !st || !sp.gearbox) return false;
+    if (st.shiftT > 0) {
+      st.shiftT -= dt * 1000;
+      if (st.shiftT <= 0) {
+        st.gearIdx = Math.max(0, Math.min(sp.gearbox.ratios.length - 1, st.gearIdx + st.shiftDir));
+        st.shiftDir = 0; st.shiftT = 0;
+        st.iceOmega = (wheelOmegaAxle || 0) * (sp.gearbox.ratios[st.gearIdx] || 1) * sp.gearbox.finalDrive;
+      }
+      return true;
+    }
+    return false;
+  },
+  /* 换挡请求（dir=+1 升 / −1 降）。越界或正在换挡时忽略（幂等，无副作用）。 */
+  requestShift(dir) {
+    const sp = this.spec, st = this.state;
+    if (!sp || !st || !sp.gearbox || st.shiftT > 0) return;
+    const ni = st.gearIdx + dir;
+    if (ni < 0 || ni >= sp.gearbox.ratios.length) return;
+    st.shiftDir = dir;
+    st.shiftT = Math.max(1, sp.gearbox.shiftTimeMs || 1);
+  },
+  /* 自动换挡策略（type=auto/dct）：rpm/redline 超 autoUpFrac 升、低于 autoDownFrac 降。
+     manual/single 不自动换挡（manual 由 requestShift 显式驱动）。 */
+  autoShift(iceRpm) {
+    const sp = this.spec, st = this.state;
+    if (!sp || !st || !sp.gearbox) return;
+    if (sp.gearbox.type === "single" || sp.gearbox.type === "manual" || st.shiftT > 0) return;
+    const rr = iceRpm / (sp.ice ? sp.ice.redlineRpm : 9000);
+    if (rr > (sp.gearbox.autoUpFrac !== undefined ? sp.gearbox.autoUpFrac : 0.92) &&
+        st.gearIdx < sp.gearbox.ratios.length - 1) this.requestShift(1);
+    else if (rr < (sp.gearbox.autoDownFrac !== undefined ? sp.gearbox.autoDownFrac : 0.55) && st.gearIdx > 0) this.requestShift(-1);
   }
 };
 if (typeof window !== "undefined") window.POWERTRAIN = POWERTRAIN;
