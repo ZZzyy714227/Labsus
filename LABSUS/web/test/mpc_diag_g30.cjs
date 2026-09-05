@@ -52,6 +52,7 @@ const R2D = 180 / Math.PI;
 let t = 0, ci = 0, lastS = 0, lapNo = 0;
 const events = [];
 let lapMarks = [];
+let diagOnset = null;
 const TH_SLIP = 14 * Math.PI / 180, TH_KAPPA = 0.45;
 // 鎸?寮楀湀 鑱氬悎锛氬嘲鍊?伪 / 魏 / 瑙﹀彂鏃剁殑 u / thr / brk
 const agg = {};
@@ -93,12 +94,11 @@ for (let step = 0; step < 240 * 900; step++) {
   }
   const telNow = eng.telemetry;
   aggRec(p.cornerId, lapNo + 1, telNow, { u: s.u, throttle: ctrl.throttle, brake: ctrl.brake });
-  // 触发式打印：任一轮 |α|>15° 时记录上下文
-  {
-    let aMax = 0;
-    for (const w of ['FL', 'FR', 'RL', 'RR']) aMax = Math.max(aMax, Math.abs(telNow.alpha[w] || 0));
-    if (aMax * R2D > 15 && step % 30 === 0) {
-      console.log(`A t=${t.toFixed(1)} s=${(p.s||0).toFixed(0)} cid=${p.cornerId} L${lapNo+1} u=${s.u.toFixed(1)} v=${(s.v||0).toFixed(2)} r=${((s.r||0)*R2D).toFixed(1)} st=${ctrl.steer.toFixed(1)} brk=${ctrl.brake.toFixed(2)} thr=${ctrl.throttle.toFixed(2)} a=${(aMax*R2D).toFixed(1)} lat=${(((s.X-p.refX)*p.refNx+(s.Y-p.refY)*p.refNy)).toFixed(2)} sRef=${(pilot._s||0).toFixed(0)}`);
+  // 触发式打印：侧滑起点（|v|>1.5）后连续 120 步逐 0.125s 记录
+  if (Math.abs(s.v || 0) > 1.5) {
+    if (diagOnset === null) diagOnset = t;
+    if (t - diagOnset < 1.5 && step % 30 === 0) {
+      console.log(`V t=${t.toFixed(2)} s=${(p.s||0).toFixed(0)} cid=${p.cornerId} u=${s.u.toFixed(1)} v=${(s.v||0).toFixed(2)} r=${((s.r||0)*R2D).toFixed(1)} st=${ctrl.steer.toFixed(1)} brk=${ctrl.brake.toFixed(2)} thr=${ctrl.throttle.toFixed(2)} lat=${(((s.X-p.refX)*p.refNx+(s.Y-p.refY)*p.refNy)).toFixed(2)} Fz=${telNow.Fz.FL.toFixed(0)}/${telNow.Fz.FR.toFixed(0)}/${telNow.Fz.RL.toFixed(0)}/${telNow.Fz.RR.toFixed(0)} k=${(telNow.kappa.RL||0).toFixed(2)}/${(telNow.kappa.RR||0).toFixed(2)}`);
     }
   }
   // 绋犲瘑鏃跺簭锛歁PC 璋冭瘯鐢紝鍓?25s 姣?0.5s 璁板綍
