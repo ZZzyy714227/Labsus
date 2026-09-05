@@ -115,6 +115,11 @@ function loadReal(webDir) {
     '\nwindow.UniversalAutoPilot = UniversalAutoPilot;\nwindow.VehicleDynamics15DOF = VehicleDynamics15DOF;',
     ctx, { filename: '11-stages.js#pilot+engine' });
 
+  // G31-P6：动力系统接线（step() 内 typeof POWERTRAIN 守卫）——加载后缺省
+  //   setSpec(defaultSpec()) 为 legacy-equivalent，圈速数值必须逐位不变（对拍锚）。
+  const ptSrc = fs.readFileSync(path.join(webDir, 'js', '16-powertrain.js'), 'utf8');
+  vm.runInContext(ptSrc, ctx, { filename: '16-powertrain.js' });
+
   // G30：MPC 控制器（opts.pilotType === 'mpc' 时由 runLaps 选用）
   const mpcSrc = fs.readFileSync(path.join(webDir, 'js', '15-mpc.js'), 'utf8');
   vm.runInContext(mpcSrc, ctx, { filename: '15-mpc.js' });
@@ -214,6 +219,56 @@ function runLaps(ctx, wp, sim, nLaps, opts) {
   };
 }
 
+/* ── G31-P6 集成级 legacy 锚：默认规格 ptOut 路径 vs spec=null 回退路径 ──
+ * 断言：POWERTRAIN 缺省规格（legacy-equivalent）接入 15-DOF 后，逐子步 omega.RR
+ * 演化与 POWERTRAIN.spec=null（旧常数 480/120 路径）逐位一致（±1e-9）。这证明
+ * 接线不改变缺省物理（对拍锚），且 ptOut 路径确被执行（非静默回退）。 */
+function runPowertrainParity(ctx, wp, sim, ok) {
+  const PT = ctx.window.POWERTRAIN;
+  ok(!!PT && !!PT.spec, 'G31-P6: POWERTRAIN 已加载且缺省 spec 非空（ptOut 路径应激活）');
+  if (!PT) return;
+
+  const P = new ctx.window.CircuitPath(wp, 1.35, 1.0);
+  const p0 = wp[0];
+  const mkEng = () => {
+    const eng = new ctx.window.VehicleDynamics15DOF(makeS(), sim, 20.0);
+    Object.assign(eng.state, {
+      X: p0.x, Y: p0.y, Z: 0, phi: 0, theta: 0, psi: p0.heading,
+      u: 20, v: 0, w: 0, p: 0, q: 0, r: 0,
+      omega: { FL: 20 / 0.30, FR: 20 / 0.30, RL: 20 / 0.30, RR: 20 / 0.30 }
+    });
+    return eng;
+  };
+  const ctrl = { throttle: 0.6, brake: 0, steer: 0 };
+  const env = { grade: 0, path: P, bumpNoise: 0 };
+  const NS = 120, dt = 1 / 240;
+
+  // A：默认规格（ptOut 路径）
+  PT.setSpec(PT.defaultSpec());
+  const engA = mkEng();
+  const omA = [];
+  let sawPtOut = false;
+  for (let i = 0; i < NS; i++) {
+    engA.step(ctrl, env, dt);
+    if (engA._ptOut) sawPtOut = true;
+    omA.push(engA.state.omega.RR);
+  }
+  ok(sawPtOut, 'G31-P6: 默认规格下 step 产出非空 _ptOut（接线确被执行，非静默回退）');
+
+  // B：spec=null（旧常数 480/120 回退路径）
+  const savedSpec = PT.spec;
+  PT.spec = null;
+  const engB = mkEng();
+  const omB = [];
+  for (let i = 0; i < NS; i++) { engB.step(ctrl, env, dt); omB.push(engB.state.omega.RR); }
+  PT.spec = savedSpec;   // 还原，避免污染后续检查
+
+  let maxDiff = 0;
+  for (let i = 0; i < NS; i++) maxDiff = Math.max(maxDiff, Math.abs(omA[i] - omB[i]));
+  ok(maxDiff <= 1e-9,
+    `G31-P6: 默认规格 vs spec=null 逐子步 omega.RR 一致（${NS} 步 maxΔ=${maxDiff.toExponential(2)} ≤ 1e-9）`);
+}
+
 function runChecks(webDir, ok, fail, opts) {
   const log = (opts && opts.log) || (() => {});
   let R;
@@ -262,6 +317,9 @@ function runChecks(webDir, ok, fail, opts) {
   ok(dLap >= T.GEOM_LAP_DELTA_MIN,
     `G24: 改悬架几何 → 学习圈速变化 ${(dLap * 100).toFixed(2)}% ≥ ${(T.GEOM_LAP_DELTA_MIN * 100).toFixed(2)}%` +
     `（几何 A 学习圈 ${isFinite(lastA) ? lastA.toFixed(2) : 'n/a'}s vs 几何 B ${isFinite(lastB) ? lastB.toFixed(2) : 'n/a'}s）`);
+
+  // G31-P6：动力系统接线集成级 legacy 锚（默认规格 == spec=null 逐位一致）
+  runPowertrainParity(R.ctx, R.wp, SIM_A, ok);
 }
 
 module.exports = runChecks;

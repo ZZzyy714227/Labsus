@@ -694,7 +694,16 @@ class VehicleDynamics15DOF {
       
       let SumFx_tire = 0.0, SumFy_tire = 0.0;
       let SumMz_tire = 0.0;
-      
+
+      // G31：动力系统每子步步进（缺省 legacy-equivalent → 与旧常数逐位一致；
+      //   POWERTRAIN 未加载或 spec=null 时回退旧路径，保对拍锚）
+      const ptOut = (typeof POWERTRAIN !== "undefined" && POWERTRAIN.spec) ?
+        POWERTRAIN.step(dt, { throttle: ctrl.throttle, brake: ctrl.brake,
+                              shiftCmd: ctrl.shiftCmd || 0, tvBias: ctrl.tvBias },
+                        { FL: st.omega.FL, FR: st.omega.FR, RL: st.omega.RL, RR: st.omega.RR }) : null;
+      const ptIw = ptOut ? POWERTRAIN.reflectedInertia() : 0;
+      this._ptOut = ptOut;   // G31：供 HUD（renderCircuitTelemetry）读挡位/rpm
+
       for(const w of wheels) {
         const ws = wheelStates[w.id];
         const Fz_w = F_susp[w.id];
@@ -769,11 +778,19 @@ class VehicleDynamics15DOF {
         if(tcsLvl > 0 && Math.abs(kappa) > kappaLimit && w.axle === 'rear') {
           throttleCmd = Math.max(0, throttleCmd * (1.0 - tcsLvl * 0.15));
         }
-        const T_drive = (w.axle === 'rear' ? (throttleCmd * 480.0 * drivePowerFactor) : (throttleCmd * 120.0 * drivePowerFactor));
+        // G31：TCS 切扭矩比例（ptOut 路径下 throttleCmd 已被 TCS 削减，除以原始
+        //   ctrl.throttle 得比例，乘到轮扭矩上，与旧路径直接切 throttleCmd 等效）。
+        //   注意：tcsScale 依赖逐轮 throttleCmd，必须置于轮循环内（TCS 之后）。
+        const tcsScale = (ctrl.throttle > 1e-6) ? (throttleCmd / ctrl.throttle) : 0;
+        const T_drive = ptOut
+          ? ((ptOut.tWheel ? ptOut.tWheel[{FL:0,FR:1,RL:2,RR:3}[w.id]]
+                           : (w.axle === 'rear' ? ptOut.tRear : ptOut.tFront)) * drivePowerFactor * tcsScale)
+          : (w.axle === 'rear' ? (throttleCmd * 480.0 * drivePowerFactor)
+                               : (throttleCmd * 120.0 * drivePowerFactor));
         const T_brake = (ctrl.brake * (w.axle === 'front' ? maxBrakeTorqueF * (bbias_eff / 0.58) : maxBrakeTorqueR * ((1.0 - bbias_eff) / 0.42)));
         const sgn_w = st.omega[w.id] >= 0 ? 1.0 : -1.0;
         const T_net = (ws.isAirborne ? (T_drive - T_brake * sgn_w) : (T_drive - T_brake * sgn_w - Fx_t * w.Re));
-        const d_omega = T_net / this.Iw;
+        const d_omega = T_net / (this.Iw + ptIw);
         st.omega[w.id] += d_omega * dt;
         
         this.telemetry.Fz[w.id] = Fz_w;
@@ -3683,15 +3700,26 @@ function renderCircuitTelemetry(st, tel, ctrl) {
   if(tab === "general") {
     const spd = Math.max(0, st.u) * 3.6;
     const curKm = spd;
-    let recGear = "1";
-    if (curKm > 260) recGear = "6";
-    else if (curKm > 200) recGear = "5";
-    else if (curKm > 145) recGear = "4";
-    else if (curKm > 95) recGear = "3";
-    else if (curKm > 50) recGear = "2";
+    // G31：真实动力链挡位/rpm 优先（step 内已存 this._ptOut 到 physicsEngine）；
+    //   POWERTRAIN 未加载或 spec=null（_ptOut=null）时回退旧查表/轮速估算（对拍锚）。
+    const pt = (typeof window !== "undefined" && window.physicsEngine && window.physicsEngine._ptOut)
+      ? window.physicsEngine._ptOut : null;
+    let recGear;
+    if (pt && Number.isFinite(pt.gearIdx)) {
+      recGear = String(pt.gearIdx + 1);
+    } else {
+      recGear = "1";
+      if (curKm > 260) recGear = "6";
+      else if (curKm > 200) recGear = "5";
+      else if (curKm > 145) recGear = "4";
+      else if (curKm > 95) recGear = "3";
+      else if (curKm > 50) recGear = "2";
+    }
     if (curKm < 1 && Math.abs(ctrl.throttle) < 0.05) recGear = "N";
 
-    const rpm = Math.min(9500, Math.max(900, (st.omega.RL * 60 / (2 * Math.PI)) * 4.2));
+    const rpm = (pt && Number.isFinite(pt.iceRpm))
+      ? Math.min(9500, Math.max(900, pt.iceRpm))
+      : Math.min(9500, Math.max(900, (st.omega.RL * 60 / (2 * Math.PI)) * 4.2));
     const pwr = Math.max(0, (ctrl.throttle * 320 * (rpm / 8000))).toFixed(0);
     const trq = Math.max(0, (ctrl.throttle * 480 * (1.0 - (rpm - 5000)**2 / (7000**2)))).toFixed(1);
     const boost = (ctrl.throttle * 1.85 * (rpm / 7500)).toFixed(2);
