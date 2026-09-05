@@ -4512,6 +4512,13 @@ function circuitStageLoop(now) {
       else if (curKm > 145) recGear = 4;
       else if (curKm > 95) recGear = 3;
       else if (curKm > 50) recGear = 2;
+      // G31-P10-3：真实动力链可用时用真实挡位（POWERTRAIN.state.gearIdx），
+      //   否则回退旧车速查表（legacy 锚/无工坊场景不变）
+      const ptG = (typeof POWERTRAIN !== "undefined" && POWERTRAIN.spec &&
+                   POWERTRAIN.hasRealDrivetrain && POWERTRAIN.hasRealDrivetrain() &&
+                   POWERTRAIN.state && Number.isFinite(POWERTRAIN.state.gearIdx))
+        ? (POWERTRAIN.state.gearIdx + 1) : null;
+      if (ptG !== null) recGear = ptG;
       
       const elGear = document.getElementById("c_hud_gear");
       if(elGear) elGear.textContent = recGear + " 档";
