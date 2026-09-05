@@ -42,7 +42,9 @@ const POWERTRAIN = {
     }
     if (sp.architecture !== "ev" && !sp.ice) errs.push("ice(required for non-ev)");
     if (sp.architecture === "ev" && sp.ice) errs.push("ice(forbidden for ev)");
+    if (sp.architecture === "ice" && (sp.motorF || sp.motorR)) errs.push("motor(forbidden for ice)");
     if (sp.architecture === "ev" && !sp.motorF && !sp.motorR) errs.push("motor(required for ev)");
+    if (sp.drive === "tv" && !(sp.motorF && sp.motorR)) errs.push("tv(requires motorF & motorR)");
     /* M-3：混动架构必须至少一台电机 */
     if (["p2","p3","p4","series","powersplit"].includes(sp.architecture) && !sp.motorF && !sp.motorR) errs.push("motor(required for hybrid)");
     if (sp.gearbox) {
@@ -220,6 +222,7 @@ const POWERTRAIN = {
        tFront/tRear = 单轮驱动扭矩（轴扭矩 / 2，与 legacy 常数 480/120 同量纲，未乘 drivePowerFactor）
        tWheel       = 仅 drive==='tv' 时逐轮 [FL,FR,RL,RR]，否则 null
        P_gen        = ICE 发电功率（W，仅 series/powersplit > 0）
+     tWheel 为逐轮扭矩（不再 /2）；tFront/tRear 为轴扭矩/2——接线层勿对 tWheel 再除 2。
      七架构功率流见各 case 注释。TCS 不在本层（接线层按轮滑移切 throttle）。 */
   step(dt, demand, wheelOmega) {
     const sp = this.spec || this.defaultSpec();
@@ -256,8 +259,17 @@ const POWERTRAIN = {
     let T_motF = 0, T_motR = 0;
     if (sp.motorF) T_motF = this.motorTorque(sp.motorF, rpmF, motCmd, st.soc);
     if (sp.motorR) T_motR = this.motorTorque(sp.motorR, rpmR, motCmd, st.soc);
-    /* 电机消耗电功率（W）：轴功率 / 逆变效率 0.95；负值 = 回充（P_mot 语义按任务定义以轮速计） */
-    const P_mot = (T_motF * wF + T_motR * wR) / 0.95;
+    /* C1：电机消耗电功率（W）：p2 电机在曲轴链 → 参考 iceOmega；其余在轮端 → wF/wR */
+    const wMotF = (sp.architecture === "p2") ? st.iceOmega : wF;
+    const wMotR = (sp.architecture === "p2") ? st.iceOmega : wR;
+    /* I2：电池功率上限反馈——在组合器前对电机扭矩做功率钳制 */
+    const pLim = (sp.battery && sp.battery.maxDischargeKw !== undefined) ? sp.battery.maxDischargeKw * 1000 : Infinity;
+    const pMotRaw = Math.abs(T_motF * wMotF) + Math.abs(T_motR * wMotR);
+    if (pMotRaw > pLim && pMotRaw > 0) {
+      const scale = pLim / pMotRaw;
+      T_motF *= scale; T_motR *= scale;
+    }
+    const P_mot = (T_motF * wMotF + T_motR * wMotR) / 0.95;
     /* series/powersplit：ICE 转速不跟轮速，按增程/功率分流控制律。
        iceOmega = max(idle, min(redline, idle + (P_demand/P_rated)×(redline−idle)))，P_demand = 电机消耗功率估计。 */
     if ((sp.architecture === "series" || sp.architecture === "powersplit") && sp.ice) {
@@ -290,16 +302,16 @@ const POWERTRAIN = {
         else { Tf = T_motF; Tr = T_motR; }
         break;
       case "p2": {
-        /* 电机在 ICE 与 gearbox 之间同轴：T_shaft = (T_ice + T_mot)×ratio×eff；换挡期整轴切断 */
-        const Ts = (T_ice + T_motR) * ratio * eff * (shifting ? 0 : 1);
+        /* I1：电机在 ICE 与 gearbox 之间同轴：T_shaft = (T_ice + T_motF + T_motR)×ratio×eff；换挡期整轴切断 */
+        const Ts = (T_ice + T_motF + T_motR) * ratio * eff * (shifting ? 0 : 1);
         if (sp.drive === "fwd") Tf = Ts;
         else if (sp.drive === "rwd") Tr = Ts;
         else { Tf = Ts * sp.splitFront; Tr = Ts * (1 - sp.splitFront); }
         break;
       }
       case "p3": {
-        /* 电机在箱后（与 ICE 输出并联到轮）：T_axle = T_ice×ratio×eff + T_mot */
-        const Ta = T_ice_wheel + T_motR;
+        /* I1：电机在箱后（与 ICE 输出并联到轮）：T_axle = T_ice×ratio×eff + T_motF + T_motR */
+        const Ta = T_ice_wheel + T_motF + T_motR;
         if (sp.drive === "fwd") Tf = Ta;
         else if (sp.drive === "rwd") Tr = Ta;
         else { Tf = Ta * sp.splitFront; Tr = Ta * (1 - sp.splitFront); }
@@ -332,7 +344,8 @@ const POWERTRAIN = {
     /* tv 逐轮：tvBias 将前/后电机扭矩分裂到左右轮（守恒：四轮和 = T_motF + T_motR） */
     let tWheel = null;
     if (sp.drive === "tv" && sp.motorF && sp.motorR) {
-      const b = dm.tvBias !== undefined ? dm.tvBias : 0.5;
+      /* M1：tvBias 钳位 [0,1]，NaN/undefined 回退 0.5 */
+      const b = Math.max(0, Math.min(1, Number.isFinite(dm.tvBias) ? dm.tvBias : 0.5));
       tWheel = [T_motF * b, T_motF * (1 - b), T_motR * b, T_motR * (1 - b)];
       Tf = T_motF; Tr = T_motR;
     }
