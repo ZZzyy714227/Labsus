@@ -78,41 +78,64 @@ class EngineAudioModel {
     /* M-1(G31-P6-fix)：rpm 源判据改架构感知——POWERTRAIN.hasLiveRpmSource()
        （spec && state && (architecture==="ev" || hasRealDrivetrain())）为真时才信任动力链 rpm 源，
        与 11-stages.js HUD（renderCircuitTelemetry）共用同一判据，避免两处各写一份、语义漂移。
-       EV：直驱电机 rpm ≈ 驱动轮 rpm，用 sig.wheelOmega×30/π（不查 motorR 是否存在——
-         wheelOmega 已由调用方 EngineSound.update() 按 architecture/drive 选好前/后驱动轮）；
-       非 EV + 真实传动比：用 state.iceOmega×30/π；
+       G31-P10-3：EV rpm 源改用 POWERTRAIN.step 回传的 shiftRpm（驱动电机轴 rpm，
+         = 轮速×减速器 ratio×finalDrive，fwd/rwd 架构感知已在 16-powertrain 内算好）——
+         旧式 sig.wheelOmega×30/π 换算漏乘减速器齿比（把电机轴转速当成轮速）。
+         shiftRpm 取自 window.physicsEngine._ptOut（接线层 11-stages.js 每子步存，
+         最小侵入：不改三舞台 loop 的 update 签名）；缺失/无效（早期帧、其他舞台未跑
+         step）→ guard 回退旧轮速换算。
+       非 EV + 真实传动比：用 state.iceOmega×30/π（曲轴，运动学耦合含齿比）；
        legacy 恒等箱 + 非 EV：hasLiveRpmSource()=false → ptRpm=null → 回退旧
          wheel-omega×齿轮比估算（对拍锚，避免塌到怠速）。 */
-    const ptRpm = (typeof POWERTRAIN !== "undefined" && POWERTRAIN.hasLiveRpmSource && POWERTRAIN.hasLiveRpmSource())
+    const ptLive = (typeof POWERTRAIN !== "undefined" && POWERTRAIN.hasLiveRpmSource && POWERTRAIN.hasLiveRpmSource());
+    const ptOut = (ptLive && sig.ptOut && Number.isFinite(sig.ptOut.shiftRpm) && sig.ptOut.shiftRpm > 0)
+      ? sig.ptOut : null;
+    const ptRpm = ptLive
       ? ((POWERTRAIN.spec.architecture === "ev")
-          ? wheelOmega * 30.0 / Math.PI
+          ? ((ptOut !== null) ? ptOut.shiftRpm
+                              : wheelOmega * 30.0 / Math.PI)   // EV 无 ptOut → 旧轮速换算
           : POWERTRAIN.state.iceOmega * 30.0 / Math.PI)
       : null;
 
-    /* 1. 挡位状态机：RPM 由驱动轮 omega × 齿轮比反推（打滑时 omega 飙升
-          → 转速跟着飙升，与真实驱动轮滑转一致） */
-    const ratio = p.ratios[this.gear - 1] * p.final;
-    let rpmRaw = (ptRpm !== null) ? ptRpm : (wheelOmega * ratio * 60.0 / (2.0 * Math.PI));
-    if (!isFinite(rpmRaw) || rpmRaw < p.idle * 0.6) rpmRaw = p.idle;
-
+    /* 1. 挡位：G31-P10-3 统一——POWERTRAIN 接管（hasLiveRpmSource）时挡位显示
+          直接跟随 POWERTRAIN.state.gearIdx（0-based→1-based），挡位状态机【不推进】
+          （换挡唯一来源 = POWERTRAIN gearbox 状态机，声浪不再自产 shift/cut/pop）。
+          仅回退路径（ptRpm===null：沙箱无 POWERTRAIN / legacy 恒等箱）沿用旧
+          状态机：RPM 由驱动轮 omega × 齿轮比反推（打滑时 omega 飙升 → 转速跟着
+          飙升，与真实驱动轮滑转一致），逐位保留（对拍锚）。 */
     let events = null;
-    if (this.shiftCooldown <= 0) {
-      const upRpm = p.redline * p.shiftUp;
-      const downRpm = p.redline * p.shiftDown;
-      if (this.gear < p.ratios.length && rpmRaw > upRpm && thr > 0.2) {
-        this.gear++; this.cutT = ENGINE_SOUND_CUT_T;
-        this.shiftCooldown = ENGINE_SOUND_MAX_GEAR_SHIFT_COOLDOWN;
-        (events = events || []).push("shift");
-      } else if (this.gear > 1 && (rpmRaw < p.idle * 1.6 ||
-                 (brk > 0.1 && rpmRaw < downRpm))) {
-        this.gear--; this.cutT = ENGINE_SOUND_CUT_T;
-        this.shiftCooldown = ENGINE_SOUND_MAX_GEAR_SHIFT_COOLDOWN;
-        (events = events || []).push("shift");
-        if (brk > 0.1) (events = events || []).push("pop");   // 重刹降挡回火
+    if (ptRpm !== null) {
+      const stG = POWERTRAIN.state;
+      if (stG && Number.isFinite(stG.gearIdx)) {
+        this.gear = Math.max(1, stG.gearIdx + 1);   // 仅作显示；可超 profile.ratios.length
+      }
+    } else {
+      /* 防御：POWERTRAIN 模式留下的越界挡位（箱挡数 > profile 挡数）先夹回，
+         保 ratios 查表不 NaN（正常回退路径中恒无操作，不改变既有逐位行为） */
+      this.gear = Math.max(1, Math.min(p.ratios.length, this.gear));
+      const ratio = p.ratios[this.gear - 1] * p.final;
+      const rpmRaw = wheelOmega * ratio * 60.0 / (2.0 * Math.PI);
+      const rpmRawEff = (!isFinite(rpmRaw) || rpmRaw < p.idle * 0.6) ? p.idle : rpmRaw;
+      if (this.shiftCooldown <= 0) {
+        const upRpm = p.redline * p.shiftUp;
+        const downRpm = p.redline * p.shiftDown;
+        if (this.gear < p.ratios.length && rpmRawEff > upRpm && thr > 0.2) {
+          this.gear++; this.cutT = ENGINE_SOUND_CUT_T;
+          this.shiftCooldown = ENGINE_SOUND_MAX_GEAR_SHIFT_COOLDOWN;
+          (events = events || []).push("shift");
+        } else if (this.gear > 1 && (rpmRawEff < p.idle * 1.6 ||
+                   (brk > 0.1 && rpmRawEff < downRpm))) {
+          this.gear--; this.cutT = ENGINE_SOUND_CUT_T;
+          this.shiftCooldown = ENGINE_SOUND_MAX_GEAR_SHIFT_COOLDOWN;
+          (events = events || []).push("shift");
+          if (brk > 0.1) (events = events || []).push("pop");   // 重刹降挡回火
+        }
       }
     }
 
-    /* 2. 引擎转速一阶惯性（换挡齿轮比变化 → 目标骤变 → 惯性滑落/拉起） */
+    /* 2. 引擎转速一阶惯性（换挡齿轮比变化 → 目标骤变 → 惯性滑落/拉起）
+       POWERTRAIN 接管时 rpmTarget = ptRpm（曲轴/电机轴真实转速，PT10-3）。
+       ratioNew 在接管模式下可能越界 NaN，但三元短路下不被消费；回退路径照旧。 */
     const ratioNew = p.ratios[this.gear - 1] * p.final;
     let rpmTarget = (ptRpm !== null) ? ptRpm : (wheelOmega * ratioNew * 60.0 / (2.0 * Math.PI));
     if (!isFinite(rpmTarget) || rpmTarget < p.idle) rpmTarget = p.idle;
@@ -411,9 +434,15 @@ const EngineSound = {
         ? ((st.omega.FL || 0) + (st.omega.FR || 0)) / 2
         : ((st.omega.RL || 0) + (st.omega.RR || 0)) / 2;
     }
+    /* G31-P10-3：POWERTRAIN.step() 回传帧 { iceRpm, shiftRpm, gearIdx, soc, ... }
+       由接线层 11-stages.js 存于 window.physicsEngine._ptOut——直接读，最小侵入
+       （不改三舞台 loop 对 EngineSound.update 的调用签名）。无 physicsEngine
+       （vm 沙箱/加载早期）→ null → EngineAudioModel 内部按判据回退。 */
+    const ptOut = (typeof window !== "undefined" && window.physicsEngine && window.physicsEngine._ptOut)
+      ? window.physicsEngine._ptOut : null;
     const p = this.model.update(dt, {
       wheelOmega, throttle: (ctrl && ctrl.throttle) || 0, brake: (ctrl && ctrl.brake) || 0,
-      kappaMax: kappa, isKerb
+      kappaMax: kappa, isKerb, ptOut
     });
     this.sink.update(p);
     return p;

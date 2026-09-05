@@ -3793,19 +3793,56 @@ function renderCircuitTelemetry(st, tel, ctrl) {
     let rpm;
     if (pt && _ptLive && Number.isFinite(pt.iceRpm)) {
       if (POWERTRAIN.spec.architecture === "ev") {
-        const driveOmega = (POWERTRAIN.spec.drive === "fwd")
-          ? (st.omega.FL + st.omega.FR) * 0.5
-          : (st.omega.RL + st.omega.RR) * 0.5;
-        rpm = Math.min(9500, Math.max(900, driveOmega * 30 / Math.PI));
+        /* G31-P10-3：EV rpm 源改用 step() 回传的 shiftRpm（驱动电机轴 rpm，
+           = 轮速×减速器 ratio×finalDrive，fwd/rwd 架构感知已在 16-powertrain 内算好）——
+           旧式前端轮速×30/π 换算漏乘减速器齿比（把电机轴转速当轮速）。shiftRpm
+           无效（早期帧/异常）→ guard 回退旧轮速换算。 */
+        if (Number.isFinite(pt.shiftRpm) && pt.shiftRpm > 0) {
+          rpm = Math.min(9500, Math.max(900, pt.shiftRpm));
+        } else {
+          const driveOmega = (POWERTRAIN.spec.drive === "fwd")
+            ? (st.omega.FL + st.omega.FR) * 0.5
+            : (st.omega.RL + st.omega.RR) * 0.5;
+          rpm = Math.min(9500, Math.max(900, driveOmega * 30 / Math.PI));
+        }
       } else {
         rpm = Math.min(9500, Math.max(900, pt.iceRpm));
       }
     } else {
       rpm = Math.min(9500, Math.max(900, (st.omega.RL * 60 / (2 * Math.PI)) * 4.2));
     }
-    const pwr = Math.max(0, (ctrl.throttle * 320 * (rpm / 8000))).toFixed(0);
-    const trq = Math.max(0, (ctrl.throttle * 480 * (1.0 - (rpm - 5000)**2 / (7000**2)))).toFixed(1);
-    const boost = (ctrl.throttle * 1.85 * (rpm / 7500)).toFixed(2);
+
+    /* G31-P10-3：功率/扭矩/boost 行真实值——POWERTRAIN 可用（spec 在）且本帧有
+       step 回传 _ptOut 时直读物理输出：P_out=轮上机械功率 W（制动/回收为负，
+       显示取绝对值）；轮上总扭矩 = tWheel 逐轮绝对值求和（tv/LSD 不对称时）或
+       (|tFront|+|tRear|)×2（轴扭矩/2 → 轮扭矩）；boost 行 ev/series 无进气增压
+       概念 → 改显示 SOC%（soc 0..1 → 百分比，复用现有槽位不加 DOM）。
+       不可用（POWERTRAIN 加载失败/无 _ptOut）→ 回退旧假公式（legacy 显示锚）。
+       HUD 为显示层，不触碰物理 parity。 */
+    const _ptReal = !!(pt && typeof POWERTRAIN !== "undefined" && POWERTRAIN.spec);
+    let pwr;
+    if (_ptReal && Number.isFinite(pt.P_out)) {
+      pwr = (Math.abs(pt.P_out) / 1000).toFixed(0);
+    } else {
+      pwr = Math.max(0, (ctrl.throttle * 320 * (rpm / 8000))).toFixed(0);
+    }
+    let trq;
+    if (_ptReal) {
+      const tSum = (Array.isArray(pt.tWheel))
+        ? pt.tWheel.reduce((a, t) => a + Math.abs(Number.isFinite(t) ? t : 0), 0)
+        : (Math.abs(Number.isFinite(pt.tFront) ? pt.tFront : 0) +
+           Math.abs(Number.isFinite(pt.tRear) ? pt.tRear : 0)) * 2.0;
+      trq = Math.max(0, tSum).toFixed(1);
+    } else {
+      trq = Math.max(0, (ctrl.throttle * 480 * (1.0 - (rpm - 5000)**2 / (7000**2)))).toFixed(1);
+    }
+    const _ptArch = _ptReal ? POWERTRAIN.spec.architecture : null;
+    let boost;
+    if ((_ptArch === "ev" || _ptArch === "series") && Number.isFinite(pt.soc)) {
+      boost = Math.max(0, Math.min(100, pt.soc * 100)).toFixed(0) + "%";
+    } else {
+      boost = (ctrl.throttle * 1.85 * (rpm / 7500)).toFixed(2);
+    }
 
     const elSpd = document.getElementById("tg_val_speed"); if(elSpd) elSpd.textContent = spd.toFixed(0);
     const elGear = document.getElementById("tg_val_gear"); if(elGear) elGear.textContent = recGear;

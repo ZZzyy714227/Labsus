@@ -179,6 +179,71 @@ function T(name, cond, extra) {
     JSON.stringify(lsCalls.slice(-2)));
 }
 
+// ── 10. G31-P10-3：POWERTRAIN 统一（rpm/gear 源接管 + 回退路径） ──
+{
+  /* 沙箱注意：本测试不加载 16-powertrain.js（其顶层含 DOM 交互，stub 风险更低）。
+     EngineAudioModel 内部以自由变量 POWERTRAIN（vm 沙箱运行时查 ctx 全局）与
+     window.physicsEngine._ptOut（11-stages 接线层存的 step 回传帧）取源——
+     在已 contextify 的沙箱上注入等价 stub 即模拟真实接线；
+     第 1-9 节在无 POWERTRAIN 的沙箱运行 = 回退路径（逐位不变保证）。 */
+  ctx.POWERTRAIN = {
+    spec: { architecture: "ice", drive: "rwd" },
+    state: { iceOmega: 523.598, gearIdx: 2 },          // 5000 rpm 曲轴，3 挡（0-based 2）
+    hasLiveRpmSource() { return true; }
+  };
+  ctx.window.physicsEngine = { _ptOut: null };         // 非 EV：rpm 走 state.iceOmega
+
+  // a) rpm 直读曲轴（state.iceOmega×30/π = 5000；dt=0.5 → 一阶惯性单帧到位），
+  //    wheelOmega 用干扰值（999→旧换算约 57000 rpm）验证其不泄漏
+  const m = new Model("gt3");
+  let f = m.update(0.5, { wheelOmega: 999, throttle: 1, brake: 0 });
+  T("POWERTRAIN 接管：rpm = state.iceOmega 曲轴值", Math.abs(f.rpm - 5000) < 1,
+    "rpm=" + f.rpm.toFixed(1));
+  T("POWERTRAIN 接管：gear = state.gearIdx+1（0-based→1-based）", f.gear === 3,
+    "gear=" + f.gear);
+
+  // b) 挡位状态机不自推进：rpm 超 redline×shiftUp（9000×0.94=8460）仍不上 4 挡、
+  //    无 shift 事件（换挡唯一来源 = POWERTRAIN gearbox 状态机）
+  ctx.POWERTRAIN.state.iceOmega = 10000 * Math.PI / 30;   // 10000 rpm
+  let shifts = 0; const gearSet = new Set();
+  for (let i = 0; i < 8; i++) {
+    f = m.update(0.05, { wheelOmega: 999, throttle: 1, brake: 0 });
+    if (f.events.includes("shift")) shifts++;
+    gearSet.add(f.gear);
+  }
+  T("POWERTRAIN 接管：挡位不自行推进（超红线不升挡/无 shift 事件）",
+    shifts === 0 && gearSet.size === 1 && f.gear === 3,
+    "gear=" + [...gearSet].join(",") + " shifts=" + shifts);
+
+  // c) EV：rpm 源 = POWERTRAIN.step 回传 shiftRpm（经 EngineSound.update 读
+  //    window.physicsEngine._ptOut；减速器齿比与 fwd/rwd 架构感知已在
+  //    16-powertrain 内算好）——wheelOmega 旧换算 30×30/π≈286 不得泄漏
+  ctx.POWERTRAIN.spec = { architecture: "ev", drive: "rwd" };
+  ctx.POWERTRAIN.state = { iceOmega: 0, gearIdx: 0 };
+  ctx.window.physicsEngine._ptOut = { iceRpm: 0, shiftRpm: 4200, gearIdx: 0, soc: 0.87, P_out: -52000 };
+  const _stEv = { omega: { FL: 0, FR: 0, RL: 30, RR: 30 } };
+  f = EngineSound.update(0.5, _stEv, null, { throttle: 1, brake: 0 });
+  T("EV：rpm = POWERTRAIN.shiftRpm（电机轴，非轮速换算）", Math.abs(f.rpm - 4200) < 1,
+    "rpm=" + f.rpm.toFixed(1));
+
+  // d) EV ptOut 缺失（早期帧/其他舞台）：guard 回退轮速换算（100×30/π≈954.9 > idle）
+  ctx.window.physicsEngine._ptOut = null;
+  f = EngineSound.update(0.5, { omega: { FL: 0, FR: 0, RL: 100, RR: 100 } }, null, { throttle: 1, brake: 0 });
+  T("EV：ptOut 缺失 guard 回退轮速换算", Math.abs(f.rpm - 100 * 30 / Math.PI) < 1,
+    "rpm=" + f.rpm.toFixed(1));
+
+  // e) 清除 stub → 回退旧路径逐位复现（与第 2 节同场景：升挡 + RPM 滑落）
+  delete ctx.POWERTRAIN; delete ctx.window.physicsEngine;
+  const mR = new Model("gt3");
+  for (let i = 0; i < 10; i++) mR.update(0.025, { wheelOmega: 78, throttle: 1, brake: 0 });
+  const seqR = [];
+  for (let i = 0; i < 12; i++) seqR.push(mR.update(0.025, { wheelOmega: 82, throttle: 1, brake: 0 }));
+  const afterR = Math.min(...seqR.map(fr => fr.rpm));
+  T("回退路径：升挡 + RPM 滑落逐位复现（无 POWERTRAIN）",
+    seqR[0].events.includes("shift") && afterR < seqR[0].rpm * 0.9,
+    "滑落至=" + afterR.toFixed(0));
+}
+
 console.log("\n========================================");
 console.log("P2-Sound 引擎声浪测试 " + pass + "/" + (pass + fail) + " Passed");
 if (fail > 0) { console.log("FAILED: " + fail); process.exit(1); }
