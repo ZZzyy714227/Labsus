@@ -116,7 +116,9 @@ const MPCModel = {
       return (((t ^ (t >>> 14)) >>> 0) / 4294967296) * 2 - 1;
     };
     let mu = Wprev.map(w => w.slice());
-    let sig = Wprev.map(() => [0.02, 0.8]);
+    let sig = Wprev.map(() => [0.005, 0.8]);   // G30：δ 探索噪声 0.3°——直道 47m/s 处
+    // CEM 每帧 δ 抖动（旧 σ=0.02≈1.1°@240Hz）激励 1.5-2Hz 横摆/侧倾耦合振荡至自旋；
+    // 横向律由解析种子提供，CEM 只精修纵向
     let bestW = null, bestJ = Infinity;
 
     for (let it = 0; it < ITERS; it++) {
@@ -361,7 +363,7 @@ class UniversalAutoPilotMPC {
     // ── 转向：模型 δ → 引擎 steer（反号）+ 低通 + 速率限制（防 CEM 抖动与 PIO）──
     let steerDeg = -deltaM * (180 / Math.PI);
     steerDeg = Math.max(-28, Math.min(28, steerDeg));
-    const steer_alpha = Math.min(1.0, dt / 0.06);
+    const steer_alpha = Math.min(1.0, dt / 0.10);
     steerDeg = this.last_steer + (steerDeg - this.last_steer) * steer_alpha;
     const max_steer_rate = 100.0;   // deg/s（Stanley 用 140，MPC 权威更大需更紧）
     const d_steer = Math.max(-max_steer_rate * dt, Math.min(max_steer_rate * dt, steerDeg - this.last_steer));
@@ -374,6 +376,14 @@ class UniversalAutoPilotMPC {
     let ctrl_brake = this.last_brake + (target_brake - this.last_brake) * filter_alpha;
     if (ctrl_throttle < 0.015) ctrl_throttle = 0;
     if (ctrl_brake < 0.015) ctrl_brake = 0;
+
+    // G30：油门/制动变化率限制——diag 实测直道 u=47m/s 处油门 1→0 在 ~0.15s 内
+    // 完成（低通 τ=45ms），瞬态载荷转移激发后轴 lift-off 甩尾（v→23m/s 自旋）。
+    // 油门松取限 2.5/s、制动施加限 4.0/s，让载荷转移平缓；制动释放不限（安全侧）。
+    ctrl_throttle = MPCModel.clamp(ctrl_throttle,
+      this.last_throttle - 2.5 * dt, this.last_throttle + 6.0 * dt);
+    ctrl_brake = MPCModel.clamp(ctrl_brake,
+      this.last_brake - 8.0 * dt, this.last_brake + 4.0 * dt);
 
     // ── G30 ABS 输出级（保留：κ/轮载骤降双通道，绕过低通）──
     const pedalBrake = ctrl_brake;
