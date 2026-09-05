@@ -323,6 +323,54 @@ function runPowertrainParity(ctx, wp, sim, ok) {
   PT.setSpec(fdOnly);
   ok(PT.hasRealDrivetrain() === true, 'G31-P6 I-1: finalDrive=3.9(ratios[1]) → hasRealDrivetrain()===true');
   PT.setSpec(PT.defaultSpec());   // 还原
+
+  // === I-3(G31-P6-fix)：TCS 介入工况 parity（低附着 mu=0.30 + 全油门 → 后轮必然打滑触发 TCS）===
+  //   锁住“双切”与“前轴泄漏”修复：默认规格（ptOut 路径，轮循环内 tcsScale 机械通道切割 +
+  //   dm.tcsRear 能量通道）与 spec=null（legacy 480/120 路径，仅轮循环内 tcsScale 切割）
+  //   在 TCS 实际介入时仍必须逐位一致——omega.RR 验证机械通道无双切，omega.FR 验证前轴无泄漏。
+  const P030 = new ctx.window.CircuitPath(wp, 0.30, 1.0);
+  const mkEng030 = () => {
+    const eng = new ctx.window.VehicleDynamics15DOF(makeS(), sim, 5.0);
+    Object.assign(eng.state, {
+      X: p0.x, Y: p0.y, Z: 0, phi: 0, theta: 0, psi: p0.heading,
+      u: 5, v: 0, w: 0, p: 0, q: 0, r: 0,
+      omega: { FL: 5 / 0.30, FR: 5 / 0.30, RL: 5 / 0.30, RR: 5 / 0.30 }
+    });
+    return eng;
+  };
+  const env030 = { grade: 0, path: P030, bumpNoise: 0 };
+  const ctrlTcs = { throttle: 1.0, brake: 0, steer: 0 };
+  PT.setSpec(PT.defaultSpec());
+  const engTcsA = mkEng030();
+  const omTcsA_RR = [], omTcsA_FR = [];
+  let sawTcsCut = false;
+  for (let i = 0; i < NS; i++) {
+    engTcsA.step(ctrlTcs, env030, dt);
+    if (engTcsA._tcsEstimate !== undefined && engTcsA._tcsEstimate < 1 - 1e-12) sawTcsCut = true;
+    omTcsA_RR.push(engTcsA.state.omega.RR);
+    omTcsA_FR.push(engTcsA.state.omega.FR);
+  }
+  ok(sawTcsCut, 'G31-P6-fix I-3: mu=0.30+throttle=1.0 工况确触发 TCS 介入（_tcsEstimate<1，非无效用例）');
+
+  PT.spec = null;
+  const engTcsB = mkEng030();
+  const omTcsB_RR = [], omTcsB_FR = [];
+  for (let i = 0; i < NS; i++) {
+    engTcsB.step(ctrlTcs, env030, dt);
+    omTcsB_RR.push(engTcsB.state.omega.RR);
+    omTcsB_FR.push(engTcsB.state.omega.FR);
+  }
+  PT.spec = savedSpec;   // 还原
+
+  let maxDiffTcsRR = 0, maxDiffTcsFR = 0;
+  for (let i = 0; i < NS; i++) {
+    maxDiffTcsRR = Math.max(maxDiffTcsRR, Math.abs(omTcsA_RR[i] - omTcsB_RR[i]));
+    maxDiffTcsFR = Math.max(maxDiffTcsFR, Math.abs(omTcsA_FR[i] - omTcsB_FR[i]));
+  }
+  ok(maxDiffTcsRR <= 1e-9,
+    `G31-P6-fix I-3: TCS 介入工况（mu=0.30,throttle=1.0）omega.RR parity（${NS} 步 maxΔ=${maxDiffTcsRR.toExponential(2)} ≤ 1e-9，锁住双切修复）`);
+  ok(maxDiffTcsFR <= 1e-9,
+    `G31-P6-fix I-3: TCS 介入工况（mu=0.30,throttle=1.0）omega.FR parity（${NS} 步 maxΔ=${maxDiffTcsFR.toExponential(2)} ≤ 1e-9，锁住前轴泄漏修复）`);
 }
 
 function runChecks(webDir, ok, fail, opts) {

@@ -698,23 +698,26 @@ class VehicleDynamics15DOF {
       let SumFx_tire = 0.0, SumFy_tire = 0.0;
       let SumMz_tire = 0.0;
 
-      // G31-P6：动力系统每子步步进（缺省 legacy-equivalent → 与旧常数逐位一致；
-      //   POWERTRAIN 未加载或 spec=null 时回退旧路径，保对拍锚）
-      // I-3：TCS 能量反馈——用上一子步后轮 tcsAvg 缩放 demand.throttle（一帧滞后，
-      //   能量近似守恒：step 内 SOC/油耗积分按缩减后油门计算）。
-      // M-2：复用 scratch 对象避免每子步 GC 压力。
-      const tcsEst = (this._tcsEstimate !== undefined) ? this._tcsEstimate : 1;
-      if (!this._ptDemand) this._ptDemand = { throttle: 0, brake: 0, shiftCmd: 0, tvBias: undefined };
+      // G31-P6-fix（I-3 阻塞修复）：动力系统每子步步进（缺省 legacy-equivalent → 与旧常数逐位一致；
+      //   POWERTRAIN 未加载或 spec=null 时回退旧路径，保对拍锚）。
+      //   TCS 机械通道：只在轮循环内用 tcsScale 切一次轮扭矩（demand.throttle 不再乘 tcsEst，
+      //     消除“双切”——throttle 与轮扭矩同时被 TCS 削减、且前轴泄漏后轴-only 的削减比例）。
+      //   TCS 能量通道：dm.tcsRear（默认 1）仅用于 step() 内 P_mot 中后电机贡献的缩放
+      //     （T_motR × tcsRear 进 P_mot，用于 SOC/油耗积分的能量近似守恒），不影响轮扭矩输出。
+      //     取上一子步后轮 tcsScale 均值，一帧滞后（子步末尾更新 this._tcsEstimate，下一子步开头读取）。
+      //   M-2：复用 scratch 对象避免每子步 GC 压力。
+      if (!this._ptDemand) this._ptDemand = { throttle: 0, brake: 0, shiftCmd: 0, tvBias: undefined, tcsRear: 1 };
       if (!this._ptOmega) this._ptOmega = { FL: 0, FR: 0, RL: 0, RR: 0 };
       const _pd = this._ptDemand, _pw = this._ptOmega;
-      _pd.throttle = ctrl.throttle * tcsEst; _pd.brake = ctrl.brake;
+      _pd.throttle = ctrl.throttle; _pd.brake = ctrl.brake;
       _pd.shiftCmd = ctrl.shiftCmd || 0; _pd.tvBias = ctrl.tvBias;
+      _pd.tcsRear = (this._tcsEstimate !== undefined) ? this._tcsEstimate : 1;   // I-3：一帧滞后（上一子步末尾算出）
       _pw.FL = st.omega.FL; _pw.FR = st.omega.FR; _pw.RL = st.omega.RL; _pw.RR = st.omega.RR;
       const ptOut = (typeof POWERTRAIN !== "undefined" && POWERTRAIN.spec) ?
         POWERTRAIN.step(dt, _pd, _pw) : null;
       const ptIw = ptOut ? POWERTRAIN.reflectedInertia() : 0;
       this._ptOut = ptOut;   // G31：供 HUD（renderCircuitTelemetry）读挡位/rpm
-      let _tcsSumRear = 0, _tcsCntRear = 0;   // I-3：累计后轮 tcsScale 供子步末更新
+      let _tcsSumRear = 0, _tcsCntRear = 0;   // I-3：累计后轮 tcsScale 供子步末更新（能量通道，一帧滞后）
 
       for(const w of wheels) {
         const ws = wheelStates[w.id];
@@ -818,8 +821,13 @@ class VehicleDynamics15DOF {
         this.telemetry.kappa[w.id] = kappa;
         this.telemetry.alpha[w.id] = alpha;
       }
-      // I-3(G31-P6)：子步末更新 tcsEstimate（后轮 tcsScale 均值，供下一子步 demand.throttle 缩放）
-      this._tcsEstimate = (_tcsCntRear > 0) ? (_tcsSumRear / _tcsCntRear) : 1;
+      // I-3(G31-P6-fix)：子步末更新 tcsEstimate（后轮 tcsScale 均值）——仅供下一子步 dm.tcsRear
+      //   （能量通道）使用，不再乘到 demand.throttle（机械通道由轮循环内 tcsScale 单独切）。
+      //   语义修正：ctrl.throttle<=1e-6（没给油）时置 1——“没给油”≠“TCS 全切”（tcsScale
+      //   在除零守卫下恒为 0，若不修正会把“零油门”误当作“TCS 全切”传给下一子步，
+      //   导致油门 onset 时能量通道丢一子步）。
+      this._tcsEstimate = (ctrl.throttle <= 1e-6) ? 1
+        : ((_tcsCntRear > 0) ? (_tcsSumRear / _tcsCntRear) : 1);
       
       // Gravity component and Aero —— P2a：分轴地面效应 cl(h) + DRS 真减阻
       // 标定结构双端同式（前端 qs camelCase ↔ 引擎 AeroParams snake_case）：
@@ -3716,10 +3724,9 @@ function renderCircuitTelemetry(st, tel, ctrl) {
   if(tab === "general") {
     const spd = Math.max(0, st.u) * 3.6;
     const curKm = spd;
-    // G31-P6 I-1：真实动力链挡位/rpm 优先——仅当 POWERTRAIN 携带真实传动比
-    //   （hasRealDrivetrain()===true）时才信任 iceRpm；legacy 恒等箱下 iceOmega=轮速，
-    //   会塌到怠速，故回退旧查表/轮速估算（对拍锚）。
-    // M-1：EV 规格用轮速换算（与声浪对齐）。
+    // G31-P6 I-1：真实动力链挡位优先——仅当 POWERTRAIN 携带真实传动比
+    //   （hasRealDrivetrain()===true）时才信任 gearIdx；legacy 恒等箱下挡位无物理意义，
+    //   回退旧查表估算（对拍锚）。
     const pt = (typeof window !== "undefined" && window.physicsEngine && window.physicsEngine._ptOut)
       ? window.physicsEngine._ptOut : null;
     const _ptHasReal = (typeof POWERTRAIN !== "undefined" && POWERTRAIN.spec && POWERTRAIN.state && POWERTRAIN.hasRealDrivetrain());
@@ -3736,12 +3743,23 @@ function renderCircuitTelemetry(st, tel, ctrl) {
     }
     if (curKm < 1 && Math.abs(ctrl.throttle) < 0.05) recGear = "N";
 
-    // M-1：EV 分支用后轮速换算 rpm（直驱电机 rpm ≈ 轮 rpm）；非 EV 用 iceRpm
+    // M-1(G31-P6-fix)：rpm 判据改架构感知——POWERTRAIN.hasLiveRpmSource()
+    //   （spec && state && (architecture==="ev" || hasRealDrivetrain())）为真时才信任动力链 rpm 源，
+    //   与 13-engine-sound.js 声浪共用同一判据（避免两处各写一份、语义漂移）。
+    //   EV：用驱动轮 ω×30/π（不查 motorR 是否存在；ev+fwd 用前轮均值，否则后轮均值）；
+    //   非 EV + 真实传动比：用 iceRpm；legacy 恒等箱 + 非 EV：hasLiveRpmSource()=false
+    //   → 回退旧轮速×齿比估算（对拍锚）。
+    const _ptLive = (typeof POWERTRAIN !== "undefined" && POWERTRAIN.hasLiveRpmSource && POWERTRAIN.hasLiveRpmSource());
     let rpm;
-    if (pt && _ptHasReal && Number.isFinite(pt.iceRpm)) {
-      rpm = (POWERTRAIN.spec.architecture === "ev")
-        ? Math.min(9500, Math.max(900, (st.omega.RL + st.omega.RR) * 0.5 * 30 / Math.PI))
-        : Math.min(9500, Math.max(900, pt.iceRpm));
+    if (pt && _ptLive && Number.isFinite(pt.iceRpm)) {
+      if (POWERTRAIN.spec.architecture === "ev") {
+        const driveOmega = (POWERTRAIN.spec.drive === "fwd")
+          ? (st.omega.FL + st.omega.FR) * 0.5
+          : (st.omega.RL + st.omega.RR) * 0.5;
+        rpm = Math.min(9500, Math.max(900, driveOmega * 30 / Math.PI));
+      } else {
+        rpm = Math.min(9500, Math.max(900, pt.iceRpm));
+      }
     } else {
       rpm = Math.min(9500, Math.max(900, (st.omega.RL * 60 / (2 * Math.PI)) * 4.2));
     }
