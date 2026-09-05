@@ -226,7 +226,8 @@ function runLaps(ctx, wp, sim, nLaps, opts) {
 function runPowertrainParity(ctx, wp, sim, ok) {
   const PT = ctx.window.POWERTRAIN;
   ok(!!PT && !!PT.spec, 'G31-P6: POWERTRAIN 已加载且缺省 spec 非空（ptOut 路径应激活）');
-  if (!PT) return;
+  /* M-4(G31-P6)：assert(PT) 防漏检——若 POWERTRAIN 未加载则后续 parity 全部无意义 */
+  if (!PT || !PT.spec) { ok(false, 'G31-P6 M-4: POWERTRAIN 未加载，parity 无法执行'); return; }
 
   const P = new ctx.window.CircuitPath(wp, 1.35, 1.0);
   const p0 = wp[0];
@@ -239,19 +240,21 @@ function runPowertrainParity(ctx, wp, sim, ok) {
     });
     return eng;
   };
-  const ctrl = { throttle: 0.6, brake: 0, steer: 0 };
   const env = { grade: 0, path: P, bumpNoise: 0 };
   const NS = 120, dt = 1 / 240;
 
+  // === A/B 对比：throttle=0.6 ===
+  const ctrl = { throttle: 0.6, brake: 0, steer: 0 };
   // A：默认规格（ptOut 路径）
   PT.setSpec(PT.defaultSpec());
   const engA = mkEng();
-  const omA = [];
+  const omA_RR = [], omA_FR = [];
   let sawPtOut = false;
   for (let i = 0; i < NS; i++) {
     engA.step(ctrl, env, dt);
     if (engA._ptOut) sawPtOut = true;
-    omA.push(engA.state.omega.RR);
+    omA_RR.push(engA.state.omega.RR);
+    omA_FR.push(engA.state.omega.FR);
   }
   ok(sawPtOut, 'G31-P6: 默认规格下 step 产出非空 _ptOut（接线确被执行，非静默回退）');
 
@@ -259,14 +262,67 @@ function runPowertrainParity(ctx, wp, sim, ok) {
   const savedSpec = PT.spec;
   PT.spec = null;
   const engB = mkEng();
-  const omB = [];
-  for (let i = 0; i < NS; i++) { engB.step(ctrl, env, dt); omB.push(engB.state.omega.RR); }
+  const omB_RR = [], omB_FR = [];
+  for (let i = 0; i < NS; i++) {
+    engB.step(ctrl, env, dt);
+    omB_RR.push(engB.state.omega.RR);
+    omB_FR.push(engB.state.omega.FR);
+  }
   PT.spec = savedSpec;   // 还原，避免污染后续检查
 
-  let maxDiff = 0;
-  for (let i = 0; i < NS; i++) maxDiff = Math.max(maxDiff, Math.abs(omA[i] - omB[i]));
-  ok(maxDiff <= 1e-9,
-    `G31-P6: 默认规格 vs spec=null 逐子步 omega.RR 一致（${NS} 步 maxΔ=${maxDiff.toExponential(2)} ≤ 1e-9）`);
+  let maxDiffRR = 0, maxDiffFR = 0;
+  for (let i = 0; i < NS; i++) {
+    maxDiffRR = Math.max(maxDiffRR, Math.abs(omA_RR[i] - omB_RR[i]));
+    maxDiffFR = Math.max(maxDiffFR, Math.abs(omA_FR[i] - omB_FR[i]));
+  }
+  ok(maxDiffRR <= 1e-9,
+    `G31-P6: 默认规格 vs spec=null 逐子步 omega.RR 一致（${NS} 步 maxΔ=${maxDiffRR.toExponential(2)} ≤ 1e-9）`);
+  /* M-4：加宽 parity——omega.FR 对比（前轮也走 ptOut 路径） */
+  ok(maxDiffFR <= 1e-9,
+    `G31-P6 M-4: 默认规格 vs spec=null 逐子步 omega.FR 一致（${NS} 步 maxΔ=${maxDiffFR.toExponential(2)} ≤ 1e-9）`);
+
+  // === C/D 对比：throttle=0（TCS 除零守卫分支） ===
+  const ctrl0 = { throttle: 0, brake: 0, steer: 0 };
+  PT.setSpec(PT.defaultSpec());
+  const engC = mkEng();
+  const omC_RR = [], omC_FR = [];
+  for (let i = 0; i < NS; i++) {
+    engC.step(ctrl0, env, dt);
+    omC_RR.push(engC.state.omega.RR);
+    omC_FR.push(engC.state.omega.FR);
+  }
+  PT.spec = null;
+  const engD = mkEng();
+  const omD_RR = [], omD_FR = [];
+  for (let i = 0; i < NS; i++) {
+    engD.step(ctrl0, env, dt);
+    omD_RR.push(engD.state.omega.RR);
+    omD_FR.push(engD.state.omega.FR);
+  }
+  PT.spec = savedSpec;
+
+  let maxDiff0RR = 0, maxDiff0FR = 0;
+  for (let i = 0; i < NS; i++) {
+    maxDiff0RR = Math.max(maxDiff0RR, Math.abs(omC_RR[i] - omD_RR[i]));
+    maxDiff0FR = Math.max(maxDiff0FR, Math.abs(omC_FR[i] - omD_FR[i]));
+  }
+  ok(maxDiff0RR <= 1e-9,
+    `G31-P6 M-4: throttle=0 omega.RR parity（maxΔ=${maxDiff0RR.toExponential(2)} ≤ 1e-9）`);
+  ok(maxDiff0FR <= 1e-9,
+    `G31-P6 M-4: throttle=0 omega.FR parity（maxΔ=${maxDiff0FR.toExponential(2)} ≤ 1e-9）`);
+
+  // === I-1：hasRealDrivetrain 判据 ===
+  PT.setSpec(PT.defaultSpec());
+  ok(PT.hasRealDrivetrain() === false, 'G31-P6 I-1: 默认规格 hasRealDrivetrain()===false');
+  const realGb = PT.defaultSpec();
+  realGb.gearbox.ratios = [3, 2, 1]; realGb.gearbox.finalDrive = 3.9;
+  PT.setSpec(realGb);
+  ok(PT.hasRealDrivetrain() === true, 'G31-P6 I-1: ratios[3,2,1]+finalDrive=3.9 → hasRealDrivetrain()===true');
+  const fdOnly = PT.defaultSpec();
+  fdOnly.gearbox.finalDrive = 3.9;
+  PT.setSpec(fdOnly);
+  ok(PT.hasRealDrivetrain() === true, 'G31-P6 I-1: finalDrive=3.9(ratios[1]) → hasRealDrivetrain()===true');
+  PT.setSpec(PT.defaultSpec());   // 还原
 }
 
 function runChecks(webDir, ok, fail, opts) {

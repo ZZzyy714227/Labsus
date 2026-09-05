@@ -140,8 +140,17 @@ const POWERTRAIN = {
     if (soc !== undefined && soc > 0.95) derate = Math.max(0, (1 - soc) / 0.05);
     return -Rcap * Math.min(1, -cmd) * derate * sgn;
   },
+  /* I-1(G31-P6)：判断当前规格是否携带真实传动比（非 legacy 恒等箱）。
+     legacy 默认 gearbox = { ratios:[1], finalDrive:1 } → 恒等传动 → iceOmega=轮速，
+     HUD/声浪若直接读 iceOmega 会塌到轮速/怠速。本方法供下游判据：
+     true = 存在真实齿轮比，可信任 iceOmega 作为 rpm 源。 */
+  hasRealDrivetrain() {
+    const g = this.spec && this.spec.gearbox;
+    return !!(g && !(g.ratios.length === 1 && g.ratios[0] === 1 && g.finalDrive === 1));
+  },
   /* ═══ 段3 传动链：gearbox 换挡状态机 + 反射惯量 ═══
-     反射到轮端的旋转惯量（kg·m²/轮）：(I_ice + I_motCoupled)×(ratio×final)²/2轮。
+     反射到轮端的旋转惯量（kg·m²/轮）：(I_ice + I_motCoupled)×(ratio×final)²/nDrive。
+     I-2(G31-P6)：nDrive 按驱动轮数归一——awd/tv=4 轮、fwd/rwd=2 轮。
      legacy 默认 inertia=0 → 0，15-DOF 的 Iw 不变（等价锚）。
      p2 架构电机在 ICE 与 gearbox 之间同轴 → 计入；p3/p4/ev 电机不在曲轴链 → 不计。 */
   reflectedInertia() {
@@ -152,7 +161,8 @@ const POWERTRAIN = {
     if (sp.architecture === "p2") {
       I += (sp.motorF ? (sp.motorF.inertia || 0) : 0) + (sp.motorR ? (sp.motorR.inertia || 0) : 0);
     }
-    return I * r * r / 2;
+    const nDrive = (sp.drive === "awd_fixed" || sp.drive === "awd_center" || sp.drive === "tv") ? 4 : 2;
+    return I * r * r / nDrive;
   },
   /* 换挡状态机推进（每子步调用）。返回 true = 本子步处于扭矩中断期。
      完成时：gearIdx += shiftDir、iceOmega 跳变 = wheelOmegaAxle×ratio_new×final
