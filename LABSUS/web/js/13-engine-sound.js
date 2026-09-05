@@ -75,10 +75,20 @@ class EngineAudioModel {
     const brk = Math.max(0, Math.min(1, sig.brake || 0));
     const wheelOmega = Math.max(0, sig.wheelOmega || 0);
 
+    /* G31：真实动力链 rpm 优先（ICE/混动用曲轴 rpm；EV 用后电机轮速换算）；
+       POWERTRAIN 未加载或 spec=null 时回退旧 wheel-omega×齿轮比猜测（对拍锚）。
+       本模型 headless 无 state，EV 分支用驱动轮 omega（sig.wheelOmega，直驱
+       电机 rpm ≈ 轮 rpm）；iceOmega × 30/π 得曲轴 rpm。 */
+    const ptRpm = (typeof POWERTRAIN !== "undefined" && POWERTRAIN.spec && POWERTRAIN.state)
+      ? ((POWERTRAIN.spec.architecture === "ev" && POWERTRAIN.spec.motorR)
+          ? wheelOmega * 30.0 / Math.PI
+          : POWERTRAIN.state.iceOmega * 30.0 / Math.PI)
+      : null;
+
     /* 1. 挡位状态机：RPM 由驱动轮 omega × 齿轮比反推（打滑时 omega 飙升
           → 转速跟着飙升，与真实驱动轮滑转一致） */
     const ratio = p.ratios[this.gear - 1] * p.final;
-    let rpmRaw = wheelOmega * ratio * 60.0 / (2.0 * Math.PI);
+    let rpmRaw = (ptRpm !== null) ? ptRpm : (wheelOmega * ratio * 60.0 / (2.0 * Math.PI));
     if (!isFinite(rpmRaw) || rpmRaw < p.idle * 0.6) rpmRaw = p.idle;
 
     let events = null;
@@ -100,7 +110,7 @@ class EngineAudioModel {
 
     /* 2. 引擎转速一阶惯性（换挡齿轮比变化 → 目标骤变 → 惯性滑落/拉起） */
     const ratioNew = p.ratios[this.gear - 1] * p.final;
-    let rpmTarget = wheelOmega * ratioNew * 60.0 / (2.0 * Math.PI);
+    let rpmTarget = (ptRpm !== null) ? ptRpm : (wheelOmega * ratioNew * 60.0 / (2.0 * Math.PI));
     if (!isFinite(rpmTarget) || rpmTarget < p.idle) rpmTarget = p.idle;
     rpmTarget = Math.min(p.redline * 1.04, rpmTarget);
     this.rpm += (rpmTarget - this.rpm) * Math.min(1.0, dt * ENGINE_SOUND_RPM_INERTIA);
