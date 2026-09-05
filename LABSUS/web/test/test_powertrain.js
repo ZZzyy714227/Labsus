@@ -236,6 +236,87 @@ T(`POWERTRAIN.setSpec(${JSON.stringify(noCutSpec)});`);
 assert(Math.abs(T("POWERTRAIN.iceTorque(10000, 1.0)") - 1200) < 1e-9, "M-4 fuelCutRpm undefined → no cut at high rpm");
 T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
 
+/* ═══ 3. Driveline (gearbox / reflected inertia / diff) ═══ */
+console.log("=== 3. Driveline (gearbox / reflected inertia / diff) ===");
+// 换挡状态机：shiftCmd → shiftT>0 且期间扭矩中断标记；完成后 gearIdx+1、iceOmega 跳变
+const gbSpec = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+gbSpec.gearbox = { type: "manual", ratios: [3, 2, 1.5, 1.2, 1, 0.85], finalDrive: 3.9, shiftTimeMs: 120, eff: 0.97, autoUpFrac: 0.92, autoDownFrac: 0.55 };
+const r0 = T(`POWERTRAIN.setSpec(${JSON.stringify(gbSpec)})`);
+assert(r0.ok === true, "gearbox spec valid");
+T("POWERTRAIN.state.gearIdx = 1; POWERTRAIN.state.iceOmega = 500;");
+T("POWERTRAIN.requestShift(1);");
+assert(T("POWERTRAIN.state.shiftT") > 0 && T("POWERTRAIN.state.shiftDir") === 1, "shift requested");
+// 换挡进行中 advanceGearbox 返回 true（扭矩中断标记，供段5 组合器置零输出）
+assert(T("POWERTRAIN.advanceGearbox(0.004, 20)") === true, "advanceGearbox returns true during shift");
+// 推进 120ms → 完成换挡
+for (let i = 0; i < 31; i++) T("POWERTRAIN.advanceGearbox(0.004, 20)");
+assert(T("POWERTRAIN.state.gearIdx") === 2, "gear advanced after shiftTime");
+assert(T("POWERTRAIN.state.shiftT") === 0 && T("POWERTRAIN.state.shiftDir") === 0, "shift state cleared");
+const wIce = 20 * 1.5 * 3.9;
+assert(Math.abs(T("POWERTRAIN.state.iceOmega") - wIce) < 1e-6, "rpm jump = wheelOmega×ratio×final");
+// 换挡结束后 advanceGearbox 返回 false（不再中断）
+assert(T("POWERTRAIN.advanceGearbox(0.004, 20)") === false, "advanceGearbox returns false when idle");
+// 越界换挡被拒
+T("POWERTRAIN.state.gearIdx = 0; POWERTRAIN.requestShift(-1);");
+assert(T("POWERTRAIN.state.shiftT") === 0, "downshift below 0 rejected");
+T("POWERTRAIN.state.gearIdx = 5; POWERTRAIN.requestShift(1);");
+assert(T("POWERTRAIN.state.shiftT") === 0, "upshift above top rejected");
+// 换挡进行中重复请求被忽略（shiftT>0 时 requestShift 无副作用）
+T("POWERTRAIN.state.gearIdx = 2; POWERTRAIN.requestShift(1); POWERTRAIN.requestShift(1);");
+assert(T("POWERTRAIN.state.shiftDir") === 1 && T("POWERTRAIN.state.gearIdx") === 2, "re-entrant requestShift ignored while shifting");
+T("POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;");
+// 反射惯量：(I_ice+I_motCoupled)×(ratio×final)²/2
+const riSpec = JSON.parse(JSON.stringify(gbSpec));
+riSpec.ice.inertia = 0.25; riSpec.architecture = "p2";
+riSpec.motorR = { peakTorqueNm: 200, peakPowerKw: 100, baseRpm: 4775, maxRpm: 10000, regenMaxKw: 80, inertia: 0.1 };
+const r1 = T(`POWERTRAIN.setSpec(${JSON.stringify(riSpec)})`);
+assert(r1.ok === true, "p2 spec valid");
+T("POWERTRAIN.state.gearIdx = 0;");
+const expectRI = (0.25 + 0.1) * (3 * 3.9) ** 2 / 2;
+assert(Math.abs(T("POWERTRAIN.reflectedInertia()") - expectRI) < 1e-9, "reflected inertia p2 gear0");
+// 反射惯量随挡位变化（gear3: 1.2×3.9）
+T("POWERTRAIN.state.gearIdx = 3;");
+assert(Math.abs(T("POWERTRAIN.reflectedInertia()") - (0.25 + 0.1) * (1.2 * 3.9) ** 2 / 2) < 1e-9, "reflected inertia p2 gear3");
+// p3 电机不在曲轴链 → 只计 ICE 惯量
+const p3Spec = JSON.parse(JSON.stringify(riSpec));
+p3Spec.architecture = "p3";
+T(`POWERTRAIN.setSpec(${JSON.stringify(p3Spec)}); POWERTRAIN.state.gearIdx = 0;`);
+assert(Math.abs(T("POWERTRAIN.reflectedInertia()") - 0.25 * (3 * 3.9) ** 2 / 2) < 1e-9, "reflected inertia p3 excludes motor");
+// legacy 默认：inertia=0 → 0（锚）
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+assert(T("POWERTRAIN.reflectedInertia()") === 0, "legacy reflected inertia zero (anchor)");
+// autoShift：rpm 超 autoUpFrac×redline → 升挡请求
+// 夹具修正：manual 不自动换挡是正确语义，故本段用 type="auto" 的 spec
+const agSpec = JSON.parse(JSON.stringify(gbSpec)); agSpec.gearbox.type = "auto";
+T(`POWERTRAIN.setSpec(${JSON.stringify(agSpec)}); POWERTRAIN.state.gearIdx = 1;`);
+T("POWERTRAIN.autoShift(0.95 * 9000);");
+assert(T("POWERTRAIN.state.shiftDir") === 1, "auto upshift at high rpm");
+T("POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0; POWERTRAIN.state.gearIdx = 2;");
+T("POWERTRAIN.autoShift(0.4 * 9000);");
+assert(T("POWERTRAIN.state.shiftDir") === -1, "auto downshift at low rpm");
+// 中间转速带（autoDownFrac..autoUpFrac）不换挡
+T("POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0; POWERTRAIN.state.gearIdx = 2;");
+T("POWERTRAIN.autoShift(0.7 * 9000);");
+assert(T("POWERTRAIN.state.shiftT") === 0 && T("POWERTRAIN.state.shiftDir") === 0, "no shift in mid-rpm band");
+// 顶挡高 rpm / 一挡低 rpm → 边界不越界
+T("POWERTRAIN.state.gearIdx = 5; POWERTRAIN.autoShift(0.99 * 9000);");
+assert(T("POWERTRAIN.state.shiftT") === 0, "top gear high rpm: no further upshift");
+T("POWERTRAIN.state.gearIdx = 0; POWERTRAIN.autoShift(0.2 * 9000);");
+assert(T("POWERTRAIN.state.shiftT") === 0, "first gear low rpm: no further downshift");
+// manual 语义：即使高 rpm 也不自动换挡（夹具修正依据）
+T(`POWERTRAIN.setSpec(${JSON.stringify(gbSpec)}); POWERTRAIN.state.gearIdx = 1;`);
+T("POWERTRAIN.autoShift(0.99 * 9000);");
+assert(T("POWERTRAIN.state.shiftT") === 0, "manual gearbox never auto-shifts");
+// type=single 不换挡
+const sgSpec = JSON.parse(JSON.stringify(gbSpec)); sgSpec.gearbox.type = "single";
+T(`POWERTRAIN.setSpec(${JSON.stringify(sgSpec)}); POWERTRAIN.state.gearIdx = 0;`);
+T("POWERTRAIN.autoShift(0.99 * 9000);");
+assert(T("POWERTRAIN.state.shiftT") === 0, "single-speed gearbox never shifts");
+// 无 gearbox / 无 spec 时的防御返回（不抛异常）
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+assert(T("POWERTRAIN.reflectedInertia()") === 0 && T("POWERTRAIN.advanceGearbox(0.004, 20)") === false, "legacy single-ratio gearbox: no inertia, no shift activity");
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+
 // 恢复默认
 T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
 
