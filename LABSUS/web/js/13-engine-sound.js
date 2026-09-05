@@ -75,11 +75,12 @@ class EngineAudioModel {
     const brk = Math.max(0, Math.min(1, sig.brake || 0));
     const wheelOmega = Math.max(0, sig.wheelOmega || 0);
 
-    /* G31：真实动力链 rpm 优先（ICE/混动用曲轴 rpm；EV 用后电机轮速换算）；
-       POWERTRAIN 未加载或 spec=null 时回退旧 wheel-omega×齿轮比猜测（对拍锚）。
-       本模型 headless 无 state，EV 分支用驱动轮 omega（sig.wheelOmega，直驱
-       电机 rpm ≈ 轮 rpm）；iceOmega × 30/π 得曲轴 rpm。 */
-    const ptRpm = (typeof POWERTRAIN !== "undefined" && POWERTRAIN.spec && POWERTRAIN.state)
+    /* G31-P6 I-1：真实动力链 rpm 优先——仅当 POWERTRAIN 携带真实传动比
+       （hasRealDrivetrain()===true）时才信任 iceOmega 作为 rpm 源；
+       legacy 恒等箱（ratios[1]=1,finalDrive=1）下 iceOmega=轮速，会塌到怠速，
+       故回退旧 wheel-omega×齿轮比估算（对拍锚）。
+       EV 分支用驱动轮 omega（直驱电机 rpm ≈ 轮 rpm）。 */
+    const ptRpm = (typeof POWERTRAIN !== "undefined" && POWERTRAIN.spec && POWERTRAIN.state && POWERTRAIN.hasRealDrivetrain())
       ? ((POWERTRAIN.spec.architecture === "ev" && POWERTRAIN.spec.motorR)
           ? wheelOmega * 30.0 / Math.PI
           : POWERTRAIN.state.iceOmega * 30.0 / Math.PI)

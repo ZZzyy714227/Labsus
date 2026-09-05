@@ -267,7 +267,8 @@ assert(T("POWERTRAIN.state.shiftT") === 0, "upshift above top rejected");
 T("POWERTRAIN.state.gearIdx = 2; POWERTRAIN.requestShift(1); POWERTRAIN.requestShift(1);");
 assert(T("POWERTRAIN.state.shiftDir") === 1 && T("POWERTRAIN.state.gearIdx") === 2, "re-entrant requestShift ignored while shifting");
 T("POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;");
-// 反射惯量：(I_ice+I_motCoupled)×(ratio×final)²/2
+// 反射惯量：(I_ice+I_motCoupled)×(ratio×final)²/nDrive
+// I-2(G31-P6)：nDrive 按驱动轮数归一——riSpec.drive="awd_fixed" → 4 轮
 const riSpec = JSON.parse(JSON.stringify(gbSpec));
 riSpec.ice.inertia = 0.25; riSpec.architecture = "p2";
 riSpec.battery = { capacityKwh: 10 };
@@ -275,19 +276,40 @@ riSpec.motorR = { peakTorqueNm: 200, peakPowerKw: 100, baseRpm: 4775, maxRpm: 10
 const r1 = T(`POWERTRAIN.setSpec(${JSON.stringify(riSpec)})`);
 assert(r1.ok === true, "p2 spec valid");
 T("POWERTRAIN.state.gearIdx = 0;");
-const expectRI = (0.25 + 0.1) * (3 * 3.9) ** 2 / 2;
-assert(Math.abs(T("POWERTRAIN.reflectedInertia()") - expectRI) < 1e-9, "reflected inertia p2 gear0");
+const expectRI = (0.25 + 0.1) * (3 * 3.9) ** 2 / 4;   // awd_fixed → nDrive=4
+assert(Math.abs(T("POWERTRAIN.reflectedInertia()") - expectRI) < 1e-9, "reflected inertia p2 awd gear0 (/4)");
 // 反射惯量随挡位变化（gear3: 1.2×3.9）
 T("POWERTRAIN.state.gearIdx = 3;");
-assert(Math.abs(T("POWERTRAIN.reflectedInertia()") - (0.25 + 0.1) * (1.2 * 3.9) ** 2 / 2) < 1e-9, "reflected inertia p2 gear3");
-// p3 电机不在曲轴链 → 只计 ICE 惯量
+assert(Math.abs(T("POWERTRAIN.reflectedInertia()") - (0.25 + 0.1) * (1.2 * 3.9) ** 2 / 4) < 1e-9, "reflected inertia p2 awd gear3 (/4)");
+// I-2：rwd 规格 → nDrive=2
+const riRwd = JSON.parse(JSON.stringify(riSpec)); riRwd.drive = "rwd";
+T(`POWERTRAIN.setSpec(${JSON.stringify(riRwd)}); POWERTRAIN.state.gearIdx = 0;`);
+assert(Math.abs(T("POWERTRAIN.reflectedInertia()") - (0.25 + 0.1) * (3 * 3.9) ** 2 / 2) < 1e-9, "I-2 reflected inertia p2 rwd gear0 (/2)");
+// p3 电机不在曲轴链 → 只计 ICE 惯量（awd_fixed → /4）
 const p3Spec = JSON.parse(JSON.stringify(riSpec));
 p3Spec.architecture = "p3";
 T(`POWERTRAIN.setSpec(${JSON.stringify(p3Spec)}); POWERTRAIN.state.gearIdx = 0;`);
-assert(Math.abs(T("POWERTRAIN.reflectedInertia()") - 0.25 * (3 * 3.9) ** 2 / 2) < 1e-9, "reflected inertia p3 excludes motor");
+assert(Math.abs(T("POWERTRAIN.reflectedInertia()") - 0.25 * (3 * 3.9) ** 2 / 4) < 1e-9, "reflected inertia p3 excludes motor (awd /4)");
 // legacy 默认：inertia=0 → 0（锚）
 T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
 assert(T("POWERTRAIN.reflectedInertia()") === 0, "legacy reflected inertia zero (anchor)");
+// I-1(G31-P6)：hasRealDrivetrain 判据
+assert(T("POWERTRAIN.hasRealDrivetrain()") === false, "I-1 hasRealDrivetrain: legacy default → false");
+const hrdSpec1 = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+hrdSpec1.gearbox.ratios = [3, 2, 1]; hrdSpec1.gearbox.finalDrive = 3.9;
+T(`POWERTRAIN.setSpec(${JSON.stringify(hrdSpec1)});`);
+assert(T("POWERTRAIN.hasRealDrivetrain()") === true, "I-1 hasRealDrivetrain: ratios[3,2,1]+fd=3.9 → true");
+const hrdSpec2 = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+hrdSpec2.gearbox.finalDrive = 3.9;
+T(`POWERTRAIN.setSpec(${JSON.stringify(hrdSpec2)});`);
+assert(T("POWERTRAIN.hasRealDrivetrain()") === true, "I-1 hasRealDrivetrain: ratios[1]+fd=3.9 → true");
+const hrdSpec3 = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+hrdSpec3.gearbox.ratios = [1, 1]; hrdSpec3.gearbox.finalDrive = 1;
+T(`POWERTRAIN.setSpec(${JSON.stringify(hrdSpec3)});`);
+assert(T("POWERTRAIN.hasRealDrivetrain()") === true, "I-1 hasRealDrivetrain: ratios[1,1] len>1 → true");
+T("POWERTRAIN.spec = null;");
+assert(T("POWERTRAIN.hasRealDrivetrain()") === false, "I-1 hasRealDrivetrain: spec=null → false");
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
 // autoShift：rpm 超 autoUpFrac×redline → 升挡请求
 // 夹具修正：manual 不自动换挡是正确语义，故本段用 type="auto" 的 spec
 const agSpec = JSON.parse(JSON.stringify(gbSpec)); agSpec.gearbox.type = "auto";

@@ -280,6 +280,9 @@ class UniversalAutoPilot {
   }
 }
 
+/* M-2(G31-P6)：轮索引映射提为模块常量，避免每子步重复创建对象字面量 */
+const WHEEL_IDX = { FL: 0, FR: 1, RL: 2, RR: 3 };
+
 class VehicleDynamics15DOF {
   constructor(S_config, SIM_data, initSpeedMs = 0) {
     this.S = S_config;
@@ -695,14 +698,23 @@ class VehicleDynamics15DOF {
       let SumFx_tire = 0.0, SumFy_tire = 0.0;
       let SumMz_tire = 0.0;
 
-      // G31：动力系统每子步步进（缺省 legacy-equivalent → 与旧常数逐位一致；
+      // G31-P6：动力系统每子步步进（缺省 legacy-equivalent → 与旧常数逐位一致；
       //   POWERTRAIN 未加载或 spec=null 时回退旧路径，保对拍锚）
+      // I-3：TCS 能量反馈——用上一子步后轮 tcsAvg 缩放 demand.throttle（一帧滞后，
+      //   能量近似守恒：step 内 SOC/油耗积分按缩减后油门计算）。
+      // M-2：复用 scratch 对象避免每子步 GC 压力。
+      const tcsEst = (this._tcsEstimate !== undefined) ? this._tcsEstimate : 1;
+      if (!this._ptDemand) this._ptDemand = { throttle: 0, brake: 0, shiftCmd: 0, tvBias: undefined };
+      if (!this._ptOmega) this._ptOmega = { FL: 0, FR: 0, RL: 0, RR: 0 };
+      const _pd = this._ptDemand, _pw = this._ptOmega;
+      _pd.throttle = ctrl.throttle * tcsEst; _pd.brake = ctrl.brake;
+      _pd.shiftCmd = ctrl.shiftCmd || 0; _pd.tvBias = ctrl.tvBias;
+      _pw.FL = st.omega.FL; _pw.FR = st.omega.FR; _pw.RL = st.omega.RL; _pw.RR = st.omega.RR;
       const ptOut = (typeof POWERTRAIN !== "undefined" && POWERTRAIN.spec) ?
-        POWERTRAIN.step(dt, { throttle: ctrl.throttle, brake: ctrl.brake,
-                              shiftCmd: ctrl.shiftCmd || 0, tvBias: ctrl.tvBias },
-                        { FL: st.omega.FL, FR: st.omega.FR, RL: st.omega.RL, RR: st.omega.RR }) : null;
+        POWERTRAIN.step(dt, _pd, _pw) : null;
       const ptIw = ptOut ? POWERTRAIN.reflectedInertia() : 0;
       this._ptOut = ptOut;   // G31：供 HUD（renderCircuitTelemetry）读挡位/rpm
+      let _tcsSumRear = 0, _tcsCntRear = 0;   // I-3：累计后轮 tcsScale 供子步末更新
 
       for(const w of wheels) {
         const ws = wheelStates[w.id];
@@ -778,12 +790,14 @@ class VehicleDynamics15DOF {
         if(tcsLvl > 0 && Math.abs(kappa) > kappaLimit && w.axle === 'rear') {
           throttleCmd = Math.max(0, throttleCmd * (1.0 - tcsLvl * 0.15));
         }
-        // G31：TCS 切扭矩比例（ptOut 路径下 throttleCmd 已被 TCS 削减，除以原始
+        // G31-P6：TCS 切扭矩比例（ptOut 路径下 throttleCmd 已被 TCS 削减，除以原始
         //   ctrl.throttle 得比例，乘到轮扭矩上，与旧路径直接切 throttleCmd 等效）。
-        //   注意：tcsScale 依赖逐轮 throttleCmd，必须置于轮循环内（TCS 之后）。
+        //   M-2：用模块常量 WHEEL_IDX 替代内联字面量。
         const tcsScale = (ctrl.throttle > 1e-6) ? (throttleCmd / ctrl.throttle) : 0;
+        // I-3：累计后轮 tcsScale 供子步末更新 _tcsEstimate
+        if (w.axle === 'rear') { _tcsSumRear += tcsScale; _tcsCntRear++; }
         const T_drive = ptOut
-          ? ((ptOut.tWheel ? ptOut.tWheel[{FL:0,FR:1,RL:2,RR:3}[w.id]]
+          ? ((ptOut.tWheel ? ptOut.tWheel[WHEEL_IDX[w.id]]
                            : (w.axle === 'rear' ? ptOut.tRear : ptOut.tFront)) * drivePowerFactor * tcsScale)
           : (w.axle === 'rear' ? (throttleCmd * 480.0 * drivePowerFactor)
                                : (throttleCmd * 120.0 * drivePowerFactor));
@@ -804,6 +818,8 @@ class VehicleDynamics15DOF {
         this.telemetry.kappa[w.id] = kappa;
         this.telemetry.alpha[w.id] = alpha;
       }
+      // I-3(G31-P6)：子步末更新 tcsEstimate（后轮 tcsScale 均值，供下一子步 demand.throttle 缩放）
+      this._tcsEstimate = (_tcsCntRear > 0) ? (_tcsSumRear / _tcsCntRear) : 1;
       
       // Gravity component and Aero —— P2a：分轴地面效应 cl(h) + DRS 真减阻
       // 标定结构双端同式（前端 qs camelCase ↔ 引擎 AeroParams snake_case）：
@@ -3700,12 +3716,15 @@ function renderCircuitTelemetry(st, tel, ctrl) {
   if(tab === "general") {
     const spd = Math.max(0, st.u) * 3.6;
     const curKm = spd;
-    // G31：真实动力链挡位/rpm 优先（step 内已存 this._ptOut 到 physicsEngine）；
-    //   POWERTRAIN 未加载或 spec=null（_ptOut=null）时回退旧查表/轮速估算（对拍锚）。
+    // G31-P6 I-1：真实动力链挡位/rpm 优先——仅当 POWERTRAIN 携带真实传动比
+    //   （hasRealDrivetrain()===true）时才信任 iceRpm；legacy 恒等箱下 iceOmega=轮速，
+    //   会塌到怠速，故回退旧查表/轮速估算（对拍锚）。
+    // M-1：EV 规格用轮速换算（与声浪对齐）。
     const pt = (typeof window !== "undefined" && window.physicsEngine && window.physicsEngine._ptOut)
       ? window.physicsEngine._ptOut : null;
+    const _ptHasReal = (typeof POWERTRAIN !== "undefined" && POWERTRAIN.spec && POWERTRAIN.state && POWERTRAIN.hasRealDrivetrain());
     let recGear;
-    if (pt && Number.isFinite(pt.gearIdx)) {
+    if (pt && _ptHasReal && Number.isFinite(pt.gearIdx)) {
       recGear = String(pt.gearIdx + 1);
     } else {
       recGear = "1";
@@ -3717,9 +3736,15 @@ function renderCircuitTelemetry(st, tel, ctrl) {
     }
     if (curKm < 1 && Math.abs(ctrl.throttle) < 0.05) recGear = "N";
 
-    const rpm = (pt && Number.isFinite(pt.iceRpm))
-      ? Math.min(9500, Math.max(900, pt.iceRpm))
-      : Math.min(9500, Math.max(900, (st.omega.RL * 60 / (2 * Math.PI)) * 4.2));
+    // M-1：EV 分支用后轮速换算 rpm（直驱电机 rpm ≈ 轮 rpm）；非 EV 用 iceRpm
+    let rpm;
+    if (pt && _ptHasReal && Number.isFinite(pt.iceRpm)) {
+      rpm = (POWERTRAIN.spec.architecture === "ev")
+        ? Math.min(9500, Math.max(900, (st.omega.RL + st.omega.RR) * 0.5 * 30 / Math.PI))
+        : Math.min(9500, Math.max(900, pt.iceRpm));
+    } else {
+      rpm = Math.min(9500, Math.max(900, (st.omega.RL * 60 / (2 * Math.PI)) * 4.2));
+    }
     const pwr = Math.max(0, (ctrl.throttle * 320 * (rpm / 8000))).toFixed(0);
     const trq = Math.max(0, (ctrl.throttle * 480 * (1.0 - (rpm - 5000)**2 / (7000**2)))).toFixed(1);
     const boost = (ctrl.throttle * 1.85 * (rpm / 7500)).toFixed(2);
