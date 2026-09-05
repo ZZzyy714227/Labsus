@@ -418,6 +418,28 @@ class IceSpec(BaseModel):
     map: list[list[float]] = Field(default_factory=lambda: [[800, 1200], [9000, 1200]])
     inertia: float = 0.0
 
+    @model_validator(mode="after")
+    def _check_map(self):
+        # G31-P7 审查修复：map 边界校验。畸形 map 若不在此拦截，会直达
+        # transient.run_track_sim 的 `p[1] for p in ice.map` / `p[0]*p[1]` ——
+        # 每项长度 != 2 触发 IndexError（500），NaN/非递增则静默污染扭矩推导。
+        # 语义对齐前端 16-powertrain.js validate 的 ice.map / ice.map(ascending)：
+        #   非空 + 每项 [rpm, N·m] 长度 2 + 全部分量有限 + rpm 严格单调递增。
+        if not self.map:
+            raise ValueError("ice.map must be non-empty")
+        for p in self.map:
+            if len(p) != 2:
+                raise ValueError(
+                    f"ice.map item must be [rpm, Nm] (length 2), got {p!r}")
+            if not (math.isfinite(p[0]) and math.isfinite(p[1])):
+                raise ValueError(f"ice.map item must be finite, got {p!r}")
+        for i in range(1, len(self.map)):
+            if not (self.map[i][0] > self.map[i - 1][0]):
+                raise ValueError(
+                    f"ice.map rpm must be strictly ascending, got "
+                    f"{self.map[i - 1][0]} -> {self.map[i][0]}")
+        return self
+
 
 class MotorSpec(BaseModel):
     """驱动电机：峰值扭矩/功率 + 基速/最高转 + 回馈制动。"""
