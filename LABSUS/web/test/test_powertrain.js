@@ -141,7 +141,7 @@ assert(T("POWERTRAIN.validate(POWERTRAIN.defaultSpec()).ok") === true, "M-2 defa
 for (const arch of ["p2", "p3", "p4", "series", "powersplit"]) {
   assert(T(`POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'${arch}',motorF:null,motorR:null})).ok`) === false, `M-3 hybrid ${arch} requires motor`);
 }
-assert(T("POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'p2',motorF:{peakTorqueNm:300,peakPowerKw:150,maxRpm:16000}})).ok") === true, "M-3 p2 with motorF valid");
+assert(T("POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'p2',motorF:{peakTorqueNm:300,peakPowerKw:150,maxRpm:16000},battery:{capacityKwh:20}})).ok") === true, "M-3 p2 with motorF valid");
 // I-2：battery.soc0 必须 ∈ [0,1]
 assert(T("POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{battery:{capacityKwh:2.5,soc0:7}})).ok") === false, "I-2 soc0=7 rejected");
 assert(T("POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{battery:{capacityKwh:2.5,soc0:-0.2}})).ok") === false, "I-2 soc0=-0.2 rejected");
@@ -155,7 +155,7 @@ assert(T("POWERTRAIN.spec.architecture") === "ice", "M-4 deep-copy isolation: ar
 assert(T("POWERTRAIN.spec.ice.map[0][1]") === 1200, "M-4 deep-copy isolation: nested map");
 assert(T("POWERTRAIN.spec.gearbox.ratios.length") === 1, "M-4 deep-copy isolation: array push");
 // M-1：EV 无曲轴 → resetState 后 iceOmega 为 0（占位不得为伪转速；EV 规格不得携带 ice 块）
-T("POWERTRAIN.setSpec(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',ice:null,motorF:{peakTorqueNm:300,peakPowerKw:150,maxRpm:16000}}));");
+T("POWERTRAIN.setSpec(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',ice:null,motorF:{peakTorqueNm:300,peakPowerKw:150,maxRpm:16000},battery:{capacityKwh:20}}));");
 assert(T("POWERTRAIN.state.iceOmega") === 0, "M-1 ev resetState iceOmega === 0");
 assert(T("POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',motorF:{peakTorqueNm:300,peakPowerKw:150,maxRpm:16000}})).ok") === false, "M-1 ev spec with leftover ice rejected");
 T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
@@ -196,10 +196,10 @@ const mBad = { peakTorqueNm: 300, peakPowerKw: 150, baseRpm: 4000, maxRpm: 12000
 const mGood = { peakTorqueNm: 300, peakPowerKw: 150, baseRpm: 4775, maxRpm: 12000 };
 assert(T(`POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',ice:null,motorF:${JSON.stringify(mBad)},motorR:null})).ok`) === false, "I-1 baseRpm=4000 inconsistent → rejected");
 assert(T(`POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',ice:null,motorF:${JSON.stringify(mBad)},motorR:null})).errors.join(',')`).includes("motorF.baseRpm(inconsistent with P/T)"), "I-1 baseRpm error string");
-assert(T(`POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',ice:null,motorF:${JSON.stringify(mGood)},motorR:null})).ok`) === true, "I-1 baseRpm=4775 consistent → accepted");
+assert(T(`POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',ice:null,motorF:${JSON.stringify(mGood)},motorR:null,battery:{capacityKwh:20}})).ok`) === true, "I-1 baseRpm=4775 consistent → accepted");
 // 无 baseRpm 不校验
 const mNoBase = { peakTorqueNm: 300, peakPowerKw: 150, maxRpm: 12000 };
-assert(T(`POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',ice:null,motorF:${JSON.stringify(mNoBase)},motorR:null})).ok`) === true, "I-1 no baseRpm → skip check");
+assert(T(`POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',ice:null,motorF:${JSON.stringify(mNoBase)},motorR:null,battery:{capacityKwh:20}})).ok`) === true, "I-1 no baseRpm → skip check");
 
 // I-2 motorTorque NaN 防护
 assert(T(`POWERTRAIN.motorTorque(null, 4000, 1, 0.8)`) === 0, "I-2 motorTorque(null) === 0");
@@ -225,7 +225,7 @@ assert(Math.abs(T(`POWERTRAIN.motorTorque(${JSON.stringify(mSpec)}, 4000, -1.0, 
 // motorTorque soc=1.0 regen → derate=0 → 0
 assert(Math.abs(T(`POWERTRAIN.motorTorque(${JSON.stringify(mSpec)}, 4000, -1.0, 1.0)`)) < 1e-9, "M-4 soc=1.0 regen → 0");
 // iceTorque spec.ice=null → 0
-T("POWERTRAIN.setSpec(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',ice:null,motorF:{peakTorqueNm:300,peakPowerKw:150,maxRpm:16000}}));");
+T("POWERTRAIN.setSpec(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',ice:null,motorF:{peakTorqueNm:300,peakPowerKw:150,maxRpm:16000},battery:{capacityKwh:20}}));");
 assert(T("POWERTRAIN.iceTorque(3000, 1.0)") === 0, "M-4 iceTorque with spec.ice=null → 0");
 T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
 // iceTorque cmd=0, fric=0 → 0
@@ -270,6 +270,7 @@ T("POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;");
 // 反射惯量：(I_ice+I_motCoupled)×(ratio×final)²/2
 const riSpec = JSON.parse(JSON.stringify(gbSpec));
 riSpec.ice.inertia = 0.25; riSpec.architecture = "p2";
+riSpec.battery = { capacityKwh: 10 };
 riSpec.motorR = { peakTorqueNm: 200, peakPowerKw: 100, baseRpm: 4775, maxRpm: 10000, regenMaxKw: 80, inertia: 0.1 };
 const r1 = T(`POWERTRAIN.setSpec(${JSON.stringify(riSpec)})`);
 assert(r1.ok === true, "p2 spec valid");
@@ -407,6 +408,7 @@ T("POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;");
 // EV+auto：ice=null，motorR.maxRpm=16000 → rr 应按 16000 计算
 const evAuto = JSON.parse(JSON.stringify(gb6));
 evAuto.architecture = "ev"; evAuto.ice = null;
+evAuto.battery = { capacityKwh: 20 };
 evAuto.motorR = { peakTorqueNm: 400, peakPowerKw: 200, maxRpm: 16000 };
 evAuto.motorF = null;
 evAuto.gearbox.type = "auto";
@@ -433,6 +435,7 @@ assert(T("POWERTRAIN.state.shiftDir") === 1, "P3 EV motorF-only autoShift → �
 // ICE 优先：同时存在 ice.redlineRpm 与 motorR.maxRpm 时，红线仍取 ice.redlineRpm
 const hybAuto = JSON.parse(JSON.stringify(gb6));
 hybAuto.architecture = "p2"; hybAuto.gearbox.type = "auto";
+hybAuto.battery = { capacityKwh: 10 };
 hybAuto.motorR = { peakTorqueNm: 200, peakPowerKw: 100, maxRpm: 20000 };  // 远大于 ice.redlineRpm=9000
 assert(T(`POWERTRAIN.setSpec(${JSON.stringify(hybAuto)})`).ok === true, "P3 p2+auto spec valid");
 T("POWERTRAIN.state.gearIdx = 1; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;");
@@ -473,6 +476,145 @@ assert(T("POWERTRAIN.state.soc") === sNoBat, "no battery → no-op");
 T(`POWERTRAIN.setSpec(${JSON.stringify(batSpec)}); POWERTRAIN.state.soc = 0.5;`);
 T("POWERTRAIN.integrateBattery(NaN, 1.0); POWERTRAIN.integrateBattery(100000, NaN);");
 assert(T("POWERTRAIN.state.soc") === 0.5, "non-finite inputs no-op");
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+
+/* ═══ 5. 组合器（七架构）+ step 主循环 + step 级 legacy 等价锚 ═══ */
+console.log("=== 5. Combinator (7 arch) + step() + Legacy Anchor ===");
+
+// ── 5.1 legacy 等价锚（step 级，最高优先；逐位 ±1e-9）──
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec()); POWERTRAIN.resetState();");
+const anc = T("POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:30,FR:30,RL:30,RR:30})");
+assert(Math.abs(anc.tRear - 480) < 1e-9 && Math.abs(anc.tFront - 120) < 1e-9, "5.1 legacy anchor tRear=480/tFront=120 (±1e-9)");
+assert(anc.shifting === false, "5.1 legacy anchor shifting===false");
+assert(anc.tWheel === null, "5.1 legacy anchor tWheel===null");
+assert(anc.gearIdx === 0 && Number.isFinite(anc.iceRpm) && anc.soc === 1 && anc.P_gen === 0, "5.1 legacy anchor fields (gearIdx=0/iceRpm finite/soc=1/P_gen=0)");
+
+// ── 5.2 throttle 线性：throttle 0.5 → tRear 240 / tFront 60 ──
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec()); POWERTRAIN.resetState();");
+const lin = T("POWERTRAIN.step(0.004, {throttle:0.5, brake:0}, {FL:30,FR:30,RL:30,RR:30})");
+assert(Math.abs(lin.tRear - 240) < 1e-9 && Math.abs(lin.tFront - 60) < 1e-9, "5.2 throttle 0.5 → tRear 240 / tFront 60");
+
+// ── 5.3 换挡期 tRear===0（设 shiftT>0 后 step）──
+const gbShift = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+gbShift.gearbox = { type:"manual", ratios:[3,2,1.5], finalDrive:1, shiftTimeMs:200, eff:1, autoUpFrac:0.92, autoDownFrac:0.55 };
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(gbShift)})`).ok === true, "5.3 shift spec valid");
+T("POWERTRAIN.state.gearIdx=0; POWERTRAIN.state.shiftT=100; POWERTRAIN.state.shiftDir=1;");
+const shf = T("POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:30,FR:30,RL:30,RR:30})");
+assert(shf.shifting === true && Math.abs(shf.tRear) < 1e-9 && Math.abs(shf.tFront) < 1e-9, "5.3 torque cut during shift (tRear===0, shifting===true)");
+
+// ── 5.4 p2 功率流：T_shaft = (T_ice + T_motR)×ratio×eff 数值核对 ──
+const p2s = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+p2s.architecture = "p2"; p2s.drive = "rwd"; p2s.ice.inertia = 0.25;
+p2s.motorR = { peakTorqueNm:200, peakPowerKw:100, maxRpm:10000, regenMaxKw:80, inertia:0.1 };
+p2s.motorF = null;
+p2s.battery = { capacityKwh:10, soc0:0.6, maxDischargeKw:200, maxChargeKw:150 };
+p2s.gearbox = { type:"manual", ratios:[3], finalDrive:3.5, shiftTimeMs:0, eff:0.95, autoUpFrac:0.92, autoDownFrac:0.55 };
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(p2s)})`).ok === true, "5.4 p2 spec valid");
+const p2soc0 = T("POWERTRAIN.state.soc");
+const p2ratio = 3 * 3.5, p2eff = 0.95;
+const p2iceRpm = (20 * p2ratio) * 30 / Math.PI;   // drive rwd → iceAxleW=wR=20；iceOmega=20×ratio
+const p2Tice = T(`POWERTRAIN.iceTorque(${p2iceRpm}, 1)`);
+const p2Tmot = T(`POWERTRAIN.motorTorque(${JSON.stringify(p2s.motorR)}, ${p2iceRpm}, 1, ${p2soc0})`);
+const p2expect = (p2Tice + p2Tmot) * p2ratio * p2eff / 2;   // rwd: Tr=Ts, tRear=Tr/2
+const p2out = T("POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:20,FR:20,RL:20,RR:20})");
+assert(Math.abs(p2out.tRear - p2expect) < 1e-6, "5.4 p2 T_shaft=(T_ice+T_motR)×ratio×eff numeric");
+assert(p2out.tRear > 0, "5.4 p2 delivers positive rear torque");
+
+// ── 5.5 series：tRear>0 且 iceRpm>0 且 P_gen>0；soc 方向正确（放电降/发电升）──
+// 5.5a 放电主导（强电机/高轮速/弱 ICE）→ P_net>0 → soc 降
+const seDis = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+seDis.architecture = "series"; seDis.drive = "rwd";
+seDis.ice.map = [[800,50],[9000,50]]; seDis.motorF = null;
+seDis.motorR = { peakTorqueNm:400, peakPowerKw:200, maxRpm:12000, regenMaxKw:150, inertia:0.1 };
+seDis.battery = { capacityKwh:30, soc0:0.6, maxDischargeKw:250, maxChargeKw:150 };
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(seDis)})`).ok === true, "5.5a series discharge spec valid");
+const seDis0 = T("POWERTRAIN.state.soc");
+const seDisOut = T("POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:100,FR:100,RL:100,RR:100})");
+assert(seDisOut.tRear > 0, "5.5a series tRear>0 (motor drives wheels)");
+assert(seDisOut.iceRpm > 0, "5.5a series iceRpm>0 (range-extender spinning)");
+assert(seDisOut.P_gen > 0, "5.5a series P_gen>0 (ICE generates)");
+assert(T("POWERTRAIN.state.soc") < seDis0, "5.5a series discharge-dominant → soc decreases");
+// 5.5b 发电主导（弱电机/低轮速/强 ICE）→ P_net<0 → soc 升
+const seChg = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+seChg.architecture = "series"; seChg.drive = "rwd";
+seChg.ice.map = [[800,3000],[9000,3000]]; seChg.motorF = null;
+seChg.motorR = { peakTorqueNm:50, peakPowerKw:20, maxRpm:12000, regenMaxKw:50, inertia:0.1 };
+seChg.battery = { capacityKwh:30, soc0:0.6, maxDischargeKw:250, maxChargeKw:150 };
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(seChg)})`).ok === true, "5.5b series charge spec valid");
+const seChg0 = T("POWERTRAIN.state.soc");
+const seChgOut = T("POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:5,FR:5,RL:5,RR:5})");
+assert(seChgOut.P_gen > 0 && seChgOut.tRear > 0 && seChgOut.iceRpm > 0, "5.5b series P_gen>0 & tRear>0 & iceRpm>0");
+assert(T("POWERTRAIN.state.soc") > seChg0, "5.5b series generation-dominant → soc increases");
+
+// ── 5.6 ev tv：tWheel 长度 4 且和 = T_motF+T_motR（tvBias 分裂守恒）──
+const tvSpec = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+tvSpec.architecture = "ev"; tvSpec.drive = "tv"; tvSpec.ice = null;
+tvSpec.motorF = { peakTorqueNm:200, peakPowerKw:100, maxRpm:12000, regenMaxKw:80, inertia:0.1 };
+tvSpec.motorR = { peakTorqueNm:200, peakPowerKw:100, maxRpm:12000, regenMaxKw:80, inertia:0.1 };
+tvSpec.battery = { capacityKwh:20, soc0:0.7, maxDischargeKw:200, maxChargeKw:120 };
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(tvSpec)})`).ok === true, "5.6 ev tv spec valid");
+const tvSoc0 = T("POWERTRAIN.state.soc");
+const tvRpm = 20 * 30 / Math.PI;   // ev 电机直驱：rpm = 轮速(rad/s)×30/π
+const tvTm = T(`POWERTRAIN.motorTorque(${JSON.stringify(tvSpec.motorF)}, ${tvRpm}, 0.8, ${tvSoc0})`);
+const tvOut = T("POWERTRAIN.step(0.004, {throttle:0.8, brake:0, tvBias:0.6}, {FL:20,FR:20,RL:20,RR:20})");
+assert(Array.isArray(tvOut.tWheel) && tvOut.tWheel.length === 4, "5.6 tv tWheel length 4");
+const tvSum = tvOut.tWheel.reduce((a,b)=>a+b, 0);
+assert(Math.abs(tvSum - 2*tvTm) < 1e-6, "5.6 tv sum(tWheel) === T_motF+T_motR (conservation)");
+assert(Math.abs(tvOut.tWheel[0] - tvTm*0.6) < 1e-6 && Math.abs(tvOut.tWheel[1] - tvTm*0.4) < 1e-6, "5.6 tvBias=0.6 splits front L/R");
+
+// ── 5.7 p3/p4/powersplit 冒烟：有限 + 符号正确 ──
+for (const [arch, drive] of [["p3","rwd"],["p4","awd_fixed"],["powersplit","rwd"]]) {
+  const s = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+  s.architecture = arch; s.drive = drive; s.splitFront = 0.5;
+  s.motorF = { peakTorqueNm:200, peakPowerKw:100, maxRpm:12000, regenMaxKw:80, inertia:0.1 };
+  s.motorR = { peakTorqueNm:200, peakPowerKw:100, maxRpm:12000, regenMaxKw:80, inertia:0.1 };
+  s.battery = { capacityKwh:20, soc0:0.7, maxDischargeKw:200, maxChargeKw:120 };
+  assert(T(`POWERTRAIN.setSpec(${JSON.stringify(s)})`).ok === true, `5.7 ${arch} spec valid`);
+  const o = T("POWERTRAIN.step(0.004, {throttle:0.8, brake:0}, {FL:20,FR:20,RL:20,RR:20})");
+  assert(Number.isFinite(o.tFront) && Number.isFinite(o.tRear) && Number.isFinite(o.iceRpm) && Number.isFinite(o.soc), `5.7 ${arch} finite output`);
+  assert(o.tRear > 0, `5.7 ${arch} tRear>0 (positive drive)`);
+}
+
+// ── 5.8 能量守恒：p2 充电工况（T_ice 富余 + motor 负扭矩）→ P_net<0 且 soc 升 ──
+const p2c = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+p2c.architecture = "p2"; p2c.drive = "rwd"; p2c.motorF = null;
+p2c.motorR = { peakTorqueNm:200, peakPowerKw:100, maxRpm:10000, regenMaxKw:80, inertia:0.1 };
+p2c.battery = { capacityKwh:10, soc0:0.6, maxDischargeKw:200, maxChargeKw:150 };
+p2c.gearbox = { type:"manual", ratios:[1], finalDrive:1, shiftTimeMs:0, eff:1, autoUpFrac:0.92, autoDownFrac:0.55 };
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(p2c)})`).ok === true, "5.8 p2 charge spec valid");
+const p2c0 = T("POWERTRAIN.state.soc");
+// throttle 0.3（ICE 富余）+ brake 0.8（电机反转矩回收）→ 充电
+let p2cOut;
+for (let i=0;i<20;i++) p2cOut = T("POWERTRAIN.step(0.004, {throttle:0.3, brake:0.8}, {FL:50,FR:50,RL:50,RR:50})");
+const p2cTmot = T(`POWERTRAIN.motorTorque(${JSON.stringify(p2c.motorR)}, ${50*30/Math.PI}, -0.8, 0.6)`);
+assert(p2cTmot < 0, "5.8 p2 motor negative torque (regen)");
+assert(T("POWERTRAIN.state.soc") > p2c0, "5.8 p2 charging → soc increases (energy conservation)");
+assert(p2cOut.tRear > 0, "5.8 p2 ICE surplus still drives wheels (tRear>0)");
+
+// ── 5.9 integrateBattery 新守卫（dt=0/负、P=Infinity、st.soc NaN/Infinity → no-op）──
+const guardSpec = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+guardSpec.architecture = "ev"; guardSpec.drive = "rwd"; delete guardSpec.ice;
+guardSpec.motorR = { peakTorqueNm:400, peakPowerKw:200, maxRpm:12000, regenMaxKw:150, inertia:0.1 };
+guardSpec.battery = { capacityKwh:60, soc0:0.8, maxDischargeKw:400, maxChargeKw:150 };
+T(`POWERTRAIN.setSpec(${JSON.stringify(guardSpec)});`);
+T("POWERTRAIN.state.soc = 0.5;");
+T("POWERTRAIN.integrateBattery(100000, 0);");
+assert(T("POWERTRAIN.state.soc") === 0.5, "5.9 integrateBattery dt=0 → no-op");
+T("POWERTRAIN.integrateBattery(100000, -1);");
+assert(T("POWERTRAIN.state.soc") === 0.5, "5.9 integrateBattery dt<0 → no-op");
+T("POWERTRAIN.integrateBattery(Infinity, 1);");
+assert(T("POWERTRAIN.state.soc") === 0.5, "5.9 integrateBattery P=Infinity → no-op");
+T("POWERTRAIN.state.soc = NaN; POWERTRAIN.integrateBattery(100000, 1);");
+assert(Number.isNaN(T("POWERTRAIN.state.soc")), "5.9 integrateBattery st.soc=NaN → no-op (stays NaN)");
+T("POWERTRAIN.state.soc = Infinity; POWERTRAIN.integrateBattery(100000, 1);");
+assert(T("POWERTRAIN.state.soc") === Infinity, "5.9 integrateBattery st.soc=Infinity → no-op");
+
+// ── 5.10 validate battery 必需（ev/p2 无 battery → ok false）──
+assert(T("POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',ice:null,motorF:{peakTorqueNm:300,peakPowerKw:150,maxRpm:16000},battery:null})).ok") === false, "5.10 ev without battery rejected");
+assert(T("POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',ice:null,motorF:{peakTorqueNm:300,peakPowerKw:150,maxRpm:16000},battery:null})).errors.join(',')").includes("battery(required for electrified)"), "5.10 battery(required for electrified) error string");
+assert(T("POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'p2',motorF:{peakTorqueNm:300,peakPowerKw:150,maxRpm:16000},battery:null})).ok") === false, "5.10 p2 without battery rejected");
+assert(T("POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architecture:'ev',ice:null,motorF:{peakTorqueNm:300,peakPowerKw:150,maxRpm:16000},battery:{capacityKwh:60}})).ok") === true, "5.10 ev with battery valid");
+
 T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
 
 console.log(`\n[cumulative] ${passed}/${total} passed`);
