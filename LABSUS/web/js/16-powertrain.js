@@ -191,6 +191,17 @@ const POWERTRAIN = {
     if (rr > (sp.gearbox.autoUpFrac !== undefined ? sp.gearbox.autoUpFrac : 0.92) &&
         st.gearIdx < sp.gearbox.ratios.length - 1) this.requestShift(1);
     else if (rr < (sp.gearbox.autoDownFrac !== undefined ? sp.gearbox.autoDownFrac : 0.55) && st.gearIdx > 0) this.requestShift(-1);
+  },
+  /* 电池 SOC 积分：dSoc = −P_net·dt/(cap×3.6e6)。P_net>0=放电、<0=充电。
+     钳位 [0,1]；无 battery / 非有限输入 → no-op（失效安全）。
+     充放功率上限（maxDischargeKw/maxChargeKw）由调用方（段 5 组合器）在
+     计算 P_net 前钳制——本方法只做积分，保持单一职责。 */
+  integrateBattery(P_net_W, dt) {
+    const b = this.spec ? this.spec.battery : null;
+    const st = this.state;
+    if (!b || !st) return;
+    if (!Number.isFinite(P_net_W) || !Number.isFinite(dt)) return;
+    st.soc = Math.max(0, Math.min(1, st.soc - P_net_W * dt / (b.capacityKwh * 3.6e6)));
   }
 };
 if (typeof window !== "undefined") window.POWERTRAIN = POWERTRAIN;

@@ -442,6 +442,39 @@ assert(T("POWERTRAIN.state.shiftDir") === 1, "P3 hybrid autoShift 优先用 ice.
 // 恢复默认
 T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
 
+/* ═══ 4. Battery SOC ═══ */
+console.log("=== 4. Battery SOC ===");
+const batSpec = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+batSpec.architecture = "ev"; batSpec.drive = "rwd"; delete batSpec.ice;
+batSpec.motorR = { peakTorqueNm: 400, peakPowerKw: 200, baseRpm: 5000, maxRpm: 12000, regenMaxKw: 150, inertia: 0.1 };
+batSpec.battery = { capacityKwh: 60, soc0: 0.8, maxDischargeKw: 400, maxChargeKw: 150 };
+const rb = T(`POWERTRAIN.setSpec(${JSON.stringify(batSpec)})`);
+assert(rb.ok === true, "ev+battery spec valid");
+const s0 = T("POWERTRAIN.state.soc");
+assert(Math.abs(s0 - 0.8) < 1e-12, "soc0 applied");
+// 放电 200kW × 1s → dSoc = 200000/(60×3.6e6) = 9.259e-4
+T("POWERTRAIN.integrateBattery(200000, 1.0);");
+assert(Math.abs((s0 - T("POWERTRAIN.state.soc")) - 200000 / (60 * 3.6e6)) < 1e-12, "discharge integral exact");
+// 充电反向
+const s1 = T("POWERTRAIN.state.soc");
+T("POWERTRAIN.integrateBattery(-150000, 1.0);");
+assert(Math.abs((T("POWERTRAIN.state.soc") - s1) - 150000 / (60 * 3.6e6)) < 1e-12, "charge integral exact");
+// 钳位 [0,1]
+T("POWERTRAIN.state.soc = 0.0001; POWERTRAIN.integrateBattery(500000, 10.0);");
+assert(T("POWERTRAIN.state.soc") === 0, "soc clamps at 0");
+T("POWERTRAIN.state.soc = 0.9999; POWERTRAIN.integrateBattery(-500000, 10.0);");
+assert(T("POWERTRAIN.state.soc") === 1, "soc clamps at 1");
+// 无电池 no-op
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+const sNoBat = T("POWERTRAIN.state.soc");
+T("POWERTRAIN.integrateBattery(100000, 1.0);");
+assert(T("POWERTRAIN.state.soc") === sNoBat, "no battery → no-op");
+// 非有限输入 no-op
+T(`POWERTRAIN.setSpec(${JSON.stringify(batSpec)}); POWERTRAIN.state.soc = 0.5;`);
+T("POWERTRAIN.integrateBattery(NaN, 1.0); POWERTRAIN.integrateBattery(100000, NaN);");
+assert(T("POWERTRAIN.state.soc") === 0.5, "non-finite inputs no-op");
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+
 console.log(`\n[cumulative] ${passed}/${total} passed`);
 
 process.exit(passed === total ? 0 : 1);
