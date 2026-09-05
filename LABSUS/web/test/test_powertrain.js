@@ -411,11 +411,17 @@ const tuSpec = JSON.parse(JSON.stringify(gb6)); delete tuSpec.gearbox.type;
 T(`POWERTRAIN.setSpec(${JSON.stringify(tuSpec)}); POWERTRAIN.state.gearIdx = 1; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;`);
 T("POWERTRAIN.autoShift(0.99 * 9000);");
 assert(T("POWERTRAIN.state.shiftT") === 0 && T("POWERTRAIN.state.shiftDir") === 0, "P3 autoShift type=undefined → no shift");
-// type="cvt" → 拒绝（未知类型不在白名单）
+// type="cvt" → 接受（C3(G31-FR)：白名单扩为 auto/dct/seq/cvt。
+//   本实现的 cvt 仍走 ratios[] 步进近似，必须能换挡，否则 THS 预设永远卡 1 挡）
 const cvtSpec = JSON.parse(JSON.stringify(gb6)); cvtSpec.gearbox.type = "cvt";
 T(`POWERTRAIN.setSpec(${JSON.stringify(cvtSpec)}); POWERTRAIN.state.gearIdx = 1; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;`);
 T("POWERTRAIN.autoShift(0.99 * 9000);");
-assert(T("POWERTRAIN.state.shiftT") === 0, "P3 autoShift type=cvt → no shift (白名单外)");
+assert(T("POWERTRAIN.state.shiftDir") === 1 && T("POWERTRAIN.state.shiftT") > 0, "P3 autoShift type=cvt → upshift (C3 白名单内)");
+// type="single" → 拒绝（白名单外的未知类型仍不自动换挡）
+const sglSpec = JSON.parse(JSON.stringify(gb6)); sglSpec.gearbox.type = "single";
+T(`POWERTRAIN.setSpec(${JSON.stringify(sglSpec)}); POWERTRAIN.state.gearIdx = 1; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;`);
+T("POWERTRAIN.autoShift(0.99 * 9000);");
+assert(T("POWERTRAIN.state.shiftT") === 0 && T("POWERTRAIN.state.shiftDir") === 0, "P3 autoShift type=single → no shift (白名单外)");
 // type="AUTO" → 拒绝（大小写敏感，不在白名单）
 const ucSpec = JSON.parse(JSON.stringify(gb6)); ucSpec.gearbox.type = "AUTO";
 T(`POWERTRAIN.setSpec(${JSON.stringify(ucSpec)}); POWERTRAIN.state.gearIdx = 1; POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;`);
@@ -1270,6 +1276,407 @@ console.log("=== 7.14 G31-P8 Review: I-2 TODO annotation ===");
 const ptSrc = fs.readFileSync(path.join(__dirname, "../js/16-powertrain.js"), "utf8");
 assert(ptSrc.indexOf("TODO(G31-P9)") >= 0, "I-2 源码包含 TODO(G31-P9) canvas 拖拽标注");
 assert(ptSrc.indexOf("canvas 拖拽控制点编辑") >= 0, "I-2 TODO 标注含中文说明");
+
+/* ═══ 8. G31 终审修复（C1/C2/C3/I1/I3）+ 六预设 1-DOF 纵向积分探针 ═══
+   C1 ev/series/powersplit 电机扭矩未乘 gearbox ratio（EV 单速比 9.73 时 tRear 仅 175 而非 1652）
+   C2 throttle=0 时接线层 tcsScale=0 抹掉发动机制动/回收，但 SOC 仍积分（能量不守恒）
+   C3 无 shiftCmd 生产者 + autoShift 白名单过窄 → 5/6 预设永远卡 1 挡
+   I1 反射惯量加到全 4 轮（应只加驱动轮、按驱动轮数归一）
+   I3 hasRealDrivetrain() 时仍乘 drivePowerFactor（legacy 常数质量补偿，GT3 类 ×0.576） */
+console.log("=== 8. G31 Final-Review Fixes (C1/C2/C3/I1/I3) ===");
+
+/* ── 8.1 C1：ev/series/powersplit 电机扭矩必须 ×ratio×finalDrive×eff，且电机 rpm 源 ×ratio ── */
+console.log("--- 8.1 C1 motor reduction ratio ---");
+// (a) EV 双电机 AWD-TV：单速比 9.73 × finalDrive 1.0 × eff 0.97
+T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["EV 双电机 AWD-TV"])));');
+const c1evSoc = T("POWERTRAIN.state.soc");
+assert(Math.abs(c1evSoc - 0.9) < 1e-12, "8.1 EV soc0=0.9");
+const C1W = 10;                              // 轮速 rad/s
+const EV_R = 9.73 * 1.0, EV_E = 0.97;        // ratio × finalDrive, eff
+const EV_WMOT = C1W * EV_R;                  // 97.3 rad/s = 929 rpm（拐点 6821 rpm → 恒扭矩区）
+assert(Math.abs(EV_WMOT * 30 / Math.PI - 929.3) < 1.0, "8.1 EV 电机转速 929 rpm（恒扭矩区）");
+const c1evTm = T(`POWERTRAIN.motorTorque(POWERTRAIN.spec.motorR, ${EV_WMOT * 30 / Math.PI}, 1, ${c1evSoc})`);
+assert(Math.abs(c1evTm - 350) < 1e-9, `8.1 EV 电机轴扭矩 = 350 N·m（实得 ${c1evTm}）`);
+const c1ev = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:${C1W},FR:${C1W},RL:${C1W},RR:${C1W}})`);
+const EV_AXLE = 350 * EV_R * EV_E;           // 3303.335 N·m/轴
+assert(Math.abs(c1ev.tRear - EV_AXLE / 2) < 1e-6,
+  `8.1 C1 EV tRear = 350×9.73×0.97/2 = ${EV_AXLE / 2}（实得 ${c1ev.tRear}；改前 175 = 漏乘齿比）`);
+assert(Math.abs(c1ev.tFront - EV_AXLE / 2) < 1e-6, "8.1 C1 EV tFront 同值（tv 双电机对称）");
+assert(c1ev.tRear > 1000, `8.1 C1 EV tRear>1000 判别断言（改前仅 175，实得 ${c1ev.tRear}）`);
+const c1evWSum = c1ev.tWheel.reduce((a, b) => a + b, 0);
+assert(Math.abs(c1evWSum - 2 * EV_AXLE) < 1e-6,
+  `8.1 C1 EV tv 四轮和 = T_motF_w+T_motR_w = ${2 * EV_AXLE}（守恒，含齿比）`);
+// (b) 串联增程后驱：9.0 × 1.0 × 0.97
+T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["串联增程后驱"]))); POWERTRAIN.state.thrSm = 1;');
+const SE_R = 9.0 * 1.0, SE_E = 0.97;
+const c1se = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:${C1W},FR:${C1W},RL:${C1W},RR:${C1W}})`);
+const SE_AXLE = 400 * SE_R * SE_E;           // 3492 N·m
+assert(Math.abs(c1se.tRear - SE_AXLE / 2) < 1e-6,
+  `8.1 C1 series tRear = 400×9.0×0.97/2 = ${SE_AXLE / 2}（实得 ${c1se.tRear}；改前 200）`);
+assert(Math.abs(c1se.tFront) < 1e-9, "8.1 C1 series(rwd) 前轴无驱动扭矩");
+assert(c1se.P_gen > 0 && c1se.iceRpm > 0, "8.1 series P_gen>0 & iceRpm>0（增程器发电，不接轮）");
+// (c) THS 功率分流：MG2（motorB）路径同样补齿比——1 × 3.6 × 0.95
+T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["THS 功率分流"]))); POWERTRAIN.state.thrSm = 1;');
+const THS_R = 1 * 3.6, THS_E = 0.95;
+const c1ths = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:${C1W},FR:${C1W},RL:${C1W},RR:${C1W}})`);
+const THS_MG2 = 207 * THS_R * THS_E;         // 707.94 N·m
+assert(Math.abs(c1ths.tRear - THS_MG2 / 2) < 1e-6,
+  `8.1 C1 powersplit MG2 tRear = 207×3.6×0.95/2 = ${THS_MG2 / 2}（实得 ${c1ths.tRear}；改前 103.5）`);
+const THS_MG1 = 150 * THS_R * THS_E;         // 513 N·m
+const c1thsTice = T(`POWERTRAIN.iceTorque(${c1ths.iceRpm}, 1)`);
+const c1thsTmech = c1thsTice * 0.72 * THS_R * THS_E;
+assert(Math.abs(c1ths.tFront * 2 - (c1thsTmech + THS_MG1)) < 1e-6,
+  "8.1 C1 powersplit fwd 前轴 = Tmech(T_ice×0.72×ratio×eff) + MG1×ratio×eff");
+assert(c1ths.P_gen > 0, "8.1 powersplit P_gen>0（28% 分流发电）");
+// (d) 无回归：p3 电机在箱后 → rpm 源与扭矩都【不】乘 ratio（motGeared=1）
+T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["P3 混动前驱"]))); POWERTRAIN.state.thrSm = 1;');
+const c1p3Soc = T("POWERTRAIN.state.soc");
+const P3_R = 3.5 * 4.1, P3_E = 0.94;
+const c1p3 = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:${C1W},FR:${C1W},RL:${C1W},RR:${C1W}})`);
+assert(Math.abs(c1p3.iceRpm - C1W * P3_R * 30 / Math.PI) < 1e-6, "8.1 p3 iceRpm = 轮速×ratio（刚性耦合）");
+assert(Math.abs(c1p3.shiftRpm - c1p3.iceRpm) < 1e-12, "8.1 p3 shiftRpm === iceRpm（非 MOTOR_GEARED）");
+const c1p3Tm = T(`POWERTRAIN.motorTorque(POWERTRAIN.spec.motorR, ${C1W * 30 / Math.PI}, 1, ${c1p3Soc})`);
+assert(Math.abs(c1p3Tm - 300) < 1e-9, "8.1 p3 电机 rpm 源 = 轮速 95.5（未乘 ratio）→ 300 N·m");
+const c1p3Ti = T(`POWERTRAIN.iceTorque(${C1W * P3_R * 30 / Math.PI}, 1)`);
+assert(Math.abs(c1p3.tFront * 2 - (c1p3Ti * P3_R * P3_E + c1p3Tm)) < 1e-6,
+  "8.1 C1 无回归：p3 = T_ice×ratio×eff + T_mot（电机路径 motGeared=1）");
+assert(Math.abs(c1p3.tRear) < 1e-9, "8.1 p3(fwd) 后轴无扭矩");
+// (e) 无回归：p2 电机在曲轴链 → motGeared=1（组合器内统一乘 ratio×eff）
+const c1p2 = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+c1p2.architecture = "p2"; c1p2.drive = "rwd"; c1p2.ice.inertia = 0.2; c1p2.motorF = null;
+c1p2.motorR = { peakTorqueNm: 200, peakPowerKw: 100, maxRpm: 10000, regenMaxKw: 80, inertia: 0.1 };
+c1p2.battery = { capacityKwh: 10, soc0: 0.6, maxDischargeKw: 400, maxChargeKw: 150 };
+c1p2.gearbox = { type: "manual", ratios: [3], finalDrive: 2, shiftTimeMs: 0, eff: 0.9, autoUpFrac: 0.92, autoDownFrac: 0.55 };
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(c1p2)})`).ok === true, "8.1 p2 spec valid");
+const c1p2Soc = T("POWERTRAIN.state.soc");
+const C1P2_R = 6, c1p2Rpm = C1W * C1P2_R * 30 / Math.PI;
+const c1p2Ti = T(`POWERTRAIN.iceTorque(${c1p2Rpm}, 1)`);
+const c1p2Tm = T(`POWERTRAIN.motorTorque(${JSON.stringify(c1p2.motorR)}, ${c1p2Rpm}, 1, ${c1p2Soc})`);
+const c1p2Out = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:0,FR:0,RL:${C1W},RR:${C1W}})`);
+assert(Math.abs(c1p2Out.tRear - (c1p2Ti + c1p2Tm) * C1P2_R * 0.9 / 2) < 1e-6,
+  "8.1 C1 无回归：p2 仍为 (T_ice+T_mot)×ratio×eff/2（不双重乘齿比）");
+
+/* ── 8.2 C2：松油门/制动工况——轮扭矩为负、SOC 上升、P_wheel 与 P_mot 同源同符号 ── */
+console.log("--- 8.2 C2 lift-off energy conservation ---");
+// (a) EV 制动回收：tRear<0、dSoc>0、P_wheel/P_mot = 0.95×eff
+T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["EV 双电机 AWD-TV"])));');
+const C2_DT = 0.004;
+const c2Soc0 = T("POWERTRAIN.state.soc");
+const c2Out = T(`POWERTRAIN.step(${C2_DT}, {throttle:0, brake:0.5}, {FL:${C1W},FR:${C1W},RL:${C1W},RR:${C1W}})`);
+const c2Soc1 = T("POWERTRAIN.state.soc");
+const C2_TREG = -175;                        // motorTorque(cmd=-0.5) = -350×0.5
+assert(c2Out.tRear < 0 && c2Out.tFront < 0, `8.2 C2 EV 松油门+制动 → 轮扭矩为负（tRear=${c2Out.tRear}）`);
+assert(Math.abs(c2Out.tRear - C2_TREG * EV_R * EV_E / 2) < 1e-6,
+  `8.2 C2 EV tRear = −175×9.73×0.97/2 = ${C2_TREG * EV_R * EV_E / 2}（改前机械通道被 tcsScale=0 抹成 0）`);
+assert(c2Soc1 > c2Soc0, `8.2 C2 EV dSoc>0（回收充电 ${c2Soc0} → ${c2Soc1}）`);
+const c2Pmot = (2 * C2_TREG * EV_WMOT) / 0.95;                 // step() 内 P_mot（tcsRear=1）
+const c2Pwheel = 2 * c2Out.tFront * C1W + 2 * c2Out.tRear * C1W; // 四轮机械功率
+assert(c2Pwheel < 0 && c2Pmot < 0, "8.2 C2 P_wheel 与 P_mot 同符号（均为负=回馈）");
+assert(Math.abs(c2Pwheel / c2Pmot - 0.95 * EV_E) < 1e-9,
+  `8.2 C2 能量守恒 P_wheel/P_mot = 0.95×0.97 = ${0.95 * EV_E}（实得 ${c2Pwheel / c2Pmot}）`);
+const c2dSoc = -c2Pmot * C2_DT / (80 * 3.6e6);
+assert(Math.abs((c2Soc1 - c2Soc0) - c2dSoc) < 1e-15,
+  `8.2 C2 SOC 积分与电机轴功率同源（期望 +${c2dSoc.toExponential(4)}）`);
+// (b) GT3 松油门发动机制动：ICE 摩擦/泵气负扭矩经齿比到轮
+T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["GT3 V8 RWD 6MT"]))); POWERTRAIN.state.thrSm = 0; POWERTRAIN.state.gearIdx = 5;');
+const C2B_W = 100, C2B_R = 0.95 * 3.9, C2B_E = 0.96;
+const c2bOut = T(`POWERTRAIN.step(${C2_DT}, {throttle:0, brake:0}, {FL:0,FR:0,RL:${C2B_W},RR:${C2B_W}})`);
+const c2bRpm = C2B_W * C2B_R * 30 / Math.PI;
+const c2bTi = T(`POWERTRAIN.iceTorque(${c2bRpm}, 0)`);
+assert(c2bTi < 0, `8.2 C2 GT3 松油门 → T_ice<0（发动机制动 ${c2bTi.toFixed(2)} N·m @${c2bRpm.toFixed(0)} rpm）`);
+assert(Math.abs(c2bOut.tRear - c2bTi * C2B_R * C2B_E / 2) < 1e-6, "8.2 C2 GT3 发动机制动扭矩经齿比到轮（解析）");
+assert(c2bOut.tRear < -10, `8.2 C2 GT3 tRear=${c2bOut.tRear.toFixed(2)} < −10 N·m（改前接线层 tcsScale=0 会抹成 0 → 空挡滑行）`);
+assert(Math.abs(c2bOut.tFront) < 1e-9, "8.2 C2 GT3(rwd) 前轴无扭矩");
+// (c) 接线层（11-stages.js）——沙箱不加载它，故按 7.14 先例做源码断言（见 8.8）
+
+/* ── 8.3 C3：autoShift 白名单 / 架构感知转速源 / 换挡生产者 / 反向锁止 ── */
+console.log("--- 8.3 C3 shift producer & whitelist ---");
+assert(JSON.stringify(T("POWERTRAIN.AUTO_GB_TYPES")) === JSON.stringify(["auto", "dct", "seq", "cvt"]),
+  `8.3 C3 AUTO_GB_TYPES = auto/dct/seq/cvt（实得 ${JSON.stringify(T("POWERTRAIN.AUTO_GB_TYPES"))}；改前仅 auto/dct）`);
+assert(T("POWERTRAIN.SHIFT_LOCK_MS") === 400, "8.3 C3 SHIFT_LOCK_MS = 400");
+// seq（FSAE）→ 白名单内，按 spec 的 autoUpFrac=0.95 升挡
+T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["FSAE I4 RWD 5MT"]))); POWERTRAIN.state.gearIdx = 0;');
+assert(T("POWERTRAIN.shiftRedlineRpm()") === 13000, "8.3 C3 FSAE(seq) 红线 = ice.redlineRpm = 13000");
+T("POWERTRAIN.autoShift(0.96 * 13000);");
+assert(T("POWERTRAIN.state.shiftDir") === 1 && T("POWERTRAIN.state.shiftT") > 0,
+  "8.3 C3 FSAE(seq) autoShift @0.96×红线 → 升挡（改前白名单外 → 卡 1 挡）");
+// cvt（THS）→ 白名单内，但 ratios.length===1 → 不越界
+T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["THS 功率分流"])));');
+assert(T("POWERTRAIN.shiftRedlineRpm()") === 12000, "8.3 C3 THS(powersplit/fwd) 红线 = MG1.maxRpm = 12000（非 ice 6000）");
+T("POWERTRAIN.autoShift(0.99 * 12000);");
+assert(T("POWERTRAIN.state.shiftT") === 0 && T("POWERTRAIN.state.gearIdx") === 0,
+  "8.3 C3 THS(cvt,单速比) autoShift 不越界（e-CVT 无挡位）");
+// manual（GT3）→ autoShift 不生效，但转速律生产者生效
+T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["GT3 V8 RWD 6MT"]))); POWERTRAIN.state.gearIdx = 0;');
+assert(T("POWERTRAIN.shiftRedlineRpm()") === 8500, "8.3 C3 GT3(ice) 红线 = ice.redlineRpm = 8500");
+T("POWERTRAIN.autoShift(0.99 * 8500);");
+assert(T("POWERTRAIN.state.shiftT") === 0 && T("POWERTRAIN.state.shiftDir") === 0,
+  "8.3 C3 GT3(manual) autoShift 不生效（manual 仍手动）");
+assert(T("POWERTRAIN.shiftCmdFromRpm(0.96 * 8500)") === 1, "8.3 C3 GT3(manual) shiftCmdFromRpm @0.96×红线 → +1（转速律生产者）");
+assert(T("POWERTRAIN.shiftCmdFromRpm(0.90 * 8500)") === 0, "8.3 C3 shiftCmdFromRpm 中间带（0.55~0.95）→ 0");
+T("POWERTRAIN.state.gearIdx = 3;");
+assert(T("POWERTRAIN.shiftCmdFromRpm(0.50 * 8500)") === -1, "8.3 C3 shiftCmdFromRpm @0.50×红线 → −1");
+T("POWERTRAIN.state.gearIdx = 0;");
+assert(T("POWERTRAIN.shiftCmdFromRpm(0.50 * 8500)") === 0, "8.3 C3 shiftCmdFromRpm 1 挡不降（越界保护）");
+T("POWERTRAIN.state.gearIdx = 5;");
+assert(T("POWERTRAIN.shiftCmdFromRpm(0.99 * 8500)") === 0, "8.3 C3 shiftCmdFromRpm 顶挡不升（越界保护）");
+T("POWERTRAIN.state.gearIdx = 2; POWERTRAIN.state.shiftT = 100; POWERTRAIN.state.shiftDir = 1;");
+assert(T("POWERTRAIN.shiftCmdFromRpm(0.99 * 8500)") === 0, "8.3 C3 shiftCmdFromRpm 换挡进行中 → 0");
+T("POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0;");
+assert(T("POWERTRAIN.shiftCmdFromRpm(NaN)") === 0 && T("POWERTRAIN.shiftCmdFromRpm(-100)") === 0,
+  "8.3 C3 shiftCmdFromRpm 非有限/负 rpm → 0（守卫）");
+assert(T("POWERTRAIN.shiftCmdFromRpm(0.80 * 8500, 0.75, 0.40)") === 1, "8.3 C3 shiftCmdFromRpm 自定义 upFrac=0.75 → +1");
+assert(T("POWERTRAIN.shiftCmdFromRpm(0.45 * 8500, 0.90, 0.50)") === -1, "8.3 C3 shiftCmdFromRpm 自定义 downFrac=0.50 → −1");
+// 架构感知转速源 shiftRpm
+T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["EV 双电机 AWD-TV"])));');
+const c3ev = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:${C1W},FR:${C1W},RL:${C1W},RR:${C1W}})`);
+assert(Math.abs(c3ev.iceRpm) < 1e-9, "8.3 C3 EV iceRpm≡0（无曲轴，改前依赖它 → 永不换挡）");
+assert(Math.abs(c3ev.shiftRpm - EV_WMOT * 30 / Math.PI) < 1e-6,
+  `8.3 C3 EV shiftRpm = 轮速×ratio×30/π = ${EV_WMOT * 30 / Math.PI}（电机 rpm）`);
+T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["串联增程后驱"]))); POWERTRAIN.state.thrSm = 1;');
+const c3se = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:${C1W},FR:${C1W},RL:${C1W},RR:${C1W}})`);
+assert(Math.abs(c3se.shiftRpm - C1W * 9.0 * 30 / Math.PI) < 1e-6, "8.3 C3 series(rwd) shiftRpm = 后电机 rpm（轮速×9.0）");
+assert(c3se.iceRpm > 0 && Math.abs(c3se.iceRpm - c3se.shiftRpm) > 1,
+  `8.3 C3 series iceRpm(${c3se.iceRpm.toFixed(0)}) ≠ shiftRpm(${c3se.shiftRpm.toFixed(0)})（发电控制律转速不可作换挡判据）`);
+T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["THS 功率分流"]))); POWERTRAIN.state.thrSm = 1;');
+const c3ths = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:${C1W},FR:${C1W},RL:${C1W},RR:${C1W}})`);
+assert(Math.abs(c3ths.shiftRpm - C1W * 3.6 * 30 / Math.PI) < 1e-6,
+  "8.3 C3 powersplit(fwd) shiftRpm = MG1 rpm（轮速×finalDrive 3.6）");
+T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["GT3 V8 RWD 6MT"]))); POWERTRAIN.state.thrSm = 1;');
+const c3gt = T("POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:0,FR:0,RL:20,RR:20})");
+assert(c3gt.shiftRpm === c3gt.iceRpm, "8.3 C3 ICE 架构 shiftRpm === iceRpm（无回归）");
+assert(Math.abs(c3gt.shiftRpm - 20 * 3.0 * 3.9 * 30 / Math.PI) < 1e-6, "8.3 C3 GT3 shiftRpm = 轮速×11.7×30/π");
+// SHIFT_LOCK_MS 反向锁止（防 P3 类大齿比间隔箱 1↔2 挡振荡）
+const lkSpec = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+lkSpec.gearbox = { type: "auto", ratios: [3.5, 2.1, 1.5], finalDrive: 1, shiftTimeMs: 100, eff: 1, autoUpFrac: 0.9, autoDownFrac: 0.55 };
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(lkSpec)})`).ok === true, "8.3 C3 lock spec valid");
+T("POWERTRAIN.state.gearIdx = 0;");
+T("POWERTRAIN.autoShift(0.95 * 9000);");
+assert(T("POWERTRAIN.state.shiftDir") === 1 && T("POWERTRAIN.state.shiftT") === 100, "8.3 C3 lock：升挡请求受理（shiftT=100ms）");
+T("POWERTRAIN.advanceGearbox(0.1, 10);");
+assert(T("POWERTRAIN.state.gearIdx") === 1 && T("POWERTRAIN.state.shiftLockT") === 400 && T("POWERTRAIN.state.shiftLockDir") === 1,
+  "8.3 C3 lock：换挡完成 → shiftLockT=400 / shiftLockDir=+1");
+T("POWERTRAIN.autoShift(0.30 * 9000);");
+assert(T("POWERTRAIN.state.shiftT") === 0 && T("POWERTRAIN.state.shiftDir") === 0,
+  "8.3 C3 lock：锁止窗口内反向（降挡）被拒——P3 预设 3.5→2.1 后 rr=0.54<0.55 的振荡由此消除");
+T("POWERTRAIN.requestShift(-1);");
+assert(T("POWERTRAIN.state.shiftDir") === -1 && T("POWERTRAIN.state.shiftT") > 0,
+  "8.3 C3 lock：显式 requestShift(-1) 不受锁止影响（驾驶员意图优先）");
+T("POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0; POWERTRAIN.state.shiftLockT = 0; POWERTRAIN.state.shiftLockDir = 0;");
+T("POWERTRAIN.autoShift(0.30 * 9000);");
+assert(T("POWERTRAIN.state.shiftDir") === -1, "8.3 C3 lock：窗口外降挡恢复正常");
+T("POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0; POWERTRAIN.state.gearIdx = 0; POWERTRAIN.state.shiftLockT = 400; POWERTRAIN.state.shiftLockDir = 1;");
+T("POWERTRAIN.autoShift(0.95 * 9000);");
+assert(T("POWERTRAIN.state.shiftDir") === 1, "8.3 C3 lock：只挡反向，同向升挡照常");
+T("POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0; POWERTRAIN.state.gearIdx = 1; POWERTRAIN.state.shiftLockT = 400; POWERTRAIN.state.shiftLockDir = 1;");
+assert(T("POWERTRAIN.shiftCmdFromRpm(0.30 * 9000)") === 0, "8.3 C3 lock：shiftCmdFromRpm 同样遵守反向锁止");
+assert(T("POWERTRAIN.shiftCmdFromRpm(0.96 * 9000)") === 1, "8.3 C3 lock：shiftCmdFromRpm 同向不受锁止");
+T("POWERTRAIN.state.shiftT = 0; POWERTRAIN.state.shiftDir = 0; POWERTRAIN.state.shiftLockT = 400; POWERTRAIN.state.shiftLockDir = 1;");
+T("POWERTRAIN.advanceGearbox(0.2, 10);");
+assert(Math.abs(T("POWERTRAIN.state.shiftLockT") - 200) < 1e-9, "8.3 C3 lock：advanceGearbox 按 dt 递减 shiftLockT");
+T("POWERTRAIN.advanceGearbox(0.3, 10);");
+assert(T("POWERTRAIN.state.shiftLockT") === 0 && T("POWERTRAIN.state.shiftLockDir") === 0,
+  "8.3 C3 lock：窗口耗尽后清零（含 shiftLockDir）");
+T("POWERTRAIN.autoShift(NaN); POWERTRAIN.autoShift(-5);");
+assert(T("POWERTRAIN.state.shiftT") === 0, "8.3 C3 autoShift 非有限/负 rpm 守卫（不抛错、不改状态）");
+
+/* ── 8.4 I1：反射惯量只加驱动轮且按驱动轮数归一 ── */
+console.log("--- 8.4 I1 reflected inertia per drive wheel ---");
+T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["GT3 V8 RWD 6MT"])));');
+assert(T("POWERTRAIN.driveWheelCount()") === 2, "8.4 I1 GT3(rwd) driveWheelCount = 2");
+assert(T("POWERTRAIN.isDriveWheel('RL')") === true && T("POWERTRAIN.isDriveWheel('RR')") === true,
+  "8.4 I1 GT3(rwd) 后轮为驱动轮");
+assert(T("POWERTRAIN.isDriveWheel('FL')") === false && T("POWERTRAIN.isDriveWheel('FR')") === false,
+  "8.4 I1 GT3(rwd) 前轮【非】驱动轮（改前 ptIw 加到全 4 轮 → 前轮 Iw 被无物理依据放大）");
+const I1_G1 = 0.35 * Math.pow(3.0 * 3.9, 2) / 2;   // I×r²/nDrive = 23.95575
+assert(Math.abs(T("POWERTRAIN.reflectedInertiaPerDriveWheel()") - I1_G1) < 1e-12,
+  `8.4 I1 GT3 1 挡每驱动轮反射惯量 = 0.35×11.7²/2 = ${I1_G1}`);
+assert(T("POWERTRAIN.reflectedInertia()") === T("POWERTRAIN.reflectedInertiaPerDriveWheel()"),
+  "8.4 I1 reflectedInertia() 委托别名（向后兼容，语义=每驱动轮）");
+T("POWERTRAIN.state.gearIdx = 5;");
+assert(Math.abs(T("POWERTRAIN.reflectedInertiaPerDriveWheel()") - 0.35 * Math.pow(0.95 * 3.9, 2) / 2) < 1e-12,
+  "8.4 I1 反射惯量随挡位（顶挡 0.95×3.9）");
+T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["P3 混动前驱"])));');
+assert(T("POWERTRAIN.driveWheelCount()") === 2 && T("POWERTRAIN.isDriveWheel('FL')") === true && T("POWERTRAIN.isDriveWheel('RR')") === false,
+  "8.4 I1 P3(fwd) 前轮驱动、后轮不驱动");
+assert(Math.abs(T("POWERTRAIN.reflectedInertiaPerDriveWheel()") - 0.15 * Math.pow(3.5 * 4.1, 2) / 2) < 1e-12,
+  "8.4 I1 P3 只计 ice.inertia（p3 电机在箱后，不在曲轴链）");
+T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["EV 双电机 AWD-TV"])));');
+assert(T("POWERTRAIN.driveWheelCount()") === 4 && T("POWERTRAIN.isDriveWheel('FL')") === true && T("POWERTRAIN.isDriveWheel('RR')") === true,
+  "8.4 I1 EV(tv) 四轮驱动");
+assert(T("POWERTRAIN.reflectedInertiaPerDriveWheel()") === 0,
+  "8.4 I1 EV 无曲轴 → 反射惯量 0（ev/series/powersplit 的电机惯量尚未计入，见报告顾虑）");
+// p2：电机在曲轴链 → 计入；awd /4、rwd /2
+const i1p2 = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+i1p2.architecture = "p2"; i1p2.drive = "awd_fixed"; i1p2.ice.inertia = 0.3;
+i1p2.motorF = { peakTorqueNm: 100, peakPowerKw: 50, maxRpm: 10000, inertia: 0.05 };
+i1p2.motorR = { peakTorqueNm: 100, peakPowerKw: 50, maxRpm: 10000, inertia: 0.05 };
+i1p2.battery = { capacityKwh: 10 };
+i1p2.gearbox = { type: "manual", ratios: [3], finalDrive: 4, shiftTimeMs: 0, eff: 1, autoUpFrac: 0.92, autoDownFrac: 0.55 };
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(i1p2)})`).ok === true, "8.4 I1 p2 spec valid");
+assert(Math.abs(T("POWERTRAIN.reflectedInertiaPerDriveWheel()") - (0.3 + 0.05 + 0.05) * 144 / 4) < 1e-12,
+  "8.4 I1 p2+awd：(I_ice+I_motF+I_motR)×(3×4)²/4");
+T("POWERTRAIN.spec.drive = 'rwd';");
+assert(Math.abs(T("POWERTRAIN.reflectedInertiaPerDriveWheel()") - 0.4 * 144 / 2) < 1e-12,
+  "8.4 I1 p2+rwd：分母改 2（每驱动轮）");
+assert(T("POWERTRAIN.isDriveWheel('RL')") === true && T("POWERTRAIN.isDriveWheel('FL')") === false,
+  "8.4 I1 isDriveWheel 跟随 spec.drive 变更");
+assert(T("POWERTRAIN.isDriveWheel('XX')") === false && T("POWERTRAIN.isDriveWheel(undefined)") === false,
+  "8.4 I1 未知 wheelId → false（失效安全）");
+
+/* ── 8.5 I3：hasRealDrivetrain() → 不乘 drivePowerFactor ── */
+console.log("--- 8.5 I3 drivePowerFactor bypass ---");
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+assert(T("POWERTRAIN.hasRealDrivetrain()") === false,
+  "8.5 I3 legacy 默认规格 hasRealDrivetrain()===false → 仍走 drivePowerFactor（保 parity）");
+for (const nm8 of T("Object.keys(POWERTRAIN_PRESETS)")) {
+  T(`POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS[${JSON.stringify(nm8)}])));`);
+  assert(T("POWERTRAIN.hasRealDrivetrain()") === true,
+    `8.5 I3 预设「${nm8}」hasRealDrivetrain()===true → 接线层 ptDriveScale=1`);
+}
+T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["EV 双电机 AWD-TV"])));');
+const i3Out = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:${C1W},FR:${C1W},RL:${C1W},RR:${C1W}})`);
+assert(Math.abs(i3Out.tRear / (EV_AXLE / 2) - 1) < 1e-12,
+  "8.5 I3 EV tRear 恰为解析值（动力层不含任何质量补偿因子）");
+assert(Math.abs(i3Out.tRear - 0.576 * EV_AXLE / 2) > 100,
+  `8.5 I3 EV tRear=${i3Out.tRear.toFixed(1)} ≠ ×0.576 的打折值 ${(0.576 * EV_AXLE / 2).toFixed(1)}`);
+
+/* ── 8.6 六预设 30s 全油门 1-DOF 纵向积分探针（F=ΣT/Re，附着钳制，减风阻+滚阻）── */
+console.log("--- 8.6 six-preset 30s WOT longitudinal probe ---");
+T(`window.__ptProbe = function(name, o) {
+  var sp = JSON.parse(JSON.stringify(POWERTRAIN_PRESETS[name]));
+  if (!POWERTRAIN.setSpec(sp).ok) return { err: "invalid spec" };
+  POWERTRAIN.resetState();
+  var dt = o.dt, Re = o.Re, m = o.m, CdA = o.CdA, mu = o.mu, rho = 1.2, Crr = 0.015, G = 9.81;
+  var nD = Math.max(1, POWERTRAIN.driveWheelCount());
+  var Fcap = mu * m * G * (nD / 4);                 /* 附着上限：静载分配近似 */
+  var manualLaw = (sp.gearbox.type === "manual");   /* 与 11-stages.js 生产者同规则 */
+  var v = 0.5, vMax = 0, aMax = 0, shifts = 0, prevRpm = 0, gears = {};
+  var lastG = POWERTRAIN.state.gearIdx; gears[lastG] = 1;
+  var N = Math.round(o.tWot / dt), i;
+  for (i = 0; i < N; i++) {
+    var w = v / Re, wo = { FL: w, FR: w, RL: w, RR: w };
+    var sc = (manualLaw && prevRpm > 0) ? POWERTRAIN.shiftCmdFromRpm(prevRpm) : 0;
+    var out = POWERTRAIN.step(dt, { throttle: 1, brake: 0, shiftCmd: sc }, wo);
+    prevRpm = out.shiftRpm;
+    if (out.gearIdx !== lastG) { shifts++; lastG = out.gearIdx; gears[lastG] = 1; }
+    var Fd = (2 * out.tFront + 2 * out.tRear) / Re;
+    if (Fd > Fcap) Fd = Fcap; else if (Fd < -Fcap) Fd = -Fcap;
+    var a = (Fd - 0.5 * rho * CdA * v * v - Crr * m * G) / m;
+    v += a * dt; if (v < 0) v = 0;
+    if (v > vMax) vMax = v;
+    if (a > aMax) aMax = a;
+  }
+  var socWot = POWERTRAIN.state.soc;
+  /* Phase B：松油门+制动 3s（轮速保持 WOT 末速，稳态工况探针） */
+  var wB = v / Re, tMin = 0, NB = Math.round(o.tCoast / dt);
+  for (i = 0; i < NB; i++) {
+    var oB = POWERTRAIN.step(dt, { throttle: 0, brake: o.brakeCoast }, { FL: wB, FR: wB, RL: wB, RR: wB });
+    var TB = 2 * oB.tFront + 2 * oB.tRear;
+    if (TB < tMin) tMin = TB;
+  }
+  var nG = 0; for (var k in gears) nG++;
+  return { vMaxKmh: vMax * 3.6, vEndKmh: v * 3.6, gearsUsed: nG, shifts: shifts,
+           aMaxG: aMax / G, socWot: socWot, dSocCoast: POWERTRAIN.state.soc - socWot, tMinWheel: tMin };
+}`);
+/* 探针参数：每预设一套质量/轮胎半径/风阻面积/附着（量级取自真实车种），
+   30s WOT + 3s 松油门制动。两相参数与车辆模型完全一致，差异只来自动力层。
+   【改前基线】（同一探针跑 git HEAD 旧 16-powertrain.js，实测值）：
+     GT3     92.5 km/h / 1 挡 / 0 次换挡      → 改后 292.1 / 6 挡 / 5 次
+     FSAE   102.1 km/h / 1 挡 / 0 次换挡      → 改后 186.2 / 4 挡 / 3 次
+     EV      81.2 km/h / a_max 0.078g          → 改后 320.4 / a_max 0.860g
+     P3     181.9 km/h / 5 挡 / 6 次换挡（1↔2 挡振荡）→ 改后 183.0 / 5 挡 / 4 次（锁止后干净）
+     串联    37.1 km/h / a_max 0.034g          → 改后 179.7 / a_max 0.415g
+     THS    120.1 km/h / a_max 0.119g          → 改后 184.0 / a_max 0.310g
+   注：THS 改前已 >100 km/h（它的机械分流路径本来就乘齿比），故 100 km/h 阈值对 THS
+   不具判别力；C1 对 powersplit 电机路径的修复由 8.1 的解析断言（353.97 vs 改前 103.5）锁住。 */
+const PROBE_CFG = [
+  { name: "GT3 V8 RWD 6MT",  m: 1300, Re: 0.33, CdA: 0.80, mu: 1.15, vMinKmh: 150, gearsMin: 3, elec: false },
+  { name: "FSAE I4 RWD 5MT", m: 240,  Re: 0.26, CdA: 0.60, mu: 1.15, vMinKmh: 120, gearsMin: 3, elec: false },
+  { name: "EV 双电机 AWD-TV", m: 2200, Re: 0.35, CdA: 0.55, mu: 1.05, vMinKmh: 150, gearsMin: 1, elec: true },
+  { name: "P3 混动前驱",      m: 1600, Re: 0.32, CdA: 0.70, mu: 1.05, vMinKmh: 150, gearsMin: 3, elec: true },
+  { name: "串联增程后驱",     m: 2300, Re: 0.36, CdA: 0.90, mu: 1.05, vMinKmh: 100, gearsMin: 1, elec: true },
+  { name: "THS 功率分流",     m: 1500, Re: 0.32, CdA: 0.70, mu: 1.05, vMinKmh: 100, gearsMin: 1, elec: true }
+];
+const PROBE_ROWS = [];
+for (const c of PROBE_CFG) {
+  assert(T(`POWERTRAIN.validate(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS[${JSON.stringify(c.name)}]))).ok`) === true,
+    `8.6 预设「${c.name}」通过 validate`);
+  const r = T(`window.__ptProbe(${JSON.stringify(c.name)}, {dt:0.002, Re:${c.Re}, m:${c.m}, CdA:${c.CdA}, mu:${c.mu}, tWot:30, tCoast:3, brakeCoast:0.35})`);
+  assert(!r.err, `8.6 预设「${c.name}」探针执行成功`);
+  PROBE_ROWS.push({ name: c.name, v: r.vMaxKmh, g: r.gearsUsed, s: r.shifts, a: r.aMaxG, ds: r.dSocCoast, tw: r.tMinWheel, soc: r.socWot });
+  assert(Number.isFinite(r.vMaxKmh) && Number.isFinite(r.aMaxG) && Number.isFinite(r.tMinWheel),
+    `8.6 ${c.name} 探针输出全有限（无 NaN 扩散）`);
+  assert(r.vMaxKmh > c.vMinKmh,
+    `8.6 ${c.name} 30s WOT 极速 ${r.vMaxKmh.toFixed(1)} km/h > ${c.vMinKmh} km/h`);
+  assert(r.gearsUsed >= c.gearsMin,
+    `8.6 ${c.name} gearsUsed ${r.gearsUsed} ≥ ${c.gearsMin}（shifts=${r.shifts}；改前 5/6 预设卡 1 挡）`);
+  assert(r.shifts >= c.gearsMin - 1, `8.6 ${c.name} 实际换挡次数 ${r.shifts} ≥ ${c.gearsMin - 1}`);
+  assert(r.aMaxG > 0.2 && r.aMaxG < 1.2,
+    `8.6 ${c.name} a_max = ${r.aMaxG.toFixed(3)} g 在物理带 (0.2, 1.2) 内（附着/功率钳制生效）`);
+  assert(r.tMinWheel < 0,
+    `8.6 ${c.name} 松油门+制动 → 轮扭矩 ${r.tMinWheel.toFixed(1)} N·m < 0（C2 发动机制动/回收）`);
+  if (c.elec) assert(r.dSocCoast > 0,
+    `8.6 ${c.name} 松油门+制动 → dSoc = +${r.dSocCoast.toExponential(3)}（回收充电，与轮上负扭矩同源）`);
+  else assert(r.dSocCoast === 0 && r.socWot === 1, `8.6 ${c.name} 无电池 → dSoc=0 / soc≡1`);
+  assert(r.socWot > 0.05 && r.socWot <= 1, `8.6 ${c.name} WOT 30s 后 SOC = ${r.socWot.toFixed(4)} 在物理范围`);
+}
+console.log("\n[8.6 六预设 30s WOT 1-DOF 纵向积分探针（改后）]");
+console.log("预设                     极速km/h   挡数  换挡次  a_max(g)  SOC@30s  dSoc(松油)  tMin轮扭矩");
+for (const row of PROBE_ROWS) {
+  console.log(
+    row.name.padEnd(22, " ") + " " +
+    row.v.toFixed(1).padStart(9) + " " +
+    String(row.g).padStart(5) + " " +
+    String(row.s).padStart(7) + " " +
+    row.a.toFixed(3).padStart(9) + " " +
+    row.soc.toFixed(4).padStart(8) + " " +
+    row.ds.toExponential(2).padStart(11) + " " +
+    row.tw.toFixed(1).padStart(11));
+}
+console.log("");
+
+/* ── 8.7 legacy 等价锚终检：C1/C2/C3/I1/I3 全部落地后默认规格逐位不变 ── */
+console.log("--- 8.7 legacy anchor final check ---");
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec()); POWERTRAIN.resetState();");
+const anc8 = T("POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:30,FR:30,RL:30,RR:30})");
+assert(anc8.tRear === 480 && anc8.tFront === 120,
+  `8.7 legacy 等价锚 tRear=480/tFront=120 逐位不变（实得 ${anc8.tRear}/${anc8.tFront}）`);
+assert(anc8.tWheel === null && anc8.shifting === false && anc8.P_gen === 0 && anc8.gearIdx === 0,
+  "8.7 legacy 等价锚其余字段（tWheel=null/shifting=false/P_gen=0/gearIdx=0）");
+assert(anc8.shiftRpm === anc8.iceRpm, "8.7 legacy shiftRpm === iceRpm（非 MOTOR_GEARED，无回归）");
+const anc8b = T("POWERTRAIN.step(0.004, {throttle:0, brake:0}, {FL:30,FR:30,RL:30,RR:30})");
+assert(anc8b.tRear === 0 && anc8b.tFront === 0,
+  "8.7 legacy throttle=0 → tRear=tFront=0（fric=0 → C2 的 tcsScale 0→1 在 legacy 路径数值不变）");
+assert(T("POWERTRAIN.reflectedInertiaPerDriveWheel()") === 0 && T("POWERTRAIN.driveWheelCount()") === 4,
+  "8.7 legacy inertia=0 → 反射惯量 0（I1 parity）");
+assert(T("POWERTRAIN.shiftCmdFromRpm(9000)") === 0,
+  "8.7 legacy 单速比箱 → shiftCmdFromRpm 恒 0（C3 生产者 parity）");
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+
+/* ── 8.8 接线层（11-stages.js）源码扫描：本沙箱不加载 11-stages.js（见 7.8 前置断言），
+      故沿用 7.14 先例做源码级断言，锁住 C2/I1/I3/C3 的接线不被回退 ── */
+console.log("--- 8.8 11-stages.js wiring source scan ---");
+const stSrc = fs.readFileSync(path.join(__dirname, "../js/11-stages.js"), "utf8");
+assert(stSrc.indexOf("(ctrl.throttle > 1e-6) ? (throttleCmd / ctrl.throttle) : 1") >= 0,
+  "8.8 C2 接线：松油门 tcsScale = 1（TCS 只在给油切驱动时介入）");
+assert(stSrc.indexOf("(throttleCmd / ctrl.throttle) : 0") < 0,
+  "8.8 C2 接线：旧的 tcsScale=0（抹掉发动机制动/回收）已移除");
+assert(stSrc.indexOf("POWERTRAIN.hasRealDrivetrain()) ? 1 : drivePowerFactor") >= 0,
+  "8.8 I3 接线：ptDriveScale = hasRealDrivetrain() ? 1 : drivePowerFactor");
+assert(stSrc.indexOf("* ptDriveScale * tcsScale") >= 0, "8.8 I3 接线：ptOut 分支改用 ptDriveScale");
+assert(stSrc.indexOf("throttleCmd * 480.0 * drivePowerFactor") >= 0,
+  "8.8 I3 接线：legacy 回退分支仍用 drivePowerFactor（保对拍锚）");
+assert(stSrc.indexOf("POWERTRAIN.reflectedInertiaPerDriveWheel()") >= 0, "8.8 I1 接线：取每驱动轮反射惯量");
+assert(stSrc.indexOf("POWERTRAIN.isDriveWheel(w.id)") >= 0, "8.8 I1 接线：只加到驱动轮");
+assert(stSrc.indexOf("POWERTRAIN.reflectedInertia()") < 0, "8.8 I1 接线：旧的全 4 轮 ptIw 调用已移除");
+assert(stSrc.indexOf("POWERTRAIN.shiftCmdFromRpm(this._ptShiftRpm)") >= 0, "8.8 C3 接线：转速律换挡生产者已接入");
+assert(stSrc.indexOf("ptOut.shiftRpm") >= 0, "8.8 C3 接线：转速源取 step() 返回的 shiftRpm（架构感知）");
+assert(stSrc.indexOf('_gbt === "manual"') >= 0,
+  "8.8 C3 接线：外部生产者只对 manual 生效（auto/dct/seq/cvt 由 step 内 autoShift 按 spec 的 autoUp/DownFrac）");
+assert(stSrc.indexOf("手动箱自动离合") >= 0, "8.8 C3 接线：转速律的简化语义已在注释声明");
+assert(stSrc.indexOf("TODO(G31-P10)") >= 0, "8.8 C3 接线：tvBias 动态扭矩矢量 TODO 标注");
+assert(ptSrc.indexOf("TODO(G31-P10)") >= 0, "8.8 C3 动力层：tv 块 TODO(G31-P10) 标注");
 
 console.log(`\n[cumulative] ${passed}/${total} passed`);
 
