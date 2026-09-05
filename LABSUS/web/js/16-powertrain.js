@@ -89,6 +89,40 @@ const POWERTRAIN = {
       }
     }
     return map[map.length - 1][1];
+  },
+  /* ICE 曲轴扭矩：map×cmd − 摩擦/泵气损失。
+     断油（rpm>fuelCut）后驱动=0 但摩擦保留 → 负扭矩=发动机制动。
+     摩擦随油门减小而占比升高（泵气损失在节气门关闭时最大）：
+       fric_eff = fric × (0.35 + 0.65×(1−c_eff))
+     断油时节气门视为全关（c_eff=0）→ 满泵气损失，与“节气门关闭时最大”一致。 */
+  iceTorque(rpm, cmd) {
+    const ice = this.spec ? this.spec.ice : null;
+    if (!ice) return 0;
+    const c = Math.max(0, Math.min(1, cmd));
+    const T_map = this.mapLookup(ice.map, rpm);
+    const fric = (ice.fricA || 0) + (ice.fricB || 0) * rpm + (ice.fricC || 0) * rpm * rpm;
+    const cut = rpm > (ice.fuelCutRpm !== undefined ? ice.fuelCutRpm : 1e9);
+    const drive = cut ? 0 : T_map * c;
+    const c_eff = cut ? 0 : c;
+    return drive - fric * (0.35 + 0.65 * (1 - c_eff));
+  },
+  /* Motor 扭矩：恒扭矩区(rpm<base)→恒功率区(T=P/ω)。
+     cmd<0 = 回收：受 regenMaxKw 与 SOC 双重限制。
+     SOC 降额：放电 soc<0.2 线性降额至 0（soc=0.05 截止）；回收 soc>0.95 线性降额。 */
+  motorTorque(ms, rpm, cmd, soc) {
+    if (!ms) return 0;
+    const w = Math.max(1, rpm * Math.PI / 30);
+    const Tp = ms.peakPowerKw * 1000 / w;
+    const cap = Math.min(ms.peakTorqueNm, Tp);
+    if (cmd >= 0) {
+      let derate = 1;
+      if (soc !== undefined && soc < 0.2) derate = Math.max(0, (soc - 0.05) / 0.15);
+      return cap * Math.min(1, cmd) * derate;
+    }
+    const Rcap = Math.min(cap, (ms.regenMaxKw !== undefined ? ms.regenMaxKw : ms.peakPowerKw) * 1000 / w);
+    let derate = 1;
+    if (soc !== undefined && soc > 0.95) derate = Math.max(0, (1 - soc) / 0.05);
+    return -Rcap * Math.min(1, -cmd) * derate;
   }
 };
 if (typeof window !== "undefined") window.POWERTRAIN = POWERTRAIN;

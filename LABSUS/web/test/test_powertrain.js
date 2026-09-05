@@ -161,6 +161,34 @@ assert(T("POWERTRAIN.validate(Object.assign(POWERTRAIN.defaultSpec(),{architectu
 T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
 assert(T("POWERTRAIN.spec.architecture") === "ice", "M-1 restore ice default");
 
+/* ═══ 2. Power Sources (ICE / Motor) ═══ */
+console.log("=== 2. Power Sources (ICE / Motor) ===");
+// ICE：map 查表 + 断油 + 摩擦/制动（用带 fric 的 spec）
+const iceSpec = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+iceSpec.ice.fricA = 10; iceSpec.ice.fricB = 0.002; iceSpec.ice.fricC = 0;
+T(`POWERTRAIN.setSpec(${JSON.stringify(iceSpec)});`);
+assert(Math.abs(T("POWERTRAIN.iceTorque(3000, 1.0)") - (1200 - (10 + 0.002*3000)*0.35)) < 1e-9, "ice full throttle = map - fric*0.35");
+assert(Math.abs(T("POWERTRAIN.iceTorque(3000, 0.0)") - (-(10 + 0.002*3000))) < 1e-9, "ice zero throttle = -fric (engine braking)");
+assert(T("POWERTRAIN.iceTorque(3000, 0.0)") < 0, "engine braking negative");
+// 断油：rpm > fuelCut → drive=0 但 fric 保留
+// 注：节1 M-2 校验要求 fuelCutRpm ≥ redlineRpm，故同步下调 redlineRpm 使 cutSpec 通过 setSpec
+const cutSpec = JSON.parse(JSON.stringify(iceSpec)); cutSpec.ice.redlineRpm = 4500; cutSpec.ice.fuelCutRpm = 5000;
+T(`POWERTRAIN.setSpec(${JSON.stringify(cutSpec)});`);
+assert(Math.abs(T("POWERTRAIN.iceTorque(6000, 1.0)") - (-(10 + 0.002*6000))) < 1e-9, "fuel cut: drive=0, fric remains");
+// Motor：恒扭矩→恒功率拐点 + 回收限制
+const mSpec = { peakTorqueNm: 300, peakPowerKw: 150, baseRpm: 4000, maxRpm: 12000, regenMaxKw: 100, inertia: 0.1 };
+assert(Math.abs(T(`POWERTRAIN.motorTorque(${JSON.stringify(mSpec)}, 2000, 1.0, 0.8)`) - 300) < 1e-6, "motor const torque below base");
+const w8 = 8000 * Math.PI / 30;
+assert(Math.abs(T(`POWERTRAIN.motorTorque(${JSON.stringify(mSpec)}, 8000, 1.0, 0.8)`) - 150000 / w8) < 1e-6, "motor power-limited above base");
+// 回收：cmd=-1 → 负扭矩，受 regenMaxKw 限制
+const regCap = 100000 / (4000 * Math.PI / 30);
+assert(Math.abs(T(`POWERTRAIN.motorTorque(${JSON.stringify(mSpec)}, 4000, -1.0, 0.5)`) + regCap) < 1e-6, "regen capped by regenMaxKw");
+// SOC 降额：soc=0.06 放电降额；soc=0.99 回收降额
+assert(T(`POWERTRAIN.motorTorque(${JSON.stringify(mSpec)}, 2000, 1.0, 0.06)`) < 300 * 0.5, "low SOC derates discharge");
+assert(Math.abs(T(`POWERTRAIN.motorTorque(${JSON.stringify(mSpec)}, 4000, -1.0, 0.99)`) ) < regCap * 0.5, "high SOC derates regen");
+// 恢复默认
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+
 console.log(`\n[cumulative] ${passed}/${total} passed`);
 
 process.exit(passed === total ? 0 : 1);
