@@ -397,6 +397,72 @@ class PowertrainParams(BaseModel):
     brake_split_f: float = 0.6     # 前轴制动分配（剩余给后轴）
 
 
+# ── G31-P7 动力工坊：详细动力链规格（可选，前端 16-powertrain.js POWERTRAIN.spec 同构）──
+# 设计原则（G29 教训 + 对拍锚不变）：
+#   • PowertrainSpec **继承** PowertrainParams —— 旧标量键 T_max/P_kw/drive_split_f/
+#     brake_split_f 仍被识别，历史请求（test_transient 自定义 T_max=320、
+#     drive_split_f=1.0、tphys_parity 锚 payload）逐位不变；新增嵌套字段并存不冲突。
+#   • TrackSimRequest.powertrain 缺省 = None（非 default_factory）：未下发时
+#     model_dump()["powertrain"] is None，不引入新键；transient 侧 `if req.powertrain
+#     is not None` 门控，缺省走旧 .get(key, default) 路径（默认值 == 旧 PowertrainParams
+#     缺省，数值逐位一致）。
+
+class IceSpec(BaseModel):
+    """内燃机：扭矩 map [[rpm, N·m], ...] + 转速/惯量。"""
+    cyl: int = 8
+    layout: str = "V8"
+    dispL: float = 4.0
+    idleRpm: float = 800.0
+    redlineRpm: float = 9000.0
+    fuelCutRpm: float = 9200.0
+    map: list[list[float]] = Field(default_factory=lambda: [[800, 1200], [9000, 1200]])
+    inertia: float = 0.0
+
+
+class MotorSpec(BaseModel):
+    """驱动电机：峰值扭矩/功率 + 基速/最高转 + 回馈制动。"""
+    peakTorqueNm: float = 300.0
+    peakPowerKw: float = 150.0
+    baseRpm: float = 4775.0
+    maxRpm: float = 12000.0
+    regenMaxKw: float = 100.0
+    inertia: float = 0.1
+
+
+class GearboxSpec(BaseModel):
+    """变速箱：挡位比列表 + 主减速 + 换挡时间 + 效率。"""
+    type: str = "manual"
+    ratios: list[float] = Field(default_factory=lambda: [1.0])
+    finalDrive: float = 1.0
+    shiftTimeMs: float = 0.0
+    eff: float = 1.0
+
+
+class BatterySpec(BaseModel):
+    """动力电池：容量 + 初始 SOC + 充放电功率上限。"""
+    capacityKwh: float = 60.0
+    soc0: float = 0.8
+    maxDischargeKw: float = 400.0
+    maxChargeKw: float = 150.0
+
+
+class PowertrainSpec(PowertrainParams):
+    """G31 详细动力链规格（可选）。
+
+    继承 PowertrainParams（T_max/P_kw/drive_split_f/brake_split_f）保持向后兼容；
+    新增 architecture/drive/ice/motor/gearbox/battery 描述真实动力链。transient
+    仅在 `ice is not None` 时用 map×传动比推导等效轮上扭矩覆盖 T_max（见 run_track_sim）。
+    """
+    architecture: str = "ice"       # ice | ev | hybrid
+    drive: str = "awd_fixed"        # fwd | rwd | awd_fixed | ...
+    splitFront: float = 0.2         # 前轴扭矩分配（awd 用；与 drive_split_f 语义分离）
+    ice: IceSpec | None = None
+    motorF: MotorSpec | None = None
+    motorR: MotorSpec | None = None
+    gearbox: GearboxSpec | None = None
+    battery: BatterySpec | None = None
+
+
 class AeroParams(BaseModel):
     """气动（S3-1 升级 + P2a 双端统一标定，2026-09-02）：
 
@@ -437,7 +503,9 @@ class TrackSimRequest(BaseModel):
     sim_time: float = Field(30.0, gt=0.0, le=300.0)
     kc_luts: dict[str, dict[str, list[float]]] = Field(default_factory=dict)
     tire: TireParams = Field(default_factory=TireParams)
-    powertrain: PowertrainParams = Field(default_factory=PowertrainParams)
+    # G31-P7：缺省 None（不污染对拍锚）；下发时可为旧标量（T_max/P_kw，继承）或
+    # 详细动力链（ice/gearbox/...）。transient 用 `if req.powertrain is not None` 门控。
+    powertrain: PowertrainSpec | None = None
     aero: AeroParams = Field(default_factory=AeroParams)
     iz_kg_m2: float | None = None          # 缺省 ≈ m(L²+t̄²)/12
     lookahead_gain: float = 0.9            # 纯追踪预视距离 = 3 + gain·vx（m）

@@ -202,5 +202,59 @@ def test_invalid_compliance_axis_422():
     assert r.status_code == 422  # 缺硬点键 → 422
 
 
+# ── G31-P7：Python 端可选 PowertrainSpec（缺省 None，不污染对拍锚）──
+
+_PT_FRONT = {
+    "LCA_F": [260, 140, 130], "LCA_R": [260, -120, 140], "UCA_F": [350, 110, 340],
+    "UCA_R": [350, -100, 350], "LBJ": [640, 10, 150], "UBJ": [590, -15, 410],
+    "WC": [710, 0, 280], "TRO": [600, -120, 185], "RACK": [220, -135, 180],
+    "STRUT_OUT": [595, 10, 185], "RCK_AX_A": [300, 15, 330], "RCK_AX_B": [300, 70, 328],
+    "STRUT_IN": [315, 45, 400], "RCK_DMP": [230, 48, 345], "DMP_BODY": [30, 48, 170],
+}
+_PT_REAR = {
+    "LCA_F": [250, 140, 115], "LCA_R": [250, -130, 125], "UCA_F": [340, 110, 320],
+    "UCA_R": [340, -110, 330], "LBJ": [630, 10, 135], "UBJ": [580, -15, 390],
+    "WC": [700, 0, 290], "TRO": [590, -120, 170], "RACK": [210, -130, 160],
+    "STRUT_OUT": [570, -15, 380], "RCK_AX_A": [340, 25, 290], "RCK_AX_B": [340, 75, 292],
+    "STRUT_IN": [370, 45, 255], "RCK_DMP": [305, 60, 270], "DMP_BODY": [25, 62, 310],
+}
+
+
+def _pt_min_body(**over):
+    """最小合法 TrackSimRequest 构造字典（vehicle 全 15 键 + ≥2 track 点）。"""
+    b = {
+        "vehicle": {
+            "wheelbase_mm": 2750.0, "mass_kg": 1420.0, "sprung_mass_kg": 1260.0,
+            "hcg_mm": 350.0, "hs_mm": 370.0,
+            "front": {"points": dict(_PT_FRONT)},
+            "rear": {"points": dict(_PT_REAR)},
+        },
+        "track": [{"x": 0.0, "y": 0.0, "target_speed": 15.0},
+                  {"x": 60.0, "y": 0.0, "target_speed": 15.0}],
+    }
+    b.update(over)
+    return b
+
+
+def test_powertrain_optional_field():
+    from src.api.v3models import TrackSimRequest, PowertrainSpec  # noqa: F401
+    # 带 powertrain：架构/齿轮比嵌套解析
+    req = TrackSimRequest(**_pt_min_body(powertrain={
+        "architecture": "ice",
+        "ice": {"map": [[800, 1200], [9000, 1200]]},
+        "gearbox": {"ratios": [3, 2, 1], "finalDrive": 3.9}}))
+    assert req.powertrain.architecture == "ice"
+    assert req.powertrain.gearbox.ratios == [3, 2, 1]
+    assert req.powertrain.ice is not None
+    # 向后兼容：旧 T_max/P_kw 标量键仍被识别（PowertrainSpec 继承 PowertrainParams）
+    req2 = TrackSimRequest(**_pt_min_body(
+        powertrain={"T_max": 320.0, "P_kw": 120.0, "drive_split_f": 1.0}))
+    assert req2.powertrain.T_max == 320.0
+    assert req2.powertrain.drive_split_f == 1.0
+    # 缺省不污染对拍：未下发 powertrain → model_dump 中该键为 None
+    d = TrackSimRequest(**_pt_min_body()).model_dump()
+    assert d.get("powertrain") is None
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))

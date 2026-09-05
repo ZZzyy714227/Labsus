@@ -415,6 +415,24 @@ def run_track_sim(req: TrackSimRequest) -> dict:
     L = v.wheelbase_mm / 1000.0
     iz = req.iz_kg_m2 or v.mass_kg * (L * L + 1.6 * 1.6) / 12.0
     pt = req.powertrain.model_dump() if req.powertrain else {}
+    # G31-P7：请求带 powertrain.ice 时，用其等效轮上扭矩上限覆盖 T_max（一档）；
+    # 缺省（None 或无 ice）保持旧 T_max/P_kw 路径逐位不变（对拍锚）。
+    # 旧路径把 T_max 视为**轮上扭矩** N·m（wheel_force 内按每轮 tire_radius 折力），
+    # 故此处只给“曲轴扭矩×变速箱比×主减速×效率”的轮端扭矩，不再除半径。
+    if req.powertrain is not None and req.powertrain.ice is not None:
+        _ps = req.powertrain
+        _t_crank = max((p[1] for p in _ps.ice.map), default=0.0)      # 曲轴峰值扭矩 N·m
+        _gb = _ps.gearbox
+        _ratio = _gb.ratios[0] if (_gb and _gb.ratios) else 1.0        # 一档传动比
+        _final = _gb.finalDrive if _gb else 1.0                        # 主减速
+        _eff = _gb.eff if _gb else 1.0                                 # 传动效率
+        _t_wheel = _t_crank * _ratio * _final * _eff
+        if _t_wheel > 0.0:
+            pt["T_max"] = _t_wheel
+        # 峰值功率由 map 估算：P[kW] = max(T×n)/9550（保留恒功率包络高速上限）
+        _p_kw = max((p[0] * p[1] for p in _ps.ice.map), default=0.0) / 9550.0
+        if _p_kw > 0.0:
+            pt["P_kw"] = _p_kw
     aero = req.aero.model_dump() if req.aero else {}
     car = VehiclePlanar(v, req.tire, req.kc_luts, iz, pt, aero)
     drv = DriverPI(gain=req.lookahead_gain)
