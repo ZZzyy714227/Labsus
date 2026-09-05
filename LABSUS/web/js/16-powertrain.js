@@ -132,10 +132,14 @@ const POWERTRAIN = {
   /* Motor 扭矩：恒扭矩区(rpm<base)→恒功率区(T=P/ω)。
      cmd<0 = 回收：受 regenMaxKw 与 SOC 双重限制。
      SOC 降额：放电 soc<0.2 线性降额至 0（soc=0.05 截止）；回收 soc>0.95 线性降额。
-     M-2：支持负 rpm（反转）——ω 取绝对值，扭矩乘 sgn(rpm)。 */
+     M-2：支持负 rpm（反转）——ω 取绝对值，扭矩乘 sgn(rpm)。
+     G31-P10-2：maxRpm 是 ECU/逆变器超转保护（硬截止），不是软衰减——
+     |rpm| 超过 maxRpm 时驱动与回收一律归零（超转不回收：转子反电动势超限后
+     逆变器无法安全施加制动扭矩）；maxRpm 缺失/非有限 → 不启用截止（向后兼容）。 */
   motorTorque(motor, rpm, cmd, soc) {
     /* I-2：NaN 防护——缺少有效 peakTorqueNm/peakPowerKw 时直接返回 0 */
     if (!motor || !(motor.peakTorqueNm > 0) || !(motor.peakPowerKw > 0)) return 0;
+    if (motor.maxRpm !== undefined && Number.isFinite(motor.maxRpm) && Math.abs(rpm) > motor.maxRpm) return 0;
     const wAbs = Math.max(1, Math.abs(rpm) * Math.PI / 30);
     const sgn = (rpm < 0) ? -1 : 1;
     const Tp = motor.peakPowerKw * 1000 / wAbs;
@@ -193,14 +197,43 @@ const POWERTRAIN = {
      I1(G31-FR)：本值只应加到 isDriveWheel(id)===true 的轮上（接线层负责筛选）；
        旧接线把它加到全 4 轮 → 非驱动轮 Iw 被无物理依据地放大、且驱动轴等效质量翻倍。
      legacy 默认 inertia=0 → 0，15-DOF 的 Iw 不变（等价锚）。
-     p2 架构电机在 ICE 与 gearbox 之间同轴 → 计入；p3/p4/ev 电机不在曲轴链 → 不计。 */
+     p2 架构电机在 ICE 与 gearbox 之间同轴 → 计入；p3/p4 电机在箱后直连轮轴
+       （速比 1，放大量可忽略）→ 沿用不计。
+     G31-P10-2：ev/series/powersplit 的驱动电机经减速器(ratio×finalDrive)接轮 →
+       按【实际驱动电机】求和计入（电机不出力 → 其惯量不经传动链到轮，不计）：
+       ev：fwd→motorF、rwd→motorR、tv/awd_*→双电机（与 step 出力分支同判据）；
+       series：轮端只由电机驱动 → 计存在的电机（预设为 motorR）；
+       powersplit：motorB(motorR 字段) 与 ICE 同在驱动轴 → 计 motorR；
+         motorF(MG1) 为发电角色不进轮 → 不计（fwd/rwd 同）。
+       单值函数的固有限制：双电机 inertia 不对称时前后轮取同值（求和/nDrive 近似）。
+     ICE 惯量：series 的 ICE 只发电不接轮 → 不计入（P10-2 修正）；
+       powersplit 的 ICE 经行星排机械路径耦合 → 保留计入（简化，与 P10-1 前现状一致）；
+       ev 无曲轴。 */
   reflectedInertiaPerDriveWheel() {
     const sp = this.spec, st = this.state;
     if (!sp || !st || !sp.gearbox) return 0;
     const r = (sp.gearbox.ratios[st.gearIdx] || 1) * sp.gearbox.finalDrive;
-    let I = sp.ice ? (sp.ice.inertia || 0) : 0;
-    if (sp.architecture === "p2") {
+    const arch = sp.architecture;
+    let I = 0;
+    if (sp.ice && arch !== "series") {
+      I += (sp.ice.inertia || 0);   // series ICE 不接轮不计；ev 无 ice；其余（含 powersplit）保留
+    }
+    if (arch === "p2") {
       I += (sp.motorF ? (sp.motorF.inertia || 0) : 0) + (sp.motorR ? (sp.motorR.inertia || 0) : 0);
+    } else if (arch === "ev") {
+      /* 只计实际出力的电机（与 step 的 ev 出力分支同判据：fwd/rwd 单电机，其余双电机） */
+      if (sp.drive === "fwd") I += (sp.motorF ? (sp.motorF.inertia || 0) : 0);
+      else if (sp.drive === "rwd") I += (sp.motorR ? (sp.motorR.inertia || 0) : 0);
+      else I += (sp.motorF ? (sp.motorF.inertia || 0) : 0) + (sp.motorR ? (sp.motorR.inertia || 0) : 0);
+    } else if (arch === "series") {
+      /* series 的出力分支不按 drive 过滤（存在的电机都出力）→ 求和同判据 */
+      I += (sp.motorF ? (sp.motorF.inertia || 0) : 0) + (sp.motorR ? (sp.motorR.inertia || 0) : 0);
+    } else if (arch === "powersplit") {
+      if (sp.drive === "awd_fixed" || sp.drive === "awd_center") {
+        I += (sp.motorF ? (sp.motorF.inertia || 0) : 0) + (sp.motorR ? (sp.motorR.inertia || 0) : 0);
+      } else {
+        I += (sp.motorR ? (sp.motorR.inertia || 0) : 0);   // 仅 motorB 进驱动轴；MG1 不计
+      }
     }
     const nDrive = Math.max(1, this.driveWheelCount());
     return I * r * r / nDrive;
@@ -387,13 +420,14 @@ const POWERTRAIN = {
      step(dt, demand, wheelOmega)：每子步调用一次（在 15-DOF 轮循环之前）。
        demand     = { throttle, brake, shiftCmd?, tvBias?, tcsRear? }
        wheelOmega = { FL, FR, RL, RR }（rad/s）
-     返回 { tFront, tRear, tWheel|null, iceRpm, shiftRpm, gearIdx, soc, shifting, P_gen }
+     返回 { tFront, tRear, tWheel|null, iceRpm, shiftRpm, gearIdx, soc, shifting, P_gen, P_out }
        tFront/tRear = 单轮驱动扭矩（轴扭矩 / 2，与 legacy 常数 480/120 同量纲，未乘 drivePowerFactor）
        tWheel       = 逐轮 [FL,FR,RL,RR]：drive==='tv'（tvBias 分裂）或差速器产出左/右非对称
                       （locked 按载荷 / lsd 速差转移）时；否则 null（对称，走 tFront/tRear）
        shiftRpm     = C3(G31-FR) 架构感知换挡转速源（ev/series/powersplit → 电机 rpm，
                       其余 → iceRpm）；接线层的换挡生产者与 HUD/声浪应统一取此值
        P_gen        = ICE 发电功率（W，仅 series/powersplit > 0）
+       P_out        = G31-P10-2 轮上机械功率（W，正=驱动 负=制动/回收；tWheel 时逐轮×各轮 ω）
      tWheel 为逐轮扭矩（不再 /2）；tFront/tRear 为轴扭矩/2——接线层勿对 tWheel 再除 2。
      七架构功率流见各 case 注释。TCS 机械通道不在本层（接线层按轮滑移切轮扭矩）。
      I-3(G31-P6-fix)：dm.tcsRear（默认 1）为 TCS 能量通道——仅缩放 P_mot 中后电机
@@ -533,14 +567,20 @@ const POWERTRAIN = {
         Tf = sp.motorF ? T_motF_w : 0;
         Tr = sp.motorR ? T_motR_w : 0;
         break;
-      case "powersplit": {
+            case "powersplit": {
         /* 功率分流（行星排简化）：72% 机械路径到轮，28% 发电；
-           motorB（MG2）叠加到轮——C1：电机路径同样×ratio×eff（与机械路径共用主减） */
+           motorB（MG2）叠加到轮——C1：电机路径同样×ratio×eff（与机械路径共用主减）。
+           G31-P10-2：单行星排前置——motorB(motorR 字段) 与 ICE 同在【驱动轴】，
+           T_motR_w 与机械路径统一路由：fwd → 全部进 Tf（后轴归零；旧实现把 MG2 出力到
+           后轴 = “前驱”车后轴出力的物理错误）；rwd → 全部进 Tr。
+           motorF(MG1) 在 fwd/rwd 为发电角色 → 不进轮扭矩（发电分流由 P_gen 承担）。
+           awd_* 保持 splitFront 分裂（既有行为）；p4 异轴独立语义不受影响。 */
         const Tmech = T_ice * 0.72 * ratio * eff * (shifting ? 0 : 1);
         P_gen = Math.max(0, T_ice) * 0.28 * st.iceOmega * 0.9;
-        if (sp.drive === "fwd") { Tf = Tmech + (sp.motorF ? T_motF_w : 0); Tr = sp.motorR ? T_motR_w : 0; }
-        else if (sp.drive === "rwd") { Tr = Tmech + (sp.motorR ? T_motR_w : 0); Tf = sp.motorF ? T_motF_w : 0; }
-        else { Tf = Tmech * sp.splitFront + (sp.motorF ? T_motF_w : 0); Tr = Tmech * (1 - sp.splitFront) + (sp.motorR ? T_motR_w : 0); }
+        const T_motB_w = (sp.motorR ? T_motR_w : 0);   // motorB 轮端扭矩（motorR 字段承载）
+        if (sp.drive === "fwd") { Tf = Tmech + T_motB_w; Tr = 0; }
+        else if (sp.drive === "rwd") { Tr = Tmech + T_motB_w; Tf = 0; }
+        else { Tf = Tmech * sp.splitFront + (sp.motorF ? T_motF_w : 0); Tr = Tmech * (1 - sp.splitFront) + T_motB_w; }
         break;
       }
     }
@@ -590,9 +630,15 @@ const POWERTRAIN = {
       const maxChg = (bat.maxChargeKw !== undefined ? bat.maxChargeKw : Infinity) * 1000;
       P_net = Math.max(-maxChg, Math.min(maxDis, P_net));
     }
+    /* G31-P10-2：轮上机械功率 P_out（W，正=驱动 负=制动/回收）——P10-3 HUD 数据源。
+       含 tWheel 时按逐轮×各轮 ω（左右速差下轴级近似不守恒）；否则轴扭矩×轴均轮速。
+       机械侧功率：与电池电功率 P_net 不同源（中间隔电机/逆变器 0.95 与齿轮 eff）。 */
+    const P_out = tWheel
+      ? tWheel[0] * (wo.FL || 0) + tWheel[1] * (wo.FR || 0) + tWheel[2] * (wo.RL || 0) + tWheel[3] * (wo.RR || 0)
+      : Tf * wF + Tr * wR;
     this.integrateBattery(P_net, dt);
     return { tFront: Tf / 2, tRear: Tr / 2, tWheel, iceRpm, shiftRpm, gearIdx: st.gearIdx,
-             soc: st.soc, shifting, P_gen };
+             soc: st.soc, shifting, P_gen, P_out };
   },
 
   /* ═══ 段6 UI：动力工坊弹窗 + 内置预设 + localStorage 持久化 + 下拉集成 ═══

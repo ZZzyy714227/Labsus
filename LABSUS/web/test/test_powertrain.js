@@ -1315,18 +1315,19 @@ assert(Math.abs(c1se.tRear - SE_AXLE / 2) < 1e-6,
   `8.1 C1 series tRear = 400×9.0×0.97/2 = ${SE_AXLE / 2}（实得 ${c1se.tRear}；改前 200）`);
 assert(Math.abs(c1se.tFront) < 1e-9, "8.1 C1 series(rwd) 前轴无驱动扭矩");
 assert(c1se.P_gen > 0 && c1se.iceRpm > 0, "8.1 series P_gen>0 & iceRpm>0（增程器发电，不接轮）");
-// (c) THS 功率分流：MG2（motorB）路径同样补齿比——1 × 3.6 × 0.95
+// (c) THS 功率分流：G31-P10-2 驱动轴路由——motorB(motorR 字段) 与 ICE 同在驱动轴（fwd），
+//     tRear 归零、MG2 进前轴；MG1(motorF) 为发电角色不进轮（旧断言锁的是“MG2 出力到后轴”
+//     的路由缺陷，随 P10-2 物理修正翻转）。
 T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["THS 功率分流"]))); POWERTRAIN.state.thrSm = 1;');
 const THS_R = 1 * 3.6, THS_E = 0.95;
 const c1ths = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:${C1W},FR:${C1W},RL:${C1W},RR:${C1W}})`);
 const THS_MG2 = 207 * THS_R * THS_E;         // 707.94 N·m
-assert(Math.abs(c1ths.tRear - THS_MG2 / 2) < 1e-6,
-  `8.1 C1 powersplit MG2 tRear = 207×3.6×0.95/2 = ${THS_MG2 / 2}（实得 ${c1ths.tRear}；改前 103.5）`);
-const THS_MG1 = 150 * THS_R * THS_E;         // 513 N·m
+assert(Math.abs(c1ths.tRear) < 1e-9,
+  `8.1(c) THS fwd tRear = 0（P10-2 路由修正：改前 MG2 出力到后轴 ${THS_MG2 / 2}）`);
 const c1thsTice = T(`POWERTRAIN.iceTorque(${c1ths.iceRpm}, 1)`);
 const c1thsTmech = c1thsTice * 0.72 * THS_R * THS_E;
-assert(Math.abs(c1ths.tFront * 2 - (c1thsTmech + THS_MG1)) < 1e-6,
-  "8.1 C1 powersplit fwd 前轴 = Tmech(T_ice×0.72×ratio×eff) + MG1×ratio×eff");
+assert(Math.abs(c1ths.tFront * 2 - (c1thsTmech + THS_MG2)) < 1e-6,
+  "8.1(c) THS fwd 前轴×2 = (T_ice×0.72 + T_motB)×ratio×eff（机械路径与 motorB 统一进驱动轴；MG1 发电不进轮）");
 assert(c1ths.P_gen > 0, "8.1 powersplit P_gen>0（28% 分流发电）");
 // (d) 无回归：p3 电机在箱后 → rpm 源与扭矩都【不】乘 ratio（motGeared=1）
 T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["P3 混动前驱"]))); POWERTRAIN.state.thrSm = 1;');
@@ -1504,8 +1505,9 @@ assert(Math.abs(T("POWERTRAIN.reflectedInertiaPerDriveWheel()") - 0.15 * Math.po
 T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["EV 双电机 AWD-TV"])));');
 assert(T("POWERTRAIN.driveWheelCount()") === 4 && T("POWERTRAIN.isDriveWheel('FL')") === true && T("POWERTRAIN.isDriveWheel('RR')") === true,
   "8.4 I1 EV(tv) 四轮驱动");
-assert(T("POWERTRAIN.reflectedInertiaPerDriveWheel()") === 0,
-  "8.4 I1 EV 无曲轴 → 反射惯量 0（ev/series/powersplit 的电机惯量尚未计入，见报告顾虑）");
+const I84_EV = (0.05 + 0.05) * 9.73 * 9.73 / 4;   // 双电机求和按 nDrive=4 归一 = 0.05×9.73²/2 每轮
+assert(Math.abs(T("POWERTRAIN.reflectedInertiaPerDriveWheel()") - I84_EV) < 1e-9,
+  `8.4 I1 EV(tv) 双电机反射 = (I_F+I_R)×ratio²/nDrive = ${I84_EV}（P10-2 补上电机惯量，翻转旧“EV→0”待办锁）`);
 // p2：电机在曲轴链 → 计入；awd /4、rwd /2
 const i1p2 = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
 i1p2.architecture = "p2"; i1p2.drive = "awd_fixed"; i1p2.ice.inertia = 0.3;
@@ -1794,6 +1796,110 @@ T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
 assert(stSrc.indexOf("_pd.wheelLoads = this.telemetry.Fz") >= 0, "9.12 接线：_pd.wheelLoads = this.telemetry.Fz");
 assert(/一子步滞后/.test(stSrc), "9.12 接线：wheelLoads 一子步滞后注释");
 T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+
+/* ═══ 10. G31-P10-2：motor maxRpm 硬截止 / ev-series-powersplit 电机惯量反射 /
+   THS(powersplit) 驱动轴路由修正 / step() 返回 P_out ═══ */
+console.log("=== 10. G31-P10-2 motor rev-limit / ev inertia reflection / THS axle routing / P_out ===");
+
+// ── 10.1 motorTorque maxRpm 硬截止（ECU/逆变器超转保护：驱动与回收都归零；|rpm| 比较）──
+{
+  const m10 = { peakTorqueNm: 350, peakPowerKw: 250, maxRpm: 16000, regenMaxKw: 200, inertia: 0.05 };
+  const m10S = JSON.stringify(m10);
+  assert(T(`POWERTRAIN.motorTorque(${m10S}, 16001, 1, 0.9)`) === 0, "10.1 驱动 @16001>maxRpm → 0（硬截止）");
+  assert(T(`POWERTRAIN.motorTorque(${m10S}, -16001, 1, 0.9)`) === 0, "10.1 驱动 @−16001 → 0（|rpm| 比较）");
+  assert(T(`POWERTRAIN.motorTorque(${m10S}, 16001, -1, 0.9)`) === 0, "10.1 回收 @16001 → 0（超转不回收）");
+  assert(T(`POWERTRAIN.motorTorque(${m10S}, -16001, -1, 0.9)`) === 0, "10.1 回收 @−16001 → 0");
+  const t10ok = T(`POWERTRAIN.motorTorque(${m10S}, 15999, 1, 0.9)`);
+  assert(Math.abs(t10ok - 250000 / (15999 * Math.PI / 30)) < 1e-6,
+    `10.1 驱动 @15999 → 恒功率区正常 ${t10ok.toFixed(2)} N·m（未截止）`);
+  const t10rg = T(`POWERTRAIN.motorTorque(${m10S}, 15999, -1, 0.9)`);
+  assert(t10rg < 0, "10.1 回收 @15999 → 正常负扭矩（未截止）");
+  assert(T(`POWERTRAIN.motorTorque(${m10S}, 16000, 1, 0.9)`) > 0, "10.1 @16000 恰等于 maxRpm → 不截止（严格 > 比较）");
+  const m10no = { peakTorqueNm: 350, peakPowerKw: 250 };
+  assert(T(`POWERTRAIN.motorTorque(${JSON.stringify(m10no)}, 99999, 1, 0.9)`) > 0,
+    "10.1 maxRpm 缺失 → 不截止（向后兼容）");
+}
+
+// ── 10.2 ev/series/powersplit 电机惯量反射（按实际驱动电机求和 ×(ratio×final)²/nDrive）──
+{
+  // (a) EV 预设 tv：双电机各 0.05，ratio 9.73×1.0，nDrive=4 → 求和/4 = 0.05×9.73²/2（每轮）
+  //     守恒：接线层给 4 个驱动轮各加该值 → 总反射 = (I_F+I_R)×9.73²（两台电机全额）
+  T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["EV 双电机 AWD-TV"])));');
+  T("POWERTRAIN.state.gearIdx = 0;");
+  const i10ev = (0.05 + 0.05) * 9.73 * 9.73 / 4;
+  assert(Math.abs(T("POWERTRAIN.reflectedInertiaPerDriveWheel()") - i10ev) < 1e-9,
+    `10.2 EV(tv) 双电机反射 = (I_F+I_R)×9.73²/4 = ${i10ev}（每轮 = 0.05×9.73²/2）`);
+  // (b) ev fwd 双电机在场但只 motorF 出力 → 只计 motorF，nDrive=2
+  const e10f = JSON.parse(JSON.stringify(T("POWERTRAIN_PRESETS['EV 双电机 AWD-TV']")));
+  e10f.drive = "fwd";
+  T(`POWERTRAIN.setSpec(${JSON.stringify(e10f)});`);
+  T("POWERTRAIN.state.gearIdx = 0;");
+  assert(Math.abs(T("POWERTRAIN.reflectedInertiaPerDriveWheel()") - 0.05 * 9.73 * 9.73 / 2) < 1e-9,
+    "10.2 ev fwd 只计 motorF（motorR 不出力不计）→ 0.05×9.73²/2");
+  // (c) series（motorR only, rwd）→ 0.05×9²/2；ice 只发电不接轮 → 不计入
+  const s10 = JSON.parse(JSON.stringify(T("POWERTRAIN_PRESETS['串联增程后驱']")));
+  s10.motorR.inertia = 0.05;
+  T(`POWERTRAIN.setSpec(${JSON.stringify(s10)});`);
+  T("POWERTRAIN.state.gearIdx = 0;");
+  assert(Math.abs(T("POWERTRAIN.reflectedInertiaPerDriveWheel()") - 0.05 * 81 / 2) < 1e-9,
+    "10.2 series(rwd, motorR only) = 0.05×9²/2 = 2.025（ice 发电不接轮 → 不计入）");
+  // (d) powersplit(THS fwd)：motorB(motorR 字段) 与 ICE 同驱动轴 → 计 motorR；
+  //     MG1(motorF) 发电角色不进轮 → 不计；ice 经行星排机械路径 → 保留计入
+  T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["THS 功率分流"])));');
+  T("POWERTRAIN.state.gearIdx = 0;");
+  assert(Math.abs(T("POWERTRAIN.reflectedInertiaPerDriveWheel()") - (0.18 + 0.04) * 3.6 * 3.6 / 2) < 1e-9,
+    "10.2 THS(fwd) = (I_ice+I_motB)×3.6²/2（MG1 不计）");
+  // (e) 回归：GT3（ice）与 legacy 不变
+  T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["GT3 V8 RWD 6MT"])));');
+  assert(Math.abs(T("POWERTRAIN.reflectedInertiaPerDriveWheel()") - 0.35 * Math.pow(3.0 * 3.9, 2) / 2) < 1e-12,
+    "10.2 GT3(ice) 反射不变（回归）");
+  T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+  assert(T("POWERTRAIN.reflectedInertiaPerDriveWheel()") === 0, "10.2 legacy inertia=0 → 0（回归）");
+}
+
+// ── 10.3 powersplit fwd 驱动轴路由修正（motorB 与 ICE 同进驱动轴；p4 异轴不动）──
+{
+  T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["THS 功率分流"]))); POWERTRAIN.state.thrSm = 1;');
+  const o10t = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:${C1W},FR:${C1W},RL:${C1W},RR:${C1W}})`);
+  assert(Math.abs(o10t.tRear) < 1e-9, "10.3 THS fwd → tRear=0（改前 MG2 出力到后轴）");
+  const t10ice = T(`POWERTRAIN.iceTorque(${o10t.iceRpm}, 1)`);
+  const t10exp = (t10ice * 0.72 + 207) * 3.6 * 0.95 / 2;
+  assert(Math.abs(o10t.tFront - t10exp) < 1e-6,
+    `10.3 THS fwd tFront = (T_ice×0.72 + T_motB)×ratio×eff/2 = ${t10exp.toFixed(2)}（MG1 不进轮）`);
+  // p4 异轴独立语义不受影响（fwd：ICE→前轴 + motorF；motorR→后轴，电机轴直连不乘齿比）
+  const p10p4 = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+  p10p4.architecture = "p4"; p10p4.drive = "fwd";
+  p10p4.motorF = null;
+  p10p4.motorR = { peakTorqueNm: 200, peakPowerKw: 100, maxRpm: 10000, regenMaxKw: 80, inertia: 0.1 };
+  p10p4.battery = { capacityKwh: 10, soc0: 0.6, maxDischargeKw: 400, maxChargeKw: 150 };
+  assert(T(`POWERTRAIN.setSpec(${JSON.stringify(p10p4)})`).ok === true, "10.3 p4 spec valid");
+  const t10p4ice = T(`POWERTRAIN.iceTorque(${C1W * 30 / Math.PI}, 1)`);
+  const o10p4 = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:${C1W},FR:${C1W},RL:${C1W},RR:${C1W}})`);
+  assert(Math.abs(o10p4.tFront - t10p4ice / 2) < 1e-9 && Math.abs(o10p4.tRear - 100) < 1e-9,
+    "10.3 p4(fwd) ICE→前轴/motorR→后轴（异轴独立，不受 P10-2 路由修正影响）");
+}
+
+// ── 10.4 step() 返回 P_out（轮上机械功率 W，正=驱动 负=制动/回收）──
+{
+  // (a) EV tv（tWheel 逐轮，四轮等速 C1W）：P_out = ΣtWheel×ω = (T_motF_w+T_motR_w)×C1W
+  T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["EV 双电机 AWD-TV"])));');
+  const o10e = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:${C1W},FR:${C1W},RL:${C1W},RR:${C1W}})`);
+  assert(Math.abs(o10e.P_out - 2 * EV_AXLE * C1W) < 1e-6,
+    `10.4 EV P_out = 2×${EV_AXLE.toFixed(3)}×${C1W} = ${(2 * EV_AXLE * C1W).toFixed(1)} W（逐轮×ω 解析）`);
+  // (b) series rwd（tWheel=null 对称）：P_out = Tf×wF + Tr×wR = SE_AXLE×C1W
+  T('POWERTRAIN.setSpec(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS["串联增程后驱"]))); POWERTRAIN.state.thrSm = 1;');
+  const o10s = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:${C1W},FR:${C1W},RL:${C1W},RR:${C1W}})`);
+  assert(Math.abs(o10s.P_out - SE_AXLE * C1W) < 1e-6,
+    `10.4 series P_out = 轴功率 Tr×wR = ${(SE_AXLE * C1W).toFixed(1)} W`);
+  // (c) 制动回收 → P_out < 0
+  const o10r = T(`POWERTRAIN.step(0.004, {throttle:0, brake:0.5}, {FL:${C1W},FR:${C1W},RL:${C1W},RR:${C1W}})`);
+  assert(o10r.P_out < 0, `10.4 EV 制动回收 P_out = ${o10r.P_out.toFixed(1)} W < 0（负=回馈）`);
+  // (d) legacy 锚：Tf=240/Tr=960 @w=30 → P_out = 1200×30 = 36000
+  T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec()); POWERTRAIN.resetState();");
+  const o10a = T("POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:30,FR:30,RL:30,RR:30})");
+  assert(Math.abs(o10a.P_out - 36000) < 1e-9, "10.4 legacy P_out = (240+960)×30 = 36000（逐位）");
+  T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+}
 
 console.log(`\n[cumulative] ${passed}/${total} passed`);
 
