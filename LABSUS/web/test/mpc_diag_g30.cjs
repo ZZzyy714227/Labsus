@@ -93,6 +93,14 @@ for (let step = 0; step < 240 * 900; step++) {
   }
   const telNow = eng.telemetry;
   aggRec(p.cornerId, lapNo + 1, telNow, { u: s.u, throttle: ctrl.throttle, brake: ctrl.brake });
+  // 触发式打印：任一轮 |α|>15° 时记录上下文
+  {
+    let aMax = 0;
+    for (const w of ['FL', 'FR', 'RL', 'RR']) aMax = Math.max(aMax, Math.abs(telNow.alpha[w] || 0));
+    if (aMax * R2D > 15 && step % 30 === 0) {
+      console.log(`A t=${t.toFixed(1)} s=${(p.s||0).toFixed(0)} cid=${p.cornerId} L${lapNo+1} u=${s.u.toFixed(1)} v=${(s.v||0).toFixed(2)} r=${((s.r||0)*R2D).toFixed(1)} st=${ctrl.steer.toFixed(1)} brk=${ctrl.brake.toFixed(2)} thr=${ctrl.throttle.toFixed(2)} a=${(aMax*R2D).toFixed(1)} lat=${(((s.X-p.refX)*p.refNx+(s.Y-p.refY)*p.refNy)).toFixed(2)} sRef=${(pilot._s||0).toFixed(0)}`);
+    }
+  }
   // 绋犲瘑鏃跺簭锛歁PC 璋冭瘯鐢紝鍓?25s 姣?0.5s 璁板綍
   if (t <= 45 && step % 60 === 0) {
     const aCG = S.wb * 0.46 / 1000;
