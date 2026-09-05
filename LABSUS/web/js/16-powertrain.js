@@ -27,17 +27,24 @@ const POWERTRAIN = {
   },
   validate(sp) {
     const errs = [];
-    if (!sp || typeof sp !== "object") return { ok: false, errors: ["spec"] };
+    if (!sp || typeof sp !== "object") return { ok: false, errors: ["spec(null or not object)"] };
     if (!["ice","ev","p2","p3","p4","series","powersplit"].includes(sp.architecture)) errs.push("architecture");
     if (!["fwd","rwd","awd_fixed","awd_center","tv"].includes(sp.drive)) errs.push("drive");
     if (!(sp.splitFront >= 0 && sp.splitFront <= 1)) errs.push("splitFront");
     if (sp.ice) {
       if (!Array.isArray(sp.ice.map) || sp.ice.map.length < 2 ||
           sp.ice.map.some(p => !Array.isArray(p) || p.length !== 2 || !(p[0] > 0) || !(p[1] >= 0))) errs.push("ice.map");
+      /* I-1：map 转速点必须严格单调递增，否则插值分母可为零或负 */
+      if (Array.isArray(sp.ice.map) && sp.ice.map.some((p, i) => i > 0 && !(p[0] > sp.ice.map[i - 1][0]))) errs.push("ice.map(ascending)");
       if (!(sp.ice.idleRpm > 0) || !(sp.ice.redlineRpm > sp.ice.idleRpm)) errs.push("ice.rpm");
+      /* M-2：断油转速必须 ≥ 红线，否则物理上不可达 */
+      if (sp.ice.fuelCutRpm !== undefined && !(sp.ice.fuelCutRpm >= sp.ice.redlineRpm)) errs.push("ice.fuelCutRpm");
     }
     if (sp.architecture !== "ev" && !sp.ice) errs.push("ice(required for non-ev)");
+    if (sp.architecture === "ev" && sp.ice) errs.push("ice(forbidden for ev)");
     if (sp.architecture === "ev" && !sp.motorF && !sp.motorR) errs.push("motor(required for ev)");
+    /* M-3：混动架构必须至少一台电机 */
+    if (["p2","p3","p4","series","powersplit"].includes(sp.architecture) && !sp.motorF && !sp.motorR) errs.push("motor(required for hybrid)");
     if (sp.gearbox) {
       if (!Array.isArray(sp.gearbox.ratios) || sp.gearbox.ratios.length < 1 ||
           sp.gearbox.ratios.some(r => !(r > 0))) errs.push("gearbox.ratios");
@@ -47,7 +54,10 @@ const POWERTRAIN = {
     for (const k of ["motorF", "motorR"]) if (sp[k]) {
       if (!(sp[k].peakTorqueNm > 0) || !(sp[k].peakPowerKw > 0) || !(sp[k].maxRpm > 0)) errs.push(k);
     }
-    if (sp.battery && !(sp.battery.capacityKwh > 0)) errs.push("battery.capacityKwh");
+    if (sp.battery) {
+      if (!(sp.battery.capacityKwh > 0)) errs.push("battery.capacityKwh");
+      if (sp.battery.soc0 !== undefined && !(sp.battery.soc0 >= 0 && sp.battery.soc0 <= 1)) errs.push("battery.soc0");
+    }
     return { ok: errs.length === 0, errors: errs };
   },
   setSpec(sp) {
@@ -60,7 +70,9 @@ const POWERTRAIN = {
   resetState() {
     const sp = this.spec || this.defaultSpec();
     this.state = {
-      iceOmega: (sp.ice ? sp.ice.idleRpm : 800) * Math.PI / 30,
+      /* M-1：EV 无曲轴，iceOmega 置 0（非 EV 无 ice 时同样置 0，不伪造怠速）；
+         下游组合器（段5）不得对该值做除法或扭矩计算 */
+      iceOmega: (sp.architecture !== "ev" && sp.ice) ? sp.ice.idleRpm * Math.PI / 30 : 0,
       gearIdx: 0, shiftT: 0, shiftDir: 0,
       soc: sp.battery ? (sp.battery.soc0 !== undefined ? sp.battery.soc0 : 0.8) : 1,
       thrSm: 0
