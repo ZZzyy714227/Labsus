@@ -310,6 +310,25 @@ assert(T("POWERTRAIN.hasRealDrivetrain()") === true, "I-1 hasRealDrivetrain: rat
 T("POWERTRAIN.spec = null;");
 assert(T("POWERTRAIN.hasRealDrivetrain()") === false, "I-1 hasRealDrivetrain: spec=null → false");
 T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+// M-1(G31-P6-fix)：hasLiveRpmSource 判据——封装 (architecture==="ev" || hasRealDrivetrain())，
+//   声浪（13-engine-sound.js）与 HUD（11-stages.js）共用；EV 直驱无需真实齿轮比即可信 rpm 源。
+assert(T("POWERTRAIN.hasLiveRpmSource()") === false, "M-1 hasLiveRpmSource: legacy ice 恒等箱 → false");
+const hlsEvSpec = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+hlsEvSpec.architecture = "ev"; hlsEvSpec.drive = "rwd"; hlsEvSpec.ice = null;
+hlsEvSpec.motorR = { peakTorqueNm: 200, peakPowerKw: 100, maxRpm: 12000 };
+hlsEvSpec.battery = { capacityKwh: 20 };
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(hlsEvSpec)})`).ok === true, "M-1 ev+恒等箱 spec valid");
+assert(T("POWERTRAIN.hasRealDrivetrain()") === false, "M-1 ev+恒等箱: hasRealDrivetrain()===false（齿轮比仍是 legacy 恒等）");
+assert(T("POWERTRAIN.hasLiveRpmSource()") === true, "M-1 ev+恒等箱: hasLiveRpmSource()===true（架构感知，EV 直驱不依赖真实齿轮比）");
+const hlsIceRealSpec = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+hlsIceRealSpec.gearbox.ratios = [3, 2, 1]; hlsIceRealSpec.gearbox.finalDrive = 3.9;
+T(`POWERTRAIN.setSpec(${JSON.stringify(hlsIceRealSpec)});`);
+assert(T("POWERTRAIN.hasLiveRpmSource()") === true, "M-1 ice+真实齿轮比: hasLiveRpmSource()===true");
+T("POWERTRAIN.spec = null;");
+assert(T("POWERTRAIN.hasLiveRpmSource()") === false, "M-1 spec=null → hasLiveRpmSource()===false");
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec()); POWERTRAIN.state = null;");
+assert(T("POWERTRAIN.hasLiveRpmSource()") === false, "M-1 state=null → hasLiveRpmSource()===false");
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");   // 还原（resetState 重建 state）
 // autoShift：rpm 超 autoUpFrac×redline → 升挡请求
 // 夹具修正：manual 不自动换挡是正确语义，故本段用 type="auto" 的 spec
 const agSpec = JSON.parse(JSON.stringify(gbSpec)); agSpec.gearbox.type = "auto";
@@ -774,6 +793,62 @@ const mg58PnetClamped = Math.max(-mg58MaxChg, Math.min(mg58MaxDis, mg58Pnet));
 const mg58DeltaSoc = mg58PnetClamped * mg58dt / (10 * 3.6e6);
 assert(Math.abs((mg58soc0 - mg58out.soc) - mg58DeltaSoc) < 1e-9, `5.8-mag p2 charge ΔSOC analytical (actual=${(mg58soc0-mg58out.soc).toExponential(6)}, expect=${mg58DeltaSoc.toExponential(6)})`);
 assert(mg58DeltaSoc < 0, "5.8-mag ΔSOC negative → soc increases (charging)");
+
+console.log("=== 5c. G31-P6-fix I-3: dm.tcsRear 能量通道（仅缩放 P_mot 后电机贡献） ===");
+// ── I-3(G31-P6-fix)：dm.tcsRear（默认 1）仅用于 P_mot 中后电机贡献的缩放
+//    （T_motR × tcsRear 进 P_mot），不影响轮扭矩输出（Tf/Tr/tWheel）。
+//    机械通道（轮循环内 tcsScale 切扭矩）与能量通道（tcsRear 切 P_mot/SOC）分离。
+const trSpec = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+trSpec.architecture = "ev"; trSpec.drive = "rwd"; trSpec.ice = null; trSpec.motorF = null;
+trSpec.motorR = { peakTorqueNm: 400, peakPowerKw: 200, maxRpm: 12000, regenMaxKw: 150, inertia: 0.1 };
+trSpec.battery = { capacityKwh: 60, soc0: 0.8 };
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(trSpec)})`).ok === true, "I-3 tcsRear ev+rwd spec valid");
+const trWo = "{FL:50,FR:50,RL:50,RR:50}";
+T("POWERTRAIN.resetState();");
+const trOutDef = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0}, ${trWo})`);          // 缺省（无 tcsRear 字段）
+T("POWERTRAIN.resetState();");
+const trOut1 = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0, tcsRear:1}, ${trWo})`);   // tcsRear=1
+T("POWERTRAIN.resetState();");
+const trOut05 = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0, tcsRear:0.5}, ${trWo})`); // tcsRear=0.5
+// 机械通道不受影响：轮扭矩输出逐位一致
+assert(trOutDef.tRear === trOut1.tRear && trOutDef.tRear === trOut05.tRear,
+  "I-3 tcsRear 不影响 tRear（机械通道独立，轮扭矩输出不受能量通道缩放影响）");
+assert(trOutDef.tFront === trOut1.tFront && trOutDef.tFront === trOut05.tFront,
+  "I-3 tcsRear 不影响 tFront");
+// 缺省 dm.tcsRear 等价 tcsRear=1（向后兼容）
+assert(trOutDef.soc === trOut1.soc, "I-3 缺省 dm.tcsRear（未传）等价 tcsRear=1");
+// 能量通道：tcsRear=0.5 → 后电机 P_mot 贡献减半 → SOC 消耗减半（rwd 无 motorF，全部来自 motorR）
+const trDSoc1 = trSpec.battery.soc0 - trOut1.soc;
+const trDSoc05 = trSpec.battery.soc0 - trOut05.soc;
+assert(trDSoc05 > 0 && trDSoc05 < trDSoc1, "I-3 tcsRear=0.5 → SOC 消耗减少但不为零（能量通道生效）");
+assert(Math.abs(trDSoc05 / trDSoc1 - 0.5) < 1e-6,
+  `I-3 tcsRear=0.5 → ΔSOC 比值≈0.5（实际 ${(trDSoc05 / trDSoc1).toFixed(8)}，仅后电机贡献缩放，机械输出不变）`);
+// NaN/越界 tcsRear 守卫：NaN → 缺省 1；>1 → 钳位 1；<0 → 钳位 0
+T("POWERTRAIN.resetState();");
+const trOutNaN = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0, tcsRear:NaN}, ${trWo})`);
+assert(trOutNaN.soc === trOut1.soc && trOutNaN.tRear === trOut1.tRear, "I-3 tcsRear=NaN → 回退缺省 1");
+T("POWERTRAIN.resetState();");
+const trOutHi = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0, tcsRear:5}, ${trWo})`);
+assert(trOutHi.soc === trOut1.soc, "I-3 tcsRear=5 → 钳位到 1");
+T("POWERTRAIN.resetState();");
+const trOutLo = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0, tcsRear:-3}, ${trWo})`);
+assert(trOutLo.soc === trSpec.battery.soc0, "I-3 tcsRear=-3 → 钳位到 0，后电机 P_mot 贡献为 0（rwd 无 motorF → SOC 不变）");
+assert(trOutLo.tRear === trOut1.tRear, "I-3 tcsRear=0 仍不影响轮扭矩输出（机械通道独立）");
+// 双电机（awd）：仅后电机贡献缩放，前电机不受影响 → ΔSOC 比值应为 0.75（前后电机规格/轮速对称）
+const trAwSpec = JSON.parse(JSON.stringify(trSpec));
+trAwSpec.drive = "awd_fixed"; trAwSpec.splitFront = 0.5;
+trAwSpec.motorF = { peakTorqueNm: 400, peakPowerKw: 200, maxRpm: 12000, regenMaxKw: 150, inertia: 0.1 };
+assert(T(`POWERTRAIN.setSpec(${JSON.stringify(trAwSpec)})`).ok === true, "I-3 tcsRear ev+awd spec valid");
+T("POWERTRAIN.resetState();");
+const trAwOut1 = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0, tcsRear:1}, ${trWo})`);
+T("POWERTRAIN.resetState();");
+const trAwOut05 = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0, tcsRear:0.5}, ${trWo})`);
+assert(trAwOut1.tFront === trAwOut05.tFront && trAwOut1.tRear === trAwOut05.tRear,
+  "I-3 awd: tcsRear 不影响前后轴扭矩输出");
+const trAwDSoc1 = trAwSpec.battery.soc0 - trAwOut1.soc;
+const trAwDSoc05 = trAwSpec.battery.soc0 - trAwOut05.soc;
+assert(Math.abs(trAwDSoc05 / trAwDSoc1 - 0.75) < 1e-6,
+  `I-3 awd: tcsRear=0.5 → ΔSOC 比值≈0.75（实际 ${(trAwDSoc05 / trAwDSoc1).toFixed(8)}；前电机贡献不变，仅后电机减半）`);
 
 T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
 

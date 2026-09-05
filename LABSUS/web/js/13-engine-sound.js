@@ -75,13 +75,16 @@ class EngineAudioModel {
     const brk = Math.max(0, Math.min(1, sig.brake || 0));
     const wheelOmega = Math.max(0, sig.wheelOmega || 0);
 
-    /* G31-P6 I-1：真实动力链 rpm 优先——仅当 POWERTRAIN 携带真实传动比
-       （hasRealDrivetrain()===true）时才信任 iceOmega 作为 rpm 源；
-       legacy 恒等箱（ratios[1]=1,finalDrive=1）下 iceOmega=轮速，会塌到怠速，
-       故回退旧 wheel-omega×齿轮比估算（对拍锚）。
-       EV 分支用驱动轮 omega（直驱电机 rpm ≈ 轮 rpm）。 */
-    const ptRpm = (typeof POWERTRAIN !== "undefined" && POWERTRAIN.spec && POWERTRAIN.state && POWERTRAIN.hasRealDrivetrain())
-      ? ((POWERTRAIN.spec.architecture === "ev" && POWERTRAIN.spec.motorR)
+    /* M-1(G31-P6-fix)：rpm 源判据改架构感知——POWERTRAIN.hasLiveRpmSource()
+       （spec && state && (architecture==="ev" || hasRealDrivetrain())）为真时才信任动力链 rpm 源，
+       与 11-stages.js HUD（renderCircuitTelemetry）共用同一判据，避免两处各写一份、语义漂移。
+       EV：直驱电机 rpm ≈ 驱动轮 rpm，用 sig.wheelOmega×30/π（不查 motorR 是否存在——
+         wheelOmega 已由调用方 EngineSound.update() 按 architecture/drive 选好前/后驱动轮）；
+       非 EV + 真实传动比：用 state.iceOmega×30/π；
+       legacy 恒等箱 + 非 EV：hasLiveRpmSource()=false → ptRpm=null → 回退旧
+         wheel-omega×齿轮比估算（对拍锚，避免塌到怠速）。 */
+    const ptRpm = (typeof POWERTRAIN !== "undefined" && POWERTRAIN.hasLiveRpmSource && POWERTRAIN.hasLiveRpmSource())
+      ? ((POWERTRAIN.spec.architecture === "ev")
           ? wheelOmega * 30.0 / Math.PI
           : POWERTRAIN.state.iceOmega * 30.0 / Math.PI)
       : null;
@@ -397,8 +400,17 @@ const EngineSound = {
       ? Math.max(Math.abs(tel.kappa.FL || 0), Math.abs(tel.kappa.FR || 0),
                  Math.abs(tel.kappa.RL || 0), Math.abs(tel.kappa.RR || 0)) : 0;
     const isKerb = !!(tel && tel.isKerb && (tel.isKerb.FL || tel.isKerb.FR || tel.isKerb.RL || tel.isKerb.RR));
-    /* 后驱动轮（RWD）omega 均值 → 挡位/RPM 链 */
-    const wheelOmega = st && st.omega ? ((st.omega.RL || 0) + (st.omega.RR || 0)) / 2 : 0;
+    /* M-1(G31-P6-fix)：驱动轮 omega 均值 → 挡位/RPM 链。架构感知：EV+FWD 用前轮均值
+       （直驱前电机），其余（legacy/RWD/AWD 及 EV+RWD/AWD/TV）沿用后轮均值。
+       非 EV 架构下该值仅用于回退估算（ptRpm=null 分支），语义不变。 */
+    let wheelOmega = 0;
+    if (st && st.omega) {
+      const isEvFwd = (typeof POWERTRAIN !== "undefined" && POWERTRAIN.spec &&
+        POWERTRAIN.spec.architecture === "ev" && POWERTRAIN.spec.drive === "fwd");
+      wheelOmega = isEvFwd
+        ? ((st.omega.FL || 0) + (st.omega.FR || 0)) / 2
+        : ((st.omega.RL || 0) + (st.omega.RR || 0)) / 2;
+    }
     const p = this.model.update(dt, {
       wheelOmega, throttle: (ctrl && ctrl.throttle) || 0, brake: (ctrl && ctrl.brake) || 0,
       kappaMax: kappa, isKerb

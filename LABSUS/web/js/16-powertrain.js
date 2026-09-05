@@ -148,6 +148,15 @@ const POWERTRAIN = {
     const g = this.spec && this.spec.gearbox;
     return !!(g && !(g.ratios.length === 1 && g.ratios[0] === 1 && g.finalDrive === 1));
   },
+  /* M-1(G31-P6-fix)：封装 rpm 源判据——architecture==="ev"（直驱，无曲轴/iceOmega
+     不可用，rpm 源必须落到驱动轮速）或 hasRealDrivetrain()（存在真实齿轮比，
+     iceOmega 可信）二者任一为真时，state.iceOmega/驱动轮速才作为 HUD/声浪 rpm 源。
+     13-engine-sound.js（声浪）与 11-stages.js（HUD renderCircuitTelemetry）共用此判据，
+     避免两处各写一份、语义漂移。legacy 恒等箱 + 非 EV → false（回退轮速×齿比估算，保对拍锚）。 */
+  hasLiveRpmSource() {
+    return !!(this.spec && this.state &&
+      (this.spec.architecture === "ev" || this.hasRealDrivetrain()));
+  },
   /* ═══ 段3 传动链：gearbox 换挡状态机 + 反射惯量 ═══
      反射到轮端的旋转惯量（kg·m²/轮）：(I_ice + I_motCoupled)×(ratio×final)²/nDrive。
      I-2(G31-P6)：nDrive 按驱动轮数归一——awd/tv=4 轮、fwd/rwd=2 轮。
@@ -226,20 +235,27 @@ const POWERTRAIN = {
   },
   /* ═══ 段5 组合器 + step 主循环 ═══
      step(dt, demand, wheelOmega)：每子步调用一次（在 15-DOF 轮循环之前）。
-       demand     = { throttle, brake, shiftCmd?, tvBias? }
+       demand     = { throttle, brake, shiftCmd?, tvBias?, tcsRear? }
        wheelOmega = { FL, FR, RL, RR }（rad/s）
      返回 { tFront, tRear, tWheel|null, iceRpm, gearIdx, soc, shifting, P_gen }
        tFront/tRear = 单轮驱动扭矩（轴扭矩 / 2，与 legacy 常数 480/120 同量纲，未乘 drivePowerFactor）
        tWheel       = 仅 drive==='tv' 时逐轮 [FL,FR,RL,RR]，否则 null
        P_gen        = ICE 发电功率（W，仅 series/powersplit > 0）
      tWheel 为逐轮扭矩（不再 /2）；tFront/tRear 为轴扭矩/2——接线层勿对 tWheel 再除 2。
-     七架构功率流见各 case 注释。TCS 不在本层（接线层按轮滑移切 throttle）。 */
+     七架构功率流见各 case 注释。TCS 机械通道不在本层（接线层按轮滑移切轮扭矩）。
+     I-3(G31-P6-fix)：dm.tcsRear（默认 1）为 TCS 能量通道——仅缩放 P_mot 中后电机
+       贡献（T_motR×tcsRear 进 P_mot，用于 SOC/油耗积分的能量近似守恒），不影响
+       tFront/tRear/tWheel 轮扭矩输出（机械通道由接线层轮循环内 tcsScale 单独切）。 */
   step(dt, demand, wheelOmega) {
     const sp = this.spec || this.defaultSpec();
     if (!this.state) this.resetState();
     const st = this.state;
     const g = sp.gearbox || { ratios: [1], finalDrive: 1, eff: 1, type: "manual" };
     const dm = demand || {}, wo = wheelOmega || {};
+    /* I-3(G31-P6-fix)：TCS 能量通道——dm.tcsRear（默认 1，钳位 [0,1]，NaN/非数值回退 1）
+       仅用于下方 P_mot 中后电机贡献的缩放，不进入任何扭矩输出路径。 */
+    const tcsRear = (typeof dm.tcsRear === "number" && Number.isFinite(dm.tcsRear))
+      ? Math.max(0, Math.min(1, dm.tcsRear)) : 1;
     /* 轴平均轮速（rad/s） */
     const wF = 0.5 * ((wo.FL || 0) + (wo.FR || 0));
     const wR = 0.5 * ((wo.RL || 0) + (wo.RR || 0));
@@ -279,7 +295,7 @@ const POWERTRAIN = {
       const scale = pLim / pMotRaw;
       T_motF *= scale; T_motR *= scale;
     }
-    const P_mot = (T_motF * wMotF + T_motR * wMotR) / 0.95;
+    const P_mot = (T_motF * wMotF + T_motR * tcsRear * wMotR) / 0.95;
     /* series/powersplit：ICE 转速不跟轮速，按增程/功率分流控制律。
        iceOmega = max(idle, min(redline, idle + (P_demand/P_rated)×(redline−idle)))，P_demand = 电机消耗功率估计。 */
     if ((sp.architecture === "series" || sp.architecture === "powersplit") && sp.ice) {
