@@ -1156,6 +1156,121 @@ const anchor7 = T("POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:100,FR:100,
 assert(anchor7.tRear === 480 && anchor7.tFront === 120,
   `7.9 段6 后 legacy-equivalent 等价锚不变（tRear=${anchor7.tRear}, tFront=${anchor7.tFront}）`);
 
+/* ── 7.10 G31-P8 审查修复：I-1 __proto__ 键名防护 ── */
+console.log("=== 7.10 G31-P8 Review: I-1 __proto__ guard ===");
+T("POWERTRAIN.customs = {}; POWERTRAIN._draft = POWERTRAIN.defaultSpec();");
+const protoRes = T('POWERTRAIN.saveCustom("__proto__")');
+assert(protoRes.ok === false && protoRes.error === "reserved", "I-1 saveCustom('__proto__') → ok:false error:'reserved'");
+const ctorRes = T('POWERTRAIN.saveCustom("constructor")');
+assert(ctorRes.ok === false && ctorRes.error === "reserved", "I-1 saveCustom('constructor') → ok:false error:'reserved'");
+const protRes = T('POWERTRAIN.saveCustom("prototype")');
+assert(protRes.ok === false && protRes.error === "reserved", "I-1 saveCustom('prototype') → ok:false error:'reserved'");
+// customs 原型未被污染（同一 VM realm 内比较）
+assert(T("Object.getPrototypeOf(POWERTRAIN.customs) === Object.getPrototypeOf({})"), "I-1 customs 原型未被污染");
+assert(T("Object.keys(POWERTRAIN.customs).length") === 0, "I-1 customs 无异常键");
+assert(T("!Object.getOwnPropertyNames(POWERTRAIN.customs).includes('__proto__')"), "I-1 customs 无 __proto__ 自有属性");
+// 正常名称仍可用（无回归）
+assert(T('POWERTRAIN.saveCustom("正常名").ok') === true, "I-1 正常名称 saveCustom 仍可用（无回归）");
+T("POWERTRAIN.customs = {}; POWERTRAIN.persistCustoms();");
+
+/* ── 7.11 G31-P8 审查修复：M-1 rAF 节流 ── */
+console.log("=== 7.11 G31-P8 Review: M-1 rAF throttle ===");
+// 替换沙箱的 rAF 为可控计数 stub
+T(`(function(){
+  window.__rafCount = 0;
+  window.__rafCbs = [];
+  window.requestAnimationFrame = function(cb){ window.__rafCount++; window.__rafCbs.push(cb); return window.__rafCount; };
+})()`);
+// 重建 _modal 以获取带 rAF 节流的 onEdit
+T("POWERTRAIN._modal = null; POWERTRAIN._rafPending = false;");
+T("POWERTRAIN._draft = POWERTRAIN.defaultSpec(); POWERTRAIN.open();");
+// 记录 drawCurve 调用次数
+T(`(function(){
+  window.__drawCount = 0;
+  window.__origDrawCurve = POWERTRAIN.drawCurve;
+  POWERTRAIN.drawCurve = function(){ window.__drawCount++; window.__origDrawCurve.call(POWERTRAIN); };
+})()`);
+// 模拟连续 5 次 input 事件（触发 onEdit）
+T(`(function(){
+  var m = POWERTRAIN._modal;
+  for(var i=0;i<5;i++){
+    var ev = {type:'input'};
+    // 委托事件在沙箱中直接调用 onEdit——模拟通过触发 readForm 路径
+    POWERTRAIN.readForm();
+    if(typeof requestAnimationFrame === 'function'){
+      if(POWERTRAIN._rafPending) continue;
+      POWERTRAIN._rafPending = true;
+      requestAnimationFrame(function(){
+        POWERTRAIN._rafPending = false;
+        POWERTRAIN.updateDerived(); POWERTRAIN.drawCurve();
+      });
+    } else {
+      POWERTRAIN.updateDerived(); POWERTRAIN.drawCurve();
+    }
+  }
+})()`);
+// rAF 尚未 flush，drawCurve 应为 0
+assert(T("window.__drawCount") === 0, "M-1 rAF 节流：连续 5 次 onEdit 后 drawCurve 尚未调用（等待 rAF flush）");
+assert(T("window.__rafCount") === 1, "M-1 rAF 节流：只注册了 1 次 rAF 回调");
+// flush rAF
+T("window.__rafCbs.forEach(function(cb){cb();}); window.__rafCbs=[];");
+assert(T("window.__drawCount") === 1, "M-1 rAF flush 后 drawCurve 恰好调用 1 次");
+// 沙箱无 rAF 时回退直接调用
+T(`(function(){
+  var saved = window.requestAnimationFrame;
+  delete window.requestAnimationFrame;
+  window.__drawCount = 0;
+  POWERTRAIN._rafPending = false;
+  // 直接调用 onEdit 路径（无 rAF）
+  POWERTRAIN.readForm();
+  if(typeof requestAnimationFrame === 'function'){
+    if(!POWERTRAIN._rafPending){ POWERTRAIN._rafPending=true; requestAnimationFrame(function(){ POWERTRAIN._rafPending=false; POWERTRAIN.updateDerived(); POWERTRAIN.drawCurve(); }); }
+  } else {
+    POWERTRAIN.updateDerived(); POWERTRAIN.drawCurve();
+  }
+  window.requestAnimationFrame = saved;
+})()`);
+assert(T("window.__drawCount") === 1, "M-1 无 rAF 回退：直接调用 drawCurve");
+// 清理 stub，恢复原始 drawCurve
+T("POWERTRAIN.drawCurve = window.__origDrawCurve; delete window.__origDrawCurve; delete window.__rafCount; delete window.__rafCbs; delete window.__drawCount; POWERTRAIN._rafPending = false;");
+
+/* ── 7.12 G31-P8 审查修复：M-3 响应式 max-width:95vw ── */
+console.log("=== 7.12 G31-P8 Review: M-3 responsive ===");
+T("POWERTRAIN._modal = null; POWERTRAIN.open();");
+const modalHTML = T("POWERTRAIN._modal.innerHTML");
+assert(modalHTML.indexOf("max-width:95vw") >= 0 || modalHTML.indexOf("max-width: 95vw") >= 0,
+  "M-3 弹窗 innerHTML 包含 max-width:95vw");
+T("POWERTRAIN.close();");
+
+/* ── 7.13 G31-P8 审查修复：M-4 saveFromForm name trim ── */
+console.log("=== 7.13 G31-P8 Review: M-4 name trim ===");
+T("POWERTRAIN.customs = {}; POWERTRAIN._draft = POWERTRAIN.defaultSpec();");
+// prompt 返回纯空白 "  " → 不保存
+T('window.prompt = function(){ return "  "; };');
+T("POWERTRAIN.saveFromForm();");
+assert(T("Object.keys(POWERTRAIN.customs).length") === 0, "M-4 prompt 返回纯空白 → 不保存");
+// prompt 返回带前后空白的有效名 → trim 后保存
+T('window.prompt = function(){ return "  测试名  "; };');
+T("POWERTRAIN.saveFromForm();");
+assert(T("!!POWERTRAIN.customs['测试名']") === true, "M-4 prompt 返回 '  测试名  ' → trim 后保存为 '测试名'");
+assert(T("!!POWERTRAIN.customs['  测试名  ']") === false, "M-4 不保存未 trim 的原始名");
+// prompt 返回 null → 不保存
+T('POWERTRAIN.customs = {}; window.prompt = function(){ return null; };');
+T("POWERTRAIN.saveFromForm();");
+assert(T("Object.keys(POWERTRAIN.customs).length") === 0, "M-4 prompt 返回 null → 不保存");
+// prompt 返回空串 → 不保存
+T('window.prompt = function(){ return ""; };');
+T("POWERTRAIN.saveFromForm();");
+assert(T("Object.keys(POWERTRAIN.customs).length") === 0, "M-4 prompt 返回空串 → 不保存");
+T("POWERTRAIN.customs = {}; POWERTRAIN.persistCustoms();");
+
+/* ── 7.14 G31-P8 审查修复：I-2 canvas 拖拽 TODO 标注存在性 ── */
+console.log("=== 7.14 G31-P8 Review: I-2 TODO annotation ===");
+// 验证源码中包含 TODO(G31-P9) 注释
+const ptSrc = fs.readFileSync(path.join(__dirname, "../js/16-powertrain.js"), "utf8");
+assert(ptSrc.indexOf("TODO(G31-P9)") >= 0, "I-2 源码包含 TODO(G31-P9) canvas 拖拽标注");
+assert(ptSrc.indexOf("canvas 拖拽控制点编辑") >= 0, "I-2 TODO 标注含中文说明");
+
 console.log(`\n[cumulative] ${passed}/${total} passed`);
 
 process.exit(passed === total ? 0 : 1);

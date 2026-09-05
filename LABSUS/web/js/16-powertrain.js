@@ -397,7 +397,7 @@ const POWERTRAIN = {
      编辑监听用委托式绑在 modal 根：栏位 innerHTML 重建后监听仍在、且不会重复注册。 */
   MAX_CUSTOMS: 20,
   LS_KEY: "labsus-powertrain-customs",
-  _modal: null, _draft: null,
+  _modal: null, _draft: null, _rafPending: false,
   /* map textarea 校验错误（null = 无错）。readMap 只记录、updateDerived 只渲染——
      单一写者，避免 ⚠ 提示被随后的概要覆盖（M-8）。 */
   _mapErr: null,
@@ -575,8 +575,9 @@ const POWERTRAIN = {
   buildModal() {
     const m = document.createElement("div");
     m.id = "powertrainModal";
+    /* M-3：响应式——窄屏不溢出 */
     m.style.cssText = "position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);";
-    m.innerHTML = `<div style="width:880px;max-height:90vh;overflow:auto;background:#0d1117;border:1px solid #30363d;border-radius:12px;padding:16px;color:#e6edf3;">
+    m.innerHTML = `<div style="width:880px;max-width:95vw;max-height:90vh;overflow:auto;background:#0d1117;border:1px solid #30363d;border-radius:12px;padding:16px;color:#e6edf3;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;">
         <b style="font:700 15px var(--font-ui);">🔧 动力工坊 POWERTRAIN LAB</b>
         <span style="flex:1;font:10px var(--font-ui);color:#8b949e;">架构 · 动力源 · 传动链 · 实时扭矩/功率曲线预览</span>
@@ -606,13 +607,24 @@ const POWERTRAIN = {
       q("ptSave").onclick = () => this.saveFromForm();
       q("ptRestore").onclick = () => this.restoreBuiltin();
     } catch (e) { console.warn("POWERTRAIN modal bind failed:", e); }
-    /* 实时预览：任何 input/change → readForm →（架构变了才重建栏位）→ 派生量 + 曲线重绘 */
+    /* 实时预览：任何 input/change → readForm →（架构变了才重建栏位）→ 派生量 + 曲线重绘
+       M-1：rAF 节流——连续快速 onEdit 只触发一次 updateDerived+drawCurve；
+       沙箱无 requestAnimationFrame 时回退直接调用（typeof 守卫）。 */
     try {
       const onEdit = () => {
         const before = this._draft ? this._draft.architecture : null;
         this.readForm();
         if (this._draft && this._draft.architecture !== before) { this.renderForm(); return; }
-        this.updateDerived(); this.drawCurve();
+        if (typeof requestAnimationFrame === "function") {
+          if (this._rafPending) return;
+          this._rafPending = true;
+          requestAnimationFrame(() => {
+            this._rafPending = false;
+            this.updateDerived(); this.drawCurve();
+          });
+        } else {
+          this.updateDerived(); this.drawCurve();
+        }
       };
       m.addEventListener("input", onEdit);
       m.addEventListener("change", onEdit);
@@ -892,6 +904,7 @@ const POWERTRAIN = {
      对 _draft 求值（非 this.spec）→ 未应用即可预览。mapLookup/motorTorque 均为纯函数，
      不需临时改 spec。只用 moveTo/lineTo/stroke/fillText/setLineDash——headless ctx 桩的
      arc()/rect() 是空实现，控制点标记用十字而不依赖 arc。 */
+  /* TODO(G31-P9): canvas 拖拽控制点编辑（当前为 textarea JSON + 只读预览，spec §6 拖拽项有意推迟） */
   drawCurve() {
     const cv = this._el("ptCurve");
     if (!cv || typeof cv.getContext !== "function") return;
@@ -1057,7 +1070,8 @@ const POWERTRAIN = {
   },
   saveFromForm() {
     this.readForm();
-    const name = (typeof prompt === "function" && prompt("预设名称：", "我的动力")) || null;
+    const rawName = (typeof prompt === "function" && prompt("预设名称：", "我的动力")) || null;
+    const name = rawName ? rawName.trim() || null : null;
     if (!name) return;
     const r = this.saveCustom(name);
     if (!r.ok) {
@@ -1138,6 +1152,7 @@ const POWERTRAIN = {
     } catch (e) { this.customs = {}; }
   },
   saveCustom(name) {
+    if (name === "__proto__" || name === "constructor" || name === "prototype") return { ok: false, error: "reserved" };
     if (!name) return { ok: false, error: "noname" };
     const sp = this._draft || this.spec;
     const v = this.validate(sp);
