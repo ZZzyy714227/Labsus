@@ -893,6 +893,21 @@ const POWERTRAIN = {
       q("ptApply").onclick = () => this.applyFromForm();
       q("ptSave").onclick = () => this.saveFromForm();
       q("ptRestore").onclick = () => this.restoreBuiltin();
+      /* G31-P9：canvas 拖拽控制点——mousedown 命中、mousemove 拖动、mouseup 结束回写。
+         坐标归一：优先 offsetX/offsetY，缺失用 getBoundingClientRect 差值（沙箱 stub 不触发）。 */
+      const cv = q("ptCurve");
+      if (cv && typeof cv.addEventListener === "function") {
+        const pos = (e) => {
+          if (typeof e.offsetX === "number" && typeof e.offsetY === "number") return [e.offsetX, e.offsetY];
+          const r = (typeof cv.getBoundingClientRect === "function") ? cv.getBoundingClientRect() : { left: 0, top: 0 };
+          return [e.clientX - r.left, e.clientY - r.top];
+        };
+        cv.addEventListener("mousedown", (e) => { const [px, py] = pos(e); this._curveDragStart(px, py); });
+        cv.addEventListener("mousemove", (e) => { if (!(this._dragIdx >= 0)) return; const [px, py] = pos(e); this._curveDragMove(px, py); });
+        const up = () => { if (this._dragIdx >= 0) this._curveDragEnd(); };
+        cv.addEventListener("mouseup", up);
+        cv.addEventListener("mouseleave", up);
+      }
     } catch (e) { console.warn("POWERTRAIN modal bind failed:", e); }
     /* 实时预览：任何 input/change → readForm →（架构变了才重建栏位）→ 派生量 + 曲线重绘
        M-1：rAF 节流——连续快速 onEdit 只触发一次 updateDerived+drawCurve；
@@ -1213,7 +1228,8 @@ const POWERTRAIN = {
      对 _draft 求值（非 this.spec）→ 未应用即可预览。mapLookup/motorTorque 均为纯函数，
      不需临时改 spec。只用 moveTo/lineTo/stroke/fillText/setLineDash——headless ctx 桩的
      arc()/rect() 是空实现，控制点标记用十字而不依赖 arc。 */
-  /* TODO(G31-P9): canvas 拖拽控制点编辑（当前为 textarea JSON + 只读预览，spec §6 拖拽项有意推迟） */
+  /* G31-P9：canvas 拖拽控制点编辑已实现（本注释保留锚位；textarea JSON 仍是
+     map 的持久真源，拖拽结束时同步回写） */
   drawCurve() {
     const cv = this._el("ptCurve");
     if (!cv || typeof cv.getContext !== "function") return;
@@ -1305,7 +1321,7 @@ const POWERTRAIN = {
     if (mR) plot("tr", "#7ee787", 1.5, false);
     plot("tot", "#e6edf3", 2, false);
     plot("pw", "#d29922", 1.5, true);
-    /* ICE 控制点十字标记（用户录入的折线节点） */
+    /* G31-P9：ICE 控制点十字标记（用户录入的折线节点）；拖拽命中半径 10px */
     if (ice && Array.isArray(ice.map)) {
       ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1;
       for (const p of ice.map) {
@@ -1317,6 +1333,8 @@ const POWERTRAIN = {
         ctx.stroke();
       }
     }
+    /* G31-P9：保存本次绘制的坐标变换，供拖拽命中/反解使用（与绘制同一套比例） */
+    this._cs = { L, Rr, Tt, Bb, rpmMax, tMax, map: ice && Array.isArray(ice.map) ? ice.map : null };
     /* 图例 */
     const legend = [];
     if (ice) legend.push(["ICE", "#f0883e"]);
@@ -1335,7 +1353,52 @@ const POWERTRAIN = {
     ctx.lineWidth = 1;
   },
 
-  /* ── 挡位增删 ── */
+  /* ── G31-P9：canvas 拖拽控制点编辑（spec §6 拖拽项落地，替代原 TODO） ──
+     命中/拖拽/结束三方法拆开，便于沙箱直接调测（真实浏览器由 buildModal 的
+     canvas 事件绑定驱动，坐标经 getBoundingClientRect 归一）。约束：
+     - 扭矩自由拖（≥0）；rpm 受邻居严格递增约束（lo<rpm<hi），不破坏 map 单调
+     - 结束时同步 textarea JSON（readMap 的单一数据源仍为 _draft）
+     - 无 ICE map（EV）时三方法均 no-op */
+  _curveHit(px, py) {
+    const cs = this._cs;
+    if (!cs || !cs.map) return -1;
+    let best = -1, bestD = 100;
+    for (let i = 0; i < cs.map.length; i++) {
+      const x = cs.L + (cs.Rr - cs.L) * (cs.map[i][0] / cs.rpmMax);
+      const y = cs.Bb - (cs.Bb - cs.Tt) * (Math.max(0, cs.map[i][1]) / cs.tMax);
+      const d = (x - px) * (x - px) + (y - py) * (y - py);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+  },
+  _curveDragStart(px, py) {
+    const i = this._curveHit(px, py);
+    this._dragIdx = (i >= 0) ? i : -1;
+    return this._dragIdx;
+  },
+  _curveDragMove(px, py) {
+    const cs = this._cs, i = this._dragIdx;
+    if (!cs || !cs.map || !(i >= 0) || i >= cs.map.length) return null;
+    const map = cs.map;
+    const lo = (i > 0) ? map[i - 1][0] + 1 : 0;
+    const hi = (i < map.length - 1) ? map[i + 1][0] - 1 : Math.max(cs.rpmMax, map[i][0] + 1);
+    let rpm = cs.rpmMax * (px - cs.L) / Math.max(1e-6, cs.Rr - cs.L);
+    rpm = Math.max(lo, Math.min(hi, rpm));
+    let tq = cs.tMax * (cs.Bb - py) / Math.max(1e-6, cs.Bb - cs.Tt);
+    tq = Math.max(0, tq);
+    map[i][0] = Math.round(rpm); map[i][1] = Math.round(tq);
+    this.updateDerived(); this.drawCurve();
+    return { rpm: map[i][0], tq: map[i][1] };
+  },
+  _curveDragEnd() {
+    /* 浏览器验收抓到的 bug：实际 textarea id 是 pt_ice_map（原误写 ptIceMap →
+       ta 恒 null、回写静默跳过）。两个 id 都尝试写入，容错未来重命名。 */
+    const ta = this._el("pt_ice_map") || this._el("ptIceMap");
+    if (ta && this._draft && this._draft.ice && Array.isArray(this._draft.ice.map)) {
+      try { ta.value = JSON.stringify(this._draft.ice.map); } catch (e) { /* 沙箱 value 只读时静默 */ }
+    }
+    this._dragIdx = -1;
+  },
   changeRatioCount(delta) {
     this.readForm();
     const d = this._draft;
