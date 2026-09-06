@@ -10,7 +10,7 @@ STRUT_OUT / RCK_AX_A / RCK_AX_B / STRUT_IN / RCK_DMP / DMP_BODY），
 from __future__ import annotations
 
 import math
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ── 前端 DWB 硬点键（同 HP_META） ────────────────────────────────────
 DWB_KEYS = frozenset({
@@ -408,7 +408,11 @@ class PowertrainParams(BaseModel):
 #     缺省，数值逐位一致）。
 
 class IceSpec(BaseModel):
-    """内燃机：扭矩 map [[rpm, N·m], ...] + 转速/惯量。"""
+    """内燃机：扭矩 map [[rpm, N·m], ...] + 转速/惯量。
+
+    G31-P10-4：前端会下发 fricA/fricB/fricC/throttleTau（JS 侧摩擦/泵气模型），
+    Python 瞬态不消费——显式 extra=ignore 吸收，防全局 strict 化后 422。"""
+    model_config = ConfigDict(extra="ignore")
     cyl: int = 8
     layout: str = "V8"
     dispL: float = 4.0
@@ -452,7 +456,10 @@ class MotorSpec(BaseModel):
 
 
 class GearboxSpec(BaseModel):
-    """变速箱：挡位比列表 + 主减速 + 换挡时间 + 效率。"""
+    """变速箱：挡位比列表 + 主减速 + 换挡时间 + 效率。
+
+    G31-P10-4：autoUpFrac/autoDownFrac（JS 自动换挡策略）Python 不消费，extra=ignore。"""
+    model_config = ConfigDict(extra="ignore")
     type: str = "manual"
     ratios: list[float] = Field(default_factory=lambda: [1.0])
     finalDrive: float = 1.0
@@ -474,7 +481,10 @@ class PowertrainSpec(PowertrainParams):
     继承 PowertrainParams（T_max/P_kw/drive_split_f/brake_split_f）保持向后兼容；
     新增 architecture/drive/ice/motor/gearbox/battery 描述真实动力链。transient
     仅在 `ice is not None` 时用 map×传动比推导等效轮上扭矩覆盖 T_max（见 run_track_sim）。
+    G31-P10-4：diff/centerDiff/slipRefRadS 等 JS 差速器字段 Python 不消费，
+    extra=ignore 吸收（payload 同键共存不 422）。
     """
+    model_config = ConfigDict(extra="ignore")
     architecture: str = "ice"       # ice | ev | hybrid
     drive: str = "awd_fixed"        # fwd | rwd | awd_fixed | ...
     splitFront: float = 0.2         # 前轴扭矩分配（awd 用；与 drive_split_f 语义分离）

@@ -1792,6 +1792,31 @@ T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
     "9.13 前轴 tAxle=0（非通过扭矩轴）→ 强制 open，无 ±X 自消力偶");
   // 能量守恒角：转移仅发生在有通过扭矩的轴上，和恒等轴扭矩已由 9.9 锁定
 }
+// ── 9.14 G31-P10-4：isLegacyEquivalent 判据 + 09-track payload 注入源扫描 ──
+{
+  T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+  assert(T("POWERTRAIN.isLegacyEquivalent()") === true, "9.14 legacy 默认 → isLegacyEquivalent true");
+  // 改任一物理字段 → false
+  const s = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+  s.gearbox.ratios = [3, 2, 1]; s.gearbox.finalDrive = 3.9;
+  assert(T(`POWERTRAIN.setSpec(${JSON.stringify(s)})`).ok && T("POWERTRAIN.isLegacyEquivalent()") === false,
+    "9.14 真实齿比 → false");
+  const s2 = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+  s2.ice.map = [[800, 1100], [9000, 1100]];   // 平直但非 1200
+  assert(T(`POWERTRAIN.setSpec(${JSON.stringify(s2)})`).ok && T("POWERTRAIN.isLegacyEquivalent()") === false,
+    "9.14 map 非平直(非 1200) → false");
+  const s3 = JSON.parse(JSON.stringify(T("POWERTRAIN.defaultSpec()")));
+  s3.ice.fricA = 5;
+  assert(T(`POWERTRAIN.setSpec(${JSON.stringify(s3)})`).ok && T("POWERTRAIN.isLegacyEquivalent()") === false,
+    "9.14 fricA≠0 → false");
+  assert(T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec()); POWERTRAIN.isLegacyEquivalent()") === true,
+    "9.14 恢复默认 → true");
+  // 09-track.js 注入源扫描（沙箱不加载 09-track，沿用 7.14/9.12 先例）
+  const trSrc = fs.readFileSync(path.join(__dirname, "..", "js", "09-track.js"), "utf8");
+  assert(trSrc.indexOf("isLegacyEquivalent") >= 0, "9.14 09-track：isLegacyEquivalent 门控存在");
+  assert(trSrc.indexOf("body.powertrain.ice=ptSpec.ice") >= 0, "9.14 09-track：嵌套 ice 字段下发");
+  assert(/仅当生效 spec 与 legacy-equivalent/.test(trSrc), "9.14 09-track：缺省不发注释声明");
+}
 // ── 9.12 11-stages 接线源扫描：_pd.wheelLoads 传入 + 一子步滞后声明 ──
 assert(stSrc.indexOf("_pd.wheelLoads = this.telemetry.Fz") >= 0, "9.12 接线：_pd.wheelLoads = this.telemetry.Fz");
 assert(/一子步滞后/.test(stSrc), "9.12 接线：wheelLoads 一子步滞后注释");
