@@ -44,25 +44,27 @@ from src.api.v3models import (  # noqa: E402
 )
 from src.solver.transient import run_track_sim  # noqa: E402
 from src.solver.tire_fit import fit_tire_params  # noqa: E402
+from src.core.json_util import wash_json as _wash_json  # noqa: E402
 
 ENGINE_VERSION = "0.3.0"          # 引擎（S1 内核 + S2 服务层）
 API_VERSION = "v3"
 
 
-def _wash_json(obj):
-    """F-25（2026-08-30）：响应出口统一洗刷非有限浮点 → None。
-
-    FastAPI 默认 allow_nan=True 会把 NaN/Infinity 原样写进响应体，
-    前端 JSON.parse 直接抛 SyntaxError。所有端点返回前过一遍。
-    """
-    import math as _math
-    if isinstance(obj, float):
-        return obj if _math.isfinite(obj) else None
-    if isinstance(obj, dict):
-        return {k: _wash_json(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        return [_wash_json(v) for v in obj]
-    return obj
+def _handle_api_error(exc: Exception, context: str) -> None:
+    """F-46 脱敏与错误分流：区分 422 客户端输入/数值发散 vs 500 服务器内部未处理崩溃。"""
+    if isinstance(exc, HTTPException):
+        raise exc
+    import traceback as _tb
+    _tb.print_exc()
+    if isinstance(exc, (ValueError, KeyError)):
+        raise HTTPException(
+            status_code=422,
+            detail=f"{context} input error ({type(exc).__name__})",
+        ) from exc
+    raise HTTPException(
+        status_code=500,
+        detail=f"internal server error ({type(exc).__name__})",
+    ) from exc
 
 app = FastAPI(
     title="LABSUS Engine /api/v3",
@@ -102,15 +104,8 @@ def version() -> dict:
 def solve_pose_api(req: PoseRequest) -> dict:
     try:
         return _wash_json(v3service.run_pose(req).model_dump())
-    except ValidationError:
-        raise
     except Exception as exc:  # noqa: BLE001
-        # F-46（2026-08-30）：detail 脱敏 —— 不再把原始异常串回给客户端
-        # （本地工具可接受，但异常可能含内部路径/参数栈，收紧为通用文案
-        # + 模块名；详细信息进服务器日志）。
-        import traceback as _tb
-        _tb.print_exc()
-        raise HTTPException(status_code=422, detail=f"solver error ({type(exc).__name__})") from exc
+        _handle_api_error(exc, "solver")
 
 
 @app.post("/api/v3/kandc/{case}")
@@ -126,10 +121,7 @@ def kandc(case: str, req: KandcRequest) -> dict:
     try:
         return _wash_json(runner(req).model_dump())
     except Exception as exc:  # noqa: BLE001
-        import traceback as _tb
-        _tb.print_exc()   # F-46：detail 脱敏（完整异常进日志）
-        raise HTTPException(status_code=422,
-                            detail=f"K&C solver error ({type(exc).__name__})") from exc
+        _handle_api_error(exc, "K&C solver")
 
 
 @app.post("/api/v3/chassis/solve")
@@ -138,10 +130,7 @@ def chassis_solve(req: ChassisRequest) -> dict:
     try:
         return _wash_json(chassis_service.solve_chassis(req).model_dump())
     except Exception as exc:  # noqa: BLE001
-        import traceback as _tb
-        _tb.print_exc()   # F-46：detail 脱敏（完整异常进日志）
-        raise HTTPException(status_code=422,
-                            detail=f"chassis solve error ({type(exc).__name__})") from exc
+        _handle_api_error(exc, "chassis solve")
 
 
 @app.post("/api/v3/chassis/kandc/{case}")
@@ -156,10 +145,7 @@ def chassis_kandc(case: str, req: ChassisRequest) -> dict:
     try:
         return _wash_json(runner(req).model_dump())
     except Exception as exc:  # noqa: BLE001
-        import traceback as _tb
-        _tb.print_exc()   # F-46：detail 脱敏（完整异常进日志）
-        raise HTTPException(status_code=422,
-                            detail=f"chassis K&C error ({type(exc).__name__})") from exc
+        _handle_api_error(exc, "chassis K&C")
 
 
 @app.post("/api/v3/chassis/simulate_track")
@@ -168,10 +154,7 @@ def simulate_track(req: TrackSimRequest) -> dict:
     try:
         return _wash_json(run_track_sim(req))
     except Exception as exc:  # noqa: BLE001
-        import traceback as _tb
-        _tb.print_exc()   # F-46：detail 脱敏（完整异常进日志）
-        raise HTTPException(status_code=422,
-                            detail=f"transient sim error ({type(exc).__name__})") from exc
+        _handle_api_error(exc, "transient sim")
 
 
 @app.post("/api/v3/tire/fit", response_model=TireFitResponse)
@@ -186,10 +169,7 @@ def tire_fit(req: TireFitRequest) -> TireFitResponse:
         r = fit_tire_params([c.model_dump() for c in req.curves],
                             fit_ls=req.fit_ls)
     except Exception as exc:  # noqa: BLE001
-        import traceback as _tb
-        _tb.print_exc()   # F-46 同款脱敏纪律
-        raise HTTPException(status_code=422,
-                            detail=f"tire fit error ({type(exc).__name__})") from exc
+        _handle_api_error(exc, "tire fit")
     from src.api.v3models import TireParams
     params = TireParams(**{**r["params"], "Sh": 0.0, "Sv": 0.0,
                            "Cg": 0.5, "Ls": 0.35}) if r["params"] else None

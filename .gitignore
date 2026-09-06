@@ -46,6 +46,10 @@ docx_output.txt
 CLAUDE.md
 .worklog.md
 **/.worklog.md
+.agents/
+**/.agents/
+.qoder/
+**/.qoder/
 
 # OS
 .DS_Store

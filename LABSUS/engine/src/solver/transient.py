@@ -27,6 +27,7 @@ import numpy as np
 from src.api.chassis import axle_rc_sweep, quasi_loads
 from src.api.v3models import (QuasiInputs, TrackSimRequest, TireParams, VehicleSpec)
 from src.tire_mf import MagicFormulaSub, load_tir_params
+from src.core.json_util import wash_json as _wash_json
 
 R2D = 180.0 / math.pi
 D2R = math.pi / 180.0
@@ -390,21 +391,6 @@ class DriverPI:
         throttle = float(np.clip(self.kp_v * e + self.ki_v * self.e_int, 0.0, 1.0))
         brake = float(np.clip(-self.kp_v * e - 0.15, 0.0, 1.0)) if e < -0.5 else 0.0
         return delta, throttle, brake, idx
-
-
-def _wash_json(obj):
-    """F-25（2026-08-30）：递归把非有限浮点洗成 None，保证响应 JSON 严格合法。
-
-    FastAPI 默认 json.dumps(allow_nan=True) 会输出 NaN/Infinity 字面量，
-    前端 JSON.parse 直接抛 SyntaxError——发散仿真的错误路径本身不能炸。
-    """
-    if isinstance(obj, float):
-        return obj if math.isfinite(obj) else None
-    if isinstance(obj, dict):
-        return {k: _wash_json(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        return [_wash_json(v) for v in obj]
-    return obj
 
 
 def run_track_sim(req: TrackSimRequest) -> dict:

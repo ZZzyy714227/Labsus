@@ -17,9 +17,9 @@ const TPHYS = (function(){
     return interp(l.travel,l[key],travel,fb);
   }
   function mfSetup(p){
-    const B=(p.By!==undefined?p.By:9), C=(p.Cy!==undefined?p.Cy:1.2),
-          E=(p.Ey!==undefined?p.Ey:-0.5), D0=p.Fy0||8000,
-          LS=(p.LS!==undefined?p.LS:0.0), FzN=p.FzNom||3500,
+    const B=(p.By!==undefined?p.By:20), C=(p.Cy!==undefined?p.Cy:1.2),
+          E=(p.Ey!==undefined?p.Ey:-0.5), D0=p.Fy0||5250,
+          LS=(p.LS!==undefined?p.LS:0.10), FzN=p.FzNom||3500,
           Sh=p.Sh||0, Sv=p.Sv||0;
     return function fy(aRad,fz){
       if(fz<=0)return 0;
@@ -81,8 +81,8 @@ const TPHYS = (function(){
   function Veh(body,ctx){
     const v=body.vehicle, t=body.tire||{}, pt=body.powertrain||{}, ae=body.aero||{};
     this.v=v; this.pt=pt; this.ae=ae;
-    this.mu=(t.Fy0||8000)/(t.FzNom||3500);
-    this.Cg=(t.Cg!==undefined?t.Cg:0.5);
+    this.mu=(t.Fy0||5250)/(t.FzNom||3500);
+    this.Cg=(t.Cg!==undefined?t.Cg:6.0);
     this.Ls=(t.Ls!==undefined?t.Ls:0.35);
     this.fy=mfSetup(t);
     this.L=v.wheelbase_mm/1000;
@@ -345,7 +345,7 @@ const TPHYS = (function(){
    → POST /api/v3/chassis/simulate_track (或内置 TPHYS 闭包) → trace 时序 → 回放（俯视轨迹 + 3D 侧倾联动
    + 遥测 HUD）。回放时 simulate() 被 trackStep 接管（roll 来自引擎准静态内核）。 */
 const TRK={
-  res:null, req:null, mu:8000/3500,
+  res:null, req:null, mu:5250/3500,
   playing:false, i:0, speed:1.0, active:false, ready:false,
   preset:"skidpad", custom:null
 };
@@ -394,11 +394,45 @@ function trackPayload(){
      null 防御同款兜底）——此前直接 .value 抛 TypeError 使整条赛道链路死亡。 */
   const ctlVal=(id,dflt)=>{const e=document.getElementById(id);
     if(!e)return dflt;const v=parseFloat(e.value);return Number.isFinite(v)?v:dflt;};
-  return {vehicle:base.vehicle,
+  const body={vehicle:base.vehicle,
     kc_luts:{front:lut(SIM.swF),rear:lut(SIM.swR)},
     track:pts, dt:0.01, sim_time:25.0,
     lookahead_gain:ctlVal("trkLook",0.9),
-    start_speed:ctlVal("trkV0",6.0), _closed:closed};
+    start_speed:ctlVal("trkV0",6.0), _closed:closed,
+    powertrain:{T_max:ctlVal("ssTq",250),
+      P_kw:ctlVal("ssPw",80),
+      brake_split_f:ctlVal("ssBrk",60)/100},
+    aero:{k_down_f:ctlVal("ssAkf",0.55),
+      k_down_r:ctlVal("ssAkr",0.45),
+      k_drag:ctlVal("ssAkd",0.35)},
+    tire:{Fy0:ctlVal("ssFy0",5250),
+      FzNom:ctlVal("ssFzN",3500),
+      Ls:ctlVal("ssLs",0.35),
+      Cg:ctlVal("ssCg",6.0),
+      LS:0.10, By:20, Cy:1.2, Ey:-0.5}};
+  /* G31-P10-4：动力工坊定制规格下发——仅当生效 spec 与 legacy-equivalent
+     物理不等价时才叠加嵌套字段（PowertrainSpec 继承 PowertrainParams，
+     标量键共存；缺省不发 → payload 与旧行为逐字节一致，对拍锚不变）。
+     前端专有字段（fricA/fricB/fricC/throttleTau/slipRefRadS/diff/centerDiff）
+     由 Python 端 PowertrainSpec extra=ignore 吸收。 */
+  if(typeof POWERTRAIN!=="undefined" && POWERTRAIN.spec && !POWERTRAIN.isLegacyEquivalent()){
+    const ptSpec=JSON.parse(JSON.stringify(POWERTRAIN.spec));
+    body.powertrain.architecture=ptSpec.architecture;
+    body.powertrain.drive=ptSpec.drive;
+    body.powertrain.splitFront=ptSpec.splitFront;
+    if(ptSpec.ice)body.powertrain.ice=ptSpec.ice;
+    if(ptSpec.motorF)body.powertrain.motorF=ptSpec.motorF;
+    if(ptSpec.motorR)body.powertrain.motorR=ptSpec.motorR;
+    if(ptSpec.gearbox)body.powertrain.gearbox=ptSpec.gearbox;
+    if(ptSpec.battery)body.powertrain.battery=ptSpec.battery;
+  }
+  /* G29 轮胎工坊自定义参数注入（base.tire 来自 chassisPayload 的 SIM.userTire） */
+  if(base.tire) Object.assign(body.tire, base.tire);
+  /* 轮胎实测标定优先（讲义 EP08 数据链）：辨识成功后覆写参数 */
+  if(typeof SIM!=="undefined" && SIM.tireCalib){const tc=SIM.tireCalib;
+    Object.assign(body.tire,{Fy0:tc.Fy0,FzNom:tc.FzNom,LS:tc.LS,By:tc.By,Cy:tc.Cy});
+    if(isFinite(SIM.tireCalibEy))body.tire.Ey=SIM.tireCalibEy;}
+  return body;
 }
 async function trackRun(){
   const btn=document.getElementById("trkRun");if(btn)btn.textContent="仿真中…";
@@ -630,10 +664,10 @@ function _stageBuild(){
         '</div>'+
         '<div class="ss-t">轮胎 TIRE (MF)</div>'+
         '<div class="telg">'+
-          '<label>Fy0 N</label><input id="ssFy0" type="number" value="8000" step="500" min="2000" max="20000">'+
+          '<label>Fy0 N</label><input id="ssFy0" type="number" value="5250" step="500" min="2000" max="20000">'+
           '<label>FzNom N</label><input id="ssFzN" type="number" value="3500" step="100" min="1000" max="8000">'+
           '<label>松弛长度 m</label><input id="ssLs" type="number" value="0.35" step="0.05" min="0.05" max="1">'+
-          '<label>外倾系数 /rad</label><input id="ssCg" type="number" value="0.5" step="0.1" min="0" max="2">'+
+          '<label>外倾系数 /rad</label><input id="ssCg" type="number" value="6.0" step="0.5" min="0" max="12">'+
         '</div>'+
         '<button class="st-btn go" id="ssGo">开始赛道仿真</button>'+
         '<label style="margin-left:14px;color:#cbd5e1;cursor:pointer"><input type="checkbox" id="ssUseEng"> 使用引擎 (/api/v3)</label>'+
@@ -723,10 +757,10 @@ function trackStageRun(){
     aero:{k_down_f:parseFloat(document.getElementById("ssAkf").value)||0.55,
       k_down_r:parseFloat(document.getElementById("ssAkr").value)||0.45,
       k_drag:parseFloat(document.getElementById("ssAkd").value)||0.35},
-    tire:{Fy0:parseFloat(document.getElementById("ssFy0").value)||8000,
+    tire:{Fy0:parseFloat(document.getElementById("ssFy0").value)||5250,
       FzNom:parseFloat(document.getElementById("ssFzN").value)||3500,
-      Ls:parseFloat(document.getElementById("ssLs").value)||0.35,
-      Cg:parseFloat(document.getElementById("ssCg").value)||0.5}};
+      Ls:parseFloat(document.getElementById("ssLs").value)||0.35, LS:0.10,
+      Cg:parseFloat(document.getElementById("ssCg").value)||6.0}};
   /* G31-P10-4：动力工坊定制规格下发——仅当生效 spec 与 legacy-equivalent
      物理不等价时才叠加嵌套字段（PowertrainSpec 继承 PowertrainParams，
      标量键共存；缺省不发 → payload 与旧行为逐字节一致，对拍锚不变）。
@@ -761,11 +795,12 @@ function trackStageRun(){
       (res.builtin?"[内置JS] ":"")+sm.path_length_m+"m - v_max "+sm.v_max+"m/s - max "+sm.max_ay_g+"g - "+(res.ms|0)+"ms"+(res.finished?" (完赛)":"");
   };
   if(useEng){
+    const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),120000);
     fetch(ENG.url+"/api/v3/chassis/simulate_track",
-      {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
-    .then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
+      {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:ctl.signal})
+    .then(r=>{clearTimeout(to);if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
     .then(res=>{finishStage(res);})
-    .catch(err=>{document.getElementById("ssStatus").textContent="仿真失败："+err.message;});
+    .catch(err=>{clearTimeout(to);document.getElementById("ssStatus").textContent="仿真失败："+err.message;});
   }else{
     setTimeout(function(){
       const res=TPHYS.run(body, TPHYS.makeSimContext(body));
@@ -913,7 +948,7 @@ function drawStageTelemetry(row){
   set("telMuMax",(maxMu*100).toFixed(0)+"%");
   const fc=["FL","FR","RL","RR"];
   const gr=document.getElementById("fcGrid").querySelectorAll(".fc-c");
-  const mu=8000/3500;
+  const mu=5250/3500;
   fc.forEach((wk,idx)=>{
     const cv=gr[idx];if(!cv)return;const ctx=cv.getContext("2d");
     const w=cv.width,h=cv.height,cx=w/2,cy=h/2,R=Math.min(w,h)/2-8;

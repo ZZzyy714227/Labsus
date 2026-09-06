@@ -30,3 +30,6 @@ scratch/
 .tempmediaStorage/
 .system_generated/
 .workbuddy/
+.agents/
+.qoder/
+web/test/*.js.json

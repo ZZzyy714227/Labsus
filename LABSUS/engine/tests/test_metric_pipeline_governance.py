@@ -15,9 +15,6 @@
    angles.py —— 若二者意外相等则说明坐标系合并发生，需要重新审视）；
 2. v3 管线黄金值保持（与 test_mirror_symmetry 交叉承担）。
 """
-import sys
-sys.path.insert(0, "src")
-
 import numpy as np
 
 from src.solver.mechanism.models import build_mechanism

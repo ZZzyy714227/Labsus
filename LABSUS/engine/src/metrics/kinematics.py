@@ -15,6 +15,14 @@ import math
 import numpy as np
 
 from core.metrics import MetricResult, not_applicable, ok, solver_failed
+try:
+    from src.metrics.kandc import slope_at_travel
+except ImportError:
+    from metrics.kandc import slope_at_travel
+try:
+    from src.geometry import line_intersect_2d
+except ImportError:
+    from geometry import line_intersect_2d
 
 R2D = 180.0 / math.pi
 D2R = math.pi / 180.0
@@ -22,37 +30,7 @@ D2R = math.pi / 180.0
 
 # ---------------------------------------------------------------- helpers
 
-def _line_intersect_2d(p1, d1, p2, d2):
-    """2D 直线交点：p1 + s*d1 与 p2 + t*d2。返回 (x, y) 或 None（平行/退化）。"""
-    denom = d1[0] * d2[1] - d1[1] * d2[0]
-    if abs(denom) < 1e-12:
-        return None
-    t = np.asarray(p2, dtype=float) - np.asarray(p1, dtype=float)
-    s = (t[0] * d2[1] - t[1] * d2[0]) / denom
-    return np.asarray(p1, dtype=float) + s * np.asarray(d1, dtype=float)
-
-
-def _slope_at(curve, x, index=0):
-    """在 index 处的一阶导数 dy/dx：取两侧最近有效点作中央差分。
-
-    返回 (slope, i0, i1) 或 None。curve 中 None 视为无效点。
-    """
-    valid = [(i, float(v)) for i, v in enumerate(curve) if v is not None]
-    if len(valid) < 2:
-        return None
-    below = [p for p in valid if p[0] < index]
-    above = [p for p in valid if p[0] > index]
-    lo = below[-1] if below else valid[0]
-    hi = above[0] if above else valid[-1]
-    if lo[0] == hi[0]:
-        # index 落在唯一有效点：退化为前两点
-        if valid[0][0] == valid[-1][0]:
-            return None
-        lo, hi = valid[0], valid[1]
-    dx = x[hi[0]] - x[lo[0]]
-    if abs(dx) < 1e-12:
-        return None
-    return (hi[1] - lo[1]) / dx, lo[0], hi[0]
+_line_intersect_2d = line_intersect_2d
 
 
 # ---------------------------------------------------------------- per-wheel
@@ -81,7 +59,6 @@ def bump_steer_deg_per_25(toe_curve, travel_curve, at_travel: float) -> MetricRe
     F-12（2026-08-30）：数值内核委托 metrics/kandc.slope_at_travel（最近邻
     中央差分单一实现），不再维护第二份 _slope_at 差分逻辑。
     """
-    from src.metrics.kandc import slope_at_travel
     slope = slope_at_travel(toe_curve, travel_curve, at_travel)
     if slope is None:
         return solver_failed("bump_steer", "deg/25mm", "扫掠曲线不足以计算导数")
@@ -89,7 +66,6 @@ def bump_steer_deg_per_25(toe_curve, travel_curve, at_travel: float) -> MetricRe
 
 
 def camber_gain_deg_per_25(camber_curve, travel_curve, at_travel: float) -> MetricResult:
-    from src.metrics.kandc import slope_at_travel
     slope = slope_at_travel(camber_curve, travel_curve, at_travel)
     if slope is None:
         return solver_failed("camber_gain", "deg/25mm", "扫掠曲线不足以计算导数")
@@ -256,10 +232,9 @@ def motion_ratio(damper_travel_curve, travel_curve, at_travel: float) -> MetricR
     """几何 Motion Ratio：|Δdamper / Δwheel|（rockers 扫掠，中央差分）。
 
     取代 analyze.py 硬编码的 mr_f=0.7 / mr_r=0.6。
+    F-12/F-13：数值内核委托 metrics/kandc.slope_at_travel（单一中央差分内核）。
     """
-    idx = min(range(len(travel_curve)),
-              key=lambda i: abs(float(travel_curve[i]) - at_travel))
-    slope = _slope_at(damper_travel_curve, [float(t) for t in travel_curve], idx)
+    slope = slope_at_travel(damper_travel_curve, travel_curve, at_travel)
     if slope is None:
         return solver_failed("motion_ratio", "-", "rockers 扫掠数据不足")
     return ok(abs(slope[0]), "-")

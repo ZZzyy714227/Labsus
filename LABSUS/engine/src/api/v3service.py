@@ -27,6 +27,7 @@ from src.solver.forces import QSLoad
 from src.solver.mechanism.models import build_mechanism
 from src.solver.mechanism.solver import solve_pose
 from src.metrics.kandc import _slope  # F-13：单一差分内核（全局共用）
+from src.geometry import line_intersect_2d
 
 R2D = 180.0 / math.pi
 
@@ -99,14 +100,7 @@ def _lerp3(a, b, t):
     return a + (b - a) * t
 
 
-def _isect2(p1, d1, p2, d2):
-    """2D 直线交点（与前端 isect2 一致），返回 (x, z) 或 None。"""
-    denom = d1[0] * d2[1] - d1[1] * d2[0]
-    if abs(denom) < 1e-12:
-        return None
-    t = p2 - p1
-    s = (t[0] * d2[1] - t[1] * d2[0]) / denom
-    return p1 + s * d1
+_isect2 = line_intersect_2d
 
 
 def _axis_at_y(a, b, y):
@@ -237,7 +231,7 @@ def _solve_point(points, bushings, case: CaseLoad, travel: float, rack: float,
     mech = _new_mech(points, arch=arch)
     if bushings:
         res = solve_compliance_full(mech, bushings=bushings, case=_qsload(case),
-                                    travel=travel, rack=rack)
+                                    travel=travel, rack=rack, tire_radius=tire_R)
         status = res.status
         warn = [] if status in ("VALID", "APPROXIMATE") else [f"compliance status={status}"]
         return pose_metrics(mech, tire_R, design), status, warn, res
@@ -298,7 +292,7 @@ def run_bump(req: KandcRequest) -> KandcResponse:
     delta = None
     if bushings:
         _, _, _, res = _solve_point(points, bushings, req.case, 0.0, 0.0,
-                                    req.tire_radius, req.design)
+                                    req.tire_radius, req.design, arch=req.arch)
         if res is not None and res.delta:
             delta = {k: [round(float(v), 6) for v in d] for k, d in res.delta.items()}
     return KandcResponse(

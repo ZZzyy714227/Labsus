@@ -1,4 +1,10 @@
-"""V1 核心数据模型（设计文档 §3/§4/§10/§11）。
+"""V1 核心数据模型（历史冻结层，设计文档 §3/§4/§10/§11）。
+
+DEPRECATION NOTICE:
+本模块中的数据模型（AxleHardpoints, DesignVersion, ChassisDesign, WheelTravel,
+LoadsInput, CaseOptions, CaseVersion, AnalysisCase, AnalysisResult）属于 V1 历史定义。
+当前 LABSUS 主线 API 及求解器服务已全面迁移至 `src.api.v3models`。
+注意：ResultStatus 枚举仍作为核心组件被 `core.metrics` 活跃依赖，予以保留。
 
 - ChassisDesign：整车底盘方案，append-only 版本列表；左右硬点为独立实例，
   左侧可由右侧模板镜像初始化（§5.1），之后独立编辑。
@@ -42,7 +48,8 @@ class ResultStatus(str, Enum):
 
 
 class AxleHardpoints(BaseModel):
-    """单轴单侧硬点实例。points 键必须属于 POINT_KEYS ∪ PRO_POINT_KEYS
+    """[DEPRECATED in V3] 单轴单侧硬点实例（替代方案：src.api.v3models.AxleSpec）。
+    points 键必须属于 POINT_KEYS ∪ PRO_POINT_KEYS
     （无前缀，轴由字段名区分；PRO 新键可缺省以兼容存量数据）。"""
     points: dict[str, list[float]]
     tire: dict[str, float] = Field(default_factory=dict)
@@ -71,6 +78,7 @@ class AxleHardpoints(BaseModel):
 
 
 class DesignVersion(BaseModel):
+    """[DEPRECATED in V3] 历史设计版本（替代方案：src.api.v3models.DesignSpec）。"""
     version: int
     name: str = ""
     notes: str = ""
@@ -95,13 +103,14 @@ class DesignVersion(BaseModel):
 
 
 class ChassisDesign(BaseModel):
+    """[DEPRECATED in V3] 历史底盘方案容器。"""
     design_id: str
     versions: list[DesignVersion]
     latest: int
 
 
 class WheelTravel(BaseModel):
-    """四轮轮跳输入（mm，正 = 车轮向上压缩）。V1 唯一几何驱动量。"""
+    """[DEPRECATED in V3] 四轮轮跳输入（替代方案：src.api.v3models.SweepSpec 或 QuasiInputs）。"""
     fl: float = 0.0
     fr: float = 0.0
     rl: float = 0.0
@@ -109,8 +118,7 @@ class WheelTravel(BaseModel):
 
 
 class LoadsInput(BaseModel):
-    """外部载荷输入（单位 g）。az 为相对设计基准的额外垂向加速度，
-    重力基准已含于静态垂向载荷，不重复叠加（§8.1）。"""
+    """[DEPRECATED in V3] 外部载荷输入（替代方案：src.api.v3models.QuasiInputs）。"""
     ax_g: float = 0.0
     ay_g: float = 0.0
     az_g: float = 0.0
@@ -119,12 +127,14 @@ class LoadsInput(BaseModel):
 
 
 class CaseOptions(BaseModel):
+    """[DEPRECATED in V3] 历史工况选项。"""
     arb_enabled: bool = True
     compute_wheel_forces: bool = True
     friction_check: bool = True
 
 
 class CaseVersion(BaseModel):
+    """[DEPRECATED in V3] 历史工况版本定义。"""
     version: int
     name: str = ""
     description: str = ""
@@ -150,13 +160,14 @@ class CaseVersion(BaseModel):
 
 
 class AnalysisCase(BaseModel):
+    """[DEPRECATED in V3] 历史分析工况容器。"""
     case_id: str
     versions: list[CaseVersion]
     latest: int
 
 
 class AnalysisResult(BaseModel):
-    """不可变分析结果。绑定方案版本 + 工况版本 + 求解器状态（§3.1）。"""
+    """[DEPRECATED in V3] 历史分析结果容器（替代方案：src.api.v3models.KandcResponse / ChassisResponse）。"""
     result_id: str
     design_id: str
     design_version: int
