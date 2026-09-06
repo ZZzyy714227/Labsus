@@ -1270,12 +1270,14 @@ T("POWERTRAIN.saveFromForm();");
 assert(T("Object.keys(POWERTRAIN.customs).length") === 0, "M-4 prompt 返回空串 → 不保存");
 T("POWERTRAIN.customs = {}; POWERTRAIN.persistCustoms();");
 
-/* ── 7.14 G31-P8 审查修复：I-2 canvas 拖拽 TODO 标注存在性 ── */
-console.log("=== 7.14 G31-P8 Review: I-2 TODO annotation ===");
-// 验证源码中包含 TODO(G31-P9) 注释
+/* ── 7.14 G31-P8 审查修复：I-2 canvas 拖拽标注（G31-P9 已落地，翻转为“已实现”钉子） ── */
+console.log("=== 7.14 G31-P8 Review: I-2 drag annotation ===");
+// 验证源码中拖拽已实现（原 TODO(G31-P9) 已被落地注释取代）
 const ptSrc = fs.readFileSync(path.join(__dirname, "../js/16-powertrain.js"), "utf8");
-assert(ptSrc.indexOf("TODO(G31-P9)") >= 0, "I-2 源码包含 TODO(G31-P9) canvas 拖拽标注");
-assert(ptSrc.indexOf("canvas 拖拽控制点编辑") >= 0, "I-2 TODO 标注含中文说明");
+assert(ptSrc.indexOf("TODO(G31-P9)") < 0, "I-2 TODO(G31-P9) 已移除（拖拽已实现）");
+assert(ptSrc.indexOf("canvas 拖拽控制点编辑") >= 0, "I-2 拖拽实现注释含中文说明");
+assert(ptSrc.indexOf("_curveDragMove") >= 0 && ptSrc.indexOf("_curveDragEnd") >= 0,
+  "I-2 拖拽三方法已实现");
 
 /* ═══ 8. G31 终审修复（C1/C2/C3/I1/I3）+ 六预设 1-DOF 纵向积分探针 ═══
    C1 ev/series/powersplit 电机扭矩未乘 gearbox ratio（EV 单速比 9.73 时 tRear 仅 175 而非 1652）
@@ -1924,6 +1926,48 @@ console.log("=== 10. G31-P10-2 motor rev-limit / ev inertia reflection / THS axl
   const o10a = T("POWERTRAIN.step(0.004, {throttle:1, brake:0}, {FL:30,FR:30,RL:30,RR:30})");
   assert(Math.abs(o10a.P_out - 36000) < 1e-9, "10.4 legacy P_out = (240+960)×30 = 36000（逐位）");
   T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+}
+
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+
+// ── 11. G31-P9：canvas 拖拽控制点编辑（_curveHit/DragStart/DragMove/DragEnd）──
+{
+  T("POWERTRAIN.open(); POWERTRAIN._draft = JSON.parse(JSON.stringify(POWERTRAIN.defaultSpec())); POWERTRAIN.renderForm(); POWERTRAIN.drawCurve();");
+  const cs = T("POWERTRAIN._cs");
+  assert(cs && Array.isArray(cs.map) && cs.map.length >= 2 && cs.rpmMax > 0 && cs.tMax > 0,
+    "11.1 drawCurve 后 _cs 保存坐标变换与 map");
+  // 计算控制点 1 的画布坐标 → 命中
+  const px1 = cs.L + (cs.Rr - cs.L) * (cs.map[1][0] / cs.rpmMax);
+  const py1 = cs.Bb - (cs.Bb - cs.Tt) * (cs.map[1][1] / cs.tMax);
+  assert(T(`POWERTRAIN._curveHit(${px1.toFixed(1)}, ${py1.toFixed(1)})`) === 1, "11.2 _curveHit 命中控制点 1");
+  assert(T(`POWERTRAIN._curveHit(${(cs.Rr + 50).toFixed(1)}, 5)`) === -1, "11.2 _curveHit 远离 → -1");
+  // 拖拽：向下压低扭矩（tq 下降但 ≥0），rpm 不越过邻居
+  T(`POWERTRAIN._curveDragStart(${px1.toFixed(1)}, ${py1.toFixed(1)})`);
+  const before = T("JSON.parse(JSON.stringify(POWERTRAIN._draft.ice.map))");
+  const lo = before[0][0] + 1, hi = before[2][0] - 1;
+  const pyLow = cs.Bb - (cs.Bb - cs.Tt) * (before[1][1] * 0.5 / cs.tMax);   // 扭矩减半的位置
+  const mv = T(`POWERTRAIN._curveDragMove(${((lo + hi) / 2).toFixed(1)}, ${pyLow.toFixed(1)})`);
+  assert(mv && mv.tq >= 0, "11.3 _curveDragMove 返回新值且 tq≥0");
+  const after = T("JSON.parse(JSON.stringify(POWERTRAIN._draft.ice.map))");
+  assert(after[1][0] >= lo && after[1][0] <= hi, "11.3 rpm 被邻居约束在 (lo,hi)");
+  assert(after[1][1] < before[1][1], "11.3 扭矩下降");
+  assert(after.every((p, i) => i === 0 || p[0] > after[i - 1][0]), "11.3 拖拽后 map 仍严格递增");
+  // EV 草稿（无 ice）→ 三方法 no-op
+  T("POWERTRAIN._draft = JSON.parse(JSON.stringify(POWERTRAIN_PRESETS['EV 双电机 AWD-TV'])); POWERTRAIN.drawCurve();");
+  assert(T("POWERTRAIN._curveHit(100, 100)") === -1 && T("POWERTRAIN._curveDragMove(100, 100)") === null,
+    "11.4 EV 无 ICE map → 拖拽 no-op");
+  // 结束：回写 textarea + 清 _dragIdx（强制断言：元素必须存在且值一致——
+  //   浏览器验收曾抓到 ptIceMap/pt_ice_map ID 不匹配致静默跳过的 bug，勿再用条件包裹）
+  T("POWERTRAIN._draft = JSON.parse(JSON.stringify(POWERTRAIN.defaultSpec())); POWERTRAIN._dragIdx = 0; POWERTRAIN._curveDragEnd();");
+  assert(T("POWERTRAIN._dragIdx") === -1, "11.5 _curveDragEnd 清 _dragIdx");
+  const taExists = T("!!POWERTRAIN._el('pt_ice_map')");
+  assert(taExists === true, "11.5 textarea pt_ice_map 存在（renderForm 已建）");
+  const taVal = T("POWERTRAIN._el('pt_ice_map').value");
+  const taArr = JSON.parse(taVal);
+  const draftMap = T("JSON.parse(JSON.stringify(POWERTRAIN._draft.ice.map))");
+  assert(taVal === JSON.stringify(draftMap),
+    "11.5 _curveDragEnd 回写 textarea JSON == _draft.ice.map（强制一致）");
+  T("POWERTRAIN.close(); POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
 }
 
 console.log(`\n[cumulative] ${passed}/${total} passed`);
