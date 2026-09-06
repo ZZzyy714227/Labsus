@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 /* ================================ 11. UI 控制面板构建 ================================ */
 const PICK=[];
 const UI={hover:null,selHP:null,drag:null,ro:{},sync:[],plots:[],syncBase:null};
@@ -502,7 +502,7 @@ function buildEnginePanel(host){
 function buildEngineResults(host){
   const b2=sec(host,"引擎 K&C 结果","ENGINE K&C RESULTS",true);
   const kcGains=E("div");kcGains.id="kcGains";b2.appendChild(kcGains);
-  const kcPlot=E("canvas","plot");kcPlot.id="kcPlot";kcPlot.style.height="120px";kcPlot.style.width="100%";
+  const kcPlot=E("canvas","plot");kcPlot.id="kcPlot";kcPlot.style.height="150px";kcPlot.style.width="100%";
   b2.appendChild(kcPlot);
 }
 /* ── 整车底盘分析（S2-5：四角+整车参数 → /api/v3/chassis/*，双模） ── */
@@ -533,7 +533,7 @@ function buildChassisPanel(host){
 function buildChassisResults(host){
   const b2=sec(host,"整车引擎结果","FULL-CHASSIS ENGINE RESULTS",true);
   const box=E("div");box.id="chResult";b2.appendChild(box);
-  const cv=E("canvas","plot");cv.id="chPlot";cv.style.height="120px";cv.style.width="100%";
+  const cv=E("canvas","plot");cv.id="chPlot";cv.style.height="150px";cv.style.width="100%";
   b2.appendChild(cv);
 }
 /* ── 轮胎实测标定（讲义 EP08 数据链：实测 Fy-α → /api/v3/tire/fit 辨识 MF） ── */

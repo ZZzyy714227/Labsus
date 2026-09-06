@@ -122,9 +122,12 @@ body{
 .sec{margin:4px 8px;border-radius:var(--r-md);overflow:hidden;
   background:var(--glass-2);border:1px solid var(--glass-bd);
   box-shadow:none}
-.sh{display:flex;align-items:center;height:28px;border-bottom:1px solid var(--glass-bd);
+.sh{display:flex;align-items:center;min-height:28px;height:auto;padding-top:4px;padding-bottom:4px;border-bottom:1px solid var(--glass-bd);
     background:var(--sh-bg);
-    padding-left:10px;font:10px/1 var(--font-ui);letter-spacing:.08em;color:var(--ink-3);text-transform:uppercase;cursor:pointer;position:relative;transition:background .18s}
+    padding-left:10px;font:10px/1.35 var(--font-ui);letter-spacing:.08em;color:var(--ink-3);text-transform:uppercase;cursor:pointer;position:relative;transition:background .18s;
+    flex-wrap:wrap}
+/* G32：中文标题长时折行不再压到英文副标签（原固定 28px 高致两行文字重叠） */
+.sh .zh{white-space:normal;line-height:1.3}
 .sh:hover{background:var(--glass-hov)}
 .sh::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:2.5px;border-radius:var(--r-pill);
   background:var(--pri);opacity:.6}
@@ -256,7 +259,7 @@ table.hp td.rk input{color:var(--pri)}
 .bar-lbl{position:absolute;top:0;bottom:0;display:flex;align-items:center;padding:0 6px;font:8.5px var(--font-mono);color:var(--ink-1);text-shadow:0 1px 2px rgba(0,0,0,.45)}
 
 .plotbox{padding:4px 6px 6px}
-canvas.plot{display:block;width:100%;height:96px;background:var(--well);border:1px solid var(--glass-bd);border-radius:var(--r-sm);box-shadow:none}
+canvas.plot{display:block;width:100%;height:150px;background:var(--well);border:1px solid var(--glass-bd);border-radius:var(--r-sm);box-shadow:none}
 
 #vp{flex:1 1 auto;min-width:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8px}
 #vp.max0{grid-template-columns:1fr;grid-template-rows:1fr}

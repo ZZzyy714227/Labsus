@@ -89,7 +89,35 @@
 .v4-pill.err{color:var(--err);border-color:var(--err)}
 .v4-pill.ro{cursor:default}
 #tb .v4-axis{min-width:0}
+/* G32：轴切换 seg 禁止被 flex 压缩到内容宽以下——原 min-width:0 使「后轴 R」
+   在所有视口都溢出容器右缘、画到相邻「几何/K&C」seg 上（宽屏也存在）。 */
+#tb .v4-seg.v4-axis{min-width:fit-content;flex:0 0 auto}
 #tb .cell.slim{min-width:0;padding:0 9px}
+/* G32：车型平台 cell 改行内布局——原 column 布局把 select+轮胎/动力按钮堆叠在
+   52px 高内，按钮溢出与下拉重叠（用户截图实证）。行内排列 + select 限宽。 */
+#tb .cell.slim{flex-direction:row;align-items:center;gap:6px;flex-wrap:nowrap}
+#tb .cell.slim i{flex:0 0 auto;margin-right:2px}
+#tb .cell.slim select{flex:1 1 auto;min-width:104px;max-width:220px;text-overflow:ellipsis}
+#tb .cell.slim button{flex:0 0 auto;white-space:nowrap}
+/* G32 窄屏断点：cell 内容（select+双按钮 ≈290px）在 flex 压缩下会溢出盒子、
+   画到相邻元素上（1366 实测 6 对叠压）。逐级收缩：藏标签→藏副标题→限宽。 */
+@media (max-width:1560px){
+  #tb .cell.slim i{display:none}
+  /* G32 终验二：1500 档 cell 被 flex 压到 221.6px < 内容 233.7px 仍溢出——
+     内容下限压到 ≈212px（gap 4 + 按钮 padding 6 + select min 76），留 9px 冗余 */
+  #tb .cell.slim{justify-content:flex-start;gap:4px;padding:0 6px}
+  #tb .cell.slim select{min-width:76px;max-width:132px}
+  #tb .cell.slim button{padding:3px 6px}
+  #tb .tt span:last-child{display:none}
+  #tb .tt{padding:0 10px}
+}
+@media (max-width:1400px){
+  #tb .tt{display:none}
+  #tb .cell.slim select{min-width:76px;max-width:118px}
+  #tb .cell.slim{gap:4px;padding:0 6px}
+  #tb .v4-seg.v4-axis button{padding:3px 5px}
+  #tb .v4-pill{padding:0 6px}
+}
 
 /* ---------- 主题选择器浮层 ---------- */
 #v4ThemeBtn{display:flex;align-items:center;justify-content:center;width:30px;height:30px;margin:0 2px;
