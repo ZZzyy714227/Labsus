@@ -18,17 +18,15 @@ import math
 
 import numpy as np
 from scipy.optimize import least_squares
+from src.tire_mf import evaluate_magic_formula_fy
 
 
 def _mf_fy(params: np.ndarray, a_rad: np.ndarray, fz: float) -> np.ndarray:
-    """与 tire_mf.MagicFormulaSub.fy 逐字同构（Sh=0、Sv=0 的辨识口径）。"""
+    """委托 tire_mf.evaluate_magic_formula_fy，保证全系统 MF 计算单一真源。"""
     d0, b, c, e, ls = (float(v) for v in params)
-    if fz <= 0:
-        return np.zeros_like(a_rad)
-    r = fz / 3500.0  # FzNom 辨识口径固定 3500 N（与 TireParams 缺省同源）
-    d = d0 * r * max(0.1, 1.0 - ls * (r - 1.0))
-    x = b * a_rad
-    return d * np.sin(c * np.arctan(x - e * (x - np.arctan(x))))
+    return evaluate_magic_formula_fy(
+        a_rad, fz, Fy0=d0, By=b, Cy=c, Ey=e, LS=ls, FzNom=3500.0
+    )
 
 
 def fit_tire_params(curves: list[dict], fit_ls: bool = True) -> dict:

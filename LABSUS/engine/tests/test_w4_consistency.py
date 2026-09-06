@@ -70,16 +70,38 @@ def test_v1_legacy_angles_still_exist_for_s1_gate():
 
 def test_kandc_and_kinematics_share_slope_kernel():
     """kinematics 状态机版与 kandc 浮点版必须给出一致的 °/25mm 增益。"""
-    from src.metrics.kandc import bump_steer_deg_per_25, camber_gain_deg_per_25
+    from src.metrics.kandc import bump_steer_deg_per_25, camber_gain_deg_per_25, mr_matrix
     from src.metrics.kinematics import (bump_steer_deg_per_25 as k_bump,
-                                        camber_gain_deg_per_25 as k_cam)
+                                        camber_gain_deg_per_25 as k_cam,
+                                        motion_ratio as k_mr)
+    import src.metrics.kinematics as kin
+    assert not hasattr(kin, "_slope_at"), "_slope_at must be deleted to honor single differentiator kernel rule"
     tr = [-25.0, -12.5, 0.0, 12.5, 25.0]
     cam = [-1.8, -1.5, -1.2, -0.9, -0.6]
     toe = [0.4, 0.2, 0.0, -0.2, -0.4]
+    damper_tr = [-10.0, -5.0, 0.0, 5.0, 10.0]
     assert abs(camber_gain_deg_per_25(cam, tr, 0.0)
                - k_cam(cam, tr, 0.0).value) < 1e-9
     assert abs(bump_steer_deg_per_25(toe, tr, 0.0)
                - k_bump(toe, tr, 0.0).value) < 1e-9
+    assert abs(mr_matrix(damper_tr, tr, 0.0)
+               - k_mr(damper_tr, tr, 0.0).value) < 1e-9
+
+
+def test_compliance_forwards_tire_radius():
+    """验证 v3service._solve_point 将 tire_radius 准确传递给 solve_compliance_full。"""
+    from unittest.mock import patch
+    import src.api.v3service as v3s
+    from src.api.v3models import KandcRequest, BushingSpec, SweepSpec
+
+    b = BushingSpec(name="bLCA_F", node="LCA_F", kT=[300.0, 300.0, 300.0], kR=[4e4, 4e4, 4e4])
+    req = KandcRequest(tire_radius=260.0, bushings=[b], compliance_axis="fy",
+                       sweep=SweepSpec(min=-100.0, max=100.0, n=3))
+    with patch("src.api.v3service.solve_compliance_full", wraps=v3s.solve_compliance_full) as mock_scf:
+        v3s.run_compliance(req)
+        assert mock_scf.called
+        for call in mock_scf.call_args_list:
+            assert call.kwargs.get("tire_radius") == 260.0
 
 
 def test_slope_endpoint_uses_single_side():

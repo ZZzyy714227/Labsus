@@ -11,9 +11,6 @@
 """
 import json
 import math
-import sys
-
-sys.path.insert(0, "src")
 
 import numpy as np
 from fastapi.testclient import TestClient

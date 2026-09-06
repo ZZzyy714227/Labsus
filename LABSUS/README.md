@@ -2,33 +2,39 @@
 
 **全车底盘高性能悬架分析工作台 —— Kinematics & Compliance / 15-DOF 动力学 / 准静态操稳 / 赛道瞬态仿真**
 
+<p align="left">
+  <a href="README.md"><b>简体中文</b></a> | <a href="README.en.md"><b>English</b></a>
+</p>
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-v3%20REST%20API-009688.svg)](https://fastapi.tiangolo.com/)
-[![Tests: 100% Passed](https://img.shields.io/badge/pytest-115%20passed-success.svg)]()
+[![Tests: 100% Passed](https://img.shields.io/badge/pytest-164%20passed-success.svg)]()
 [![Platform: Web & Desktop](https://img.shields.io/badge/Platform-Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-orange.svg)]()
 
 > 面向 **FSAE 方程式赛车、GT3 房车赛车及全地形越野车** 的现代化全车底盘悬架工程分析平台。
 > 从双叉臂/推拉杆空间硬点编辑、多体运动学与 K&C 扫掠，到 4-Post 台架动力学、准静态载荷转移与 **15-DOF 全赛道自动驾驶瞬态仿真**，全部在一个精美现代的交互式仪器台中完成。轻量级自研实现，深度对标 OptimumKinematics 与 ADAMS/Car。
+>
+> 📁 **工程代码位于 [`LABSUS/`](LABSUS/) 子目录**，本文所有相对路径均以其为根。
 
 ---
 
 ## 📸 界面预览 (Screenshots)
 
 ### 1. V4 新版工作台 —— Formula SAE 方程式（浅色主题 · 四视口联动）
-![LABSUS V4 工作台 · 方程式](assets/labsus_v4_formula_light.png)
+![LABSUS V4 工作台 · 方程式](LABSUS/assets/labsus_v4_formula_light.png)
 *正视/俯视/侧视/等轴测四视口实时联动，右侧「核心结论」实时输出 Camber/Toe/侧倾中心/侧倾梯度/US Gradient/TLLTD 与操稳偏向判定；直接拖拽 3D 空间硬点即时收敛（残差 $10^{-10}$ 量级、毫秒级求解）。*
 
 ### 2. SAE Baja 越野车 —— 直连双叉臂大行程架构（暖色主题）
-![LABSUS V4 工作台 · Baja](assets/labsus_v4_baja_offroad.png)
+![LABSUS V4 工作台 · Baja](LABSUS/assets/labsus_v4_baja_offroad.png)
 *外置直立直连减振柱（DIRECT COILOVER）越野架构，$R=396\,\text{mm}$ 全地形大轮胎、$[-90, 100]\,\text{mm}$ 超长轮跳行程；推拉杆 / 直连多悬架拓扑一键切换。*
 
 ### 3. FIA GT3 赛道模式 —— 深色驾驶舱主题
-![LABSUS V4 工作台 · GT3](assets/labsus_v4_gt3_dark.png)
+![LABSUS V4 工作台 · GT3](LABSUS/assets/labsus_v4_gt3_dark.png)
 *GT3 空间桁架车壳 + 副车架挂载大口径 ARB，赛道/日常双模悬架一键切换；几何 / K&C / 整车 / 赛道多页签工程工作流。*
 
 ### 4. 上海国际赛车场 (SIC) 15-DOF 实时瞬态赛道仿真舞台
-![LABSUS 赛道瞬态仿真舞台](assets/labsus_circuit_sim.png)
+![LABSUS 赛道瞬态仿真舞台](LABSUS/assets/labsus_circuit_sim.png)
 *高精度 15-DOF 整车多体动力学、Pacejka 复合滑移轮胎摩擦圆、外-内-外赛车线走线与逐圈刹车点自适应试探学习、冲出罚时与圈数统计、多机位跟踪与实时工程遥测 HUD。*
 
 ---
@@ -96,14 +102,14 @@
 
 ### 方式 A：零依赖极速启动
 1. 本项目网页端为纯原生技术栈开发，**无需任何 npm 构建或环境配置**。
-2. 浏览器直接打开主入口 **`web/dwb-pro-v4.html`**（V4 新版工作台），或模块化版 `web/dwb-pro-fullchassis.html` / 零依赖单文件 `web/dwb-pro-allinone.html`，也可通过本地 HTTP 服务器运行：
+2. 浏览器直接打开主入口 **`LABSUS/web/dwb-pro-v4.html`**（V4 新版工作台），或模块化版 `LABSUS/web/dwb-pro-fullchassis.html` / 零依赖单文件 `LABSUS/web/dwb-pro-allinone.html`，也可通过本地 HTTP 服务器运行：
    ```bash
-   python -m http.server 8000 --directory web
+   python -m http.server 8000 --directory LABSUS/web
    ```
 3. 浏览器访问 `http://127.0.0.1:8000/dwb-pro-v4.html` 即可开始使用。
 
 ### 方式 B：双击脚本启动（Windows 一键运行）
-双击根目录下的 `start.bat`：
+双击 `LABSUS/start.bat`：
 - 自动拉起 Python FastAPI 计算引擎（端口 8001，已在运行则自动复用）；
 - 自动启动无缓存前端服务器并打开浏览器进入工作台。
 
@@ -111,10 +117,10 @@
 如果你需要运行完整的 Python 高性能数值求解后端：
 ```bash
 # 1. 安装 Python 依赖
-pip install -r requirements.txt
+pip install -r LABSUS/requirements.txt
 
 # 2. 启动 FastAPI 引擎服务
-python engine/server.py
+python LABSUS/engine/server.py
 # 服务启动于 http://127.0.0.1:8001 (API 文档: http://127.0.0.1:8001/docs)
 ```
 
@@ -122,16 +128,22 @@ python engine/server.py
 
 ## 🧪 测试与质量保证
 
-项目包含严苛的自动化测试套件：
+项目包含严苛的自动化测试套件（在 `LABSUS/` 目录下运行）：
 ```bash
-# 1. Python 引擎物理断言 / 门禁 / TPHYS 双端对拍（115 项全部通过）
-pytest
+cd LABSUS
+
+# 1. Python 引擎物理断言 / 门禁 / TPHYS 双端对拍 / 对抗应力测试（164 项全部通过）
+pytest engine/tests -q
 
 # 2. 前端 DOM/结构断言测试（163 项全部通过）
 node web/test/test_dom.js
 
-# 3. 舞台启动防线（40 项：模块加载顺序 / TDZ / 三舞台可启动且真的画了东西）
+# 3. 舞台启动防线（40 项：模块加载顺序 / TDZ / 三舞台可启动且绘制正常）
 node web/test/stage_boot_check.js
+
+# 4. 双端物理闭环与 15-DOF 圈速综合测试（全部通过）
+node web/test/tphys_parity.cjs
+node web/test/test_lap_15dof.js
 ```
 
 ---
@@ -139,16 +151,17 @@ node web/test/stage_boot_check.js
 ## 📂 项目结构说明
 
 ```
-LABSUS/
+LABSUS/                           # 工程代码根（下同）
 ├── assets/                       # 项目预览截图与工程图表资源
 ├── web/                          # 现代 Web 前端工程目录
+│   ├── index.html                # 根目录自动重定向引导页
 │   ├── dwb-pro-v4.html           # V4 主工作台入口（主用）
 │   ├── dwb-pro-fullchassis.html  # 模块化全车工作台（薄壳 + css/ + js/）
 │   ├── dwb-pro-allinone.html     # 零依赖综合交付单文件
 │   ├── css/
 │   │   └── fullchassis.css       # 模块化现代工程仪器台 CSS 设计系统
 │   ├── js/                       # 前端核心功能域模块 (按文件名序加载)
-│   │   ├── 01-core.js            # 数学库 / 状态管理
+│   │   ├── 01-core.js            # 数学库 / 状态管理 / 矩阵运算
 │   │   ├── 02-presets.js         # 车型预设 (Formula/GT3/Baja)
 │   │   ├── 03-mechanism.js       # 多体闭式几何投影内核与 K&C 扫掠
 │   │   ├── 04-dynamics.js        # 准静态载荷转移与 4-Post 台架解算
@@ -159,19 +172,26 @@ LABSUS/
 │   │   ├── 09-track.js           # TPHYS 离线物理闭包与赛道回放
 │   │   ├── 10-eval.js            # 综合评价报告与赛车线路径规划
 │   │   ├── 11-stages.js          # 15-DOF 爬坡/定圆/上海赛道瞬态仿真舞台
-│   │   └── 12-v4-arrange.js      # V4 布局编排 / 结论卡 / 诊断建议
-│   └── test/                     # 前端 DOM 与加载防线测试 (163+40 项)
+│   │   ├── 12-v4-arrange.js      # V4 布局编排 / 结论卡 / 诊断建议
+│   │   ├── 13-engine-sound.js    # WebAudio 动态转速与排气声浪合成器
+│   │   ├── 14-tire-lab.js        # 轮胎实验室 (MF5.2 刷子/Magic Formula 拟合)
+│   │   ├── 15-mpc.js             # 赛道自适应模型预测控制 (MPC)
+│   │   └── 16-powertrain.js      # 动力总成与扭矩矢量分配解算
+│   └── test/                     # 前端 16 套自动化测试套件
 ├── engine/                       # Python 高性能数值计算引擎
 │   ├── server.py                 # FastAPI 入口服务 (:8001)
 │   ├── src/                      # 求解器核心源码 (K&C/衬套/Pacejka/轮胎标定/瞬态)
-│   └── tests/                    # pytest 单元测试套件 (115 项)
+│   └── tests/                    # pytest 单元测试套件 (164 项全部通过)
 ├── scripts/                      # 开发与运维工具脚本
 ├── requirements.txt              # Python 依赖清单
 ├── start.bat                     # Windows 一键启动脚本
 ├── INTENTIONAL_DIFFERENCES.md    # 双端故意差异登记真源
+├── AUDIT_AND_REFACTOR_LOG.md     # 全系统代码审计与重构归档报告
 ├── LICENSE                       # MIT 开源许可证
 └── README.md                     # 项目中文文档
 ```
+
+> 注：`LICENSE` 与英文版 `README.en.md` 位于仓库根；`AUDIT_AND_REFACTOR_LOG.md` 详述系统审计、接口对齐与修复细节。
 
 ---
 

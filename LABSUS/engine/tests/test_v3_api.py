@@ -328,5 +328,35 @@ def test_icespec_map_malformed_422_not_500():
         assert "IndexError" not in r.text
 
 
+def test_server_error_handling_500_on_crash(monkeypatch):
+    """验证 server.py 错误分流：非客户端输入异常（如内部 ZeroDivisionError）
+    返回 HTTP 500（脱敏详情），而非错误地归为 422 客户端错误。"""
+    from src.api import v3service
+
+    def _crash_run_pose(req):
+        raise ZeroDivisionError("simulated internal calculation bug")
+
+    monkeypatch.setattr(v3service, "run_pose", _crash_run_pose)
+    body = {"travel": 0.0, "rack": 0.0}
+    r = client.post("/api/v3/solve/pose", json=body)
+    assert r.status_code == 500
+    assert "ZeroDivisionError" in r.text
+    assert "simulated internal calculation bug" not in r.text  # F-46 脱敏验证
+
+
+def test_server_error_handling_422_on_value_error(monkeypatch):
+    """验证 server.py 错误分流：数值或输入异常（ValueError）返回 HTTP 422。"""
+    from src.api import v3service
+
+    def _value_err_run_pose(req):
+        raise ValueError("unsolvable linkage configuration")
+
+    monkeypatch.setattr(v3service, "run_pose", _value_err_run_pose)
+    body = {"travel": 0.0, "rack": 0.0}
+    r = client.post("/api/v3/solve/pose", json=body)
+    assert r.status_code == 422
+    assert "ValueError" in r.text
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))

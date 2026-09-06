@@ -2,10 +2,14 @@
 
 **全车底盘高性能悬架分析工作台 —— Kinematics & Compliance / 15-DOF 动力学 / 准静态操稳 / 赛道瞬态仿真**
 
+<p align="left">
+  <a href="README.md"><b>简体中文</b></a> | <a href="README.en.md"><b>English</b></a>
+</p>
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-v3%20REST%20API-009688.svg)](https://fastapi.tiangolo.com/)
-[![Tests: 100% Passed](https://img.shields.io/badge/pytest-115%20passed-success.svg)]()
+[![Tests: 100% Passed](https://img.shields.io/badge/pytest-164%20passed-success.svg)]()
 [![Platform: Web & Desktop](https://img.shields.io/badge/Platform-Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-orange.svg)]()
 
 > 面向 **FSAE 方程式赛车、GT3 房车赛车及全地形越野车** 的现代化全车底盘悬架工程分析平台。
@@ -128,14 +132,18 @@ python LABSUS/engine/server.py
 ```bash
 cd LABSUS
 
-# 1. Python 引擎物理断言 / 门禁 / TPHYS 双端对拍（115 项全部通过）
-pytest
+# 1. Python 引擎物理断言 / 门禁 / TPHYS 双端对拍 / 对抗应力测试（164 项全部通过）
+pytest engine/tests -q
 
 # 2. 前端 DOM/结构断言测试（163 项全部通过）
 node web/test/test_dom.js
 
-# 3. 舞台启动防线（40 项：模块加载顺序 / TDZ / 三舞台可启动且真的画了东西）
+# 3. 舞台启动防线（40 项：模块加载顺序 / TDZ / 三舞台可启动且绘制正常）
 node web/test/stage_boot_check.js
+
+# 4. 双端物理闭环与 15-DOF 圈速综合测试（全部通过）
+node web/test/tphys_parity.cjs
+node web/test/test_lap_15dof.js
 ```
 
 ---
@@ -146,13 +154,14 @@ node web/test/stage_boot_check.js
 LABSUS/                           # 工程代码根（下同）
 ├── assets/                       # 项目预览截图与工程图表资源
 ├── web/                          # 现代 Web 前端工程目录
+│   ├── index.html                # 根目录自动重定向引导页
 │   ├── dwb-pro-v4.html           # V4 主工作台入口（主用）
 │   ├── dwb-pro-fullchassis.html  # 模块化全车工作台（薄壳 + css/ + js/）
 │   ├── dwb-pro-allinone.html     # 零依赖综合交付单文件
 │   ├── css/
 │   │   └── fullchassis.css       # 模块化现代工程仪器台 CSS 设计系统
 │   ├── js/                       # 前端核心功能域模块 (按文件名序加载)
-│   │   ├── 01-core.js            # 数学库 / 状态管理
+│   │   ├── 01-core.js            # 数学库 / 状态管理 / 矩阵运算
 │   │   ├── 02-presets.js         # 车型预设 (Formula/GT3/Baja)
 │   │   ├── 03-mechanism.js       # 多体闭式几何投影内核与 K&C 扫掠
 │   │   ├── 04-dynamics.js        # 准静态载荷转移与 4-Post 台架解算
@@ -163,21 +172,26 @@ LABSUS/                           # 工程代码根（下同）
 │   │   ├── 09-track.js           # TPHYS 离线物理闭包与赛道回放
 │   │   ├── 10-eval.js            # 综合评价报告与赛车线路径规划
 │   │   ├── 11-stages.js          # 15-DOF 爬坡/定圆/上海赛道瞬态仿真舞台
-│   │   └── 12-v4-arrange.js      # V4 布局编排 / 结论卡 / 诊断建议
-│   └── test/                     # 前端 DOM 与加载防线测试 (163+40 项)
+│   │   ├── 12-v4-arrange.js      # V4 布局编排 / 结论卡 / 诊断建议
+│   │   ├── 13-engine-sound.js    # WebAudio 动态转速与排气声浪合成器
+│   │   ├── 14-tire-lab.js        # 轮胎实验室 (MF5.2 刷子/Magic Formula 拟合)
+│   │   ├── 15-mpc.js             # 赛道自适应模型预测控制 (MPC)
+│   │   └── 16-powertrain.js      # 动力总成与扭矩矢量分配解算
+│   └── test/                     # 前端 16 套自动化测试套件
 ├── engine/                       # Python 高性能数值计算引擎
 │   ├── server.py                 # FastAPI 入口服务 (:8001)
 │   ├── src/                      # 求解器核心源码 (K&C/衬套/Pacejka/轮胎标定/瞬态)
-│   └── tests/                    # pytest 单元测试套件 (115 项)
+│   └── tests/                    # pytest 单元测试套件 (164 项全部通过)
 ├── scripts/                      # 开发与运维工具脚本
 ├── requirements.txt              # Python 依赖清单
 ├── start.bat                     # Windows 一键启动脚本
 ├── INTENTIONAL_DIFFERENCES.md    # 双端故意差异登记真源
+├── AUDIT_AND_REFACTOR_LOG.md     # 全系统代码审计与重构归档报告
 ├── LICENSE                       # MIT 开源许可证
 └── README.md                     # 项目中文文档
 ```
 
-> 注：`LICENSE` 与英文版 `README.en.md` 位于仓库根；`docs/DEVLOG.md` 为历史开发日志。
+> 注：`LICENSE` 与英文版 `README.en.md` 位于仓库根；`AUDIT_AND_REFACTOR_LOG.md` 详述系统审计、接口对齐与修复细节。
 
 ---
 

@@ -27,6 +27,30 @@ def load_tir_params(src: dict) -> dict[str, float]:
     }
 
 
+def evaluate_magic_formula_fy(
+    a_rad: np.ndarray | float,
+    fz: float,
+    Fy0: float,
+    By: float,
+    Cy: float,
+    Ey: float,
+    LS: float = 0.0,
+    FzNom: float = 3500.0,
+    Sh: float = 0.0,
+    Sv: float = 0.0,
+) -> np.ndarray:
+    """Core Pacejka Magic Formula lateral force calculation in radians."""
+    a = np.asarray(a_rad, float) + Sh
+    if fz <= 0:
+        return np.zeros_like(a)
+    r = fz / FzNom
+    d = Fy0 * r
+    if LS:
+        d *= max(0.1, 1.0 - LS * (r - 1.0))
+    x = By * a
+    return d * np.sin(Cy * np.arctan(x - Ey * (x - np.arctan(x)))) + Sv
+
+
 class MagicFormulaSub:
     def __init__(self, params: dict[str, float]):
         self.p = params
@@ -49,12 +73,22 @@ class MagicFormulaSub:
         """摩擦圆预算（与 MF 标称峰值同源——修复 2026-08-22：不再独立硬编码 μ）。"""
         return self.p["Fy0"] / self.p["FzNom"]
 
+    def fy_rad(self, a_rad, fz: float) -> np.ndarray:
+        """侧偏角为弧度时的横向力计算（辨识与底层求解器同源入口）。"""
+        return evaluate_magic_formula_fy(
+            a_rad, fz,
+            Fy0=self.p["Fy0"],
+            By=self.p["By"],
+            Cy=self.p["Cy"],
+            Ey=self.p["Ey"],
+            LS=self.p.get("LS", 0.0),
+            FzNom=self.p.get("FzNom", 3500.0),
+            Sh=self.p.get("Sh", 0.0),
+            Sv=self.p.get("Sv", 0.0),
+        )
+
     def fy(self, alpha_deg, fz: float) -> np.ndarray:
-        a = np.asarray(alpha_deg, float) * math.pi / 180.0 + self.p["Sh"]
-        b, c, e = self.p["By"], self.p["Cy"], self.p["Ey"]
-        x = b * a
-        y = self._d(fz) * np.sin(c * np.arctan(x - e * (x - np.arctan(x))))
-        return y + self.p["Sv"]
+        return self.fy_rad(np.asarray(alpha_deg, float) * (math.pi / 180.0), fz)
 
     def cornering_stiffness(self, fz: float) -> float:
         """侧偏刚度 Cα = dFy/dα @α=0（N/rad）：线性区斜率 = B·C·D(Fz)。

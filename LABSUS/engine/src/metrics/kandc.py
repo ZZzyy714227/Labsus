@@ -19,28 +19,8 @@ def _slope(y: list, x: list, at: float) -> float:
     - 取 at 两侧最近的两个**有效**采样点做差商；单侧不足时退化为单侧
       差分（端点不再虚高一倍）。少于 2 个有效点 → 0.0。
     """
-    xs = [float(x[i]) for i in range(len(x)) if y[i] is not None]
-    ys = [float(y[i]) for i in range(len(y)) if y[i] is not None]
-    n = len(xs)
-    if n < 2:
-        return 0.0
-    # 找到 at 两侧最近的有效点
-    below = [i for i in range(n) if xs[i] <= at]
-    above = [i for i in range(n) if xs[i] >= at]
-    lo = below[-1] if below else 0
-    hi = above[0] if above else n - 1
-    if lo == hi:
-        # at 恰落在采样点上（或全在一侧）：放宽为最近邻对
-        if lo > 0:
-            lo -= 1
-        elif hi < n - 1:
-            hi += 1
-        else:
-            return 0.0
-    dx = xs[hi] - xs[lo]
-    if abs(dx) < 1e-12:
-        return 0.0
-    return (ys[hi] - ys[lo]) / dx
+    res = slope_at_travel(y, x, at)
+    return res[0] if res is not None else 0.0
 
 
 def camber_gain_deg_per_25(camber: list, travel: list, at: float) -> float:
@@ -76,15 +56,19 @@ def slope_at_travel(curve: list, travel: list, at_travel: float):
     valid = [(i, float(v)) for i, v in enumerate(curve) if v is not None]
     if len(valid) < 2:
         return None
-    below = [p for p in valid if travel[p[0]] <= at_travel]
-    above = [p for p in valid if travel[p[0]] >= at_travel]
+    below = [p for p in valid if float(travel[p[0]]) <= at_travel]
+    above = [p for p in valid if float(travel[p[0]]) >= at_travel]
     lo = below[-1] if below else valid[0]
     hi = above[0] if above else valid[-1]
     if lo[0] == hi[0]:
-        if valid[0][0] == valid[-1][0]:
+        lo_idx = valid.index(lo)
+        if lo_idx > 0:
+            lo = valid[lo_idx - 1]
+        elif lo_idx < len(valid) - 1:
+            hi = valid[lo_idx + 1]
+        else:
             return None
-        lo, hi = valid[0], valid[1]
-    dx = travel[hi[0]] - travel[lo[0]]
+    dx = float(travel[hi[0]]) - float(travel[lo[0]])
     if abs(dx) < 1e-12:
         return None
     return (hi[1] - lo[1]) / dx, lo[0], hi[0]

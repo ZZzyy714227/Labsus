@@ -39,7 +39,11 @@ if (start < 0) fail('TPHYS closure not found');
 let end = src.indexOf('\n})();', start);
 if (end < 0) fail('TPHYS close not found');
 end += '\n})();'.length;
-const sandbox = { console: { log() {}, warn() {}, error() {} }, Math, JSON, isFinite, NaN, Infinity, Number };
+const sandbox = {
+  console: { log() {}, warn() {}, error() {} },
+  Math, JSON, isFinite, NaN, Infinity, Number,
+  SIM: { swF: null, swR: null, mFR: null, mRR: null }
+};
 vm.createContext(sandbox);
 vm.runInContext(src.slice(start, end) + '\nthis.__TPHYS = TPHYS;', sandbox);
 const TPHYS = sandbox.__TPHYS;
@@ -55,7 +59,10 @@ let ctx = null;
 if (input.ctx && typeof input.ctx === 'object') {
   ctx = input.ctx;
 } else if (TPHYS.makeSimContext) {
-  try { ctx = TPHYS.makeSimContext(input.body); }
+  try {
+    ctx = TPHYS.makeSimContext(input.body);
+    console.warn('WARN: input.ctx not provided; using fallback TPHYS.makeSimContext with default kinematics');
+  }
   catch (e) { fail('makeSimContext 失败（无 SIM 上下文时请传入 input.ctx）: ' + e.message); }
 }
 if (!ctx) fail('无有效仿真上下文（input.ctx 缺失且 makeSimContext 不可用）');

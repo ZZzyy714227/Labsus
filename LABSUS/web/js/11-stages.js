@@ -2390,9 +2390,12 @@ function initSlopeStageEvents(){
   }
   if (customApplyBtn && customModal) {
     customApplyBtn.onclick = () => {
-      const rampC = parseInt(document.getElementById("custRampCount").value, 10) || 10;
-      const mooseC = parseInt(document.getElementById("custMooseCount").value, 10) || 5;
-      const bumpC = parseInt(document.getElementById("custBumpCount").value, 10) || 8;
+      const rampEl = document.getElementById("custRampCount");
+      const mooseEl = document.getElementById("custMooseCount");
+      const bumpEl = document.getElementById("custBumpCount");
+      const rampC = (rampEl ? parseInt(rampEl.value, 10) : NaN) || 10;
+      const mooseC = (mooseEl ? parseInt(mooseEl.value, 10) : NaN) || 5;
+      const bumpC = (bumpEl ? parseInt(bumpEl.value, 10) : NaN) || 8;
       
       SLOPE_STAGE.scenarioConfigs.jump_ramp.repeatCount = rampC;
       SLOPE_STAGE.scenarioConfigs.moose_test.repeatCount = mooseC;

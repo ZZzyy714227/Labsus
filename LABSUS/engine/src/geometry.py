@@ -18,6 +18,20 @@ def dist(a, b):
     return float(np.linalg.norm(vec3(a, b)))
 
 
+def line_intersect_2d(p1, d1, p2, d2):
+    """2D line intersection between p1 + s*d1 and p2 + t*d2.
+
+    Returns the intersection point as a 2D numpy array [x, y],
+    or None if the lines are parallel or degenerate (|det| < 1e-12).
+    """
+    denom = d1[0] * d2[1] - d1[1] * d2[0]
+    if abs(denom) < 1e-12:
+        return None
+    t = np.asarray(p2, dtype=float) - np.asarray(p1, dtype=float)
+    s = (t[0] * d2[1] - t[1] * d2[0]) / denom
+    return np.asarray(p1, dtype=float) + s * np.asarray(d1, dtype=float)
+
+
 def distance_point_to_line(p, a, b):
     """Shortest distance from point p to line through a-b."""
     closest = closest_point_on_line(p, a, b)

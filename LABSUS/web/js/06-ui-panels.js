@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 /* ================================ 11. UI 控制面板构建 ================================ */
 const PICK=[];
 const UI={hover:null,selHP:null,drag:null,ro:{},sync:[],plots:[],syncBase:null};
@@ -566,8 +566,8 @@ function tireCalibParse(text){
   return out.length?out:null;
 }
 function tireCalibSample(){
-  /* 示例：用引擎缺省 MF 在 2000/3500/5000 N 三个载荷层级合成曲线 */
-  const P={Fy0:8000,By:9,Cy:1.2,Ey:-0.5,LS:0.10,FzNom:3500};
+  /* 示例：用引擎缺省 GT3 MF 在 2000/3500/5000 N 三个载荷层级合成曲线 */
+  const P={Fy0:5250,By:20,Cy:1.2,Ey:-0.5,LS:0.10,FzNom:3500};
   const al=[];for(let a=0;a<=20;a+=0.5)al.push(a);
   return [2000,3500,5000].map(fz=>{
     const r=fz/P.FzNom, d=P.Fy0*r*Math.max(0.1,1-P.LS*(r-1));
@@ -619,7 +619,7 @@ function buildTireCalibPanel(host){
   runBtn.onclick=tireCalibRun;
   row.appendChild(exBtn);row.appendChild(runBtn);b.appendChild(row);
   const st=E("div","eng-status");st.id="tireCalibStatus";
-  st.textContent="当前缺省胎（引擎 TireParams）：Fy0 8000 N · μ 2.29 · LS 0.10；辨识成功后此处显示实胎参数。";
+  st.textContent="当前缺省胎（引擎 TireParams）：Fy0 5250 N · μ 1.50 · LS 0.10；辨识成功后此处显示实胎参数。";
   b.appendChild(st);
 }
 /* ── K&C 台架对拍（真实开发闭环：仿真预测 ↔ 台架验证，讲义 EP02“仿真 vs 实测”纪律） ── */
