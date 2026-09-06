@@ -127,13 +127,17 @@ function buildLeft(){
   groupDiv(host,"TUNING");
 
   b=sec(host,"多体求解模式","SOLVER CONTROLS",false,"grn");
+  /* G32 修复：切 RIG 时若路面激励仍为 none，台架点运行会纹丝不动（用户困惑点）
+     → 自动给默认正弦激励（UI.sync 每帧会同步路面激励区块的 select 显示） */
   rowBtns(b,[["运动学 KIN",()=>{S.mode="kin";},()=>S.mode==="kin"],
-             ["4-Post 台架 RIG",()=>{S.mode="rig";S.simT=0;},()=>S.mode==="rig"],
+             ["4-Post 台架 RIG",()=>{S.mode="rig";S.simT=0;if(S.road==="none")S.road="sine";},()=>S.mode==="rig"],
              ["准静态操稳 QS",()=>{S.mode="quasi";},()=>S.mode==="quasi"]]);
   rowBtns(b,[["运行 / 暂停",()=>{S.play=!S.play;},()=>S.play],
              ["复位 RESET",()=>{S.travel=0;S.roll=0;S.rack=0;rebuild();}]]);
-  rowSlider(b,"轮跳幅值","TRAVEL AMP","mm",0,75,1,()=>S.excA,v=>S.excA=v,0);
-  rowSlider(b,"轮跳频率","FREQ","Hz",0.05,1.5,0.01,()=>S.excF,v=>S.excF=v,2);
+  /* G32 修复：这两个滑杆原只写 S.excA/S.excF（仅 KIN 正弦消费）——RIG 模式下
+     完全无效（台架激励走 S.rA/S.rF，roadSignal）。rig 时同步下发。 */
+  rowSlider(b,"轮跳幅值","TRAVEL AMP","mm",0,75,1,()=>S.excA,v=>{S.excA=v;if(S.mode==="rig")S.rA=v;},0);
+  rowSlider(b,"轮跳频率","FREQ","Hz",0.05,1.5,0.01,()=>S.excF,v=>{S.excF=v;if(S.mode==="rig")S.rF=v;},2);
 
   b=sec(host,"内置弹性与阻尼元件","SPRINGS & DAMPERS",false);
   rowSlider(b,"主弹簧刚度","SPRING RATE","N/mm",40,300,5,()=>S[S.axis].kS,v=>{S[S.axis].kS=v;refreshDerived(false);},0);
