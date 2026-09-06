@@ -1,4 +1,4 @@
-/* =====================================================================
+﻿/* =====================================================================
    16-powertrain.js — G31 动力工坊（2026-09-05）
    段1 数据模型/校验/默认(legacy-equivalent)/状态/mapLookup
    段2 动力源(ICE/Motor) 段3 传动链 段4 电池 段5 组合器+step 段6 UI
@@ -874,7 +874,7 @@ const POWERTRAIN = {
         <div style="flex:1;min-width:0;" id="ptLeft"></div>
         <div style="flex:1;min-width:0;" id="ptRight"></div>
       </div>
-      <canvas id="ptCurve" width="840" height="190" style="width:100%;height:190px;margin-top:6px;background:#0b0f16;border:1px solid #21262d;border-radius:6px;"></canvas>
+      <canvas id="ptCurve" width="840" height="260" style="width:100%;height:260px;margin-top:6px;background:#0b0f16;border:1px solid #21262d;border-radius:6px;"></canvas>
       <div id="ptDerived" style="font:10px monospace;color:#8b949e;margin-top:4px;min-height:14px;"></div>
       <div id="ptSavedList" style="margin-top:6px;"></div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
@@ -1235,9 +1235,15 @@ const POWERTRAIN = {
     if (!cv || typeof cv.getContext !== "function") return;
     const ctx = cv.getContext("2d");
     if (!ctx) return;
-    const W = Number(cv.width) > 0 ? Number(cv.width) : 840;
-    const H = Number(cv.height) > 0 ? Number(cv.height) : 190;
-    const L = 48, Rr = W - 50, Tt = 16, Bb = H - 22;
+    /* G32：DPR 自适应背衬——原固定 840×190 被 CSS 拉伸到容器宽 → 模糊。
+       逻辑坐标仍为 CSS 像素，拖拽命中/绘制共用同一坐标系，不受影响。 */
+    const dpr = Math.min(3, (typeof window !== "undefined" && Number(window.devicePixelRatio)) || 1);
+    const W = (typeof cv.clientWidth === "number" && cv.clientWidth > 0) ? cv.clientWidth : 840;
+    const H = (typeof cv.clientHeight === "number" && cv.clientHeight > 0) ? cv.clientHeight : 260;
+    const bw = Math.round(W * dpr), bh = Math.round(H * dpr);
+    if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; }
+    if (typeof ctx.setTransform === "function") ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const L = 52, Rr = W - 56, Tt = 18, Bb = H - 26;
     ctx.clearRect(0, 0, W, H);
     const d = this._draft || this.spec || this.defaultSpec();
     const ice = d.ice || null, mF = d.motorF || null, mR = d.motorR || null;
@@ -1268,7 +1274,7 @@ const POWERTRAIN = {
     const YP = p => Bb - (Bb - Tt) * (Math.max(0, p) / pMax);
     /* 网格 + X 轴刻度（rpm） */
     ctx.lineWidth = 1; ctx.strokeStyle = "rgba(139,148,158,0.16)";
-    ctx.font = "9px monospace"; ctx.fillStyle = "#8b949e";
+    ctx.font = "11px monospace"; ctx.fillStyle = "#8b949e";
     const nx = 6;
     for (let i = 0; i <= nx; i++) {
       const rpm = rpmMax * i / nx, x = X(rpm);
@@ -1342,7 +1348,7 @@ const POWERTRAIN = {
     if (mR) legend.push(["后电机", "#7ee787"]);
     legend.push(["合成扭矩", "#e6edf3"]);
     legend.push(["功率 kW(右轴)", "#d29922"]);
-    ctx.font = "9px monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.font = "11px monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
     let lx = L + 2;
     for (const [t, c] of legend) {
       ctx.strokeStyle = c; ctx.lineWidth = 2;

@@ -1,12 +1,12 @@
-"use strict";
+﻿"use strict";
 function plotXYMulti(cv,title,unit,series,xr,curx){
   /* 多实线绘制（plotXYOverlay 的多线版本，供引擎结果面板使用） */
-  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const dpr=Math.min(3,window.devicePixelRatio||1);
   const w=cv.clientWidth||300,h=cv.clientHeight||84;
   if(cv.width!==w*dpr||cv.height!==h*dpr){cv.width=w*dpr;cv.height=h*dpr;}
   const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,w,h);ctx.fillStyle=C.bg;ctx.fillRect(0,0,w,h);
-  const ml=34,mr=6,mt=13,mb=11,pw=w-ml-mr,ph=h-mt-mb;
+  const ml=42,mr=8,mt=16,mb=13,pw=w-ml-mr,ph=h-mt-mb;
   let y0=1e9,y1=-1e9;
   series.forEach(s=>s.pts.forEach(p=>{if(p[1]===null||!isFinite(p[1]))return;
     if(p[1]<y0)y0=p[1];if(p[1]>y1)y1=p[1];}));
@@ -30,7 +30,7 @@ function plotXYMulti(cv,title,unit,series,xr,curx){
     ctx.beginPath();ctx.moveTo(x,mt);ctx.lineTo(x,mt+ph);ctx.stroke();ctx.setLineDash([]);
   }
   ctx.strokeStyle=C.axis;ctx.lineWidth=1;ctx.strokeRect(ml+.5,mt+.5,pw,ph);
-  ctx.fillStyle=C.txt2;ctx.font="8.5px ui-monospace,monospace";
+  ctx.fillStyle=C.txt2;ctx.font="10.5px ui-monospace,monospace";
   ctx.fillText(title,ml+1,mt-3.5);
   ctx.fillStyle=C.txt3;ctx.textAlign="right";
   ctx.fillText(fmt(y1,1),ml-3,mt+7);ctx.fillText(fmt(y0,1),ml-3,mt+ph-1);
@@ -163,12 +163,12 @@ function updateReadouts(){
 }
 
 function plotXYOverlay(cv,title,unit,seriesActive,seriesBase,xr,curx,seriesMeas){
-  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const dpr=Math.min(3,window.devicePixelRatio||1);
   const w=cv.clientWidth||300,h=cv.clientHeight||84;
   if(cv.width!==w*dpr||cv.height!==h*dpr){cv.width=w*dpr;cv.height=h*dpr;}
   const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,w,h);ctx.fillStyle=C.bg;ctx.fillRect(0,0,w,h);
-  const ml=34,mr=6,mt=13,mb=11,pw=w-ml-mr,ph=h-mt-mb;
+  const ml=42,mr=8,mt=16,mb=13,pw=w-ml-mr,ph=h-mt-mb;
   
   let y0=1e9,y1=-1e9;
   const allPts = [].concat(seriesActive.pts, seriesBase?seriesBase.pts:[], seriesMeas?seriesMeas.pts:[]);
@@ -215,7 +215,7 @@ function plotXYOverlay(cv,title,unit,seriesActive,seriesBase,xr,curx,seriesMeas)
   }
 
   ctx.strokeStyle=C.axis;ctx.lineWidth=1;ctx.strokeRect(ml+.5,mt+.5,pw,ph);
-  ctx.fillStyle=C.txt2;ctx.font="8.5px ui-monospace,monospace";
+  ctx.fillStyle=C.txt2;ctx.font="10.5px ui-monospace,monospace";
   ctx.fillText(title,ml+1,mt-3.5);
   ctx.fillStyle=C.txt3;ctx.textAlign="right";
   ctx.fillText(fmt(y1,1),ml-3,mt+7);ctx.fillText(fmt(y0,1),ml-3,mt+ph-1);
@@ -245,12 +245,12 @@ function kcMeasuredRMS(axis,key){
 /* 不足转向特性 δ-ay 图（底盘开发汇报核心图；当前工况点红点标记） */
 function plotUsCurve(cv){
   const c=SIM.usCurve;if(!c||!c.gy||c.gy.length<3)return;
-  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const dpr=Math.min(3,window.devicePixelRatio||1);
   const w=cv.clientWidth||300,h=cv.clientHeight||110;
   if(cv.width!==w*dpr||cv.height!==h*dpr){cv.width=w*dpr;cv.height=h*dpr;}
   const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,w,h);ctx.fillStyle=C.bg;ctx.fillRect(0,0,w,h);
-  const ml=30,mr=6,mt=13,mb=13,pw=w-ml-mr,ph=h-mt-mb;
+  const ml=38,mr=8,mt=16,mb=14,pw=w-ml-mr,ph=h-mt-mb;
   let y0=0,y1=0.1;
   c.us.forEach(v=>{if(isFinite(v)){if(v<y0)y0=v;if(v>y1)y1=v;}});
   const pad=(y1-y0)*0.15+0.05;y0-=pad;y1+=pad;
@@ -279,7 +279,7 @@ function plotUsCurve(cv){
     }
   }
   ctx.strokeStyle=C.axis;ctx.lineWidth=1;ctx.strokeRect(ml+.5,mt+.5,pw,ph);
-  ctx.fillStyle=C.txt2;ctx.font="8.5px ui-monospace,monospace";
+  ctx.fillStyle=C.txt2;ctx.font="10.5px ui-monospace,monospace";
   ctx.fillText("不足转向特性 US CHARACTERISTIC · 实线=总 δ（轮胎+侧倾转向） · 虚线=轮胎项 · 红点=当前工况",ml+1,mt-3.5);
   ctx.fillStyle=C.txt3;ctx.textAlign="right";
   ctx.fillText(fmt(y1,1),ml-3,mt+7);ctx.fillText(fmt(y0,1),ml-3,mt+ph-1);
