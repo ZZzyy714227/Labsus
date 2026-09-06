@@ -226,6 +226,22 @@ ctx.SLOPE_STAGE.switchScenario("undulating_road", false);
 assert(ctx.SLOPE_STAGE.scenario === "undulating_road", "Switched scenario to undulating_road");
 assert(ctx.SLOPE_STAGE.camMode === "front_low", "Auto-switched camera to front_low for undulating_road");
 
+// ── G32 修复回归：RIG 模式暂停（simulate(0)）不得 NaN 毒化机构 ──
+// 根因：暂停帧 dt=0 进入 stepDyn 后 h=dt/NS=0，速度差分 (p-pp)/0=NaN 污染全部
+// 节点，复位前不可自愈（用户报告：RIG 点一次暂停画面冻死、读数全 "--"）。
+console.log("=== G32-fix: RIG pause (dt=0) must not poison mechanism ===");
+vm.runInContext("S.mode='rig'; S.road='sine'; S.play=true;", ctx);
+vm.runInContext("simulate(0.016); simulate(0.016);", ctx);
+const trRun = vm.runInContext("SIM.mFR.tr", ctx);
+assert(isFinite(trRun), `RIG run frames produce finite travel (tr=${trRun.toFixed(3)})`);
+vm.runInContext("simulate(0); simulate(0); simulate(0);", ctx);
+const trPause = vm.runInContext("SIM.mFR.tr", ctx);
+assert(isFinite(trPause), `RIG pause frames (dt=0) keep travel finite (tr=${trPause})`);
+vm.runInContext("simulate(0.016);", ctx);
+const trResume = vm.runInContext("SIM.mFR.tr", ctx);
+assert(isFinite(trResume), `RIG resume after pause stays finite (tr=${trResume})`);
+assert(trResume !== trPause, "RIG actually integrates again after resume");
+
 console.log(`\n========================================`);
 console.log(`All ${passed}/${total} Proving Ground Unit Tests Passed!`);
 console.log(`========================================`);

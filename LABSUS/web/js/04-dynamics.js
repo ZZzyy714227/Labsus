@@ -123,8 +123,11 @@ function travelL(half, deg){return clamp(S.travel-rollOffset(half,deg),S.trMin,S
 
 function simulate(dt){
   if(TRK.active){trackStep(dt);return;}
-  if(STAGE.open){requestAnimationFrame(loop);return;}   // 舞台打开时挂起主渲染（省帧率）
-  if((typeof SLOPE_STAGE !== 'undefined' && SLOPE_STAGE.active) || (typeof SKIDPAD_STAGE !== 'undefined' && SKIDPAD_STAGE.active)){requestAnimationFrame(loop);return;} // 爬坡舞台打开时挂起主仿真，避免双写 SIM
+  /* G32 修复：原此处对 STAGE.open/SLOPE/SKIDPAD 分支各注册一次 rAF(loop)，
+     而主循环自身每帧自注册（08-interact.js）→ 舞台打开期间 rAF 实例每帧翻倍，
+     关台后大量并行 loop 永久残留（卡顿源）。直接 return 即可，主循环自续。 */
+  if(STAGE.open){return;}
+  if((typeof SLOPE_STAGE !== 'undefined' && SLOPE_STAGE.active) || (typeof SKIDPAD_STAGE !== 'undefined' && SKIDPAD_STAGE.active)){return;}
   const MF=SIM.FR, NF=SIM.FL, MR=SIM.RR, NR=SIM.RL;
   if(S.mode==="kin"){
     const z0F=MF.n[MF.idx.WC].p0[2], z0R=MR.n[MR.idx.WC].p0[2];
@@ -147,15 +150,26 @@ function simulate(dt){
     }else{SIM.mFL=null; SIM.mRL=null;}
     S.dyn.on=false;
   }else{
-    const rF=stepDyn(MF, dt, S.rack, S.simT, 'front'); SIM.mFR=metrics(MF, 'front');
-    const rR=stepDyn(MR, dt, 0, S.simT, 'rear');       SIM.mRR=metrics(MR, 'rear');
-    S.dyn={on:true,load:rF.load,fs:rF.fs,fd:rF.fd,pen:rF.pen,acc:rF.acc,road:rF.road,z:SIM.mFR.tr};
-    if(S.show.mirror){
-      stepDyn(NF, dt, -S.rack, S.simT, 'front'); SIM.mFL=metrics(NF, 'front');
-      stepDyn(NR, dt, 0, S.simT, 'rear');        SIM.mRL=metrics(NR, 'rear');
-    }else{SIM.mFL=null; SIM.mRL=null;}
-    SIM.trace.push({t:S.simT,tr:SIM.mFR.tr,load:rF.load,fs:rF.fs,fd:rF.fd,road:rF.road});
-    if(SIM.trace.length>1400)SIM.trace.shift();
+    /* G32 修复（用户报告"有bug"）：RIG 模式点一次「运行/暂停」即永久冻死。
+       根因：暂停帧 simulate(0)（08-interact.js F-20）进入 stepDyn 后
+       h=dt/NS=0 → 速度差分 (p-pp)/0=NaN 毒化全部节点，复位前不可自愈。
+       dt=0（暂停）时跳过积分，仅刷新读数快照。 */
+    if(dt>0){
+      const rF=stepDyn(MF, dt, S.rack, S.simT, 'front');
+      SIM.mFR=metrics(MF, 'front');
+      const rR=stepDyn(MR, dt, 0, S.simT, 'rear');       SIM.mRR=metrics(MR, 'rear');
+      S.dyn={on:true,load:rF.load,fs:rF.fs,fd:rF.fd,pen:rF.pen,acc:rF.acc,road:rF.road,z:SIM.mFR.tr};
+      if(S.show.mirror){
+        stepDyn(NF, dt, -S.rack, S.simT, 'front'); SIM.mFL=metrics(NF, 'front');
+        stepDyn(NR, dt, 0, S.simT, 'rear');        SIM.mRL=metrics(NR, 'rear');
+      }else{SIM.mFL=null; SIM.mRL=null;}
+      SIM.trace.push({t:S.simT,tr:SIM.mFR.tr,load:rF.load,fs:rF.fs,fd:rF.fd,road:rF.road});
+      if(SIM.trace.length>1400)SIM.trace.shift();
+    }else{
+      SIM.mFR=metrics(MF, 'front'); SIM.mRR=metrics(MR, 'rear');
+      if(S.show.mirror){SIM.mFL=metrics(NF, 'front'); SIM.mRL=metrics(NR, 'rear');}
+      else{SIM.mFL=null; SIM.mRL=null;}
+    }
   }
   SIM.halfF = SIM.mFR?abs(SIM.mFR.cp[0]):790;
   SIM.halfR = SIM.mRR?abs(SIM.mRR.cp[0]):790;
