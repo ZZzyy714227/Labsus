@@ -162,6 +162,32 @@ const POWERTRAIN = {
     const g = this.spec && this.spec.gearbox;
     return !!(g && !(g.ratios.length === 1 && g.ratios[0] === 1 && g.finalDrive === 1));
   },
+  /* G31-P10-4：当前生效 spec 是否仍与 legacy-equivalent 默认物理等价。
+     true → payload 不发嵌套 powertrain 字段（与旧行为逐字节一致，对拍锚）；
+     false → 09-track.js 把 spec 发给 Python 引擎。
+     逐项比较影响物理的字段（map 平直性/比表/惯量/摩擦/架构/驱动/分裂比），
+     不比 UI 专用字段（slipRefRadS 等在缺省 open diff 下无物理效应）。 */
+  isLegacyEquivalent() {
+    const sp = this.spec;
+    if (!sp) return true;
+    if (sp.architecture !== "ice" || sp.drive !== "awd_fixed") return false;
+    if (Math.abs((sp.splitFront || 0) - 0.2) > 1e-12) return false;
+    if (sp.motorF || sp.motorR || sp.battery) return false;
+    const g = sp.gearbox;
+    if (!g || g.ratios.length !== 1 || g.ratios[0] !== 1 || g.finalDrive !== 1 ||
+        (g.eff !== undefined && g.eff !== 1) || (g.shiftTimeMs || 0) !== 0) return false;
+    const d = sp.diff;
+    if (d && d.type && d.type !== "open") return false;
+    const ice = sp.ice;
+    if (!ice) return false;
+    if ((ice.fricA || 0) !== 0 || (ice.fricB || 0) !== 0 || (ice.fricC || 0) !== 0) return false;
+    if ((ice.inertia || 0) !== 0 || (ice.throttleTau || 0) !== 0) return false;
+    const m = ice.map;
+    if (!Array.isArray(m) || m.length === 0) return false;
+    const t0 = m[0][1];
+    if (Math.abs(t0 - 1200) > 1e-9) return false;
+    return m.every(p => Math.abs(p[1] - t0) < 1e-9);
+  },
   /* M-1(G31-P6-fix)：封装 rpm 源判据——architecture==="ev"（直驱，无曲轴/iceOmega
      不可用，rpm 源必须落到驱动轮速）或 hasRealDrivetrain()（存在真实齿轮比，
      iceOmega 可信）二者任一为真时，state.iceOmega/驱动轮速才作为 HUD/声浪 rpm 源。

@@ -727,6 +727,22 @@ function trackStageRun(){
       FzNom:parseFloat(document.getElementById("ssFzN").value)||3500,
       Ls:parseFloat(document.getElementById("ssLs").value)||0.35,
       Cg:parseFloat(document.getElementById("ssCg").value)||0.5}};
+  /* G31-P10-4：动力工坊定制规格下发——仅当生效 spec 与 legacy-equivalent
+     物理不等价时才叠加嵌套字段（PowertrainSpec 继承 PowertrainParams，
+     标量键共存；缺省不发 → payload 与旧行为逐字节一致，对拍锚不变）。
+     前端专有字段（fricA/fricB/fricC/throttleTau/slipRefRadS/diff/centerDiff）
+     由 Python 端 PowertrainSpec extra=ignore 吸收。 */
+  if(typeof POWERTRAIN!=="undefined" && POWERTRAIN.spec && !POWERTRAIN.isLegacyEquivalent()){
+    const ptSpec=JSON.parse(JSON.stringify(POWERTRAIN.spec));
+    body.powertrain.architecture=ptSpec.architecture;
+    body.powertrain.drive=ptSpec.drive;
+    body.powertrain.splitFront=ptSpec.splitFront;
+    if(ptSpec.ice)body.powertrain.ice=ptSpec.ice;
+    if(ptSpec.motorF)body.powertrain.motorF=ptSpec.motorF;
+    if(ptSpec.motorR)body.powertrain.motorR=ptSpec.motorR;
+    if(ptSpec.gearbox)body.powertrain.gearbox=ptSpec.gearbox;
+    if(ptSpec.battery)body.powertrain.battery=ptSpec.battery;
+  }
   /* 轮胎实测标定优先（讲义 EP08 数据链）：辨识成功后覆写舞台胎参数 */
   if(SIM.tireCalib){const tc=SIM.tireCalib;
     Object.assign(body.tire,{Fy0:tc.Fy0,FzNom:tc.FzNom,LS:tc.LS,By:tc.By,Cy:tc.Cy});

@@ -256,6 +256,30 @@ def test_powertrain_optional_field():
     assert d.get("powertrain") is None
 
 
+def test_powertrain_frontend_shape_extra_ignored():
+    """G31-P10-4：前端 09-track.js 下发的形状（标量+嵌套+JS 专有字段）被接受。
+
+    fricA/fricB/fricC/throttleTau（IceSpec）、autoUpFrac/autoDownFrac（GearboxSpec）、
+    diff/centerDiff（PowertrainSpec）均为 Python 不消费的 JS 字段，extra=ignore 吸收
+    ——防全局 strict 化后 422；同时验证 transient 消费门控依赖的 ice 嵌套完整可达。"""
+    from src.api.v3models import TrackSimRequest
+    req = TrackSimRequest(**_pt_min_body(powertrain={
+        "T_max": 250, "P_kw": 80, "brake_split_f": 0.6,       # 标量共存（继承）
+        "architecture": "ice", "drive": "rwd", "splitFront": 0.0,
+        "ice": {"cyl": 8, "layout": "V8", "map": [[800, 520], [6500, 520]],
+                 "redlineRpm": 8500, "fuelCutRpm": 8700,
+                 "fricA": 8, "fricB": 0.002, "fricC": 2.2e-6, "throttleTau": 0.02},
+        "gearbox": {"type": "manual", "ratios": [3.0, 2.2, 1.7, 1.4, 1.15, 0.95],
+                     "finalDrive": 3.9, "shiftTimeMs": 120, "eff": 0.97,
+                     "autoUpFrac": 0.92, "autoDownFrac": 0.55},
+        "diff": {"type": "lsd", "bias": 3, "lockNm": 120, "slipRefRadS": 8}}))
+    assert getattr(req.powertrain.ice, "fricA", None) is None   # extra=ignore：静默丢弃（非 422）
+    assert req.powertrain.gearbox.ratios[0] == 3.0
+    assert req.powertrain.drive == "rwd"
+    # transient 门控可达：ice is not None → 等效轮上扭矩覆盖生效路径可用
+    assert req.powertrain.ice.map[0][1] == 520
+
+
 # ── G31-P7 审查修复：IceSpec.map 边界校验（畸形输入 → ValidationError/422，
 #    而非 transient 内 p[0]/p[1] 触发的 IndexError/500）。语义对齐前端
 #    16-powertrain.js validate 的 ice.map / ice.map(ascending)。──
