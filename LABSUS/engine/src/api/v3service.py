@@ -131,9 +131,17 @@ def _estimate_rotation(m) -> np.ndarray:
 
     引擎求解器只输出节点位置（distance-only 约束），不输出刚体四元数；
     轮轴等 knuckle 标签方向须由姿态估计恢复（前端由四元数直接给出）。
+
+    2026-09-07（独立解析基准对拍发现）：刚体点集必须取机构 KNUCKLE 簇
+    实际成员 —— strut_attach=lca/uca 时 UP4 挂在摆臂上、相对转向节运动，
+    混入刚体拟合会污染 camber/toe。偏差量级随几何而定：基准几何推杆
+    +90mm 行程处 camber ~0.4°；repo 默认推杆 preset 同点复核 ~0.08°
+    （2026-09-18 评审实测）。knuckle 拓扑下 ids 与历史常量一致，行为不变。
     """
-    A = np.stack([m.node(k).p0 for k in _KNUCKLE_IDS])
-    B = np.stack([m.node(k).pos for k in _KNUCKLE_IDS])
+    body = next((b for b in m.bodies if b.name == "KNUCKLE"), None)
+    ids = list(body.ids) if body is not None else _KNUCKLE_IDS
+    A = np.stack([m.node(k).p0 for k in ids])
+    B = np.stack([m.node(k).pos for k in ids])
     c0, c1 = A.mean(0), B.mean(0)
     H = (B - c1).T @ (A - c0)
     u, _s, vt = np.linalg.svd(H)

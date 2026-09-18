@@ -22,7 +22,6 @@ from geometry import distance_point_to_line, rotate_around_axis
 from .models import Mechanism
 
 _STATE_IDS = ["UP1", "UP2", "UP3", "UP4", "UP5", "FL1"]
-_KNUCKLE_IDS = ["UP1", "UP2", "UP3", "UP4", "UP5"]
 
 
 @dataclass
