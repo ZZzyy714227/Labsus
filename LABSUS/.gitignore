@@ -33,3 +33,4 @@ scratch/
 .agents/
 .qoder/
 web/test/*.js.json
+!requirements*.txt

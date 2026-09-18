@@ -11,11 +11,49 @@ rem ============================================================
 setlocal
 cd /d "%~dp0"
 
-set "PY=python"
-where python >nul 2>nul || set "PY=py"
-rem fallback: PATH python may lack deps (managed env) - use the known system python
-%PY% -c "import fastapi,uvicorn,numpy,scipy,pydantic" >nul 2>nul
-if errorlevel 1 set "PY=C:\Users\zzy\AppData\Local\Programs\Python\Python313\python.exe"
+set "PY="
+
+rem -- 1. Check local virtual environments (.venv / venv) --
+if exist "%~dp0.venv\Scripts\python.exe" (
+  "%~dp0.venv\Scripts\python.exe" -c "import fastapi,uvicorn,numpy,scipy,pydantic" >nul 2>nul
+  if not errorlevel 1 set "PY=%~dp0.venv\Scripts\python.exe"
+)
+if not defined PY if exist "%~dp0venv\Scripts\python.exe" (
+  "%~dp0venv\Scripts\python.exe" -c "import fastapi,uvicorn,numpy,scipy,pydantic" >nul 2>nul
+  if not errorlevel 1 set "PY=%~dp0venv\Scripts\python.exe"
+)
+
+rem -- 2. Check PATH python / py --
+if not defined PY (
+  python -c "import fastapi,uvicorn,numpy,scipy,pydantic" >nul 2>nul
+  if not errorlevel 1 set "PY=python"
+)
+if not defined PY (
+  py -c "import fastapi,uvicorn,numpy,scipy,pydantic" >nul 2>nul
+  if not errorlevel 1 set "PY=py"
+)
+
+rem -- 3. Check Windows per-user Python installation in LOCALAPPDATA --
+if not defined PY if defined LOCALAPPDATA (
+  if exist "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" set "PY=%LOCALAPPDATA%\Programs\Python\Python313\python.exe"
+  if not defined PY if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" set "PY=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+  if not defined PY if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" set "PY=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+  if not defined PY if exist "%LOCALAPPDATA%\Programs\Python\Python310\python.exe" set "PY=%LOCALAPPDATA%\Programs\Python\Python310\python.exe"
+)
+
+rem -- 4. Fallback if dependencies not met --
+if not defined PY (
+  where python >nul 2>nul && set "PY=python"
+  if not defined PY where py >nul 2>nul && set "PY=py"
+  echo [LABSUS WARNING] Python environment may lack required dependencies.
+  echo Please run: pip install -r requirements.txt
+)
+
+if not defined PY (
+  echo [LABSUS ERROR] Python not found. Please install Python 3.10+ and add to PATH.
+  pause
+  exit /b 1
+)
 
 rem -- 1) engine :8001 --
 %PY% -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/v3/health', timeout=1)" >nul 2>nul
@@ -40,4 +78,3 @@ timeout /t 2 /nobreak >nul
 start "" "http://127.0.0.1:714/dwb-pro-v4.html"
 
 endlocal
-
