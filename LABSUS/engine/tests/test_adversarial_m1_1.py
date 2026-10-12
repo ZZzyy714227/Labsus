@@ -6,14 +6,14 @@ Targeting:
 3. line_intersect_2d (geometry.py)
 """
 import math
+
 import numpy as np
 import pytest
 
-from src.metrics.kandc import slope_at_travel, _slope
-from src.tire_mf import evaluate_magic_formula_fy, MagicFormulaSub
-from src.solver.tire_fit import _mf_fy
 from src.geometry import line_intersect_2d
-
+from src.metrics.kandc import _slope, slope_at_travel
+from src.solver.tire_fit import _mf_fy
+from src.tire_mf import MagicFormulaSub, evaluate_magic_formula_fy
 
 # ============================================================================
 # TARGET 1: slope_at_travel & _slope on Extreme Curves
@@ -332,6 +332,7 @@ def test_line_intersect_unnormalized_scaling_behavior():
     p2 = [0.0, 1.0]
     d2 = [0.0, 1e-7]
     denom = d1[0]*d2[1] - d1[1]*d2[0]  # = 1e-14 < 1e-12
+    assert abs(denom) < 1e-12, '本例前提：两方向近平行'
     res = line_intersect_2d(p1, d1, p2, d2)
     # Documents that unnormalized tiny vectors return None due to unnormalized denom check
     assert res is None, "Empirically confirms scale dependence when vectors have small norms"
@@ -351,7 +352,7 @@ def test_slope_exact_interior_knot_difference_scheme():
     # y = x^2, sampled at x = [-2, -1, 0, 1, 2], y = [4, 1, 0, 1, 4]
     x = [-2.0, -1.0, 0.0, 1.0, 2.0]
     y = [4.0, 1.0, 0.0, 1.0, 4.0]
-    
+
     # At x = 0.0:
     res = slope_at_travel(y, x, 0.0)
     assert res is not None
@@ -359,7 +360,7 @@ def test_slope_exact_interior_knot_difference_scheme():
     # Empirically verify that lo=1 (x=-1) and hi=2 (x=0) -> backward difference
     assert lo == 1 and hi == 2
     assert slope == (0.0 - 1.0) / (0.0 - (-1.0))  # = -1.0
-    
+
     # At x = 0.5 (between sample points):
     res_mid = slope_at_travel(y, x, 0.5)
     assert res_mid is not None

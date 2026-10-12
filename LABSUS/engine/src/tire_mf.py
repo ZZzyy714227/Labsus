@@ -3,8 +3,9 @@
 S1 降阶：无复合滑移、无压力/温度项；摩擦圆（F_avail = μ(Fz)·Fz）作为
 无 MF 参数时的回退检查（沿用 V1 设计 §8.3）。
 """
-import numpy as np
 import math
+
+import numpy as np
 
 
 def _load_d(d: dict[str, float]) -> dict[str, float]:
@@ -27,6 +28,44 @@ def load_tir_params(src: dict) -> dict[str, float]:
     }
 
 
+def load_d(fz: float, *, Fy0: float, FzNom: float = 3500.0, LS: float = 0.0) -> float:
+    """峰值尺度 D(Fz) —— **全工程唯一实现**（LS>0 时施加 Jensen 载荷敏感性）。
+
+    D = Fy0·(Fz/FzNom)·max(0.1, 1 − LS·(Fz/FzNom − 1))，LS=0 退化为线性基线。
+    M5（2026-09-20）单源化：此前该式在 `evaluate_magic_formula_fy`、
+    `MagicFormulaSub._d`、`api/chassis.py::_ca_mf` 三处各写一遍。
+    """
+    if fz <= 0:
+        return 0.0
+    r = fz / FzNom
+    d = Fy0 * r
+    if LS:
+        d *= max(0.1, 1.0 - LS * (r - 1.0))
+    return float(d)
+
+
+def cornering_stiffness(
+    fz: float,
+    *,
+    Fy0: float,
+    By: float,
+    Cy: float,
+    FzNom: float = 3500.0,
+    LS: float = 0.0,
+    axle_scale: float = 1.0,
+) -> float:
+    """侧偏刚度 Cα = dFy/dα|α=0（N/rad）= axle_scale · By · Cy · D(Fz)。
+
+    **全工程唯一实现**：MF 参数入口 `MagicFormulaSub.cornering_stiffness` 与
+    整车 US 梯度入口 `api/chassis.py` 都委托本函数（M5 单源化，此前两份拷贝）。
+
+    `axle_scale` = 按胎宽配平的轴系数 k = W_axle / mean(W_f, W_r)（M5 B3）：
+    只放大**刚度因子**，不动峰值 D（μ·Fz 与胎宽基本无关）⇒ 不影响轮胎量级
+    标定（μ=1.50 / 峰值侧偏角 8.27°）。等宽或缺字段时 k≡1。
+    """
+    return float(axle_scale * By * Cy * load_d(fz, Fy0=Fy0, FzNom=FzNom, LS=LS))
+
+
 def evaluate_magic_formula_fy(
     a_rad: np.ndarray | float,
     fz: float,
@@ -43,10 +82,7 @@ def evaluate_magic_formula_fy(
     a = np.asarray(a_rad, float) + Sh
     if fz <= 0:
         return np.zeros_like(a)
-    r = fz / FzNom
-    d = Fy0 * r
-    if LS:
-        d *= max(0.1, 1.0 - LS * (r - 1.0))
+    d = load_d(fz, Fy0=Fy0, FzNom=FzNom, LS=LS)
     x = By * a
     return d * np.sin(Cy * np.arctan(x - Ey * (x - np.arctan(x)))) + Sv
 
@@ -56,17 +92,9 @@ class MagicFormulaSub:
         self.p = params
 
     def _d(self, fz: float) -> float:
-        """峰值尺度 D(Fz)。LS>0 时施加载荷敏感性（重载 μ 递减，Jensen 效应）：
-        D = Fy0·(Fz/FzNom)·(1 − LS·(Fz/FzNom − 1))，LS=0 保持线性基线。
-        """
-        if fz <= 0:
-            return 0.0
-        r = fz / self.p["FzNom"]
-        d = self.p["Fy0"] * r
-        ls = self.p.get("LS", 0.0)
-        if ls:
-            d *= max(0.1, 1.0 - ls * (r - 1.0))
-        return d
+        """峰值尺度 D(Fz)；实现在模块级 `load_d`（全工程唯一）。"""
+        return load_d(fz, Fy0=self.p["Fy0"], FzNom=self.p["FzNom"],
+                      LS=self.p.get("LS", 0.0))
 
     @property
     def mu(self) -> float:
@@ -90,15 +118,17 @@ class MagicFormulaSub:
     def fy(self, alpha_deg, fz: float) -> np.ndarray:
         return self.fy_rad(np.asarray(alpha_deg, float) * (math.pi / 180.0), fz)
 
-    def cornering_stiffness(self, fz: float) -> float:
-        """侧偏刚度 Cα = dFy/dα @α=0（N/rad）：线性区斜率 = B·C·D(Fz)。
+    def cornering_stiffness(self, fz: float, axle_scale: float = 1.0) -> float:
+        """侧偏刚度 Cα = dFy/dα @α=0（N/rad）：线性区斜率 = axle_scale·B·C·D(Fz)。
 
         含载荷敏感性（LS）——重载下 Cα 递增但次线性，是载荷转移损失轴总
         抓地力与稳态不足转向梯度的轮胎侧根基（讲义 EP08/EP10）。
+        实现在模块级 `cornering_stiffness`（全工程唯一，chassis 的 US 梯度
+        走同一函数）；`axle_scale` = 按胎宽配平的轴系数（见该函数文档）。
         """
-        if fz <= 0:
-            return 0.0
-        return float(self.p["By"] * self.p["Cy"] * self._d(fz))
+        return cornering_stiffness(fz, Fy0=self.p["Fy0"], By=self.p["By"],
+                                   Cy=self.p["Cy"], FzNom=self.p["FzNom"],
+                                   LS=self.p.get("LS", 0.0), axle_scale=axle_scale)
 
     def fx(self, kappa, fz: float) -> np.ndarray:
         k = np.asarray(kappa, float)

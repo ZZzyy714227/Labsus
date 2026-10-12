@@ -17,7 +17,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.optimize import least_squares
 
-from geometry import distance_point_to_line, rotate_around_axis
+from src.geometry import distance_point_to_line, rotate_around_axis
 
 from .models import Mechanism
 
@@ -35,18 +35,14 @@ class SolveReport:
     damper_len: float | None = None
 
 
-def set_drives(m: Mechanism, travel: float, rack: float) -> None:
-    m.node(m.wheel).pos[2] = m.node(m.wheel).p0[2] + travel
-    m.node("FL1").pos = m.steer_anchor + rack * m.steer_axis
-
-
 def _state(m: Mechanism) -> np.ndarray:
     return np.concatenate([m.nodes[i].pos for i in _STATE_IDS])
 
 
 def _apply(m: Mechanism, x: np.ndarray) -> None:
     # F-68（2026-08-30）：视图别名 → 拷贝。旧实现把 x 的切片直接赋给
-    # node.pos（零拷贝视图），`set_drives` 原地写 pos[2] 会反写 x 数组——
+    # node.pos（零拷贝视图），驱动写入会反写 x 数组（M5 已删除那个死函数
+    # set_drives——驱动写入自 F-13 起内联在 _build_residual）——
     # 当前调用序无害，但属易踩雷别名，任何"先 apply 再改 pos"的新路径
     # 都会静默污染初值向量（least_squares 复用 x 的路径尤其危险）。
     for k, i in enumerate(_STATE_IDS):
@@ -236,7 +232,6 @@ def find_limits(
 
 __all__ = [
     "SolveReport",
-    "set_drives",
     "solve_pose",
     "drive_to",
     "find_limits",

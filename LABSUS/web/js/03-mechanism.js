@@ -443,7 +443,10 @@ function solveQuasiStatic(gyOverride){
   const mS = S.mSprung, mT = S.mTotal;
   const mU_f = S.front.mU * 2, mU_r = S.rear.mU * 2;
   
-  const b = L * (S.rear.mS / (S.front.mS + S.rear.mS));
+  /* a = CG→前轴、b = CG→后轴（讲义 ch10 §2.1：前轴权重 = b/L）。
+     M5 2026-09-20 修复前后轴对调：旧式 b = L·m_r/(m_f+m_r) 把"后簧载份额"
+     当成 CG→后轴距，使前后轴静载整体反了（前轴拿到后轴的份额）。 */
+  const b = L * (S.front.mS / (S.front.mS + S.rear.mS));
   const a = L - b;
   
   const tf = (abs(S.front.hp.WC[0]) * 2) / 1000;
@@ -525,15 +528,28 @@ function solveQuasiStatic(gyOverride){
   const fzRR = Math.max(0, (Fzr0 + dFz_long) / 2 + dFz_r_tot * sgnY);
 
   /* —— 稳态不足转向梯度（线性区，镜像引擎 chassis.quasi_loads）——
-     α轴 = Fy轴 / ΣCα(各轮真实载荷)；Cα = B·C·D(Fz) 含 LS 载荷敏感性。 */
-  const caMF = (fzW) => { if (fzW <= 0) return 0;
+     α轴 = Fy轴 / ΣCα(各轮真实载荷)；Cα = B·C·D(Fz) 含 LS 载荷敏感性。
+     M5（2026-09-20）：Cα 再乘**按胎宽配平的轴系数** k = W_axle / mean(W_f, W_r)
+     ——补上"后胎更宽 ⇒ 后轴更抓 ⇒ 不足转向"这条真车主平衡机制（此前 tire.W
+     只被渲染层消费，模型对胎宽盲）。只放大刚度因子、不动峰值 D，故 μ 量级
+     标定（G24）不变；等宽或缺字段时 k≡1，旧行为逐位不变。 */
+  const widthScale = (wA, wB) => {
+    if (!(typeof wA === 'number' && isFinite(wA) && wA > 0)) return 1;
+    if (!(typeof wB === 'number' && isFinite(wB) && wB > 0)) return 1;
+    const ref = 0.5 * (wA + wB);
+    return ref > 0 ? wA / ref : 1;
+  };
+  const kW_F = widthScale(S.front.tire && S.front.tire.W, S.rear.tire && S.rear.tire.W);
+  const kW_R = widthScale(S.rear.tire && S.rear.tire.W, S.front.tire && S.front.tire.W);
+  const caMF = (fzW, kW) => { if (fzW <= 0) return 0;
     const r = fzW / TIRE_MF_QS.FzNom;
     const d = TIRE_MF_QS.Fy0 * r * Math.max(0.1, 1 - TIRE_MF_QS.LS * (r - 1));
-    return TIRE_MF_QS.By * TIRE_MF_QS.Cy * d; };
+    return (kW === undefined ? 1 : kW) * TIRE_MF_QS.By * TIRE_MF_QS.Cy * d; };
   let usGrad = 0, alphaFDeg = 0, alphaRDeg = 0;
   if (Math.abs(Gy) >= 0.02) {
     const fyF = mT * ay * (b / L), fyR = mT * ay * (a / L);
-    const caF = caMF(fzFL) + caMF(fzFR), caR = caMF(fzRL) + caMF(fzRR);
+    const caF = caMF(fzFL, kW_F) + caMF(fzFR, kW_F);
+    const caR = caMF(fzRL, kW_R) + caMF(fzRR, kW_R);
     if (caF > 1e-6 && caR > 1e-6) {
       alphaFDeg = (fyF / caF) * R2D;
       alphaRDeg = (fyR / caR) * R2D;

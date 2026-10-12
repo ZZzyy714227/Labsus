@@ -6,14 +6,10 @@ import argparse
 import os
 import sys
 
-# 确保 engine/ 和 engine/src 都在 sys.path
-# engine/   → from src.xxx import …（顶层脚本用）
-# engine/src → from geometry / from solver.xxx import …（引擎内部模块用）
+# 确保 engine/ 在 sys.path（F-74：不再挂 engine/src，统一 `src.` 导入根）
 _ENGINE_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-_SRC = os.path.join(_ENGINE_ROOT, "src")
-for _p in (_ENGINE_ROOT, _SRC):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+if _ENGINE_ROOT not in sys.path:
+    sys.path.insert(0, _ENGINE_ROOT)
 
 import numpy as np
 

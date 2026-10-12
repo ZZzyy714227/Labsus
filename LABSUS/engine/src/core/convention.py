@@ -1,7 +1,11 @@
 """坐标、符号与角度规范 — V1 冻结基线（设计文档 §12，P2-0 更新）。
 
-本模块是规范的唯一真源；tests/test_convention.py 固定全部条款。
-修改规范必须同时修改本模块、测试与设计文档。
+本模块是 **V1 冻结线** 的内部真源（v3 主线的真源在 `src/api/v3models.py`
+的 DWB_KEYS 与坐标注释，见 INTENTIONAL_DIFFERENCES.md「坐标系双血脉」）。
+V1 冻结线当前仅被已弃用的 `src/core/models.py` 引用，无独立测试文件；
+其条款由 tests/test_s1_gate.py 的手算对照与 tests/test_w4_consistency.py
+的层间换算锚间接看守。修改约定必须同步本模块 + 设计文档 +
+INTENTIONAL_DIFFERENCES.md。
 
 坐标系
 ------
@@ -41,10 +45,11 @@ compute_alignment_angles 已按侧别直接输出车辆全局约定，无需翻�
 - K-2（P2-0 已修复）：toe 符号已统一为 toe-in 为正，并写入方案元数据。
 - K-3（P2-0 已修复）：caster 公式与 derive_hardpoints 主销倾角符号已统一为
   经典定义（正 = 轴上端后倾）；caster_trail_mm 即经典机械拖距。
-- K-4：polish 残差在 dz ∉ [-3, +10]mm 区间超标（负行程侧最差：-10mm ≈ 0.10mm、
-  -15mm ≈ 0.19mm；分支锚定软项的妥协残差，且负/正行程不对称），
-  未达 §13.2 全区间 ≤0.02mm 目标；tests/test_hand_benchmark.py 已锁定基线。
-  属 P1 求解器议程（与顺序/统一解误差基准一并处理）。
+- K-4（已关闭，2026-08-22 起）：旧"顺序解 + polish 分支锚定"在负行程侧残差超标
+  （-10mm ≈ 0.10mm、-15mm ≈ 0.19mm），未达 §13.2 全区间 ≤0.02mm 目标。该实现已
+  整体退役——现行 `src/solver/mechanism/solver.py` 改用 scipy least_squares(TRF)
+  联合收敛，实测（2026-09-20）±80mm 全行程最差 1.14e-13mm、0 点超 0.02mm 门禁，
+  由 tests/test_s1_gate.py G1 看守。本条仅作历史记录，勿据此判断现行求解器精度。
 """
 from dataclasses import dataclass
 
@@ -57,7 +62,7 @@ class CoordinateConvention:
     y_axis: str = "right"
     z_axis: str = "up"
     origin: str = "front_axle_center_ground"
-    camber_positive: str = "top_in"                    # 负 = 内倾
+    camber_positive: str = "top_out"                   # 正 = 顶端外倾（负 = 内倾）
     toe_positive: str = "toe_in_positive"              # 正 = Toe-in（P2-0）
     kpi_positive: str = "axis_top_inboard"
     caster_positive: str = "axis_top_rearward"         # 经典（P2-0）
@@ -69,4 +74,6 @@ class CoordinateConvention:
 
 DEFAULT_CONVENTION = CoordinateConvention()
 
-KNOWN_ISSUES = ("K-4",)
+# 已知规范问题登记真源在模块 docstring（K-1..K-4，全部已关闭）。
+# 旧版此处有 KNOWN_ISSUES=("K-4",) 常量：无任何消费方，且 K-4 已关闭，
+# 保留会误导读者以为仍有未关闭项 —— 2026-09-20 删除。

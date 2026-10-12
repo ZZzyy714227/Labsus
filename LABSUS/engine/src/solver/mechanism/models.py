@@ -24,12 +24,6 @@ class Node:
     fix: bool  # 刚线/驱动不会移动车身点
     mass: float
 
-    @property
-    def inv_m(self) -> float:
-        if self.fix:
-            return 0.0
-        return 1.0 / self.mass if self.mass > 0 else 1.0
-
 
 @dataclass
 class Link:
@@ -66,6 +60,14 @@ class BodyCluster:
 
 @dataclass
 class Mechanism:
+    """机构模型（节点 + 刚线 + 铰链簇 + 转向节刚体 + 双驱动）。
+
+    自由度口径：驱动量恒为 2（轮跳 Z + 齿条 FL1），但**不要**用 3N−Σ约束 求秩
+    来算自由度——本机构含刚体簇与冗余铰链，是超静定约束系统，秩计算给出的是
+    约束秩而非运动自由度（见模块 docstring）。
+    旧版此处有 `dof()` 方法硬编码 `return 2`，无任何调用方，M5（2026-09-20）删除。
+    """
+
     nodes: dict[str, Node]
     links: list[Link]
     axis_clusters: list[AxisCluster]
@@ -78,10 +80,6 @@ class Mechanism:
 
     def node(self, name: str) -> Node:
         return self.nodes[name]
-
-    def dof(self) -> int:
-        """传动自由度：轮跳 + 齿条转向 = 2（超静定机构，见模块 docstring）。"""
-        return 2
 
 
 def _unit(v: Vec) -> Vec:

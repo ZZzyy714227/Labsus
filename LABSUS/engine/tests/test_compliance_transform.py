@@ -1,6 +1,12 @@
 import numpy as np
-from src.solver.compliance_transform import small_rot_matrix, transform_point, apply_bushing_to_anchors
+
 from src.components.bushing import Bushing6DOF, Curve
+from src.solver.compliance_transform import (
+    apply_bushing_to_anchors,
+    small_rot_matrix,
+    transform_point,
+)
+
 
 def test_small_rot_and_transform():
     R = small_rot_matrix(np.array([0.01, 0.0, 0.0]))      # rx = 0.01 rad

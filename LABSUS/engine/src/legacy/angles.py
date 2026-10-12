@@ -17,7 +17,7 @@ import math
 
 import numpy as np
 
-from geometry import vec3
+from src.geometry import vec3
 
 
 def _side_sign_from_up5(up5_y: float) -> float:

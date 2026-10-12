@@ -14,14 +14,25 @@
 1. v3 指标与 legacy 管线输出**必须显著不同**（防止有人把 v3 悄悄切回
    angles.py —— 若二者意外相等则说明坐标系合并发生，需要重新审视）；
 2. v3 管线黄金值保持（与 test_mirror_symmetry 交叉承担）。
+
+⚠️ 第 47-48 行的 "88.24° / 175.07°" **不是正确性断言，而是坐标系代差的指纹**：
+它们正是把 v3 坐标喂进 V1 冻结线管线后的废值形态。若未来真要统一坐标系，
+正确动作是「同步 INTENTIONAL_DIFFERENCES.md 的『坐标系双血脉』+『定位角双权威』
+两节 + 本文件 + tests/test_w4_consistency.py 的 `_v3_to_v1` 层间换算 +
+src/core/convention.py 的 x_axis/y_axis 字段」，而不是直接删掉这两行断言。
+登记真源见仓库根 INTENTIONAL_DIFFERENCES.md。
 """
 import numpy as np
 
+from src.api.v3service import (
+    DEFAULT_DWB_POINTS,
+    DesignSpec,
+    pose_metrics,
+    to_engine_points,
+)
+from src.legacy.pose import solve_to_angles
 from src.solver.mechanism.models import build_mechanism
-from src.solver.mechanism.pose import solve_to_angles
 from src.solver.mechanism.solver import solve_pose
-from src.api.v3service import (pose_metrics, DesignSpec, DEFAULT_DWB_POINTS,
-                               to_engine_points)
 
 _PT = DEFAULT_DWB_POINTS
 
@@ -43,7 +54,8 @@ def test_legacy_pipeline_not_equal_v3_markers():
     若某次重构把 v3 切回 angles.py，此测试会立即失败并暴露坐标系回归。
     """
     a, mm = _legacy_and_v3(0.0)
-    # legacy 废值特征：toe≈±88°（X/Y 交换产物）、kpi≈±175°
+    # legacy 废值特征：toe≈±88°（X/Y 交换产物）、kpi≈±175°。
+    # 这是坐标系代差的指纹，不是正确性断言——见模块 docstring 的 ⚠️ 段。
     assert abs(abs(a["toe_deg"]) - 88.24) < 0.5
     assert abs(abs(a["kpi_deg"]) - 175.07) < 0.5
     # v3 正常值

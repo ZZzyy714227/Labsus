@@ -5,7 +5,6 @@
 """
 import numpy as np
 from fastapi.testclient import TestClient
-
 from server import app  # noqa: E402
 
 client = TestClient(app)
@@ -41,10 +40,12 @@ def _req(**over):
             "hcg_mm": 350.0, "hs_mm": 370.0,
             "front": {"points": FRONT, "arch": "pushrod", "camber_deg": -1.2,
                       "toe_deg": 0.05, "tire_radius": 325.0, "spring_rate": 110.0,
-                      "spring_mass_kg": 330.0, "unsprung_kg": 38.0},
+                      "spring_mass_kg": 380.0, "unsprung_kg": 38.0,
+                      "tire_width": 265.0},
             "rear": {"points": REAR, "arch": "pullrod", "camber_deg": -1.5,
                      "toe_deg": 0.1, "tire_radius": 330.0, "spring_rate": 130.0,
-                     "spring_mass_kg": 380.0, "unsprung_kg": 42.0},
+                     "spring_mass_kg": 330.0, "unsprung_kg": 42.0,
+                     "tire_width": 285.0},
         },
         "quasi": {"gy": 0.0, "gx": 0.0, "aero_force_n": 0.0, "aero_bias": 0.5},
         "travel": {"fl": 0.0, "fr": 0.0, "rl": 0.0, "rr": 0.0},
@@ -238,7 +239,6 @@ def test_chassis_kw_curve_validation_422():
 
 def test_load_sensitivity_ls():
     """LS 载荷敏感性：重载 μ 递减；LS=0 保持线性基线（2026-08-22 修复4）。"""
-    import numpy as np
     from src.tire_mf import MagicFormulaSub
     alphas = np.linspace(0, 25, 201)
     base = {"Fy0": 8000.0, "By": 9.0, "Cy": 1.2, "Ey": -0.5, "Sh": 0.0, "Sv": 0.0, "FzNom": 3500.0}
@@ -267,7 +267,14 @@ def test_chassis_hs_hcg_conservation_warning():
 # ── 稳态不足转向梯度 + Jacking（真实底盘开发 KPI，镜像前端 solveQuasiStatic）──
 
 def test_chassis_us_gradient_positive_neutral_bias():
-    """默认设计（前轴载荷需求 53.5%）应呈小幅不足转向：0 < K < 2.5 °/g。"""
+    """默认设计应呈小幅不足转向：0 < K < 2.5 °/g。
+
+    夹具口径（M5 2026-09-20 校正）：前轴簧载 380 > 后轴 330（前轴份额 53.5%）
+    + 前胎 265 / 后胎 285。旧夹具写成前 330/后 380（前轴更轻）却断言"前轴载荷
+    需求 53.5%"——那个 53.5% 正是当时 a/b 前后对调 bug 的产物；修复后该夹具
+    实际变成后重车（前 46.5%），自然不再满足"不足转向"。现按物理正确的方式
+    表达同一设计意图：前轴确实更容易失稳（载荷份额大 + 胎窄）。
+    """
     r = client.post("/api/v3/chassis/solve",
                     json=_req(quasi={"gy": 1.0, "gx": 0.0, "aero_force_n": 0.0,
                                      "aero_bias": 0.5}))
@@ -332,7 +339,7 @@ def test_chassis_jacking_lifts_sprung_mass():
 
 def test_kinematics_jacking_formula():
     """kinematics.jacking：F_jack = Fy·2·z_RC/T；负 RC 下拉；退化输入状态机。"""
-    from src.metrics.kinematics import jacking
+    from src.legacy.kinematics import jacking
     r = jacking(fy_sprung_n=5000.0, rc_h_mm=50.0, track_mm=1600.0)
     assert r.status == "VALID" and abs(r.value - 5000.0 * 100.0 / 1600.0) < 1e-9
     r_neg = jacking(fy_sprung_n=5000.0, rc_h_mm=-20.0, track_mm=1600.0)

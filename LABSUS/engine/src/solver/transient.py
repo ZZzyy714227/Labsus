@@ -1,4 +1,6 @@
-"""整车平面瞬态动力学（S3-1 升级版 · 2026-08-24）：3-DOF 车体 + 四轮 MF(复合滑移+松弛+外倾项) + 动力/气动 + 准静态载荷耦合。
+"""整车平面瞬态动力学（S3-1 升级版 · 2026-08-24）。
+
+3-DOF 车体 + 四轮 MF(复合滑移+松弛+外倾项) + 动力/气动 + 准静态载荷耦合。
 
 模型范围（相对初版升级点标注 ★）：
 - 车体：平面 6 状态 [X, Y, ψ, vx, vy, r]；侧倾/俯仰不作为状态、由准静态内核代数解
@@ -25,9 +27,9 @@ import time
 import numpy as np
 
 from src.api.chassis import axle_rc_sweep, quasi_loads
-from src.api.v3models import (QuasiInputs, TrackSimRequest, TireParams, VehicleSpec)
-from src.tire_mf import MagicFormulaSub, load_tir_params
+from src.api.v3models import QuasiInputs, TireParams, TrackSimRequest, VehicleSpec
 from src.core.json_util import wash_json as _wash_json
+from src.tire_mf import MagicFormulaSub, load_tir_params
 
 R2D = 180.0 / math.pi
 D2R = math.pi / 180.0
@@ -37,15 +39,19 @@ _WHEELS = ("FR", "FL", "RR", "RL")
 
 
 class TireState:
-    """每轮瞬态状态：松弛侧偏（rad）与纵向滑移缓存。
+    """每轮瞬态滞后状态：侧偏松弛（rad）。
 
     alpha_st：本步侧偏目标（rad），由 derivs 记录、step() 末尾统一积分用——
     F-22 修复后 derivs 保持纯函数，RK2 中间评估不得污染滞后状态。
+
+    M5（2026-09-20）：删除 `kappa_dyn` 字段——它只被初始化、从未读写，是
+    纵向滑移反馈的占位残骸。本模型的纵向力由动力需求包络给出（见
+    `wheel_force` 的 f_avail / 制动分支），**纵滑是开环量**：`slip_k` 每步算出
+    仅用于观测，不进入 Kr 反馈。该缺口已在 INTENTIONAL_DIFFERENCES.md 登记。
     """
-    __slots__ = ("alpha_lat", "kappa_dyn", "alpha_st")
+    __slots__ = ("alpha_lat", "alpha_st")
     def __init__(self):
         self.alpha_lat = 0.0
-        self.kappa_dyn = 0.0
         self.alpha_st = 0.0
 
 
@@ -101,7 +107,21 @@ class VehiclePlanar:
                  kc_luts: dict, iz: float, powertrain, aero):
         self.v = vehicle
         self.tire = tire
-        self.tires = {w: MagicFormulaSub(load_tir_params(tire.model_dump())) for w in _WHEELS}
+        # ── 按胎宽配平的轴侧偏刚度（M5，2026-09-20）────────────────────────
+        # k_axle = W_axle / mean(W_f, W_r)，只放大 MF 的刚度因子 By，不动峰值
+        # （μ·Fz 与胎宽基本无关）。与 chassis.quasi_loads 的 Cα 配平同源，
+        # 保证"准静态说不足转向 / 瞬态也真不足转向"两内核口径一致。
+        # 任一轴缺 tire_width ⇒ k≡1，旧行为逐位不变（tphys_parity 锚安全）。
+        _kf = vehicle.front.tire_width_scale(vehicle.rear)
+        _kr = vehicle.rear.tire_width_scale(vehicle.front)
+        self.tires = {}
+        for _w in _WHEELS:
+            _tp = tire.model_dump()
+            _sc = _kf if _w in ("FR", "FL") else _kr
+            if abs(_sc - 1.0) > 1e-12:
+                _tp["By"] = float(_tp["By"]) * _sc
+            self.tires[_w] = MagicFormulaSub(load_tir_params(_tp))
+        self.kW_F, self.kW_R = _kf, _kr
         self.mu = tire.Fy0 / tire.FzNom
         self.Cg = float(getattr(tire, "Cg", 6.0))        # 外倾推力系数 1/rad（缺省 6.0
                                                           #   ⇒ 21 kN/rad @ FzNom=3500，真实量级）
@@ -138,8 +158,10 @@ class VehiclePlanar:
         # 显式输入依旧优先，差额登记"故意不同清单"（transient 无摇臂链）。
         swf = axle_rc_sweep(vehicle.front)
         swr = axle_rc_sweep(vehicle.rear)
-        rc0 = lambda sw: float(np.interp(0.0, sw["travel"],
-                                         [v if v is not None else 55.0 for v in sw["rc_h"]]))
+        def rc0(sw):
+            """travel=0 处的侧倾中心高（缺失点按 55mm 兜底）。"""
+            return float(np.interp(0.0, sw["travel"],
+                                   [v if v is not None else 55.0 for v in sw["rc_h"]]))
         self.rcH = {"FR": rc0(swf), "RR": rc0(swr)}
         self.rc_sw = {"front": swf, "rear": swr}
         self.prev_ay = 0.0
@@ -353,14 +375,12 @@ def _closest_idx(track_xy: np.ndarray, p: np.ndarray, start: int) -> int:
 
 def _lookahead_point(track_xy: np.ndarray, idx: int, ld: float) -> np.ndarray:
     acc = 0.0
-    p = track_xy[idx].copy()
     for k in range(idx, len(track_xy) - 1):
         seg = track_xy[k + 1] - track_xy[k]
         sl = float(np.linalg.norm(seg))
         if acc + sl >= ld and sl > 1e-9:
             return track_xy[k] + seg * ((ld - acc) / sl)
         acc += sl
-        p = track_xy[k + 1]
     return track_xy[-1]
 
 
@@ -469,6 +489,7 @@ def run_track_sim(req: TrackSimRequest) -> dict:
                 row[f"fy_{w}"] = round(diag[w]["fy"], 1)
                 row[f"fx_{w}"] = round(diag[w]["fx"], 1)
                 row[f"mu_{w}"] = round(diag[w]["mu_use"], 3)
+                row[f"slip_{w}"] = round(diag[w]["slip_k"], 4)   # M5：纵滑可观（原算出即丢）
                 row[f"cam_{w}"] = round(diag[w]["cam"], 2)
             ts.append(row.pop("t"))
             trace.append(row)

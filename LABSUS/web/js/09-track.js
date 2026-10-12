@@ -38,7 +38,10 @@ const TPHYS = (function(){
     const L=v.wheelbase_mm/1000, mS=v.sprung_mass_kg, mT=v.mass_kg;
     const mUf=v.front.unsprung_kg*2, mUr=v.rear.unsprung_kg*2;
     const fms=v.front.spring_mass_kg, rms=v.rear.spring_mass_kg;
-    const b=L*(rms/(fms+rms)), a=L-b;
+    /* a = CG→前轴、b = CG→后轴（M5 2026-09-20 修复前后轴对调，与
+       chassis.quasi_loads / 03-mechanism.solveQuasiStatic 同源）：
+       点质量模型 ⇒ b = L·m_f/(m_f+m_r)。旧式用后簧载份额当 b，使前后轴静载整体反了。 */
+    const b=L*(fms/(fms+rms)), a=L-b;
     const tf=Math.abs(v.front.points.WC[0])*2/1000;
     const tr=Math.abs(v.rear.points.WC[0])*2/1000;
     const huf=v.front.tire_radius/1000, hur=v.rear.tire_radius/1000;
@@ -608,7 +611,6 @@ function _stageOpenSetup(){
   document.getElementById("stageSetup").style.display="block";
   document.getElementById("stageWrap").style.display="none";
   drawStageSetupPreview();
-  console.log("STAGE-SETUP-OPENED");
 }
 function _stageCloseSetup(){
   document.getElementById("stageSetup").style.display="none";

@@ -12,7 +12,6 @@ W4 从"合并成单一真源"改为"故意不同清单 + 一致性对拍"：
    输出一致；端点窗口行为同一。
 3. F-67 MR 优先级：显式 > 数值推导 > 分轴常量回退（回退不吞异常/不串轴）。
 """
-import numpy as np
 
 from src.api.v3models import DesignSpec, VehicleSpec
 from src.api.v3service import DEFAULT_DWB_POINTS, _new_mech, pose_metrics
@@ -62,7 +61,7 @@ def test_v1_legacy_angles_still_exist_for_s1_gate():
     改动角度数学只允许改 v3 权威线；冻结线若被删除必须同步
     test_s1_gate.py / test_metric_pipeline_governance.py 引用。
     """
-    from src.solver import angles as a1
+    from src.legacy import angles as a1
     assert hasattr(a1, "compute_alignment_angles")
 
 
@@ -70,11 +69,15 @@ def test_v1_legacy_angles_still_exist_for_s1_gate():
 
 def test_kandc_and_kinematics_share_slope_kernel():
     """kinematics 状态机版与 kandc 浮点版必须给出一致的 °/25mm 增益。"""
-    from src.metrics.kandc import bump_steer_deg_per_25, camber_gain_deg_per_25, mr_matrix
-    from src.metrics.kinematics import (bump_steer_deg_per_25 as k_bump,
-                                        camber_gain_deg_per_25 as k_cam,
-                                        motion_ratio as k_mr)
-    import src.metrics.kinematics as kin
+    import src.legacy.kinematics as kin
+    from src.legacy.kinematics import bump_steer_deg_per_25 as k_bump
+    from src.legacy.kinematics import camber_gain_deg_per_25 as k_cam
+    from src.legacy.kinematics import motion_ratio as k_mr
+    from src.metrics.kandc import (
+        bump_steer_deg_per_25,
+        camber_gain_deg_per_25,
+        mr_matrix,
+    )
     assert not hasattr(kin, "_slope_at"), "_slope_at must be deleted to honor single differentiator kernel rule"
     tr = [-25.0, -12.5, 0.0, 12.5, 25.0]
     cam = [-1.8, -1.5, -1.2, -0.9, -0.6]
@@ -88,11 +91,47 @@ def test_kandc_and_kinematics_share_slope_kernel():
                - k_mr(damper_tr, tr, 0.0).value) < 1e-9
 
 
+# ── 2b. M5：侧偏刚度 Cα 单一实现（此前三份拷贝）─────────────────────
+
+def test_cornering_stiffness_single_source():
+    """Cα 与峰值尺度 D(Fz) 在 engine 内只能各有一份实现。
+
+    背景：M5 之前 `D = Fy0·r·max(0.1, 1−LS·(r−1))` 同时写在
+    `tire_mf.evaluate_magic_formula_fy`、`MagicFormulaSub._d`、
+    `api/chassis.py::_ca_mf` 三处；改一处忘另两处会静默改变不足转向梯度。
+    现全部收敛到 `tire_mf.load_d` / `tire_mf.cornering_stiffness`。
+    """
+    import re
+    from pathlib import Path
+
+    engine = Path(__file__).resolve().parents[1]
+    src_files = [p for p in (engine / "src").rglob("*.py") if "__pycache__" not in p.parts]
+    hits = [(p.name, m.start()) for p in src_files
+            for m in re.finditer(r"max\(0\.1,\s*1\.0\s*-\s*\w+\s*\*\s*\(r\s*-\s*1\.0\)\)",
+                                 p.read_text(encoding="utf-8"))]
+    assert len(hits) == 1, f"D(Fz) 载荷敏感性算式有 {len(hits)} 份（应为 1）: {hits}"
+    assert hits[0][0] == "tire_mf.py", hits
+
+    from src.tire_mf import MagicFormulaSub, cornering_stiffness
+    mf = MagicFormulaSub({"Fy0": 5250.0, "By": 20.0, "Cy": 1.2, "Ey": -0.5,
+                          "FzNom": 3500.0, "LS": 0.1})
+    for fz in (500.0, 1500.0, 3500.0, 6000.0):
+        assert cornering_stiffness(fz, Fy0=5250.0, By=20.0, Cy=1.2,
+                                   FzNom=3500.0, LS=0.1) == mf.cornering_stiffness(fz)
+        # 胎宽轴系数只做线性放大（不动峰值 D）；k≡1 时逐位相同，一般 k 允许
+        # 乘法结合序带来的最后一位差异（(k·B)·C·D vs k·(B·C·D)）。
+        base = mf.cornering_stiffness(fz)
+        assert mf.cornering_stiffness(fz, axle_scale=1.0) == base
+        assert abs(mf.cornering_stiffness(fz, axle_scale=1.25) - 1.25 * base) <= 1e-12 * abs(base)
+    assert cornering_stiffness(0.0, Fy0=5250.0, By=20.0, Cy=1.2) == 0.0
+
+
 def test_compliance_forwards_tire_radius():
     """验证 v3service._solve_point 将 tire_radius 准确传递给 solve_compliance_full。"""
     from unittest.mock import patch
+
     import src.api.v3service as v3s
-    from src.api.v3models import KandcRequest, BushingSpec, SweepSpec
+    from src.api.v3models import BushingSpec, KandcRequest, SweepSpec
 
     b = BushingSpec(name="bLCA_F", node="LCA_F", kT=[300.0, 300.0, 300.0], kR=[4e4, 4e4, 4e4])
     req = KandcRequest(tire_radius=260.0, bushings=[b], compliance_axis="fy",
@@ -174,3 +213,33 @@ def test_mr_fallback_is_axis_aware():
     assert any("MR compute failed" in w for w in warns), warns
     # 正常路径（第一组）不触发回退
     assert fb_f is False and fb_r is False
+
+
+def test_mr_explicit_divergence_is_surfaced():
+    """M5：显式 MR 命中时仍比对引擎推导值，差距 >15% 必须上报 warning。
+
+    背景：前端恒下发自己的扫掠 MR（`motion_ratio: SIM.mrRefF||0.75`），
+    显式分支永远命中 ⇒ 引擎 `mr_at_zero` 推导在生产链路从未被执行，
+    两口径分叉（OpenItem-B 摇臂双根分支）永久静默。本测试把它钉成
+    可观测项：数值仍取显式值（优先级 1 不变），但差异必须出现在 warnings。
+    """
+    from src.api.chassis import _resolve_mr_fb, mr_at_zero
+    from src.api.v3models import AxleSpec
+    ax = AxleSpec(points=DEFAULT_DWB_POINTS, motion_ratio=0.75)
+    warns: list[str] = []
+    mr, fb = _resolve_mr_fb(ax, DEFAULT_DWB_POINTS, is_front=True, warnings=warns)
+    derived = round(mr_at_zero(ax, DEFAULT_DWB_POINTS, False), 4)
+    assert mr == 0.75 and fb is False                  # 显式值仍是权威
+    assert derived < 0.6, derived                      # 引擎推导确实显著不同
+    assert any("MR 口径分歧" in w for w in warns), warns
+
+
+def test_mr_derivation_matches_when_no_explicit():
+    """无显式值时走推导路径，且不产生分歧告警（推导=自身，非分叉）。"""
+    from src.api.chassis import _resolve_mr_fb
+    from src.api.v3models import AxleSpec
+    ax = AxleSpec(points=DEFAULT_DWB_POINTS)           # motion_ratio=None
+    warns: list[str] = []
+    mr, fb = _resolve_mr_fb(ax, DEFAULT_DWB_POINTS, is_front=True, warnings=warns)
+    assert fb is False and 0.02 <= mr <= 1.5
+    assert not any("MR 口径分歧" in w for w in warns), warns

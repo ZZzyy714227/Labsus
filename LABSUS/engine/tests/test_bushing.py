@@ -1,6 +1,7 @@
 import numpy as np
-import pytest
+
 from src.components.bushing import Bushing6DOF, Curve, bush_force, bush_force_jac
+
 
 def _lin_curve(k):
     return Curve(kind="linear", k=k)
@@ -18,8 +19,10 @@ def test_linear_force_and_jac():
     fd = np.zeros((6, 6))
     h = 1e-7
     for i in range(6):
-        dp = d.copy(); dp[i] += h
-        dm = d.copy(); dm[i] -= h
+        dp = d.copy()
+        dp[i] += h
+        dm = d.copy()
+        dm[i] -= h
         fd[:, i] = (bush_force(b, dp) - bush_force(b, dm)) / (2 * h)
     assert np.allclose(J, fd, atol=1e-3)
 

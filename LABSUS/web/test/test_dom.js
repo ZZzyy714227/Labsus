@@ -149,6 +149,30 @@ ok(/nx:\s*pt\.nx,\s*ny:\s*pt\.ny/.test(fc), 'fullchassis: CircuitPath.getLookahe
 ok(/gt3_sport:/.test(fc), 'fullchassis: GT3 日常运动型 (gt3_sport) 预设在位');
 ok(/baja:\s*\{[\s\S]*?Baja Off-Road - 长行程越野型/.test(fc), 'fullchassis: Baja 长行程越野型预设在位');
 ok(/initCircuitStageEvents/.test(fc), 'fullchassis: initCircuitStageEvents 独立机位切换事件在位');
+/* M5（2026-09-20）：前后轴静载对调回归守卫。
+   a = CG→前轴、b = CG→后轴；两轴簧载点质量模型 ⇒ b = L·m_f/(m_f+m_r)。
+   旧式把"后簧载份额"当 b，使前后轴静载整体反了（引擎侧已由
+   tests/test_static_split_invariant.py 数值钉死，此处守前端源码口径）。 */
+ok(!/S\.rear\.mS\s*\/\s*\(S\.front\.mS\s*\+\s*S\.rear\.mS\)/.test(fc),
+  'fullchassis: 03-mechanism 不再用「后簧载份额」当 CG→后轴距（M5 前后对调修复）');
+ok(/S\.front\.mS\s*\/\s*\(S\.front\.mS\s*\+\s*S\.rear\.mS\)/.test(fc),
+  'fullchassis: 03-mechanism 的 b = L·m_f/(m_f+m_r) 正确口径在位');
+ok(/this\.wb\s*\*\s*\(_mr\s*\/\s*\(_mf\s*\+\s*_mr\)\)/.test(fc),
+  'fullchassis: 11-stages CG→前轴距离按两轴簧载就地推导（不再硬编码 0.46）');
+/* M5-B3（2026-09-20）：按胎宽配平轴侧偏刚度。
+   机制：k_axle = W_axle / mean(W_f, W_r) 只放大刚度因子，不动峰值 —— 补上
+   "后胎更宽 ⇒ 后轴更抓 ⇒ 不足转向"这条真车主平衡机制（此前 tire.W 只被
+   渲染层消费）。引擎侧由 tests/test_tire_width_balance.py 数值钉死。 */
+ok(/const kW_F\s*=\s*widthScale\(/.test(fc) && /const kW_R\s*=\s*widthScale\(/.test(fc),
+  'fullchassis: 03-mechanism 准静态 Cα 带按轴胎宽系数 kW_F/kW_R');
+ok(/magicFormula\(Fz,\s*alpha,\s*kappa,\s*mu_peak\s*=\s*1\.35,\s*axleScale\s*=\s*1\)/.test(fc),
+  'fullchassis: 11-stages magicFormula 接受 axleScale（只放大 By，不动峰值 D）');
+ok(/axleScale\s*\*\s*tp\.By\s*\*\s*Math\.tan\(alpha\)/.test(fc),
+  'fullchassis: 11-stages 侧向归一化滑移乘 axleScale');
+ok(/tire_width:f\.tire\.W/.test(fc) && /tire_width:r\.tire\.W/.test(fc),
+  'fullchassis: chassisPayload 下发 tire_width（前/后轴）');
+ok(/const b=L\*\(fms\/\(fms\+rms\)\)/.test(fc),
+  'fullchassis: 09-track quasiLoads 的 a/b 与引擎同源（M5 对调修复已同步到 TPHYS）');
 ok(/data-cam="nose"/.test(fc) && /data-cam="wheel"/.test(fc) && /data-cam="rear"/.test(fc) && /data-cam="heli"/.test(fc),
   'fullchassis: 8 种赛道动力学与悬架特写机位在位');
 
@@ -160,6 +184,19 @@ ok(!/E\("div","chk",'<i>/.test(ai), 'allinone: chkList 不再字面渲染标签'
 ok(!/E\("span",null,zh\+' <u>/.test(ai), 'allinone: ro 读数标签不再字面渲染 <u>');
 scriptBlocks(ai, 'allinone');
 ok(ai.includes('const TPHYS'), 'allinone: TPHYS 闭包存在');
+/* M5：allinone 的定位声明必须留在文件里（冻结快照 + 对拍锚 + 不做功能同步） */
+ok(/冻结快照/.test(ai), 'allinone: 冻结快照定位声明在位（防被误当 js/ 的功能镜像）');
+/* M5：内联 TPHYS 的缺省轮胎常数必须与 js/09-track.js 同构。
+   这是唯一允许的"同步"——全部其它模块增量都不得搬进 allinone（对拍锚红线）。 */
+(function () {
+  const num = (src, re, tag) => { const m = src.match(re); if (!m) { failures.push(tag); return null; } return m[1]; };
+  const aiB = num(ai, /function mfSetup\(p\)\{[\s\S]{0,600}?p\.By!==undefined\?p\.By:(\d+)/, 'allinone: mfSetup By 缺省未找到');
+  const jsB = num(fc, /function mfSetup\(p\)\{[\s\S]{0,600}?p\.By!==undefined\?p\.By:(\d+)/, 'fullchassis: mfSetup By 缺省未找到');
+  const aiD = num(ai, /function mfSetup\(p\)\{[\s\S]{0,600}?D0=p\.Fy0\|\|(\d+)/, 'allinone: mfSetup Fy0 缺省未找到');
+  const jsD = num(fc, /function mfSetup\(p\)\{[\s\S]{0,600}?D0=p\.Fy0\|\|(\d+)/, 'fullchassis: mfSetup Fy0 缺省未找到');
+  ok(aiB !== null && aiB === jsB, 'allinone: mfSetup By 缺省与 09-track.js 同构 (' + aiB + ' vs ' + jsB + ')');
+  ok(aiD !== null && aiD === jsD, 'allinone: mfSetup Fy0 缺省与 09-track.js 同构 (' + aiD + ' vs ' + jsD + ')');
+})();
 /* TPHYS 闭包可在沙箱中求值，且导出 run/makeSimContext */
 (function () {
   const marker = 'const TPHYS = (function(){';

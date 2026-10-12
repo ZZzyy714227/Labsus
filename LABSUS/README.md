@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-v3%20REST%20API-009688.svg)](https://fastapi.tiangolo.com/)
-[![Tests: 100% Passed](https://img.shields.io/badge/pytest-164%20passed-success.svg)]()
+[![Tests: 100% Passed](https://img.shields.io/badge/pytest-189%20passed-success.svg)]()
 [![Platform: Web & Desktop](https://img.shields.io/badge/Platform-Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-orange.svg)]()
 
 > 面向 **FSAE 方程式赛车、GT3 房车赛车及全地形越野车** 的现代化全车底盘悬架工程分析平台。
@@ -35,7 +35,7 @@
 
 ### 4. 上海国际赛车场 (SIC) 15-DOF 实时瞬态赛道仿真舞台
 ![LABSUS 赛道瞬态仿真舞台](LABSUS/assets/labsus_circuit_sim.png)
-*高精度 15-DOF 整车多体动力学、Pacejka 复合滑移轮胎摩擦圆、外-内-外赛车线走线与逐圈刹车点自适应试探学习、冲出罚时与圈数统计、多机位跟踪与实时工程遥测 HUD。*
+*整车多体动力学（`VehicleDynamics15DOF`，命名口径见 §4）、Pacejka 复合滑移轮胎摩擦圆、外-内-外赛车线走线与逐圈刹车点自适应试探学习、冲出罚时与圈数统计、多机位跟踪与实时工程遥测 HUD。*
 
 ---
 
@@ -67,15 +67,26 @@
   - 非簧载质量侧向惯性力分量。
 - **准静态闭环耦合迭代**：准确计算侧倾角 ($\phi$)、整车侧倾梯度 ($d\phi/dg_y$)、四轮接地动载荷分布 ($F_z$) 与操稳偏向判定 (Understeer / Oversteer / Neutral)。
 - **底盘开发核心 KPI 全覆盖**：
-  - **US Gradient 不足转向梯度**（$0.2\sim2.0\,^\circ/g$）与前后轴侧偏角 $\alpha_f/\alpha_r$ 分解；
+  - **US Gradient 不足转向梯度**（目标窗口 $0.2\sim2.0\,^\circ/g$；四款出厂预设实测 $0.21\sim0.27\,^\circ/g$ @1g）与前后轴侧偏角 $\alpha_f/\alpha_r$ 分解；
+  > 配平口径：轴侧偏刚度按**胎宽**配平（$k_\text{axle}=W_\text{axle}/\overline{W}$，只放大刚度因子、不动峰值 μ），叠加两轴簧载份额 —— 这是本模型里两条真实的平衡杠杆（ARB 对 US 几乎无效：实测前 ARB $0\to40$ 让 TLLTD 走 $45\%\to83\%$，US 只动 $+0.01\,^\circ/g$）。
   - **Jacking 抬升量**、TLLTD 前轴占比、侧倾梯度等多 KPI 在「核心结论」卡实时呈现并附目标窗口；
   - **不足转向特性 $\delta$-$a_y$ 扫掠曲线**：轮胎项与侧倾转向分量双线分解，$0\to2g$ 均匀扫掠。
 
 ### 4. 15-DOF 全赛道瞬态动力学与 AutoPilot 巡航舞台
-- **15 自由度整车多体动力学**：
-  - 车身 6-DOF（纵向 $u$、侧向 $v$、垂向 $w$、侧倾 $p$、俯仰 $q$、横摆 $r$）；
-  - 四轮独立垂向跳动 4-DOF 与四轮独立自转角速度 4-DOF；
-  - 1000Hz 高频子步积分器，精确捕捉车身点头（Pitch）、侧倾（Roll）与轮荷动态转移。
+- **整车多体动力学（`VehicleDynamics15DOF`，历史命名）**：
+  - 车身 6-DOF：位置 $X,Y,Z$ + 姿态 $\phi,\theta,\psi$ + 体速 $u,v,w$ + 体角速度 $p,q,r$；
+  - 四轮独立自转角速度 4-DOF（$\omega_{FL,FR,RL,RR}$）；
+  - **车轮垂向为运动学从动**（$tr = -(z_\text{corner}-z_\text{road})$，droop/缓冲块钳位），
+    轮荷 $F_z$ 由弹簧 + 阻尼 + ARB + 缓冲块**代数**求出后作用到车身 —— 即**无
+    非簧载质量垂向惯性与轮胎垂向柔度 DOF**；
+  - 1000Hz 高频子步积分器（`MAX_SUB_DT = 1ms`），精确捕捉车身点头（Pitch）、
+    侧倾（Roll）与轮荷动态转移。
+  > ⚠️ 口径说明：上述实现是「6 车身 DOF + 4 轮自转 + 4 个运动学从动轮」，
+  > 不是教科书的「6 车身 + 4 非簧载垂向 + 4 轮自转」形式。后果与升级路径
+  > 登记于 `INTENTIONAL_DIFFERENCES.md`「15-DOF 口径」与
+  > `web/js/11-stages.js` 类声明上方的口径注释。引擎侧
+  > `/api/v3/chassis/simulate_track` 则是平面 3-DOF + 准静态侧倾/俯仰代数解，
+  > 与前端舞台**不是同一个模型**（跨语言对拍针对的是内置 TPHYS 闭包，非本内核）。
 - **Pacejka Magic Formula 复合滑移轮胎模型**：
   - 精确计算非线性纯侧滑偏角力 ($F_y$)、纯纵向滑移率驱动/制动力 ($F_x$) 以及摩擦圆复合滑移附着极限。
 - **上海国际赛车场 (SIC 5.45km) 全赛道瞬态仿真**：
@@ -128,23 +139,48 @@ python LABSUS/engine/server.py
 
 ## 🧪 测试与质量保证
 
-项目包含严苛的自动化测试套件（在 `LABSUS/` 目录下运行）：
+项目包含严苛的自动化测试套件（在 `LABSUS/` 目录下运行）。全部套件为 **零 npm、零浏览器** 的
+node `vm` 无头沙箱（自带 DOM/Canvas stub），唯一跨语言的是 TPHYS 对拍：
+
 ```bash
 cd LABSUS
 
-# 1. Python 引擎物理断言 / 门禁 / TPHYS 双端对拍 / 对抗应力测试（164 项全部通过）
-pytest engine/tests -q
+# ── Python 引擎：物理断言 / 门禁 / 契约守卫 / TPHYS 双端对拍 / 对抗应力 ──
+pytest engine/tests -q                 # 189 passed / 1 skipped（skip = OptimumK 未录入，显式）
+                                       #   · test_api_contract          前后端键集契约
+                                       #   · test_static_split_invariant 静态载荷分配不变量
+                                       #   · test_tire_width_balance      胎宽→侧偏刚度配平
+                                       #   · test_legacy_isolation        V1 冻结线隔离守卫
+ruff check engine                      # All checks passed（配置见 pyproject.toml，规则 E/F/W/I）
+python scripts/sync_root_docs.py --check   # 根 ↔ LABSUS 的 README/LICENSE 逐字节一致
 
-# 2. 前端 DOM/结构断言测试（163 项全部通过）
-node web/test/test_dom.js
+# ── 前端防线（逐套件）──────────────────────────────────────────────
+node web/test/test_dom.js              # 274 断言：薄壳结构 / 双端同构 / 已知 bug 回访
+node web/test/stage_boot_check.js      # 45 断言：模块加载顺序 / TDZ / 三舞台 20 帧无抛错
+node web/test/test_lap_15dof.js        # 23 断言：2 圈 5.45km 全闭环 + 6 项 powertrain parity
+node web/test/test_15dof_steady.js     # 14 断言：15-DOF 内核解析稳态锚（自由落体/静载/自行车模型/左右对称）
+node web/test/test_powertrain.js       # 587 断言：七架构动力总成
+node web/test/test_tire_lab.js         # 65 断言：轮胎工坊
+node web/test/test_tire_wiring.js      # 36 断言 · proving_ground_test.js 36 断言（含 RIG 回归）
+node web/test/test_racingline.js       # 30 断言 · test_engine_sound.js 26 断言
+node web/test/test_kc_wiring.js        # 25 断言 · undulating_road_test.js 21 断言
+node web/test/test_mpc.js              # 19 断言 · test_p2b_damper.js 18 断言
+node web/test/test_p2a_aero.js         # 14 断言 · test_circuit_ui.js 100%（64 id + 22 class）
 
-# 3. 舞台启动防线（40 项：模块加载顺序 / TDZ / 三舞台可启动且绘制正常）
-node web/test/stage_boot_check.js
+# ── 跨语言物理对拍（JS TPHYS ↔ Python transient，门限 5%）────────────
+node web/test/tphys_parity.cjs         # 实测 worst 0.51%
 
-# 4. 双端物理闭环与 15-DOF 圈速综合测试（全部通过）
-node web/test/tphys_parity.cjs
-node web/test/test_lap_15dof.js
+# ── 诊断工具（不参与回归）─────────────────────────────────────────
+node web/test/preset_balance_sweep.cjs # 预设配平扫描（US / TLLTD ← 簧载份额 / ARB / 胎宽）
+node web/test/mpc_diag_g30.cjs         # MPC 整定诊断 · mpc_calib_g30.cjs 校准网格
 ```
+
+> 测试数字以本仓库当前工作区实测为准（2026-09-20 基线）。改前端后至少跑
+> `test_dom` + `stage_boot_check`；改引擎后跑 `pytest engine/tests` + `ruff check engine`；
+> 改 TPHYS/内联物理后跑 `tphys_parity.cjs`。
+>
+> **自动门禁**：`.github/workflows/ci.yml`（lint / pytest / node 三 job，PR 自动跑）；
+> 提交前钩子 `.pre-commit-config.yaml`（秒级检查 + 2 MB 大文件防护 + README 一致性检查，不含 pytest）。
 
 ---
 

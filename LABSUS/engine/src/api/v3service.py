@@ -18,16 +18,21 @@ import time
 import numpy as np
 
 from src.api.v3models import (
-    BushingSpec, CaseLoad, DesignSpec, KandcRequest, KandcResponse, PoseRequest,
+    BushingSpec,
+    CaseLoad,
+    DesignSpec,
+    KandcRequest,
+    KandcResponse,
+    PoseRequest,
     PoseResponse,
 )
 from src.components.bushing import Bushing6DOF, Curve
+from src.geometry import line_intersect_2d
+from src.metrics.kandc import _slope  # F-13：单一差分内核（全局共用）
 from src.solver.compliance import solve_compliance_full
 from src.solver.forces import QSLoad
 from src.solver.mechanism.models import build_mechanism
 from src.solver.mechanism.solver import solve_pose
-from src.metrics.kandc import _slope  # F-13：单一差分内核（全局共用）
-from src.geometry import line_intersect_2d
 
 R2D = 180.0 / math.pi
 
@@ -38,9 +43,7 @@ DWB_TO_ENGINE = {
     "RACK": "FL1", "STRUT_IN": "CH5",
     "RCK_AX_A": "RK_PIVOT", "RCK_DMP": "RK_DAMPER", "DMP_BODY": "DAMPER_CHASSIS",
 }
-ENGINE_TO_DWB = {v: k for k, v in DWB_TO_ENGINE.items()}
 _ENGINE_KEYS = tuple(DWB_TO_ENGINE.values())
-
 # ── 缺省基线（前端 PRESETS 前悬架推杆 / S1 PRO_POINTS 同源） ─────────
 DEFAULT_DWB_POINTS: dict[str, list[float]] = {
     "LCA_F": [240.0, 180.0, 145.0], "LCA_R": [240.0, -160.0, 155.0],
@@ -251,8 +254,11 @@ def _solve_point(points, bushings, case: CaseLoad, travel: float, rack: float,
 
 def _gains_from_curves(x: list[float], y: dict[str, list[float]], axis_key: str) -> dict:
     """中心差分增益表（复用 S1 metrics/kandc.py 的斜率约定）。"""
-    from src.metrics.kandc import (bump_steer_deg_per_25, camber_gain_deg_per_25,
-                                   compliance_toe_deg, _slope)
+    from src.metrics.kandc import (
+        _slope,
+        bump_steer_deg_per_25,
+        camber_gain_deg_per_25,
+    )
     gains: dict[str, float] = {}
     if "cam" in y:
         gains["camber_gain_deg_per_25"] = camber_gain_deg_per_25(y["cam"], x, at=0.0)

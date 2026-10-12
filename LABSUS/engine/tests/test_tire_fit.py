@@ -5,8 +5,8 @@
 """
 import numpy as np
 from fastapi.testclient import TestClient
-
 from server import app  # noqa: E402
+
 from src.solver.tire_fit import fit_tire_params
 
 client = TestClient(app)

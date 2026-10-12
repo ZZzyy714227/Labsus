@@ -4,6 +4,29 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>LABSUS 悬架实验室 · 全车底盘多体运动学、4-Post动力学与准静态操稳分析平台</title>
+<!--
+  ============================================================================
+  dwb-pro-allinone.html —— 零依赖单文件「冻结快照」版（不是 js/ 模块的功能镜像）
+  ============================================================================
+  定位（2026-09-20 明确）：
+    1) 跨语言物理对拍锚：engine/tests/test_tphys_parity.py 用 node vm 抽取本文件
+       内置的 TPHYS 闭包（本文件下半部的 `const TPHYS = ...` IIFE），与 Python
+       src/solver/transient.py 对拍（门限 5%，实测 worst 0.11%）。
+       ⚠ 抽取器按 marker 字符串定位，注释里**不得**写出完整的闭包起始字面量
+       （web/test/test_dom.js 与 tphys_parity.cjs 都按该 marker 先命中）。
+    2) 离线演示/交付：双击即用，不依赖 npm / 构建 / 后端。
+  快照基线：≈ 2026-08-24（模块化拆分 G9 之前）。因此本文件**不含**以下后加能力：
+    - 车型预设体系 VEHICLE_PRESETS / loadVehiclePreset（本文件用早期命名）
+    - 三舞台系统（爬坡/定圆/上赛；无 openCircuitStage / buildShanghaiCircuit）
+    - 综合评价报告（evalReport）、15-DOF 舞台内核（VehicleDynamics15DOF）
+    - 轮胎工坊（14-tire-lab）、MPC（15-mpc）、动力工坊（16-powertrain）
+    - 生效式画布错误横幅 paintStageError、硬点校验 hpValidate、实体分色 entityColor
+  维护约定：**不要**为了"功能同步"往本文件搬 js/ 的增量——那会顶替
+    test_tphys_parity 校验的 legacy 路径，引入对拍锚漂移风险。
+    唯一允许的同步是"内联 TPHYS 与 js/09-track.js 的缺省物理常数保持一致"
+    （由 web/test/test_dom.js 的同构断言看守）。
+  ============================================================================
+-->
 <style>
 /* ============================================================
    LABSUS 悬架实验室 · 工程仪器风工作台 (Engineering Instrument)
@@ -1361,7 +1384,10 @@ function solveQuasiStatic(gyOverride){
   const mS = S.mSprung, mT = S.mTotal;
   const mU_f = S.front.mU * 2, mU_r = S.rear.mU * 2;
   
-  const b = L * (S.rear.mS / (S.front.mS + S.rear.mS));
+  /* M5 2026-09-20：b = CG→后轴 = L·m_f/(m_f+m_r)（与 js/03-mechanism 同源）。
+     物理修正必须在对拍锚里同步——否则 test_tphys_parity 的 5% 门限会被这条
+     口径吃掉（实测不同步时 worst 从 0.11% 退化到 2.36%）。 */
+  const b = L * (S.front.mS / (S.front.mS + S.rear.mS));
   const a = L - b;
   
   const tf = (abs(S.front.hp.WC[0]) * 2) / 1000;
@@ -4510,9 +4536,13 @@ const TPHYS = (function(){
     return interp(l.travel,l[key],travel,fb);
   }
   function mfSetup(p){
-    const B=(p.By!==undefined?p.By:9), C=(p.Cy!==undefined?p.Cy:1.2),
-          E=(p.Ey!==undefined?p.Ey:-0.5), D0=p.Fy0||8000,
-          LS=(p.LS!==undefined?p.LS:0.0), FzN=p.FzNom||3500,
+    /* 缺省物理常数 = GT3 光头胎基线，与 js/09-track.js 内联同构（G24/M5）。
+       注意：跨语言对拍（web/test/parity_input.example.json）显式传入
+       Fy0=8000/By=9/LS=0.10/Cg=0.5 冻结输入，故此处缺省值的修改不影响
+       test_tphys_parity 的对拍锚。 */
+    const B=(p.By!==undefined?p.By:20), C=(p.Cy!==undefined?p.Cy:1.2),
+          E=(p.Ey!==undefined?p.Ey:-0.5), D0=p.Fy0||5250,
+          LS=(p.LS!==undefined?p.LS:0.10), FzN=p.FzNom||3500,
           Sh=p.Sh||0, Sv=p.Sv||0;
     return function fy(aRad,fz){
       if(fz<=0)return 0;
@@ -4531,7 +4561,10 @@ const TPHYS = (function(){
     const L=v.wheelbase_mm/1000, mS=v.sprung_mass_kg, mT=v.mass_kg;
     const mUf=v.front.unsprung_kg*2, mUr=v.rear.unsprung_kg*2;
     const fms=v.front.spring_mass_kg, rms=v.rear.spring_mass_kg;
-    const b=L*(rms/(fms+rms)), a=L-b;
+    /* M5 2026-09-20：a = CG→前轴、b = CG→后轴；点质量模型 ⇒ b = L·m_f/(m_f+m_r)。
+       同步引擎 chassis.quasi_loads 的前后轴静载对调修复（物理修正必须在
+       对拍锚里同步，否则 test_tphys_parity 的 5% 门限会被这条口径吃掉）。 */
+    const b=L*(fms/(fms+rms)), a=L-b;
     const tf=Math.abs(v.front.points.WC[0])*2/1000;
     const tr=Math.abs(v.rear.points.WC[0])*2/1000;
     const huf=v.front.tire_radius/1000, hur=v.rear.tire_radius/1000;

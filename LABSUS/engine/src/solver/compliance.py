@@ -20,15 +20,22 @@ T5 将对接 T2 静力层（接地点外载 → 二力杆 → 锚点合力）替
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import time
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy.optimize import least_squares
 
 from src.components.bushing import Bushing6DOF, bush_force, bush_force_jac
-from src.solver.mechanism.solver import solve_pose
 from src.solver.compliance_transform import apply_bushing_to_anchors
+from src.solver.mechanism.solver import solve_pose
+
+if TYPE_CHECKING:
+    # 仅用于 solve_compliance_full 的 `case` 形参标注；运行时由函数内
+    # 惰性 import 保持"compliance 不依赖 forces"的边界（ruff F821 曾在此报警：
+    # `case: "QSLoad"` 引用了从未导入的名字，注解不可解析）。
+    from src.solver.forces import QSLoad
 
 # ── 状态判定阈值（模块常量） ──
 COST_VALID = 1e-6         # 外层代价函数低于此值 → VALID
@@ -285,7 +292,7 @@ def solve_compliance_full(
     mech,
     *,
     bushings: dict[str, Bushing6DOF],
-    case: "QSLoad",
+    case: QSLoad,
     travel: float,
     rack: float,
     mk_links=None,
@@ -307,7 +314,7 @@ def solve_compliance_full(
     - 外力矩折算到轮心后的残余 moment_residual 非零 → APPROXIMATE（球铰
       模型无法平衡力矩），并在返回值上携带说明（warnings 合并入 status）。
     """
-    from src.solver.forces import LinkForce, corner_to_anchor_loads, _chassis_end
+    from src.solver.forces import LinkForce, _chassis_end, corner_to_anchor_loads
 
     # 1) 运动学求解（确认机构可达当前姿态）
     rep = solve_pose(mech, travel, rack)
@@ -350,10 +357,10 @@ def solve_compliance_full(
 
     # 5) 按节点聚合力（anchor_loads 值已是车身端力，直接累加）
     per_node: dict[str, np.ndarray] = {}
-    for l in links:
-        end = _chassis_end(l, hub_point)
+    for lk in links:
+        end = _chassis_end(lk, hub_point)
         nm = _node_name(end)
-        per_node[nm] = per_node.get(nm, np.zeros(3)) + corner.anchor_loads.get(l.id, np.zeros(3))
+        per_node[nm] = per_node.get(nm, np.zeros(3)) + corner.anchor_loads.get(lk.id, np.zeros(3))
 
     # 6) 衬套载荷映射：{衬套名: 对应成员节点合力}
     loads: dict[str, np.ndarray] = {}

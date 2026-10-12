@@ -9,18 +9,19 @@ Mission:
    (e.g. 200mm, 325mm, 450mm).
 """
 import math
+
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
-
 from server import app
+
+from src.api import v3service
+from src.api.v3models import BushingSpec
 from src.components.bushing import Bushing6DOF, Curve
 from src.solver.compliance import solve_compliance_full
-from src.solver.forces import QSLoad, corner_to_anchor_loads, LinkForce
-from src.api import v3service
-from src.api.v3models import KandcRequest, BushingSpec, SweepSpec
-from tests.test_compliance_integration import _mech, PRO_POINTS
-from tests.test_v3_chassis import FRONT, REAR, _req as _chassis_req_body
+from src.solver.forces import LinkForce, QSLoad, corner_to_anchor_loads
+from tests.test_compliance_integration import PRO_POINTS, _mech
+from tests.test_v3_chassis import _req as _chassis_req_body
 
 client = TestClient(app)
 

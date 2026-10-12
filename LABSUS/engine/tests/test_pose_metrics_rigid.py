@@ -5,7 +5,7 @@ pushrod/pullrod 拓扑下 _estimate_rotation 必须只用 KNUCKLE 刚体簇节�
 """
 import numpy as np
 
-from src.api.v3service import _new_mech, _estimate_rotation, DEFAULT_DWB_POINTS
+from src.api.v3service import DEFAULT_DWB_POINTS, _estimate_rotation, _new_mech
 from src.solver.mechanism.solver import solve_pose
 
 

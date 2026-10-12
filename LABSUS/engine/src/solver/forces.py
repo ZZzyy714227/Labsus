@@ -4,6 +4,7 @@
 超静定时用最小范数最小二乘并在结果标注 APPROXIMATE（自重残差）。
 """
 from dataclasses import dataclass
+
 import numpy as np
 
 
@@ -32,43 +33,6 @@ def _solve_linear(A: np.ndarray, rhs: np.ndarray) -> tuple[np.ndarray, float]:
     return m, float(np.linalg.norm(A @ m - rhs))
 
 
-def force_balance_2lines(l1: LinkForce, l2: LinkForce, ext: np.ndarray) -> tuple[LinkForce, LinkForce]:
-    """球头受外力 ext（N），两杆在该点汇交：反解轴向力（2 未知，3 方程→最小二乘）。
-
-    残差可由 ``_solve_linear(A, -ext)`` 单独调用获取；
-    S1 集成路径（``corner_to_anchor_loads``）已在返回值中携带残差。
-    """
-    A = np.column_stack([l1.unit(), l2.unit()])
-    m, _ = _solve_linear(A, -np.asarray(ext, float))
-    l1.mag, l2.mag = float(m[0]), float(m[1])
-    return l1, l2
-
-
-def ball_joint_reaction(links_in: list[LinkForce], hub_load: np.ndarray) -> np.ndarray:
-    """转向节球铰处反力：外载荷（接地点力+力矩分配后的轮心力矩）+ 各杆轴向力合力。"""
-    f = np.asarray(hub_load, float).copy()
-    for l in links_in:
-        f = f - l.mag * l.unit()
-    return f
-
-
-def inner_anchor_force(links: list[LinkForce], i_node: np.ndarray, loads: list[np.ndarray]) -> np.ndarray:
-    """车身内锚点合力：由各杆轴向力在锚点汇交求和 + 直接施加在锚点的外载。
-
-    Args:
-        links: 所有二力杆列表。
-        i_node: 锚点坐标。
-        loads: 直接施加在该锚点的外载荷列表（每个元素为 3-向量）。
-    """
-    f = np.zeros(3)
-    for ext in loads:
-        f = f + ext
-    for l in links:
-        if np.allclose(l.a, i_node) or np.allclose(l.b, i_node):
-            f = f - l.mag * l.unit()
-    return f
-
-
 # ---------- 公开别名 ----------------------------------------------------------
 
 solve_linear = _solve_linear
@@ -87,10 +51,6 @@ class QSLoad:
     my: float = 0.0
     mz: float = 0.0
 
-    def vector(self) -> np.ndarray:
-        """返回 6-向量 [fx, fy, fz, mx, my, mz]。"""
-        return np.array([self.fx, self.fy, self.fz, self.mx, self.my, self.mz], float)
-
 
 @dataclass
 class CornerLoadsResult:
@@ -108,14 +68,14 @@ class CornerLoadsResult:
     moment_residual: float = 0.0
 
 
-def _chassis_end(l: LinkForce, hub: np.ndarray) -> np.ndarray:
+def _chassis_end(link: LinkForce, hub: np.ndarray) -> np.ndarray:
     """识别杆的车身端：距 hub_point 较远的一侧。
 
-    退化情况：若两端等距（杆中点恰在 hub），默认返回 l.b；实际悬架不会出现。
+    退化情况：若两端等距（杆中点恰在 hub），默认返回 link.b；实际悬架不会出现。
     """
-    da = float(np.linalg.norm(l.a - hub))
-    db = float(np.linalg.norm(l.b - hub))
-    return l.a if da > db else l.b
+    da = float(np.linalg.norm(link.a - hub))
+    db = float(np.linalg.norm(link.b - hub))
+    return link.a if da > db else link.b
 
 
 def corner_to_anchor_loads(
@@ -155,15 +115,15 @@ def corner_to_anchor_loads(
     m_cp = np.array([q.mx, q.my, q.mz], float)
     r = np.asarray(cp_rel, float)
     m_hub = m_cp + np.cross(r, f_cp)          # 刚体等效：力矩平移至轮心
-    A = np.column_stack([l.unit() for l in links])
+    A = np.column_stack([lk.unit() for lk in links])
     m, resid = solve_linear(A, -f_cp)
-    for i, l in enumerate(links):
-        l.mag = float(m[i])
+    for i, lk in enumerate(links):
+        lk.mag = float(m[i])
     out: dict[str, np.ndarray] = {}
-    for l in links:
-        end = _chassis_end(l, hub_point)
-        key = l.id if l.id else f"{end[0]:.0f},{end[1]:.0f},{end[2]:.0f}"
+    for lk in links:
+        end = _chassis_end(lk, hub_point)
+        key = lk.id if lk.id else f"{end[0]:.0f},{end[1]:.0f},{end[2]:.0f}"
         # 车身端反力 = -mag * unit（构件端在 hub 的反作用传递到车身）
-        out[key] = out.get(key, np.zeros(3)) - l.mag * l.unit()
+        out[key] = out.get(key, np.zeros(3)) - lk.mag * lk.unit()
     return CornerLoadsResult(anchor_loads=out, residual=float(resid),
                              moment_residual=float(np.linalg.norm(m_hub)))

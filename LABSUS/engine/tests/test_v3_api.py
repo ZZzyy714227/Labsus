@@ -2,10 +2,10 @@
 
 覆盖：健康检查 / 单点求解 / K&C 四工况 / 衬套装配 / 非法输入 / 未知工况。
 """
-import numpy as np
+import sys
+
 import pytest
 from fastapi.testclient import TestClient
-
 from server import app  # noqa: E402  (sys.path 注入由 server 完成)
 
 client = TestClient(app)
@@ -237,7 +237,7 @@ def _pt_min_body(**over):
 
 
 def test_powertrain_optional_field():
-    from src.api.v3models import TrackSimRequest, PowertrainSpec  # noqa: F401
+    from src.api.v3models import PowertrainSpec, TrackSimRequest  # noqa: F401
     # 带 powertrain：架构/齿轮比嵌套解析
     req = TrackSimRequest(**_pt_min_body(powertrain={
         "architecture": "ice",
@@ -287,6 +287,7 @@ def test_powertrain_frontend_shape_extra_ignored():
 def test_icespec_map_malformed_raises_validation_error():
     """三条畸形 map 各自触发 pydantic ValidationError（模型层）。"""
     from pydantic import ValidationError
+
     from src.api.v3models import IceSpec
     # (1) 每项长度 != 2（缺扭矩分量）——transient 会 p[1] → IndexError
     with pytest.raises(ValidationError):

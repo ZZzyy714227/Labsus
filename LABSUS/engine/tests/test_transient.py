@@ -10,7 +10,6 @@ import math
 
 import numpy as np
 from fastapi.testclient import TestClient
-
 from server import app  # noqa: E402
 
 client = TestClient(app)
@@ -84,7 +83,7 @@ def test_transient_circle_steady_state():
                     json=_body(track, sim_time=20.0, start_speed=12.0))
     assert r.status_code == 200
     b = r.json()
-    tr, t = b["trace"], np.array(b["t"])
+    tr, _t = b["trace"], np.array(b["t"])   # _t: 平行时间轴，本用例不直接用
     # 稳态段（跳过入弯暂态）：半径与横摆率中位数
     d = np.array([math.hypot(p["x"], p["y"]) for p in tr])
     r_yaw = np.abs(np.array([p["r"] for p in tr]))
@@ -131,7 +130,6 @@ def test_transient_braking_load_transfer():
              {"x": 200, "y": 0, "target_speed": 4.0}]        # 远端低速 → 全程刹车需求
     r = client.post("/api/v3/chassis/simulate_track",
                     json=_body(track, sim_time=8.0, start_speed=20.0))
-    b = r.json()
     tr = r.json()["trace"]
     # 找减速段（vx 下降）比较前后轴载荷变化方向
     f0 = tr[2]["fz_FR"] + tr[2]["fz_FL"]
@@ -217,8 +215,9 @@ def test_aero_drs_straight_reduces_drag():
     assert a_drs["summary"]["v_end"] > a_nod["summary"]["v_end"] + 0.02, (
         a_drs["summary"]["v_end"], a_nod["summary"]["v_end"])
     assert max(p["drs"] for p in a_nod["trace"]) == 0, "drs_v_ms 高阈值应永不触发"
-    f_frac = lambda r: (r["fz_RR"] + r["fz_RL"]) / max(1e-6, sum(
-        r[f"fz_{w}"] for w in ("FR", "FL", "RR", "RL")))
+    def f_frac(r):
+        return (r["fz_RR"] + r["fz_RL"]) / max(1e-6, sum(
+            r[f"fz_{w}"] for w in ("FR", "FL", "RR", "RL")))
     assert f_frac(a_drs["trace"][-1]) < f_frac(a_nod["trace"][-1]), "DRS 削后轴 cl → 占比降"
 
 

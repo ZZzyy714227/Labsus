@@ -1,0 +1,44 @@
+# LABSUS 工程与代码质量配置（M5 批次 4，2026-09-20）
+#
+# 说明：本文件在 LABSUS/ 下（而非仓库根）——发布物是 LABSUS/，
+# 仓库根的 archive/ 是历史归档，不应被 lint/打包工具扫到。
+# ruff 从"被检查文件"向上找最近的 pyproject.toml，故 CI 里
+# 以 LABSUS/engine 为 target 即可命中本配置。
+
+[project]
+name = "labsus-engine"
+version = "0.3.0"
+description = "LABSUS 悬架运动学/K&C/准静态操稳计算引擎（FastAPI，/api/v3）"
+requires-python = ">=3.11"
+readme = "README.md"
+license = { file = "LICENSE" }
+# 运行期依赖见 requirements.txt（此处仅登记元数据，避免与 pip 流程重复）
+dependencies = []
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+# 不扫历史归档 / 缓存 / 手册构建中间物
+extend-exclude = ["_build", "build", "dist", "scratch"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    # E402：scripts/kandc_run.py 与 tests/test_tphys_parity.py 必须在
+    #       `sys.path.insert(...)` 之后再 import `src.*`，这是刻意顺序（见文件内注释）。
+    "E402",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.pytest.ini_options]
+testpaths = ["engine/tests"]
+# pytest 需能 import `src.*` 与 `server`：conftest.py 已注入 engine/ 到 sys.path
+addopts = "-q"
+filterwarnings = []

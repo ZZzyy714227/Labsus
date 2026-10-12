@@ -105,3 +105,14 @@
 每一章节末尾均提供配套的源码索引，读者可以直接在 LABSUS 工程中对照运行：
 * **Python 求解器调试**：在根目录下运行 `pytest` 或调用 `engine/server.py`；
 * **Web 端实时多体与赛道仿真**：直接双击 `start.bat` 或在浏览器中打开 `web/dwb-pro-v4.html`。
+
+---
+
+## 📦 资产与构建约定
+
+| 文件 | 角色 |
+|---|---|
+| `cover_illustration_vertical.jpg` | **封面图（构建输入）**：`handbook-tools/build_anthropic_master.py` 在合订 md 里以内联图引用，`compile_anthropic_pdf.py` 从本目录复制到临时构建目录。与 `../assets/cover_illustration_vertical.jpg` 是同一张图（构建脚本按 `md.parent` 找图，故此处保留副本）。 |
+| `../assets/cover_illustration.jpg` | 同系列横版封面（当前无引用，保留为设计资产）。2026-09-20 清理时删掉了本目录下误命名的 `cover_illustration.jpg`（内容其实是竖版，且构建不用它）。 |
+
+构建流水线（`../handbook-tools/`）：`build_anthropic_master.py` 合订 27 章 → `format_anthropic_handbook.py` 排版 → `compile_anthropic_pdf.py` 出 PDF → `check_html.py` / `inspect_diff.py` 自检。

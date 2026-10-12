@@ -8,7 +8,6 @@
   委托本模块 `_slope`，两边数学恒等（F-12 双语义收敛）。
 - 端点用单侧窗口（只有一个邻点时用该侧差分），不再放大端点增益。
 """
-import numpy as np
 
 # F-10（讲义 A.2 修订）：力轴差分不适用固定 ±2N 窗口（力噪声量级与位移不同），
 # 统一走最近邻中央差分（实际步长），由 `window` 参数显式控制期望窗口宽度。
@@ -37,14 +36,14 @@ def compliance_toe_deg(toe: list, force: list, at: float) -> float:
 
 
 def mr_matrix(damper_travel: list, wheel_travel: list, at: float) -> float:
-    """d(DamperTravel)/d(WheelTravel)（导数矩阵对角线项，S1 每轮单值）。"""
+    """d(DamperTravel)/d(WheelTravel)（导数矩阵对角线项，S1 每轮单值）。
+
+    ⚠️ 生产零引用：整车 MR 走 `chassis` 的 `mr_at_zero` 与前端扫掠。本函数保留为
+    **F-12「差分内核单一实现」门禁的独立参考实现**——`test_w4_consistency.py` 用它
+    逐位对齐 legacy `kinematics.motion_ratio`，证明状态机版确实委托同一个 `_slope`。
+    不要把本函数接进生产路径（会多出一条 MR 口径）。
+    """
     return round(_slope(damper_travel, wheel_travel, at), 6)
-
-
-def rc_migration(rc_heights: list, travel: list) -> tuple[float, float]:
-    """RC 高度迁移：返回 (工作段 max−min, 起止差值 start−end)。"""
-    return (round(float(np.max(rc_heights) - np.min(rc_heights)), 2),
-            round(float(rc_heights[0] - rc_heights[-1]), 2))
 
 
 # ── F-12：kinematics.py 状态机版本的数值内核（单一实现） ──────────

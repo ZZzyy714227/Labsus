@@ -12,9 +12,9 @@
 import numpy as np
 import pytest
 
-from src.api.v3service import _new_mech, DEFAULT_DWB_POINTS
-from src.api.v3models import AxleSpec
 from src.api.chassis import mr_at_zero
+from src.api.v3models import AxleSpec
+from src.api.v3service import DEFAULT_DWB_POINTS, _new_mech
 from src.solver.mechanism.models import build_mechanism
 from src.solver.mechanism.solver import solve_pose
 

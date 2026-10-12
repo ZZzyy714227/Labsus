@@ -9,6 +9,7 @@ bush_force / bush_force_jac 中完整生效，但尚未有工况向求解器注�
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+
 import numpy as np
 from scipy.interpolate import PchipInterpolator
 
@@ -24,7 +25,8 @@ class Curve:
         if self.kind == "linear":
             return lambda x: self.k * x, lambda x: np.full_like(np.asarray(x, float), self.k)
         if self.kind in ("table", "spline"):
-            x = np.asarray(self.xs, float); y = np.asarray(self.ys, float)
+            x = np.asarray(self.xs, float)
+            y = np.asarray(self.ys, float)
             if len(x) < 2:
                 raise ValueError(f"table/spline curve requires >=2 points, got {len(x)}")
             # F-66（2026-08-30）：x 非严格递增 → PchipInterpolator 静默抛错（仅 422

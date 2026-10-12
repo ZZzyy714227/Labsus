@@ -14,11 +14,11 @@ import math
 
 import numpy as np
 from fastapi.testclient import TestClient
-
 from server import app  # noqa: E402
-from src.api.v3models import QuasiInputs, VehicleSpec   # noqa: E402
-from src.api.chassis import quasi_loads                 # noqa: E402
-from src.solver.transient import _wash_json             # noqa: E402
+
+from src.api.chassis import quasi_loads  # noqa: E402
+from src.api.v3models import QuasiInputs, VehicleSpec  # noqa: E402
+from src.solver.transient import _wash_json  # noqa: E402
 
 client = TestClient(app)
 
@@ -190,10 +190,10 @@ def test_wash_json_boundaries():
 # ── F-63：compliance 锚点映射失败必须显式报错 ──────────────────
 
 def test_compliance_unmapped_anchor_raises():
+    from src.api.v3service import DEFAULT_DWB_POINTS, make_bushings, to_engine_points
+    from src.solver.compliance import solve_compliance_full
     from src.solver.forces import LinkForce, QSLoad
     from src.solver.mechanism.models import build_mechanism
-    from src.solver.compliance import solve_compliance_full
-    from src.api.v3service import to_engine_points, DEFAULT_DWB_POINTS, make_bushings
 
     eng = to_engine_points(DEFAULT_DWB_POINTS)
     mech = build_mechanism(eng, steer_axis=np.array([-1.0, 0.0, 0.0]),

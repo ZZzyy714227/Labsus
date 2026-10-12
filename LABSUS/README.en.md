@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-v3%20REST%20API-009688.svg)](https://fastapi.tiangolo.com/)
-[![Tests: 100% Passed](https://img.shields.io/badge/pytest-164%20passed-success.svg)]()
+[![Tests: 100% Passed](https://img.shields.io/badge/pytest-189%20passed-success.svg)]()
 [![Platform: Web & Desktop](https://img.shields.io/badge/Platform-Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-orange.svg)]()
 
 > A modern full-chassis suspension engineering workbench tailored for **Formula Student (FSAE), FIA GT3 racing, and Baja off-road vehicles**.
@@ -67,15 +67,25 @@
   - Unsprung mass lateral inertial force component.
 - **Quasi-Static Closed-Loop Coupling**: Precise computation of roll angle ($\phi$), full-vehicle roll gradient ($d\phi/dg_y$), dynamic 4-wheel normal loads ($F_z$), and handling balance classification (Understeer / Oversteer / Neutral).
 - **Comprehensive Chassis KPIs**:
-  - **US Gradient** ($0.2\sim2.0\,^\circ/g$) with front/rear axle slip angle ($\alpha_f/\alpha_r$) decomposition;
+  - **US Gradient** (target window $0.2\sim2.0\,^\circ/g$; all four factory presets measure $0.21\sim0.27\,^\circ/g$ @1g) with front/rear axle slip angle ($\alpha_f/\alpha_r$) decomposition;
+  > Balance is carried by two real levers: per-axle cornering stiffness scaled by **tire width** ($k_\text{axle}=W_\text{axle}/\overline{W}$ — stiffness factor only, peak μ untouched) plus the per-axle sprung-mass split. The ARB is nearly inert for US in this model (front ARB $0\to40$ swings TLLTD $45\%\to83\%$ but US by only $+0.01\,^\circ/g$).
   - **Jacking effect**, front axle TLLTD percentage, and roll gradient displayed live on the "Key Results" card with design target corridors;
   - **Understeer characteristic $\delta$-$a_y$ sweep curves**: 2-path decomposition of tire slip and roll steer across $0\to2g$.
 
 ### 4. 15-DOF Full-Track Transient Dynamics & AutoPilot Stage
-- **15-Degree-of-Freedom Full-Vehicle Multibody Dynamics**:
-  - Chassis 6-DOF (longitudinal $u$, lateral $v$, vertical $w$, roll $p$, pitch $q$, yaw $r$);
-  - 4-wheel independent vertical travel (4-DOF) + 4-wheel independent rotational spin (4-DOF);
-  - 1000 Hz high-frequency sub-stepping numerical integrator, capturing pitch squat/dive, roll, and dynamic wheel load transfer.
+- **Full-Vehicle Multibody Dynamics (`VehicleDynamics15DOF`, legacy naming)**:
+  - Chassis 6-DOF: position $X,Y,Z$ + attitude $\phi,\theta,\psi$ + body velocities $u,v,w$ + body rates $p,q,r$;
+  - 4-wheel independent rotational spin (4-DOF, $\omega_{FL,FR,RL,RR}$);
+  - **Wheel vertical motion is kinematically slaved** ($tr = -(z_\text{corner}-z_\text{road})$, clamped by droop/bump-stop); wheel load $F_z$ is computed **algebraically** from spring + damper + ARB + bump-stop and applied to the chassis — i.e. **no unsprung-mass vertical inertia and no tire vertical compliance DOF**;
+  - 1000 Hz high-frequency sub-stepping integrator (`MAX_SUB_DT = 1ms`), capturing squat/dive, roll, and dynamic wheel load transfer.
+  > ⚠️ Caliber note: the implementation is "6 chassis DOF + 4 wheel spin + 4 kinematically
+  > slaved wheels", **not** the textbook "6 chassis + 4 unsprung vertical + 4 wheel spin"
+  > 15-DOF form. Consequences and the upgrade path are registered in
+  > `INTENTIONAL_DIFFERENCES.md` ("15-DOF caliber") and in the caliber comment above the
+  > class declaration in `web/js/11-stages.js`. The engine-side
+  > `/api/v3/chassis/simulate_track` is a planar 3-DOF model with algebraic quasi-static
+  > roll/pitch — a **different** model from this stage kernel (the cross-language parity
+  > test targets the built-in TPHYS closure, not this kernel).
 - **Pacejka Magic Formula Combined-Slip Tire Model**:
   - Accurate calculation of pure side-slip lateral force ($F_y$), pure longitudinal slip traction/braking force ($F_x$), and combined-slip friction circle adhesion limits.
 - **Shanghai International Circuit (SIC 5.45km) Simulation**:
@@ -128,23 +138,48 @@ python LABSUS/engine/server.py
 
 ## 🧪 Testing & Quality Assurance
 
-LABSUS includes a rigorous automated test suite (run from the `LABSUS/` directory):
+LABSUS includes a rigorous automated test suite (run from the `LABSUS/` directory).
+All frontend suites are **npm-free, browser-free** node `vm` sandboxes with built-in
+DOM/Canvas stubs; only the TPHYS parity check is cross-language:
+
 ```bash
 cd LABSUS
 
-# 1. Python engine physics assertions / gate checks / TPHYS dual-kernel parity / stress tests (164 passed)
-pytest engine/tests -q
+# ── Python engine: physics assertions / gates / API-contract guard / TPHYS parity / stress ──
+pytest engine/tests -q                 # 189 passed / 1 skipped (skip = OptimumK rows not entered, explicit)
+                                       #   · test_api_contract            frontend/backend key-set contract
+                                       #   · test_static_split_invariant  static load-split invariant
+                                       #   · test_tire_width_balance      tire width -> cornering stiffness
+                                       #   · test_legacy_isolation        V1 frozen-line isolation guard
+ruff check engine                      # All checks passed (config in pyproject.toml, rules E/F/W/I)
+python scripts/sync_root_docs.py --check   # root <-> LABSUS README/LICENSE byte-identical
 
-# 2. Frontend DOM / state machine assertions (163 passed)
-node web/test/test_dom.js
+# ── Frontend defense lines (per suite) ──────────────────────────────────
+node web/test/test_dom.js              # 274 assertions: shell structure / dual-entry parity / bug regressions
+node web/test/stage_boot_check.js      # 45 assertions: module order / TDZ / 3 stages x 20 frames
+node web/test/test_lap_15dof.js        # 23 assertions: 2 laps of 5.45 km + 6 powertrain parity checks
+node web/test/test_15dof_steady.js     # 14 assertions: analytic steady-state anchors for the 15-DOF kernel
+node web/test/test_powertrain.js       # 587 assertions (7 powertrain architectures)
+node web/test/test_tire_lab.js         # 65 · test_tire_wiring.js 36 · proving_ground_test.js 36
+node web/test/test_racingline.js       # 30 · test_engine_sound.js 26 · test_kc_wiring.js 25
+node web/test/undulating_road_test.js  # 21 · test_mpc.js 19 · test_p2b_damper.js 18
+node web/test/test_p2a_aero.js         # 14 · test_circuit_ui.js 100% (64 ids + 22 classes)
 
-# 3. Stage boot defense checks (40 passed: TDZ, module ordering, stage rendering)
-node web/test/stage_boot_check.js
+# ── Cross-language physics parity (JS TPHYS <-> Python transient, 5% threshold) ──
+node web/test/tphys_parity.cjs         # measured worst 0.51%
 
-# 4. Dual-kernel physics parity & 15-DOF lap simulation integration (100% passed)
-node web/test/tphys_parity.cjs
-node web/test/test_lap_15dof.js
+# ── Diagnostic tools (not part of the regression) ───────────────────────
+node web/test/preset_balance_sweep.cjs # preset balance sweep (US / TLLTD vs sprung split / ARB / tire width)
+node web/test/mpc_diag_g30.cjs         # MPC tuning diagnostics · mpc_calib_g30.cjs calibration grid
 ```
+
+> Numbers reflect the current workspace (baseline 2026-09-20). After frontend edits run at
+> least `test_dom` + `stage_boot_check`; after engine edits run `pytest engine/tests` +
+> `ruff check engine`; after touching TPHYS/inlined physics run `tphys_parity.cjs`.
+>
+> **Automated gates**: `.github/workflows/ci.yml` (lint / pytest / node jobs, runs on every PR);
+> pre-commit hooks in `.pre-commit-config.yaml` (fast checks + 2 MB large-file guard + README
+> consistency check; pytest deliberately excluded).
 
 ---
 

@@ -10,7 +10,6 @@
 """
 import pytest
 from fastapi.testclient import TestClient
-
 from server import app  # noqa: E402
 
 client = TestClient(app)

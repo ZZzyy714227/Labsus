@@ -10,7 +10,6 @@ gate 测试覆盖四维度：
 import time
 
 import numpy as np
-import pytest
 
 from src.components.bushing import Bushing6DOF, Curve
 from src.solver.compliance import solve_compliance, solve_compliance_full
@@ -118,7 +117,7 @@ def test_gate_static_alignment_handcheck():
     从硬点直接计算 kpi / caster，与 solve_to_angles 输出比对。
     容差 0.5°（机构求解器姿态误差 + 数值精度）。
     """
-    from src.solver.mechanism.pose import solve_to_angles
+    from src.legacy.pose import solve_to_angles
 
     m = _mech()
     ang = solve_to_angles(m, 0.0, 0.0)

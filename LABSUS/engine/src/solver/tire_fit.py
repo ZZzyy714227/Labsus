@@ -18,6 +18,7 @@ import math
 
 import numpy as np
 from scipy.optimize import least_squares
+
 from src.tire_mf import evaluate_magic_formula_fy
 
 

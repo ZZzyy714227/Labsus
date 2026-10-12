@@ -87,11 +87,14 @@
     </section>
 
     <!-- 右坞站：核心结论卡(#v4Hero) → 明细(#rp, buildRight 产物) → 诊断卡 -->
+    <!-- M5（2026-09-20）：补回 class="v4-hero"/"v4-diag"——v4.css:54/69 定义了整卡
+         外壳（玻璃底/边框/圆角/padding），但容器一直没有 class ⇒ 外壳样式从未生效，
+         只有 JS 注入的内层 .v4-hero-hd/.v4-hero-grid 生效。-->
     <aside class="pnl" id="v4right">
       <div id="v4scroll">
-        <div id="v4Hero"></div>
+        <div class="v4-hero" id="v4Hero"></div>
         <div id="rp"></div>
-        <div id="v4Diag"></div>
+        <div class="v4-diag" id="v4Diag"></div>
       </div>
     </aside>
   </div>
@@ -383,7 +386,7 @@
                 <div class="c-pedal-item">
                   <span class="c-pedal-label">离合 %</span>
                   <div class="c-pedal-bar-bg"><div class="c-pedal-bar-fill" id="tg_bar_clutch" style="height:0%;"></div></div>
-                  <b id="tg_val_clutch">0.0</b>
+                  <b id="tg_val_clutch" title="未接入：离合器踏板模型未实现">—</b>
                 </div>
                 <div class="c-pedal-item">
                   <span class="c-pedal-label">油门 %</span>
@@ -392,8 +395,8 @@
                 </div>
                 <div class="c-pedal-item">
                   <span class="c-pedal-label">手刹 %</span>
-                  <div class="c-pedal-bar-bg"><div class="c-pedal-bar-fill" id="tg_bar_hb" style="height:0%;"></div></div>
-                  <b id="tg_val_hb">0.0</b>
+                  <div class="c-pedal-bar-bg"><div class="c-pedal-bar-fill" id="tg_bar_hb" style="height:0%;" title="未接入：手刹踏板模型未实现"></div></div>
+                  <b id="tg_val_hb" title="未接入：手刹踏板模型未实现">—</b>
                 </div>
                 <div class="c-pedal-item">
                   <span class="c-pedal-label">刹车 %</span>
@@ -498,7 +501,7 @@
                 <div><span>线速</span><b id="td_spd_fl">0 km/h</b></div>
                 <div><span>外倾角</span><b id="td_cam_fl">-2.15°</b></div>
                 <div><span>滑移率</span><b id="td_slip_fl">0.0%</b></div>
-                <div><span>损耗</span><b id="td_wear_fl">0.0%</b></div>
+                <div><span>损耗</span><b id="td_wear_fl" title="未接入：胎温/磨损模型未实现（R-0905b 保真度清单）">—</b></div>
               </div>
             </div>
             <!-- 右前 FR -->
@@ -510,7 +513,7 @@
                 <div><span>线速</span><b id="td_spd_fr">0 km/h</b></div>
                 <div><span>外倾角</span><b id="td_cam_fr">-2.15°</b></div>
                 <div><span>滑移率</span><b id="td_slip_fr">0.0%</b></div>
-                <div><span>损耗</span><b id="td_wear_fr">0.0%</b></div>
+                <div><span>损耗</span><b id="td_wear_fr" title="未接入：胎温/磨损模型未实现（R-0905b 保真度清单）">—</b></div>
               </div>
             </div>
             <!-- 左后 RL -->
@@ -522,7 +525,7 @@
                 <div><span>线速</span><b id="td_spd_rl">0 km/h</b></div>
                 <div><span>外倾角</span><b id="td_cam_rl">-1.85°</b></div>
                 <div><span>滑移率</span><b id="td_slip_rl">0.0%</b></div>
-                <div><span>损耗</span><b id="td_wear_rl">0.0%</b></div>
+                <div><span>损耗</span><b id="td_wear_rl" title="未接入：胎温/磨损模型未实现（R-0905b 保真度清单）">—</b></div>
               </div>
             </div>
             <!-- 右后 RR -->
@@ -534,7 +537,7 @@
                 <div><span>线速</span><b id="td_spd_rr">0 km/h</b></div>
                 <div><span>外倾角</span><b id="td_cam_rr">-1.85°</b></div>
                 <div><span>滑移率</span><b id="td_slip_rr">0.0%</b></div>
-                <div><span>损耗</span><b id="td_wear_rr">0.0%</b></div>
+                <div><span>损耗</span><b id="td_wear_rr" title="未接入：胎温/磨损模型未实现（R-0905b 保真度清单）">—</b></div>
               </div>
             </div>
           </div>
@@ -586,18 +589,18 @@
         <div class="c-tel-view" id="tel_view_damage">
           <div class="c-damage-container">
             <div class="c-damage-car-wireframe">
-              <div class="c-dm-wheel c-dm-fl"><span class="c-dm-lbl">FL</span><b id="dm_val_fl">0.0%</b></div>
-              <div class="c-dm-wheel c-dm-fr"><span class="c-dm-lbl">FR</span><b id="dm_val_fr">0.0%</b></div>
+              <div class="c-dm-wheel c-dm-fl"><span class="c-dm-lbl">FL</span><b id="dm_val_fl" title="未接入：损伤/磨损模型未实现，仅燃油累计在跑">—</b></div>
+              <div class="c-dm-wheel c-dm-fr"><span class="c-dm-lbl">FR</span><b id="dm_val_fr" title="未接入：损伤/磨损模型未实现，仅燃油累计在跑">—</b></div>
               <div class="c-dm-body-shape"></div>
-              <div class="c-dm-wheel c-dm-rl"><span class="c-dm-lbl">RL</span><b id="dm_val_rl">0.0%</b></div>
-              <div class="c-dm-wheel c-dm-rr"><span class="c-dm-lbl">RR</span><b id="dm_val_rr">0.0%</b></div>
+              <div class="c-dm-wheel c-dm-rl"><span class="c-dm-lbl">RL</span><b id="dm_val_rl" title="未接入：损伤/磨损模型未实现，仅燃油累计在跑">—</b></div>
+              <div class="c-dm-wheel c-dm-rr"><span class="c-dm-lbl">RR</span><b id="dm_val_rr" title="未接入：损伤/磨损模型未实现，仅燃油累计在跑">—</b></div>
             </div>
             <div class="c-damage-list">
-              <div class="c-dm-item"><span>转向系统 %</span><b id="dm_val_steer">0.0</b></div>
-              <div class="c-dm-item"><span>电驱/引擎 %</span><b id="dm_val_engine">0.0</b></div>
-              <div class="c-dm-item"><span>离合器 %</span><b id="dm_val_clutch">0.0</b></div>
-              <div class="c-dm-item"><span>变速箱 %</span><b id="dm_val_gear">0.0</b></div>
-              <div class="c-dm-item"><span>悬架连杆 %</span><b id="dm_val_susp">0.0</b></div>
+              <div class="c-dm-item"><span>转向系统 %</span><b id="dm_val_steer" title="未接入：损伤累计模型未实现">—</b></div>
+              <div class="c-dm-item"><span>电驱/引擎 %</span><b id="dm_val_engine" title="未接入：损伤累计模型未实现">—</b></div>
+              <div class="c-dm-item"><span>离合器 %</span><b id="dm_val_clutch" title="未接入：损伤累计模型未实现">—</b></div>
+              <div class="c-dm-item"><span>变速箱 %</span><b id="dm_val_gear" title="未接入：损伤累计模型未实现">—</b></div>
+              <div class="c-dm-item"><span>悬架连杆 %</span><b id="dm_val_susp" title="未接入：损伤累计模型未实现">—</b></div>
               <div class="c-dm-item"><span>电池/燃料 %</span><b id="dm_val_fuel" style="color:#7ee787;">96.5</b></div>
             </div>
           </div>

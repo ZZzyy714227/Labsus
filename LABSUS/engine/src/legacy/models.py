@@ -20,7 +20,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field, field_validator
 
-from core.convention import DEFAULT_CONVENTION, CoordinateConvention
+from src.core.convention import DEFAULT_CONVENTION, CoordinateConvention
 
 POINT_KEYS = frozenset({"CH1", "CH2", "CH3", "CH4", "CH5",
                         "UP1", "UP2", "UP3", "UP4", "UP5", "FL1"})

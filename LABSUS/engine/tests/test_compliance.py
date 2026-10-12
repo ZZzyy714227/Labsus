@@ -1,8 +1,8 @@
 """K&C 两层迭代求解器测试。"""
 import numpy as np
-import pytest
+
 from src.components.bushing import Bushing6DOF, Curve
-from src.solver.compliance import ComplianceSolverResult, solve_compliance
+from src.solver.compliance import solve_compliance
 from src.solver.mechanism.models import build_mechanism
 
 PRO_POINTS = {  # 前轴推杆侧硬点（DWB-SIM PRO 前悬架，坐标 X=外侧/Y=向前/Z=上）

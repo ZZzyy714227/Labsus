@@ -10,7 +10,8 @@ STRUT_OUT / RCK_AX_A / RCK_AX_B / STRUT_IN / RCK_DMP / DMP_BODY），
 from __future__ import annotations
 
 import math
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # ── 前端 DWB 硬点键（同 HP_META） ────────────────────────────────────
 DWB_KEYS = frozenset({
@@ -118,11 +119,6 @@ class KandcRequest(BaseModel):
         return self
 
 
-class GainsModel(BaseModel):
-    """工况增益表（数值随工况不同）。"""
-    extra: dict[str, float] = Field(default_factory=dict)
-
-
 class KandcResponse(BaseModel):
     """K&C 工况响应：曲线 + 增益表 + 可信度状态。"""
     case: str                                    # bump | roll | steer | compliance
@@ -218,9 +214,32 @@ class AxleSpec(BaseModel):
     unsprung_kg: float = 38.0               # mU 单侧
     motion_ratio: float | None = None       # 缺省 → 引擎 mr_at_zero 数值推导
     kw_curve: KwCurve | None = None         # 缺省 → 常数 kw = kS·mr²（见 KwCurve）
+    tire_width: float | None = None         # M5 胎宽 mm：参与前后轴侧偏刚度配平（见下）
     tire_rim_w: float | None = None         # G29 轮胎工坊：轮毂宽度 mm（可选，缺省不参与计算）
     tire_et: float | None = None            # G29 轮胎工坊：偏距 mm（可选）
     arb: ArbSpec = Field(default_factory=ArbSpec)
+
+    def tire_width_scale(self, other: "AxleSpec | None") -> float:
+        """M5（2026-09-20）：按胎宽配平侧偏刚度因子的轴系数 k = W_axle / mean(W_f, W_r)。
+
+        物理依据：侧偏刚度随胎宽（接触斑尺度）近似线性增长，而峰值摩擦 μ·Fz
+        对同配方/同胎压基本与胎宽无关 ⇒ 只放大刚度因子（MF 的 B），**不动峰值 D**。
+        这样 G24 的轮胎量级标定（μ=1.50 / 峰值侧偏角 8.27°）不被改动，只改前后
+        轴平衡——补上"后胎更宽 ⇒ 后轴更抓 ⇒ 不足转向"这条真车主平衡机制
+        （此前 tire.W 只被渲染层消费，模型对胎宽完全盲）。
+
+        归一化用两轴均值：等宽时 k≡1（旧行为逐位不变）；不等宽时只在两轴之间
+        重新分配刚度，整车平均拓地力不变。任一轴缺 tire_width ⇒ 返回 1（不参与）。
+        """
+        w_a = self.tire_width
+        w_b = other.tire_width if other is not None else None
+        if w_a is None or w_b is None:
+            return 1.0
+        w_a, w_b = float(w_a), float(w_b)
+        ref = 0.5 * (w_a + w_b)
+        if ref <= 0.0:
+            return 1.0
+        return w_a / ref
 
 
 class VehicleSpec(BaseModel):
@@ -558,13 +577,20 @@ class TrackSimRequest(BaseModel):
 
 
 class TrackSimResponse(BaseModel):
+    """整车瞬态赛道仿真响应（M5：由 server.py 绑为 response_model，契约不再裸奔）。
+
+    summary 的值允许 None：`run_track_sim` 出口统一过 `_wash_json`，非有限量
+    （发散工况）会被洗成 null 以保证 RFC8259 严格合法 JSON（F-25）。若此处收紧
+    为 `float`，发散工况会从"诚实的 SOLVER_FAILED 响应"退化成 500。
+    键名本身仍被钉死——前端按 key 取值（web/js/09-track.js），改名即红。
+    """
     status: str
     ms: float = 0.0
     steps: int = 0
     finished: bool = False
     t: list[float] = Field(default_factory=list)
     trace: list[dict] = Field(default_factory=list)
-    summary: dict[str, float] = Field(default_factory=dict)
+    summary: dict[str, float | None] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
 
 

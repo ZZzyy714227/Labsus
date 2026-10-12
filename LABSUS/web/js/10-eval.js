@@ -18,17 +18,6 @@ function applyTheme(t){
 /* =====================================================================
    LABSUS 综合性能评价与AI调校诊断引擎 (Evaluation Engine)
    ===================================================================== */
-/* V-F 阻尼曲线插值（速度 m/s → 阻尼力 N）：damperMode==="table" 时替换线性 cB/cR */
-function vfDamper(table, v, fallback){
-  if(!table||table.length<2)return fallback;
-  if(v<=table[0][0])return table[0][1];
-  if(v>=table[table.length-1][0])return table[table.length-1][1];
-  let i=1;while(i<table.length&&table[i][0]<v)i++;
-  const a=table[i-1],b=table[i];
-  const t=(v-a[0])/((b[0]-a[0])||1e-9);
-  return a[1]+(b[1]-a[1])*t;
-}
-
 const EVAL_BENCHMARKS = {
   camberGainF:     { name: "前外倾增益 (Camber Gain)", target: "0.04 ~ 0.08 °/mm", unit: "°/mm", eval: v => (v >= 0.04 && v <= 0.08 ? 'good' : (v >= 0.02 && v <= 0.11 ? 'warn' : 'bad')), desc: "过弯侧倾时补偿接地面积，过小易推头，过大影响制动" },
   camberGainR:     { name: "后外倾增益 (Camber Gain)", target: "0.03 ~ 0.07 °/mm", unit: "°/mm", eval: v => (v >= 0.03 && v <= 0.07 ? 'good' : (v >= 0.015 && v <= 0.09 ? 'warn' : 'bad')), desc: "后轴侧倾附着力支撑，保障高速稳定性" },

@@ -254,7 +254,6 @@ table.hp td.rk input{color:var(--pri)}
 
 .bar-box{display:flex;height:15px;background:var(--well);border:1px solid var(--glass-bd);margin:4px 10px 6px;overflow:hidden;position:relative;border-radius:var(--r-pill);box-shadow:none}
 .bar-fill-f{background:var(--pri);height:100%}
-.bar-fill-r{background:var(--s-copper);height:100%}
 .bar-box::after{content:"";position:absolute;left:50%;top:2px;bottom:2px;width:1px;background:var(--glass-bd-2);border-radius:var(--r-pill)}
 .bar-lbl{position:absolute;top:0;bottom:0;display:flex;align-items:center;padding:0 6px;font:8.5px var(--font-mono);color:var(--ink-1);text-shadow:0 1px 2px rgba(0,0,0,.45)}
 
@@ -360,13 +359,6 @@ canvas.plot{display:block;width:100%;height:150px;background:var(--well);border:
   margin-left: 8px;
   transition: all 0.2s ease;
 }
-.slope-btn {
-  background: rgba(46, 204, 113, 0.15);
-  border: 1px solid rgba(46, 204, 113, 0.4);
-  color: #2ecc71;
-}
-.slope-btn:hover { background: rgba(46, 204, 113, 0.3); }
-
 .eval-btn {
   background: rgba(78, 161, 211, 0.15);
   border: 1px solid rgba(78, 161, 211, 0.4);
@@ -498,18 +490,6 @@ canvas.plot{display:block;width:100%;height:150px;background:var(--well);border:
 .metric-val { font-size: 15px; font-weight: 800; font-family: ui-monospace, monospace; color: #58a6ff; }
 .metric-target { font-size: 10.5px; color: #8b949e; }
 .metric-desc { font-size: 10.5px; color: #8b949e; line-height: 1.35; margin-top: 2px; }
-
-/* 定圆绕环按钮样式 */
-.header-action-btn.skidpad-btn {
-  background: linear-gradient(135deg, rgba(230, 126, 34, 0.25), rgba(241, 196, 15, 0.2));
-  border: 1px solid rgba(243, 156, 18, 0.5);
-  color: #f39c12;
-}
-.header-action-btn.skidpad-btn:hover {
-  background: linear-gradient(135deg, rgba(230, 126, 34, 0.4), rgba(241, 196, 15, 0.35));
-  border-color: #f39c12;
-  box-shadow: 0 0 12px rgba(243, 156, 18, 0.3);
-}
 
 /* 定圆绕环舞台全屏模态窗口 */
 .circuit-stage-modal-backdrop {

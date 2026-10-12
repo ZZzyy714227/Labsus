@@ -5,7 +5,6 @@ TrackPoint target_speed 非负。这些都是 pydantic 服务边界防线——
 非法 JSON 直达求解器将被 422 拒绝（F-60 测试盲区① 补全）。
 """
 from fastapi.testclient import TestClient
-
 from server import app  # noqa: E402
 
 client = TestClient(app)
@@ -75,9 +74,11 @@ def test_track_rejects_bad_tire_params():
         "track": [{"x": 0.0, "y": 0.0, "target_speed": 10.0},
                   {"x": 50.0, "y": 0.0, "target_speed": 10.0}],
     }
-    bad = dict(body); bad["tire"] = {"Fy0": 8000.0, "FzNom": 0.0}
+    bad = dict(body)
+    bad["tire"] = {"Fy0": 8000.0, "FzNom": 0.0}
     assert client.post("/api/v3/chassis/simulate_track", json=bad).status_code == 422
-    bad2 = dict(body); bad2["tire"] = {"Fy0": 8000.0, "By": -1.0}
+    bad2 = dict(body)
+    bad2["tire"] = {"Fy0": 8000.0, "By": -1.0}
     assert client.post("/api/v3/chassis/simulate_track", json=bad2).status_code == 422
 
 

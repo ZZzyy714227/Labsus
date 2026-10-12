@@ -21,19 +21,18 @@ from __future__ import annotations
 import os
 import sys
 
-# 确保 engine/ 与 engine/src 都在 sys.path（与 scripts/kandc_run.py 同款注入）
+# 确保 engine/ 在 sys.path（与 scripts/kandc_run.py 同款注入）。
+# F-74：不再挂 engine/src —— 引擎内部统一 `src.` 绝对导入根，避免同一文件
+# 被加载成 `src.geometry` 与 `geometry` 两个模块对象导致身份比较失效。
 _ENGINE_ROOT = os.path.dirname(os.path.abspath(__file__))
-_SRC = os.path.join(_ENGINE_ROOT, "src")
-for _p in (_ENGINE_ROOT, _SRC):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+if _ENGINE_ROOT not in sys.path:
+    sys.path.insert(0, _ENGINE_ROOT)
 
 from fastapi import FastAPI, HTTPException  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-from pydantic import ValidationError  # noqa: E402
 
-from src.api import v3service  # noqa: E402
 from src.api import chassis as chassis_service  # noqa: E402
+from src.api import v3service  # noqa: E402
 from src.api.v3models import (  # noqa: E402
     ChassisRequest,
     KandcRequest,
@@ -41,10 +40,11 @@ from src.api.v3models import (  # noqa: E402
     TireFitRequest,
     TireFitResponse,
     TrackSimRequest,
+    TrackSimResponse,
 )
-from src.solver.transient import run_track_sim  # noqa: E402
-from src.solver.tire_fit import fit_tire_params  # noqa: E402
 from src.core.json_util import wash_json as _wash_json  # noqa: E402
+from src.solver.tire_fit import fit_tire_params  # noqa: E402
+from src.solver.transient import run_track_sim  # noqa: E402
 
 ENGINE_VERSION = "0.3.0"          # 引擎（S1 内核 + S2 服务层）
 API_VERSION = "v3"
@@ -148,9 +148,16 @@ def chassis_kandc(case: str, req: ChassisRequest) -> dict:
         _handle_api_error(exc, "chassis K&C")
 
 
-@app.post("/api/v3/chassis/simulate_track")
+@app.post("/api/v3/chassis/simulate_track", response_model=TrackSimResponse)
 def simulate_track(req: TrackSimRequest) -> dict:
-    """整车瞬态赛道仿真（S3-1）：平面 3-DOF + 四轮 MF + 准静态载荷 + 纯追踪驾驶员。"""
+    """整车瞬态赛道仿真（S3-1）：平面 3-DOF + 四轮 MF + 准静态载荷 + 纯追踪驾驶员。
+
+    M5：绑定 response_model —— 这是唯一返回裸 dict 的端点，绑上之后响应键集
+    由模型钉死，后端改名会当场红，而不是让前端静默空白。
+    其余端点不绑：它们的服务层本就返回 pydantic 模型（`runner(req).model_dump()`），
+    键集已由模型保证；再加运行时校验只会把 `_wash_json` 洗出的诚实 null
+    （发散工况）变成 500。
+    """
     try:
         return _wash_json(run_track_sim(req))
     except Exception as exc:  # noqa: BLE001

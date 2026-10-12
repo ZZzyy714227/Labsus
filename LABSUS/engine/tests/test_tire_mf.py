@@ -1,5 +1,7 @@
 import numpy as np
+
 from src.tire_mf import MagicFormulaSub, load_tir_params
+
 
 def test_fy_peak_and_saturation():
     """MF 简化：Fy(α) 峰值后在合理滑移区单调性（α=0 → 0；峰值 ~8-12°）。"""

@@ -95,10 +95,15 @@ function buildShanghaiCircuit(mu = 1.35, aggressiveness = 1.0) {
 class UniversalAutoPilot {
   constructor(S_config) {
     this.wb = (S_config.wb || 2600) / 1000.0; 
-    // G22：与 VehicleDynamics15DOF 的 a = wb*0.46 对齐（旧值 0.48 与引擎的 CG→前轴
-    //     距离不一致，前轴参考点系统性偏移 ~5cm；量小但属口径错误）
-    this.a = this.wb * 0.46; // Dist from CG to Front Axle
-    
+    /* M5（2026-09-20）：与 VehicleDynamics15DOF 同源就地推导 CG→前轴距离。
+       旧值 wb*0.46 源自前后对调的准静态口径（见 VehicleDynamics15DOF 构造器注），
+       使前轴参考点系统性偏移；G22 当时只在错值之间对齐（0.48→0.46），
+       本次连根修正。缺 mS 的测试桩回落 0.46。 */
+    {
+      const _mf = (S_config.front && S_config.front.mS) || 0;
+      const _mr = (S_config.rear && S_config.rear.mS) || 0;
+      this.a = (_mf + _mr) > 0 ? this.wb * (_mr / (_mf + _mr)) : this.wb * 0.46;
+    }
     this.pid_speed = { p: 0.95, i: 0.08, d: 0.04, integral: 0, last_err: 0 };
     this.last_steer = 0;
     this.last_throttle = 0;
@@ -283,6 +288,34 @@ class UniversalAutoPilot {
 /* M-2(G31-P6)：轮索引映射提为模块常量，避免每子步重复创建对象字面量 */
 const WHEEL_IDX = { FL: 0, FR: 1, RL: 2, RR: 3 };
 
+/* ────────────────────────────────────────────────────────────────────────────
+   M5（2026-09-20）自由度口径校准 —— 名称与实现必须对得上
+
+   类名 `VehicleDynamics15DOF` 是历史命名（README/手册第 16 章沿用）。实现的实际
+   口径是：
+
+     积分状态（16 个标量 / 10 个机械自由度）
+       · 车身 6 DOF：X,Y,Z（世界位置）+ phi,theta,psi（欧拉角）
+                     + u,v,w（体速）+ p,q,r（体角速度）
+       · 车轮 4 DOF：omega{FL,FR,RL,RR}（自转角，state.omega）
+
+     非积分量（代数/运动学从动，不是独立 DOF）
+       · 车轮垂向：`tr_w = -(z_corner - z_road_w)`（本文件 step() 内）——车轮
+         被**运动学地钉在路面上**，由 droop/bumpstop 钳位；`Fz` 由
+         Kw·tr + 阻尼 + ARB + 缓冲块**代数**算出后作用到车身。
+       · 结果：**没有非簧载质量的垂向惯性，也没有轮胎垂向柔度 DOF**；弹簧/阻尼
+         力经 `F_susp` 直接进车身，不经过中间质量。
+
+   因此"15-DOF"应理解为「6 车身 DOF + 4 轮自转 + 4 个运动学从动轮」，
+   而不是「6 车身 + 4 非簧载垂向 + 4 轮自转」的教科书 15-DOF 形式。
+   已知后果（登记于 INTENTIONAL_DIFFERENCES.md「15-DOF 口径」）：
+     · 无轮跳共振/轮荷高频振荡能力（轮胎与簧下质量的 10~16Hz 模态缺失）；
+     · 过路肩/减速带时车轮不"脱开"路面，只由 droop 行程钳位表达；
+     · 车身与路面之间是"弹簧+阻尼+缓冲块"单链，无轮胎垂向弹簧串联。
+   若要升级为真 15-DOF，须为每轮引入 zw/vw 状态 + 非簧载质量 + 轮胎垂向刚度/阻尼
+   （并重标 test_lap_15dof / proving_ground 全部阈值）——属独立立项，不在本轮。
+   ──────────────────────────────────────────────────────────────────────────── */
+
 class VehicleDynamics15DOF {
   constructor(S_config, SIM_data, initSpeedMs = 0) {
     this.S = S_config;
@@ -290,8 +323,32 @@ class VehicleDynamics15DOF {
     
     this.m = Math.max(150, S_config.mTotal || 1000);
     this.wb = (S_config.wb || 2600) / 1000;
-    this.a = this.wb * 0.46;
+    /* a = CG→前轴距离、b = CG→后轴距离。M5（2026-09-20）修复：
+       旧值 `this.wb * 0.46` 是从（当时前后对调的）准静态内核抄来的口径错误值，
+       使 Fz0_F = m·g·(b/wb) 把后轴静载份额给了前轴（formula 预设 45.3% ↔ 54.7%
+       整体反了）。现按两轴簧载点质量模型就地推导，与 03-mechanism/chassis.py 同源：
+         a = L·m_r/(m_f+m_r)、b = L·m_f/(m_f+m_r)
+       缺 mS 的测试桩回落 0.46（旧行为）。 */
+    {
+      const _mf = (S_config.front && S_config.front.mS) || 0;
+      const _mr = (S_config.rear && S_config.rear.mS) || 0;
+      this.a = (_mf + _mr) > 0 ? this.wb * (_mr / (_mf + _mr)) : this.wb * 0.46;
+    }
     this.b = this.wb - this.a;
+    /* M5：按胎宽配平的轴侧偏刚度系数 k = W_axle / mean(W_f, W_r)，喂给
+       magicFormula 的 axleScale（见该方法注释）。等宽/缺字段 ⇒ 1，旧行为不变。 */
+    {
+      const _wf = (S_config.front && S_config.front.tire) ? S_config.front.tire.W : null;
+      const _wr = (S_config.rear && S_config.rear.tire) ? S_config.rear.tire.W : null;
+      if (typeof _wf === 'number' && isFinite(_wf) && _wf > 0 &&
+          typeof _wr === 'number' && isFinite(_wr) && _wr > 0) {
+        const _ref = 0.5 * (_wf + _wr);
+        this.kW_F = _wf / _ref;
+        this.kW_R = _wr / _ref;
+      } else {
+        this.kW_F = 1.0; this.kW_R = 1.0;
+      }
+    }
     this.h_cg = (S_config.hcg || 350) / 1000;
     
     const hF = (S_config.front && S_config.front.hp && S_config.front.hp.WC) ? S_config.front.hp.WC : [750,0,300];
@@ -448,7 +505,7 @@ class VehicleDynamics15DOF {
      ★ 组合滑移保留旧架构的【归一化滑移量 + 方向分解】（已由赛车线回归验证），
        只修正标度：小滑移下 Fy ≈ −D·Cy·By·tanα ⇒ C_alpha = B·C·D，与引擎
        cornering_stiffness() 完全同式；且合力 hypot(Fx,Fy) ≤ D 恒成立（摩擦圆）。 */
-  magicFormula(Fz, alpha, kappa, mu_peak = 1.35) {
+  magicFormula(Fz, alpha, kappa, mu_peak = 1.35, axleScale = 1) {
     if (Fz <= 1.0) return { Fx: 0, Fy: 0 };
     const tp = this.resolveTireParams();
     // 载荷敏感性（Jensen 效应）：重载 μ 递减——载荷转移损失轴总拓地力、
@@ -457,8 +514,12 @@ class VehicleDynamics15DOF {
     const lsF = Math.max(0.1, 1.0 - tp.LS * (r - 1.0));
     const D = mu_peak * tp.gripScale * Fz * lsF;
 
+    /* M5（2026-09-20）：axleScale = 按胎宽配平的轴刚度系数 k = W_axle / mean(W_f, W_r)。
+       只放大**刚度因子**（侧向归一化滑移 sy 的 By），不动峰值 D —— 胎宽对接触斑
+       刚度近似线性、对同配方同胎压的 μ·Fz 基本中性。等宽/缺字段时 k=1，旧行为
+       逐位不变（test_dom 与 test_lap_15dof 的 legacy 锚不受影响）。 */
     const sx = tp.Bx * kappa;
-    const sy = tp.By * Math.tan(alpha);
+    const sy = axleScale * tp.By * Math.tan(alpha);
     const s = Math.max(1e-9, Math.hypot(sx, sy));
     const x = s - tp.Ey * (s - Math.atan(s));
     const F = D * Math.sin(tp.Cy * Math.atan(x));
@@ -775,7 +836,8 @@ class VehicleDynamics15DOF {
         // Pacejka tire forces (Fx_t: tractive/braking along tire rolling, Fy_t: cornering grip)
         let Fx_t = 0, Fy_t_base = 0, mf = null;
         if (Fz_w > 1.0) {
-          mf = this.magicFormula(Fz_w, alpha, kappa, ws.mu);
+          mf = this.magicFormula(Fz_w, alpha, kappa, ws.mu,
+                                 w.axle === 'front' ? this.kW_F : this.kW_R);
           Fx_t = mf.Fx;
           Fy_t_base = mf.Fy;
         }

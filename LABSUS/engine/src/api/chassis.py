@@ -15,16 +15,24 @@ import bisect
 import math
 import threading
 import time
+from collections import OrderedDict
 
 import numpy as np
 
 from src.api.v3models import (
-    AxleSpec, ChassisLoads, ChassisPoseResponse, ChassisRequest, ChassisSweepResponse,
-    CornerTravel, DesignSpec, QuasiInputs, VehicleSpec,
+    AxleSpec,
+    ChassisLoads,
+    ChassisPoseResponse,
+    ChassisRequest,
+    ChassisSweepResponse,
+    DesignSpec,
+    QuasiInputs,
+    VehicleSpec,
 )
 from src.api.v3service import _new_mech, mirror_left, pose_metrics
 from src.metrics.kandc import _slope  # F-13：单一差分内核（全局共用）
 from src.solver.mechanism.solver import solve_pose
+from src.tire_mf import cornering_stiffness  # M5：Cα 唯一实现（避免第三份拷贝）
 
 R2D = 180.0 / math.pi
 D2R = math.pi / 180.0
@@ -129,7 +137,7 @@ def arb_rate(ax: AxleSpec) -> dict:
     return {"k": k, "J": J, "kt": kt, "a": g["a"], "L": L}
 
 
-_RC_SWEEP_CACHE: dict[tuple, dict] = {}
+_RC_SWEEP_CACHE: OrderedDict[tuple, dict] = OrderedDict()
 _RC_SWEEP_LOCK = threading.Lock()  # F-70：FastAPI 端点跑线程池，缓存读写加锁
 
 
@@ -142,6 +150,9 @@ def axle_rc_sweep(ax: AxleSpec, lim: float = 90.0, n: int = 21) -> dict:
 
     F-70（2026-08-30）：dict 淘汰/写入此前无锁（CPython 下竞态良性但
     非零风险）；加锁保证并发的 Hit/Miss 与 LRU 淘汰原子化。
+    M5（2026-09-20）：docstring 一直自称 LRU，实现却是 FIFO（`pop(next(iter))`
+    淘汰最早插入项）——改为 OrderedDict + move_to_end / popitem(last=False)，
+    实现与声明一致。
     """
     key = (tuple(sorted((k, tuple(map(float, v))) for k, v in ax.points.items())),
            float(ax.tire_radius), float(ax.camber_deg), float(ax.toe_deg),
@@ -149,6 +160,7 @@ def axle_rc_sweep(ax: AxleSpec, lim: float = 90.0, n: int = 21) -> dict:
     with _RC_SWEEP_LOCK:
         hit = _RC_SWEEP_CACHE.get(key)
         if hit is not None:
+            _RC_SWEEP_CACHE.move_to_end(key)   # 真 LRU：命中即刷新新鲜度
             return hit
     mech = _new_mech(ax.points, arch=ax.arch)
     design = DesignSpec(camber_deg=ax.camber_deg, toe_deg=ax.toe_deg)
@@ -160,8 +172,8 @@ def axle_rc_sweep(ax: AxleSpec, lim: float = 90.0, n: int = 21) -> dict:
         rc.append(None if m["rc_h"] is None else float(m["rc_h"]))
     out = {"travel": xs, "rc_h": rc}
     with _RC_SWEEP_LOCK:
-        if len(_RC_SWEEP_CACHE) > 16:
-            _RC_SWEEP_CACHE.pop(next(iter(_RC_SWEEP_CACHE)))
+        while len(_RC_SWEEP_CACHE) >= 16:
+            _RC_SWEEP_CACHE.popitem(last=False)   # 淘汰最久未使用项
         _RC_SWEEP_CACHE[key] = out
     return out
 
@@ -214,7 +226,14 @@ def quasi_loads(vehicle: VehicleSpec, q: QuasiInputs,
 
     f_ms = vehicle.front.spring_mass_kg
     r_ms = vehicle.rear.spring_mass_kg
-    b = L * (r_ms / (f_ms + r_ms))
+    # ── a/b 口径（M5 2026-09-20 修复前后轴对调）────────────────────────────
+    # a = CG→前轴距、b = CG→后轴距（讲义 ch10 §2.1：z_ra = (b/L)·z_rc,f + (a/L)·z_rc,r
+    # 即前轴权重 = b/L）。两轴簧载按点质量模型：a = L·m_r/(m_f+m_r)、
+    # b = L·m_f/(m_f+m_r) —— 簧载重的一端离它更近、且承担更多静载。
+    # 旧实现写成 b = L·m_r/(m_f+m_r)（把"后簧载份额"当成 CG→后轴距），
+    # 使前后轴静载整体对调：实测 f_ms=300/r_ms=340 时前轴占比 52.2%，
+    # 而物理正确值应为 46.9%（簧载 300/640）。见 tests/test_static_split_invariant.py。
+    b = L * (f_ms / (f_ms + r_ms))
     a = L - b
 
     tf = (abs(vehicle.front.points["WC"][0]) * 2) / 1000.0
@@ -323,18 +342,28 @@ def quasi_loads(vehicle: VehicleSpec, q: QuasiInputs,
     # α轴 = Fy轴 / ΣCα(各轮真实载荷)；Cα = B·C·D(Fz) 含 LS 载荷敏感性
     # （EP08/EP10：载荷转移使轴总刚度次线性增长 → 梯度含非线性饱和种子）。
     # 只含轮胎分量；roll steer / 柔度项在 sweep_roll / compliance 通道另查。
+    # M5（2026-09-20）：Cα 再乘**按胎宽配平的轴系数** k = W_axle / mean(W_f, W_r)
+    # （AxleSpec.tire_width_scale）——补上"后胎更宽 ⇒ 后轴更抓 ⇒ 不足转向"这条
+    # 真车主平衡机制（此前 tire.W 从不进入刚度，模型对胎宽盲，导致只能靠
+    # 前重配重才能凑出不足转向）。等宽或缺字段时 k≡1，旧行为逐位不变。
     us_grad = alpha_f = alpha_r = 0.0
     if tire is not None and abs(q.gy) >= 0.02:
-        def _ca_mf(fz_w: float) -> float:
-            if fz_w <= 0:
-                return 0.0
-            r = fz_w / tire.FzNom
-            d = tire.Fy0 * r * max(0.1, 1.0 - tire.LS * (r - 1.0))
-            return tire.By * tire.Cy * d
+        k_f = vehicle.front.tire_width_scale(vehicle.rear)
+        k_r = vehicle.rear.tire_width_scale(vehicle.front)
+
+        def _ca_mf(fz_w: float, k: float = 1.0) -> float:
+            """侧偏刚度 Cα（N/rad）——委托 tire_mf 的唯一实现（M5 单源化）。
+
+            此前这里是该公式的第三份拷贝（另两份在 tire_mf 的
+            evaluate_magic_formula_fy 与 MagicFormulaSub._d）。
+            """
+            return cornering_stiffness(fz_w, Fy0=tire.Fy0, By=tire.By,
+                                       Cy=tire.Cy, FzNom=tire.FzNom,
+                                       LS=tire.LS, axle_scale=k)
         fy_f = mT * ay * (b / L)
         fy_r = mT * ay * (a / L)
-        ca_f = _ca_mf(fz["FL"]) + _ca_mf(fz["FR"])
-        ca_r = _ca_mf(fz["RL"]) + _ca_mf(fz["RR"])
+        ca_f = _ca_mf(fz["FL"], k_f) + _ca_mf(fz["FR"], k_f)
+        ca_r = _ca_mf(fz["RL"], k_r) + _ca_mf(fz["RR"], k_r)
         if ca_f > 1e-6 and ca_r > 1e-6:
             alpha_f = (fy_f / ca_f) * R2D
             alpha_r = (fy_r / ca_r) * R2D
@@ -360,30 +389,6 @@ def quasi_loads(vehicle: VehicleSpec, q: QuasiInputs,
         alpha_f_deg=round(alpha_f, 4), alpha_r_deg=round(alpha_r, 4),
         jacking_f_n=round(f_jack, 1), jacking_heave_mm=round(jack_heave_mm, 4),
     )
-
-
-def _us_curve(vehicle: VehicleSpec, tire, mr: dict[str, float],
-              rcH: dict[str, float], rc_sw: dict[str, dict],
-              n: int = 21, gy_max: float = 2.0) -> dict[str, list]:
-    """不足转向特性 δ-ay 扫掠（底盘开发汇报核心图，讲义 EP11/EP12）。
-
-    沿 gy 0→gy_max 均匀扫描准静态工况，输出 δ_us = αf − αr（°）曲线；
-    仅含轮胎分量，与单点 us_grad_deg_per_g 严格同口径（roll steer /
-    compliance 项在 sweep_roll / compliance 通道另查，不在此伪造）。
-    """
-    from src.api.v3models import QuasiInputs
-    gy_l, af_l, ar_l, us_l, roll_l = [], [], [], [], []
-    for i in range(n):
-        g = gy_max * i / (n - 1)
-        q = QuasiInputs(gy=g, gx=0.0, aero_force_n=0.0, aero_bias=0.5)
-        ld = quasi_loads(vehicle, q, mr, rcH, rc_sw, warnings=None, tire=tire)
-        gy_l.append(round(g, 4))
-        af_l.append(ld.alpha_f_deg)
-        ar_l.append(ld.alpha_r_deg)
-        us_l.append(round(ld.alpha_f_deg - ld.alpha_r_deg, 4) if g >= 0.02 else 0.0)
-        roll_l.append(ld.roll_deg)
-    return {"gy": gy_l, "alpha_f_deg": af_l, "alpha_r_deg": ar_l,
-            "us_angle_deg": us_l, "roll_deg": roll_l}
 
 
 def _roll_steer_rate(vehicle: VehicleSpec) -> dict[str, float]:
@@ -448,9 +453,30 @@ def _resolve_mr_fb(ax: AxleSpec, points: dict, is_front: bool,
 
     返回 (mr, 是否回退常量)。回退常量分轴（前 0.75 / 后 0.78——旧实现恒
     0.75 使后轴也吃到前轴常量），且异常原因随 warning 上报（不再静默吞）。
+
+    M5（2026-09-20）**MR 口径分歧显式化**：前端恒定下发自己的扫掠 MR
+    （web/js/06-ui-panels.js `motion_ratio: SIM.mrRefF||0.75`，其值是前端真实
+    几何扫掠得到的 mr@0，不是占位常量）⇒ 显式分支永远命中，引擎的
+    `mr_at_zero` 推导在**生产链路上从未被执行**，两口径的分叉（实测前
+    0.47 vs 0.75、后 0.17 vs 0.78，OpenItem-B 摇臂双根分支）因此永久静默。
+    本函数现在在命中显式值时**仍然算一遍推导并比对**，相对差 >15% 即上报
+    warning——数值行为不变（显式值仍是权威），只是把分叉暴露在响应的
+    warnings 里（前端会显示在状态行）。
     """
     if ax.motion_ratio is not None:
-        return round(float(ax.motion_ratio), 4), False
+        mr = round(float(ax.motion_ratio), 4)
+        try:
+            derived = round(mr_at_zero(ax, points, False), 4)
+        except Exception:  # noqa: BLE001
+            derived = None   # 推导失败不影响显式值；兜底告警由无显式分支负责
+        if derived:
+            rel = abs(mr - derived) / max(mr, derived, 1e-9)
+            if rel > 0.15:
+                warnings.append(
+                    f"MR 口径分歧（{'前' if is_front else '后'}轴）：前端显式 {mr} "
+                    f"vs 引擎推导 {derived}（相对差 {rel * 100:.0f}%）→ 取显式值；"
+                    f"根因登记 OpenItem-B（摇臂双根分支选择）")
+        return mr, False
     try:
         v = round(mr_at_zero(ax, points, False), 4)
         return v, False
