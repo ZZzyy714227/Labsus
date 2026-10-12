@@ -1,0 +1,29 @@
+# EditorConfig —— 跨编辑器统一风格（M5 批次 4，2026-09-20）
+# 与根 .gitattributes 的行尾策略保持一致：库内与工作区一律 LF，.bat 例外。
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+max_line_length = off
+
+[*.py]
+indent_size = 4
+max_line_length = 120
+
+[*.{js,cjs,mjs,json,jsonl,yml,yaml,html,css,md}]
+indent_size = 2
+
+[*.md]
+# Markdown 的行尾双空格是硬换行语法，不能裁
+trim_trailing_whitespace = false
+
+[*.{bat,cmd}]
+end_of_line = crlf
+
+[Makefile]
+indent_style = tab

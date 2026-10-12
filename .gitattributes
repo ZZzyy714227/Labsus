@@ -1,0 +1,42 @@
+# 换行符与文本/二进制归一（M5 批次 1）
+#
+# 此前仓库只有 core.autocrlf=true 的个人配置，导致每次提交都刷
+# "LF will be replaced by CRLF" 警告，且不同机器/IDE 生成的行尾不一致。
+# 这里把规则写进版本库：库内一律 LF，工作区检出也一律 LF（.bat 例外）。
+# 注意：库内历史本来就是 LF，所以本文件不会引发 renormalize 大 diff。
+
+* text=auto eol=lf
+
+# 明确文本类型
+*.py      text eol=lf
+*.js      text eol=lf
+*.cjs     text eol=lf
+*.mjs     text eol=lf
+*.html    text eol=lf
+*.css     text eol=lf
+*.md      text eol=lf
+*.json    text eol=lf
+*.jsonl   text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.toml    text eol=lf
+*.txt     text eol=lf
+*.sh      text eol=lf
+*.bat     text eol=crlf
+*.cmd     text eol=crlf
+
+# 二进制（禁止任何行尾/编码转换）
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.ico     binary
+*.pdf     binary
+*.woff    binary
+*.woff2   binary
+*.ttf     binary
+
+# 生成物/差异噪音：不参与语言统计
+LABSUS/web/dwb-pro-allinone.html  linguist-generated=true
+docs/DEVLOG.md                    linguist-documentation=true
+LABSUS/.worklog.md                linguist-documentation=true

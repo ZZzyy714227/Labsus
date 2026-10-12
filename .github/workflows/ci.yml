@@ -1,0 +1,85 @@
+name: CI
+
+# LABSUS 三道防线（M5 批次 4，2026-09-20）
+#   ① pytest        —— 引擎物理断言 / 门禁 / 契约守卫
+#   ② node 无头沙箱 —— 前端 16 套结构·接线·舞台回归
+#   ③ tphys_parity  —— JS TPHYS ↔ Python transient 跨语言物理对拍（门限 5%）
+# 另加 lint 与 README 一致性守卫。
+#
+# 触发：推送到 main + 所有 PR + 手动。published 部分 = LABSUS/（仓库根其余目录本地维护）。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── 静态检查与文档一致性（快，先失败）──────────────────────────────
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: 安装 ruff
+        run: pip install ruff==0.15.14
+      - name: ruff（配置见 LABSUS/pyproject.toml）
+        run: ruff check LABSUS/engine
+      - name: README/LICENSE 根↔LABSUS 一致性
+        run: python LABSUS/scripts/sync_root_docs.py --check
+
+  # ── 引擎：pytest ─────────────────────────────────────────────────
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: 安装依赖
+        run: |
+          pip install -r LABSUS/requirements.txt
+          pip install -r LABSUS/requirements-dev.txt
+      - name: pytest
+        working-directory: LABSUS
+        run: python -m pytest engine/tests -q
+
+  # ── 前端 + 跨语言对拍：node 沙箱（需要 Python 供对拍调用）──────────
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: 安装引擎依赖（tphys_parity.cjs 会拉起 Python 参考实现）
+        run: |
+          pip install -r LABSUS/requirements.txt
+      - name: 前端防线（逐套件，任一失败即红）
+        working-directory: LABSUS
+        env:
+          LABSUS_PY: python
+        run: |
+          fail=0
+          for f in test_dom stage_boot_check test_15dof_steady test_lap_15dof \
+                   proving_ground_test undulating_road_test test_p2a_aero \
+                   test_p2b_damper test_circuit_ui test_racingline \
+                   test_tire_wiring test_kc_wiring test_mpc test_powertrain \
+                   test_tire_lab test_engine_sound; do
+            echo "── $f"
+            node "web/test/$f.js" || fail=1
+          done
+          echo "── tphys_parity（跨语言物理对拍，门限 5%）"
+          node web/test/tphys_parity.cjs || fail=1
+          exit $fail

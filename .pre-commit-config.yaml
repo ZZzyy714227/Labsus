@@ -1,0 +1,41 @@
+# 提交前门禁（M5 批次 4，2026-09-20）
+#
+# 安装：pip install pre-commit && pre-commit install
+# 全量手动跑：pre-commit run --all-files
+#
+# 设计原则：**只放秒级、确定性的检查**。pytest（~35s）与 16 套 node 回归
+# 交给 CI（.github/workflows/ci.yml），不进 pre-commit，避免毁掉提交手感。
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=2048]           # 防止再有人把 15MB PDF 提进来
+      - id: check-json
+      - id: check-toml
+      - id: check-yaml
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.14
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^LABSUS/(engine|scripts)/.*\.py$
+
+  # 自定义本地钩子：README 双份一致性（根为真源）
+  - repo: local
+    hooks:
+      - id: sync-root-docs
+        name: README/LICENSE 根↔LABSUS 一致性
+        entry: python LABSUS/scripts/sync_root_docs.py --check
+        language: system
+        pass_filenames: false
+        files: ^(README\.md|README\.en\.md|LICENSE|LABSUS/(README\.md|README\.en\.md|LICENSE))$
