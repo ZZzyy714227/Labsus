@@ -216,3 +216,63 @@
 - **15-DOF 舞台无非簧载质量与胎垂向柔度**（见「15-DOF 口径」节）。
 - **`metrics/kinematics.py` 生产零引用**（仅测试导入），而 `jacking` 在
   `api/chassis.py` 就地重写 ⇒ 潜在双实现漂移。
+
+## 差速器双实现（M19 / T2，2026-09-20）
+
+| 实现 | 形式 | 参数键 | 角色 |
+|---|---|---|---|
+| 前端 `web/js/16-powertrain.js::distributeAxle` | **扭矩域** + 滑差 ramp | `type` / `bias`(TBR) / `lockNm` / `slipRefRadS` | **真源**（已接 TPHYS） |
+| 引擎 `components/differential.py::distribute_axle` | 同上，**逐字移植** | 同键名 | 引擎真源路径（`wheel_dof=True` 时启用） |
+| 引擎 `differential.py::axle_static_capacity_split` | **力域**准静态能力估算 | `kind` / `preload_nm` / `bias_ratio` | **准静态工具**（方案对比/报告），非运行时 |
+| 引擎 `differential.py::split_from_spec` | 力域，喂上面那个 | 同上（力域键） | 仅 `wheel_dof=False` 的**历史路径** |
+
+公式（真源，两侧逐字一致）：
+
+```
+Δω = ω_R − ω_L ；ramp = lockNm·min(1, |Δω|/slipRef)
+Ttrans = min(lockNm, ((bias−1)/(bias+1))·|tAxle|/2 + ramp)
+Δω ≥ 0 → 向左轮转移（对 Δω=0 右连续）；tR ≡ tAxle − tL（逐位守恒）
+locked → 按垂直载荷分配（fz 和 ≤0 退化 50/50）；open/未知 → 严格 50/50
+```
+
+参数映射（**改动必须两侧同步**）：`bias(TBR) ↔ bias_ratio = (TBR−1)/(TBR+1)`、
+`lockNm ↔ preload_nm`、`slipRefRadS` 同名同义。因形式同为 (TBR−1)/(TBR+1)，映射是恒等的。
+
+**对拍工件**：`engine/data/diff_parity_cases.json`（162 例，由 Python 侧生成）。
+Python 侧由 `tests/test_differential.py::test_distribute_axle_matches_cross_language_artifact`
+逐例断言（实测 worst rel = 4.69e-15）；前端侧由 `web/test/test_dom.js` 读同一文件比对
+（相对差门限 1e-9）。**任一侧改公式而不同步工件，对拍立刻失败。**
+
+## 轮自由度开关（M19 / T1）
+
+`TrackSimRequest.wheel_dof`（默认 **False**）。这是**刻意差异开关**，不是"两种物理"：
+
+| 开关 | 状态向量 | 单轮纵向上限 | 滑移/轮速输出 | 差速器路径 |
+|---|---|---|---|---|
+| **关（默认）** | 平面 6 状态（历史） | `0.75·μFz`（历史余量，出处未说明） | `kappa_*`/`omega_*` 恒 0 | 力域历史路径 |
+| **开** | 仍为平面 6 状态（准稳态代数解，**不扩状态**） | `μFz` | 准稳态 κ 与 ω | 扭矩域真源 `distribute_axle` |
+
+- **为什么用代数解而不是扩状态积分**：轮自由度是刚性的 ——
+  `τ_eff = I·vx/(Cκ·Re²) ≈ 0.55~2.2 ms`，而引擎子步约 1.6 ms ⇒ 显式积分临界/发散
+  （实测 3 m/s、dt=2ms 时 15 步内偏差发散 10 倍以上，断言见
+  `tests/test_wheel_dof.py::test_step_size_constraint_is_speed_dependent`）。
+  令 `I·dω/dt=0` 解出 κ 得 `κ = clamp(Fx/Cκ, ±κ_peak)`、`ω = vx(1+κ)/Re`，稳定且便宜。
+- **刻意差异**：开启后单轮纵向上限由 `0.75·μFz` 改为 `μFz`。历史 0.75 是未说明出处的余量；
+  轮自由度模型下上限应由滑移曲线与附着共同决定。差异量级见 DEVLOG（R-0933）。
+- **已知局限**：代数形式下 `|κ| ≤ κ_peak` ⇒ **完全抱死（κ=−1）表达不出来**；
+  抱死/锁死必须走动态形式（`WheelDof.advance`，已单独测试）。
+- `TireParams.kappa_peak`（默认 0.12）**未标定**：取自赛车胎文献区间 0.10~0.15，需按实件校正。
+
+## 历史退化路径（M19 / T4 登记，2026-09-20）
+
+以下路径**保留但不代表物理**，仅用于"没有更完整模型时"的兜底。**不要把它们当作差速器/轮胎模型的实现**，
+也**不要在对比结论里引用它们的数值**。
+
+| 位置 | 触发条件 | 行为 | 与完整模型的差异 |
+|---|---|---|---|
+| 前端 `11-stages.js` 逐轮 `throttleCmd*480 / *120` | `ptOut` 为空（未启用真实动力总成） | 每轴按固定值给力，**左右恒等** | 相当于"永远 50/50 且可无限转移"；**开放式**下弱侧打滑时整轴上限应为 `2·min(cap)`，此处会高估 |
+| 引擎 `transient.wheel_force` 历史分支 | `wheel_dof=False`（默认） | `min(0.75·μFz, demand)` 逐轮独立 | 等价"锁死且 50/50"的混合体；既非开放式（不按弱侧限制整轴）也非锁死式（不按载荷分配）。实测三型整轴能力：开放式 **600 N** / 锁死 **1500 N**（差 2.5 倍） |
+| 引擎 `_diff_shares` 力式路径 | `wheel_dof=False` 且给了差速器规格 | 力域准静态分配 `axle_static_capacity_split` | 无 Δω 依赖（拿不到轮速）⇒ 限滑的 ramp 项缺失，**系统性低估**滑差带来的额外锁紧 |
+
+**升级路径**：把 `wheel_dof` 置 True 即走真源路径（准稳态 κ/ω + 扭矩域 `distribute_axle`），
+代价是单轮纵向上限由 `0.75·μFz` 变为 `μFz`（登记在案的刻意差异）。

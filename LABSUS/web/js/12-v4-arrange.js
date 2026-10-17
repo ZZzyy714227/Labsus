@@ -236,7 +236,7 @@ function v4InitThemePicker(){
    ============================================================ */
 /* tune 是 v4ArrangeLeft 的默认分支（见 :259 的三元），无需单独正则 —— M5 删除了
    全仓零引用的 V4_TUNE_T（同族 V4_ANA_T / V4_SET_T 在用，保留）。 */
-const V4_ANA_T=/引擎连接|整车底盘分析|动态驾驶测试|赛道动态遥测|4-Post|Baseline|轮胎实测标定|台架对拍|衬套刚度标定/;
+const V4_ANA_T=/引擎连接|整车底盘分析|动态驾驶测试|赛道动态遥测|4-Post|Baseline|轮胎实测标定|台架对拍|衬套刚度标定|灵敏度扫描|双参数交互|方案库/;
 const V4_SET_T=/硬点永久保存|系统显示|实体着色|3D 空间硬点表|显示图层控制/;
 function v4ArrangeLeft(){
   const lp=document.getElementById("lp");if(!lp||lp.dataset.v4)return;lp.dataset.v4="1";
@@ -259,7 +259,12 @@ function v4ArrangeLeft(){
       const t=(zh?zh.textContent:"")+" "+(el.textContent||"").slice(0,40);
       const dst=V4_ANA_T.test(t)?"analyze":(V4_SET_T.test(t)?"setup":"tune");
       panes[dst].appendChild(el);
-    } /* groupDiv 分隔符丢弃，由 Tab 替代分组语义 */
+    }else{
+      /* M7（2026-09-20）：旧注释说"groupDiv 分隔符丢弃"，但代码只是跳过它们、
+         从未从 DOM 移除 ⇒ 三个 CORE/TUNING/ADVANCED 分隔行滞留在 Tab 栏上方，
+         成为左栏最显眼的杂乱源（三行英文小字，无任何语义）。这里真正移除。 */
+      el.remove();
+    }
   });
   let saved="tune";try{saved=localStorage.getItem("labsus-v4-lpane")||"tune";}catch(e){}
   if(!panes[saved])saved="tune";
@@ -402,6 +407,10 @@ function v4SetQuad(q){
   const vp=document.getElementById("vp");
   vp.classList.toggle("vp-single",!q);
   if(q)VW.forEach(v=>v.el.classList.remove("v4-cur"));else v4ShowView(V4.vcur,true);
+  /* M7（2026-09-20）：四宫格时顶栏不再谎报"当前视图"（四口同显，无单一当前视图），
+     改为显式标注四宫格；单视口由 v4ShowView 写回视图名。 */
+  const tt=document.getElementById("v4VpTitle");
+  if(tt&&q)tt.textContent="四宫格 QUAD [4 视口]";
   const b=document.getElementById("v4QuadBtn");if(b)b.classList.toggle("on",q);
   setTimeout(()=>{VW.forEach(v=>{const had=v.w>60;sizeView(v);if(!had)fitView(v);});},80);
 }

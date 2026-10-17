@@ -251,7 +251,7 @@ ok(/shanghai:\{zh:"上海国际赛车场/.test(ai), 'allinone: Shanghai 5.45km �
  * chassis.quasi_loads 逐字同构；TIRE_MF_QS 与引擎 TireParams 缺省值同源，
  * 改一侧必须同步另一侧，否则双内核对拍漂移。 */
 ok(/usGradient:\s*\{\s*name: "稳态不足转向梯度/.test(fc), 'fullchassis: US Gradient 评价基准在位');
-ok(/let TIRE_MF_QS = \{ Fy0: 5250, FzNom: 3500, By: 20, Cy: 1\.2, LS: 0\.10 \}/.test(fc),
+ok(/let TIRE_MF_QS = \{ Fy0: 5250, FzNom: 3500, By: 20, Cy: 1\.2, LS: 0\.10, Cg: 6\.0 \}/.test(fc),
   'fullchassis: 准静态 MF 参数集与引擎 TireParams 缺省同源（模块级可变，标定可覆写）');
 ok(/usGrad: usGrad, alphaF: alphaFDeg/.test(fc) && /jackingN: jackingN/.test(fc),
   'fullchassis: solveQuasiStatic 输出 usGrad/α/Jacking');
@@ -327,7 +327,222 @@ require('./test_kc_wiring')(webDir, ok, failures.push.bind(failures), { log(){} 
  * 单独跑：node web/test/test_tire_wiring.js */
 require('./test_tire_wiring')(webDir, ok, failures.push.bind(failures), { log(){} });
 
-// ── 结果 ───────────────────────────────────────────────────────
+// ── 结果（M10b 2026-09-20：结果块必须留在文件**最末尾**）─────────────────
+/* ⚠ 历史坑：本结果块原先放在文件中部（require(...) 之后、各结构守卫之前），
+   于是 2026-09-20 追加的 M8/M9/M10 三批结构守卫（23 条断言）全部落在 gate **之后**
+   —— 它们照常 ok() 记录失败，但退出码早已由中段的 gate 决定 ⇒ 守卫形同虚设
+   （实测：一条"必须存在 sort(...localeCompare)"的断言在源码里根本没有该实现，
+   却报告 PASS）。现把 gate 与摘要统一移到文件末尾，任何新增断言都在其之前。
+   教训：测试文件的"结果块"不能出现在断言区中间。 */
+/* M11b：此处原有一个中段 gate。它会在任何较早断言失败时 process.exit(1) 提前退出，
+   导致其后的 M8/M9/M10 结构守卫**根本不运行**（实测失败信息只显示 1/274，而后面的
+   35 条断言未被计入）。现统一为"只在文件末尾 gate"：所有断言都跑完，一次报全。 */
+
+/* ── M8（2026-09-20）· 预设质量口径不变量 ─────────────────────────────
+   背景：改前 formula 的 mSprung=185 而两轴 mS 之和=106、mSprung+非簧载=237≠mTotal=235
+   （GT3 差 36kg、Baja 差 19kg）。两内核只用比例定静载分配，故静载不错，但读数撒谎、
+   绝对质量链与分配链口径不一致。此处直接解析源码钉住两条不变量。 */
+{
+  const presetsSrc = fs.readFileSync(path.join(__dirname, '..', 'js', '02-presets.js'), 'utf8');
+  const names = ['formula', 'gt3', 'gt3_sport', 'baja'];
+  const missing = names.filter(n => !presetsSrc.includes(n + ': {'));
+  ok(missing.length === 0, 'M8: 四款预设均在位' + (missing.length ? ' 缺 ' + missing.join(',') : ''));
+  for (const n of names) {
+    const start = presetsSrc.indexOf(n + ': {');
+    const body = presetsSrc.slice(start, presetsSrc.indexOf('\n  },', start));
+    const g = k => { const m = body.match(new RegExp(k + '\\s*:\\s*([0-9.]+)')); return m ? parseFloat(m[1]) : NaN; };
+    const mTotal = g('mTotal'), mSprung = g('mSprung');
+    const mSs = [...body.matchAll(/mS:\s*([0-9.]+)/g)].map(m => parseFloat(m[1]));
+    const mUs = [...body.matchAll(/mU:\s*([0-9.]+)/g)].map(m => parseFloat(m[1]));
+    ok(mSs.length === 2 && mUs.length === 2, `M8: ${n} 两轴 mS/mU 齐备`);
+    const unsprung = 2 * mUs.reduce((a, b) => a + b, 0);
+    const sumS = mSs.reduce((a, b) => a + b, 0);
+    ok(Math.abs(sumS - mSprung) < 0.6,
+       `M8: ${n} 两轴簧载之和 ${sumS.toFixed(1)} 必须等于 mSprung ${mSprung}（容差 0.6kg）`);
+    ok(Math.abs((mSprung + unsprung) - mTotal) < 1.5,
+       `M8: ${n} mSprung(${mSprung}) + 非簧载(${unsprung}) 必须等于 mTotal(${mTotal})`);
+  }
+}
+
+/* ── M9（2026-09-20）· 灵敏度扫描（T1-1）结构守卫 ─────────────────────
+   这是"从能算到能设计"的入口，删掉或退化成空壳不会让任何数值测试失败，
+   所以在这里钉住四件事：面板在位 / 目标量口径与读数同源 / 参数精确还原 / 分栏路由。 */
+{
+  const uiSrc = fs.readFileSync(path.join(__dirname, '..', 'js', '06-ui-panels.js'), 'utf8');
+  const arrSrc = fs.readFileSync(path.join(__dirname, '..', 'js', '12-v4-arrange.js'), 'utf8');
+  ok(/function buildSensitivityPanel\(/.test(uiSrc), 'M9: 灵敏度扫描面板构建函数在位');
+  ok(/function runSensitivitySweep\(/.test(uiSrc), 'M9: 扫描引擎在位');
+  const objBlock = uiSrc.slice(uiSrc.indexOf('const SENS_OBJ'), uiSrc.indexOf('function sensSweepVal'));
+  const nObj = (objBlock.match(/\{ key:"/g) || []).length;
+  ok(nObj >= 8, `M9: 目标量至少 8 个（实际 ${nObj}）`);
+  ok(/sampleSweep\(sw,\s*m\.tr,\s*field\)/.test(uiSrc), 'M9: 目标量取值与 07-plots 读数同源（sampleSweep(sw,m.tr,field)）');
+  ok(/P\.set\(base\);\s*rebuild\(\);/.test(uiSrc), 'M9: 扫描后必须精确还原参数并复算');
+  ok(/灵敏度扫描/.test(arrSrc), 'M9: 分栏正则 V4_ANA_T 含"灵敏度扫描"（面板落在分析页）');
+}
+
+/* ── M9（2026-09-20）· 设计报告导出（T1-3）结构守卫 ──────────────────── */
+{
+  const evSrc = fs.readFileSync(path.join(__dirname, '..', 'js', '10-eval.js'), 'utf8');
+  const htmlSrc = fs.readFileSync(path.join(__dirname, '..', 'dwb-pro-v4.html'), 'utf8');
+  ok(/id="evalExportBtn"/.test(htmlSrc), 'M9: 评价报告模态含导出按钮');
+  ok(/function exportDesignReport\(/.test(evSrc), 'M9: exportDesignReport 在位');
+  ok(/return html;/.test(evSrc) && !/return html\.length;/.test(evSrc),
+     'M9: 导出函数必须返回 HTML 串本身（曾误写成 html.length，自动化取证拿到的是数字）');
+  ok(/typeof drawAll === "function"\) drawAll\(\)/.test(evSrc),
+     'M9: 捕获画布前必须强制重绘（打开模态触发 resize 会清空画布 → 拍到空白帧）');
+  ok(/kv\("rcHeightF"\)|kpi\.\w+\.formatted|o\.formatted/.test(evSrc),
+     'M9: 报告 KPI 必须读 metrics 的 {val,formatted} 结构（直接 num() 会全变 "—"）');
+  ok(/模型边界与免责说明/.test(evSrc), 'M9: 报告含模型边界免责说明');
+}
+
+/* ── M10（2026-09-20）· 方案库与对比（T1-2）结构守卫 ─────────────────── */
+{
+  const uiSrc = fs.readFileSync(path.join(__dirname, '..', 'js', '06-ui-panels.js'), 'utf8');
+  const arrSrc = fs.readFileSync(path.join(__dirname, '..', 'js', '12-v4-arrange.js'), 'utf8');
+  ok(/function buildSetupPanel\(/.test(uiSrc), 'M10: 方案库面板在位');
+  ok(/const SETUPS = \{ lsKey: "labsus-setups-v1"/.test(uiSrc), 'M10: 方案库存 localStorage（跨会话）');
+  ok(/front: deepClone\(S\.front\), rear: deepClone\(S\.rear\)/.test(uiSrc),
+     'M10: 方案必须整体 deepClone 两轴（与预设加载同路径，防漏字段）');
+  ok(/S\.front = deepClone\(r\.front\); S\.rear = deepClone\(r\.rear\)/.test(uiSrc),
+     'M10: 载入必须完整还原两轴设计');
+  ok(/kpi: setupKpiSnapshot\(\)/.test(uiSrc),
+     'M10: 保存时同步存 KPI 快照（对比表读取不载入模型）');
+  ok(/\.sort\(\(a,b\)=> \(\(a\.seq\|\|0\) - \(b\.seq\|\|0\)\)/.test(uiSrc),
+     'M10: 对比基准列取最早保存的方案（seq 单调序号排序，避免同毫秒并列）');
+  ok(/seq: SETUPS\.list\.reduce/.test(uiSrc), 'M10: 方案记录含单调保存序号 seq');
+  ok(/function exportSetupCompareCsv\(/.test(uiSrc) && /\\ufeff/.test(uiSrc),
+     'M10: 对比导出 CSV（含 BOM，Excel 直开不乱码）');
+  ok(/方案库/.test(arrSrc), 'M10: 分栏正则含"方案库"（面板落在分析页）');
+  const nKpi = (uiSrc.slice(uiSrc.indexOf('const SETUP_KPI'), uiSrc.indexOf('function setupKpiSnapshot'))
+                .match(/\{ k:"/g) || []).length;
+  ok(nKpi >= 12, `M10: 对比 KPI 至少 12 项（实际 ${nKpi}）`);
+}
+
+/* ── M12（2026-09-20）· E12 双参数交互扫描 + E13 报告补节 结构守卫 ─────── */
+{
+  const uiSrc = fs.readFileSync(path.join(__dirname, '..', 'js', '06-ui-panels.js'), 'utf8');
+  const evSrc = fs.readFileSync(path.join(__dirname, '..', 'js', '10-eval.js'), 'utf8');
+  const arrSrc = fs.readFileSync(path.join(__dirname, '..', 'js', '12-v4-arrange.js'), 'utf8');
+  ok(/function buildSens2Panel\(/.test(uiSrc), 'M12: 双参数交互面板在位');
+  ok(/function runSens2Sweep\(/.test(uiSrc), 'M12: 交互扫描引擎在位');
+  /* 交互项必须是"差分之差"（四角），而不是任意两格之差 */
+  ok(/\(M\[n-1\]\[n-1\] - M\[n-1\]\[0\]\) - \(M\[0\]\[n-1\] - M\[0\]\[0\]\)/.test(uiSrc),
+     'M12: 交互项 = [f(++)−f(+−)] − [f(−+)−f(−−)]（差分之差）');
+  ok(/P\.set\(bxp\); Q\.set\(byq\); rebuild\(\); refreshDerived\(true\);/.test(uiSrc),
+     'M12: 扫描结束必须精确还原两个参数并复算');
+  ok(/\} finally \{/.test(uiSrc), 'M12: 还原必须放在 finally（中途出错也要还原）');
+  ok(/function sens2Verdict\(/.test(uiSrc) && /sens2Verdict\(s2\.rel\)/.test(evSrc),
+     'M12: 交互强度判定单一真源（面板与报告共用，避免阈值漂移）');
+  ok(/P\.key === Q\.key/.test(uiSrc), 'M12: X/Y 同参数时必须拒绝（否则只得到对角线）');
+  ok(/双参数交互/.test(arrSrc), 'M12: 分栏正则含"双参数交互"');
+  ok(/<h2>七、双参数交互扫描<\/h2>/.test(evSrc) && /<h2>八、多方案对比<\/h2>/.test(evSrc),
+     'M12: 设计报告含"七、双参数交互扫描"与"八、多方案对比"两节');
+  ok(/typeof setupCompareRows === "function"/.test(evSrc),
+     'M12: 报告复用方案库对比行（不另算一套）');
+}
+
+/* ── M15（2026-09-20）· 质量与惯量属性：跨语言同源守卫 ───────────────────
+   清单与算法在两侧各实现一份（真源 = engine/src/api/mass_properties.py），
+   靠本守卫**逐件比对 + 数值对齐**，防止两套口径各自漂移（P16 那类口径差的成因）。 */
+{
+  const uiTxt = fs.readFileSync(path.join(__dirname, '..', 'js', '02-presets.js'), 'utf8');
+  const pyTxt = fs.readFileSync(path.join(__dirname, '..', '..', 'engine', 'src', 'api', 'mass_properties.py'), 'utf8');
+  const trackTxt = fs.readFileSync(path.join(__dirname, '..', 'js', '09-track.js'), 'utf8');
+  const i0 = uiTxt.indexOf('const MASS_ITEMS_FSAE');
+  const i1 = uiTxt.indexOf('function resolveYawInertia');
+  ok(i0 > 0 && i1 > i0, 'M15: 前端含 MASS_ITEMS_FSAE 与 resolveYawInertia');
+  const frag = uiTxt.slice(i0, uiTxt.indexOf('\n}', i1) + 2);
+  const c2 = { console: { log() {} } };
+  vm.createContext(c2);
+  vm.runInContext(frag + '; this.__p = massPropsOf(massItemsFSAE(), 1550);', c2);
+  const p = c2.__p;
+  const near = (a, b, t) => Math.abs(a - b) <= t;
+  ok(near(p.mass_kg, 235.0, 1e-6) && near(p.sprung_mass_kg, 183.0, 1e-6),
+     `M15: 前端质量口径与引擎一致（${p.mass_kg}/${p.sprung_mass_kg}）`);
+  ok(near(p.unFrontCorner, 12.0, 1e-9) && near(p.unRearCorner, 14.0, 1e-9),
+     'M15: 每角非簧载与引擎一致（前 12 / 后 14 kg）');
+  ok(near(p.cg[2], 270.20, 0.02) && near(p.sprungCgZ, 282.08, 0.02),
+     `M15: 质心高与引擎一致（整车 ${p.cg[2].toFixed(2)} / 簧载 ${p.sprungCgZ.toFixed(2)} mm）`);
+  ok(near(p.Ixx, 52.58, 0.02) && near(p.Iyy, 16.79, 0.02) && near(p.Izz, 68.78, 0.02) && near(p.Iyz, 0.57, 0.02),
+     `M15: 惯量张量与引擎一致（Ixx ${p.Ixx.toFixed(2)} / Iyy ${p.Iyy.toFixed(2)} / Izz ${p.Izz.toFixed(2)} / Iyz ${p.Iyz.toFixed(2)}）`);
+  ok(p.kz_mm / 1550 > 0.30 && p.kz_mm / 1550 < 0.36,
+     `M15: 横摆惯量半径 k_z/L=${(p.kz_mm / 1550).toFixed(3)} 应在 0.30~0.36`);
+  ok(Math.abs(p.cg[0]) < 1.0, 'M15: 前端 x 质心≈0（左右对称）');
+  const num = e => Function('"use strict";return (' + String(e)
+    .replace(/_TRACK_F/g, '600').replace(/_TRACK_R/g, '580').replace(/_WB/g, '1550').trim() + ')')();
+  const pyNorm = [...pyTxt.matchAll(/MassItem\("(\w+)",\s*"[^"]*",\s*([\d.]+),\s*([^,]+?),\s*([^,]+?),\s*([^,]+?),\s*"(u\w*|sprung)"/g)]
+    .map(m => ({ id: m[1], m: parseFloat(m[2]), x: num(m[3]), y: num(m[4]), z: num(m[5]) }));
+  const jsRows = [...uiTxt.matchAll(/\["(\w+)","[^"]*",([\d.]+),\s*(-?[\d.]+),\s*(-?[\d.]+),\s*([\d.]+),\s*"\w+"\]/g)]
+    .map(m => ({ id: m[1], m: parseFloat(m[2]), x: parseFloat(m[3]), y: parseFloat(m[4]), z: parseFloat(m[5]) }));
+  ok(pyNorm.length >= 20 && jsRows.length >= 20,
+     `M15: 两侧清单都解析成功（Python ${pyNorm.length} 件 / JS ${jsRows.length} 件）`);
+  ok(pyNorm.length === jsRows.length,
+     `M15: 两侧清单件数一致（Python ${pyNorm.length} vs JS ${jsRows.length}）`);
+  const drift = [];
+  pyNorm.forEach((a, i) => {
+    const b = jsRows[i];
+    if (!b) { drift.push(a.id + ' 缺失'); return; }
+    if (a.id !== b.id) drift.push(`${a.id}≠${b.id}`);
+    else if (Math.abs(a.m - b.m) > 1e-9 || Math.abs(a.x - b.x) > 1e-9
+          || Math.abs(a.y - b.y) > 1e-9 || Math.abs(a.z - b.z) > 1e-9) drift.push(a.id + ' 数值不一致');
+  });
+  ok(drift.length === 0,
+     `M15: 两侧清单逐件一致${drift.length ? '（漂移：' + drift.slice(0, 3).join('、') + '）' : ''}`);
+  ok(/function resolveYawInertia/.test(uiTxt) && /def resolve_yaw_inertia/.test(pyTxt),
+     'M15: 两侧都有横摆惯量三档解析');
+  ok(/resolve_yaw_inertia\(req\.iz_kg_m2/.test(fs.readFileSync(path.join(__dirname, '..', '..', 'engine', 'src', 'solver', 'transient.py'), 'utf8')),
+     'M15: 引擎 transient 已改走 resolve_yaw_inertia');
+  ok(/typeof fsaeMassProps === "function"/.test(trackTxt) && /inventory:fsae/.test(trackTxt),
+     'M15: 09-track 三档解析必须用特性探测（该文件会被对拍沙箱单独加载，硬调用会打死对拍）');
+  ok(!/resolveYawInertia\(body\.iz_kg_m2/.test(trackTxt),
+     'M15: 09-track 不得硬调 02-presets 的函数（沙箱里不存在 ⇒ ReferenceError）');
+  ok(/1\.6\*1\.6\)\/12/.test(trackTxt), 'M15: 矩形近似仅作为第三档保留（沙箱/其他车型兜底）');
+}
+/* ── M19（2026-09-20）· 差速器跨语言对拍（T2 收口）───────────────────────
+   真源 = 16-powertrain.js::distributeAxle（扭矩域）；引擎镜像 = differential.py::distribute_axle。
+   工件 engine/data/diff_parity_cases.json 由 Python 侧生成 → 两侧都断言它。
+   本守卫把真源方法体抽出来用 new Function 求值，逐例比对（门限 1e-9）。
+   **任一侧改公式而不同步工件，这里立刻失败** —— 这是防两套口径漂移的机制。 */
+{
+  const ptTxt = fs.readFileSync(path.join(__dirname, '..', 'js', '16-powertrain.js'), 'utf8');
+  const artPath = path.join(__dirname, '..', '..', 'engine', 'data', 'diff_parity_cases.json');
+  ok(fs.existsSync(artPath), 'M19: 差速器对拍工件 engine/data/diff_parity_cases.json 在位');
+  const art = JSON.parse(fs.readFileSync(artPath, 'utf8'));
+  ok(Array.isArray(art.cases) && art.cases.length >= 24,
+     `M19: 对拍用例足够（${(art.cases || []).length} 例）`);
+  const m = ptTxt.match(/distributeAxle\(tAxle, wL, wR, fzL, fzR, diff\)\s*\{([\s\S]*?)\n  \},/);
+  ok(!!m, 'M19: 能从 16-powertrain.js 抽出 distributeAxle 方法体');
+  let fn = null;
+  try {
+    fn = new Function('tAxle', 'wL', 'wR', 'fzL', 'fzR', 'diff', m ? m[1] : 'return [0,0];');
+  } catch (e) {
+    ok(false, `M19: distributeAxle 方法体求值失败（${e.message}）`);
+  }
+  if (fn) {
+    let worst = 0, bad = null;
+    for (const c of art.cases) {
+      const got = fn(c.t_axle, c.w_l, c.w_r, c.fz_l, c.fz_r, c.diff);
+      for (const pair of [[got[0], c.t_l, 't_l'], [got[1], c.t_r, 't_r']]) {
+        const rel = Math.abs(pair[0] - pair[1]) / Math.max(1, Math.abs(pair[1]));
+        if (rel > worst) { worst = rel; bad = { spec: c.diff, tag: pair[2], g: pair[0], e: pair[1] }; }
+      }
+    }
+    ok(worst < 1e-9,
+       `M19: 前端 distributeAxle 与工件逐例一致（worst rel=${worst.toExponential(2)}，${art.cases.length} 例）`
+       + (worst < 1e-9 ? '' : `；超差例：${JSON.stringify(bad && bad.spec)} ${bad && bad.tag} got=${bad && bad.g} exp=${bad && bad.e}`));
+    let consWorst = 0;
+    for (const c of art.cases) {
+      const got = fn(c.t_axle, c.w_l, c.w_r, c.fz_l, c.fz_r, c.diff);
+      consWorst = Math.max(consWorst, Math.abs(got[0] + got[1] - c.t_axle));
+    }
+    ok(consWorst < 1e-12, `M19: 前端分配逐位守恒（最大偏差 ${consWorst.toExponential(2)}）`);
+    const hasFsaeSpec = art.cases.some(c => c.diff && c.diff.type === 'lsd'
+      && c.diff.bias === 1.6 && c.diff.lockNm === 25 && c.diff.slipRefRadS === 8);
+    ok(hasFsaeSpec, 'M19: 对拍工件覆盖 FSAE 限滑规格（TBR 1.6 / lockNm 25 / slipRef 8）');
+  }
+}
+
+// ── 结果（必须在所有断言之后，见文件中部 M10b 注释）──────────────────────
 if (failures.length) {
   console.error(`DOM/结构测试 FAIL：${failures.length}/${checks} 项失败`);
   failures.forEach((f, i) => console.error(`  [${i + 1}] ${f}`));

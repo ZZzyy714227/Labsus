@@ -38,6 +38,10 @@ G = 9.81
 _WHEELS = ("FR", "FL", "RR", "RL")
 
 
+from src.components.differential import distribute_axle, split_from_spec
+from src.solver.wheel_dof import quasi_steady_omega, quasi_steady_slip
+
+
 class TireState:
     """每轮瞬态滞后状态：侧偏松弛（rad）。
 
@@ -131,6 +135,11 @@ class VehiclePlanar:
         self.lut_f = kc_luts.get("front", {})
         self.lut_r = kc_luts.get("rear", {})
         self.iz = iz
+        # M19（2026-09-20）：轮自由度开关。**默认关** ⇒ 状态仍为平面 6 状态、数值逐位不变。
+        # 打开后：纵向力受 μFz 限制（而非历史的 0.75μFz 余量）、并输出准稳态滑移率与轮速，
+        # 供差速器的 Δω 使用。开关由请求字段 TrackSimRequest.wheel_dof 控制（默认关）。
+        self.wheel_dof = False
+        self.kappa_peak = float(getattr(tire, "kappa_peak", 0.12))
         self.pt = powertrain
         self.aero_p = aero
         self._ts = {w: TireState() for w in _WHEELS}
@@ -251,7 +260,8 @@ class VehiclePlanar:
     # ── 单轮力（★复合/松弛/外倾）────────────────────────────────
     def wheel_force(self, w: str, vx_w: float, vy_w: float, delta: float,
                     fz: float, throttle: float, brake: float,
-                    vx: float, dt: float) -> dict:
+                    vx: float, dt: float,
+                     diff_force_n: float | None = None) -> dict:
         lut = self.lut_f if w in ("FR", "FL") else self.lut_r
         travel_mm = math.radians(self.roll_deg) * abs(self.pos[w][1]) * 1000.0
         toe_deg = _lut(lut, travel_mm, "toe", 0.0)
@@ -263,6 +273,10 @@ class VehiclePlanar:
         vwy = -vx_w * sd + vy_w * cd
         speed = math.hypot(vwx, vwy)
         ts = self._ts[w]
+        # M19：轮自由度输出量的初值必须在**分支之前**统一给出 —— 本函数有
+        # 「失活轮（speed<0.8 或 fz<=1）→ 早退」与「主路径」两条分支，
+        # 只在主路径初始化会让失活轮的返回字典引用到未绑定变量（实测 UnboundLocalError）。
+        kappa_q = omega_q = 0.0
         if speed < 0.8 or fz <= 1.0:
             alpha_st, fy_w, fx_w, mu_use, slip_k = 0.0, 0.0, 0.0, 0.0, 0.0
             ts.alpha_st = ts.alpha_lat    # 失活轮：松弛目标=当前值（不衰减，状态冻结）
@@ -279,7 +293,10 @@ class VehiclePlanar:
             fy_w += -self.Cg * cam_deg * fz              # ★ 外倾推力（cam_deg 为弧度，γ>0 产生反向 Fy）
             # 纵向：动力包络（★ 恒扭矩-恒功率，前后分配 drive_split_f）或制动（参数化分配）
             fx_w = 0.0
-            if throttle > 0:
+            if diff_force_n is not None:
+                # M16：轴级差速器已决定本轮该轮纵向力（N，含锁紧约束）
+                fx_w = float(diff_force_n)
+            elif throttle > 0:
                 # F-26（2026-08-30）：轮半径不再硬编码 0.30（默认 tire 325mm 却按
                 # 300mm 算力会虚高 ~8%）——取本轴 tire_radius 折算扭矩→力。
                 is_f = w in ("FR", "FL")
@@ -290,11 +307,25 @@ class VehiclePlanar:
                 split = float(self.pt.get("drive_split_f", 0.0))
                 share = (1.0 - split) if w in ("RR", "RL") else split
                 if share > 0.0:
-                    fx_w = min(0.75 * mu_fz, f_avail * share) * 0.5
+                    # 历史路径用 0.75·μFz 作为单轮纵向余量（出处未说明）；轮自由度打开后
+                    # 该余量由滑移曲线与附着共同决定 ⇒ 改用 μFz，并把差异登记为刻意差异。
+                    cap = mu_fz if self.wheel_dof else 0.75 * mu_fz
+                    fx_w = min(cap, f_avail * share) * 0.5
             if brake > 0:
                 sp_f = float(self.pt.get("brake_split_f", 0.60))
                 share = (sp_f / 2.0) if w in ("FR", "FL") else ((1.0 - sp_f) / 2.0)
                 fx_w = -math.copysign(min(mu_fz, brake * share * 14000.0), vwx)
+            # M19：轮自由度打开时输出**准稳态**滑移率与轮速（代数解，不引入刚性）
+            kappa_q = omega_q = 0.0
+            if self.wheel_dof:
+                # ⚠ 轮半径必须在此独立取：上方 `t_r_mm` 只在 `elif throttle > 0` 分支内定义，
+                # 而走差速器路径（`diff_force_n` 非 None）时该分支被跳过 ⇒ 引用它会
+                # UnboundLocalError。这是"开关开 + 差速器规格"的端到端集成测试当场抓出的，
+                # 单测（只开开关、不给差速器）覆盖不到 —— 集成缺口比 bug 本身更值得记。
+                r_use_mm = (self.v.front.tire_radius if w in ("FR", "FL")
+                            else self.v.rear.tire_radius) or 325.0
+                kappa_q = quasi_steady_slip(fx_w, mu_fz, self.kappa_peak)
+                omega_q = quasi_steady_omega(vx, kappa_q, r_use_mm / 1000.0)
             # ★ 摩擦圆 + 利用率输出
             lat_avail = math.sqrt(max(0.0, mu_fz * mu_fz - fx_w * fx_w))
             fy_w = max(-lat_avail, min(lat_avail, fy_w))
@@ -303,7 +334,61 @@ class VehiclePlanar:
         return {"fx": fx_w * cd - fy_w * sd, "fy": fx_w * sd + fy_w * cd,
                 "alpha": math.degrees(alpha_st), "alpha_lat": math.degrees(ts.alpha_lat),
                 "toe": toe_deg, "cam": math.degrees(cam_deg), "fz": fz,
-                "mu_use": mu_use, "slip_k": slip_k}
+                "mu_use": mu_use, "slip_k": slip_k,
+                # M19：轮自由度输出（开关关闭时恒 0，不改变任何既有消费方）
+                "kappa_qs": kappa_q, "omega_qs": omega_q}
+
+    def _diff_shares(self, fz: dict, throttle: float, vx: float) -> dict:
+        """按差速器算两轴左右驱动力（N）。未给规格的轴不在此返回 ⇒ 沿用历史逐轮路径。
+
+        **两条路径**（由 `self.wheel_dof` 决定）：
+
+        · **开关开（真源路径）**：用 `distribute_axle`（扭矩单位，逐字移植前端
+          `web/js/16-powertrain.js::distributeAxle`）。它需要左右**轮速差 Δω**，而准稳态下
+          `ω_w = vx·(1+κ_w)/Re`、`κ_w` 又取决于本轮的扭矩分配 ⇒ 一个小不动点，两轮迭代即可
+          收敛（首轮用等分扭矩起算）。T2 对拍工件 `engine/data/diff_parity_cases.json`
+          保证这一侧与前端逐例一致（worst rel < 1e-9）。
+        · **开关关（历史路径）**：没有 Δω 可用 ⇒ 退回力式准静态分配 `split_from_spec`，
+          保持 M16 引入的行为与数值**逐位不变**。
+
+        差速器是**轴级**装置：左右分配必须先于逐轮受力计算，逐轮独立算必然退化成
+        "每轮各自用满附着"（= 隐式锁死轴），这正是 M16 要修的东西。
+        """
+        out: dict = {}
+        if throttle <= 0:
+            return out
+        t_max = float(self.pt.get("T_max", 250.0))
+        p_w = float(self.pt.get("P_kw", 80.0)) * 1000.0
+        split_f = float(self.pt.get("drive_split_f", 0.0))
+        for axle, wheels, key, share in (("front", ("FL", "FR"), "front_diff", split_f),
+                                         ("rear", ("RL", "RR"), "rear_diff", 1.0 - split_f)):
+            spec = self.pt.get(key)
+            if not spec or share <= 0.0:
+                continue
+            r_mm = (self.v.front.tire_radius if axle == "front" else self.v.rear.tire_radius) or 325.0
+            r_m = r_mm / 1000.0
+            f_avail = min(t_max / r_m, p_w / max(0.8, vx)) * throttle * share
+            cap_l = 0.75 * self.mu * fz[wheels[0]]
+            cap_r = 0.75 * self.mu * fz[wheels[1]]
+            if self.wheel_dof:
+                # 真源路径：扭矩域分配 + 两轮不动点求 Δω
+                t_axle = f_avail * r_m
+                t_l, t_r = distribute_axle(t_axle, 0.0, 0.0,
+                                           fz[wheels[0]], fz[wheels[1]], spec)
+                for _ in range(2):
+                    om = []
+                    for _w, _t in ((wheels[0], t_l), (wheels[1], t_r)):
+                        _k = quasi_steady_slip(_t / r_m, self.mu * fz[_w], self.kappa_peak)
+                        om.append(quasi_steady_omega(vx, _k, r_m))
+                    t_l, t_r = distribute_axle(t_axle, om[0], om[1],
+                                               fz[wheels[0]], fz[wheels[1]], spec)
+                out[wheels[0]] = min(self.mu * fz[wheels[0]], t_l / r_m)
+                out[wheels[1]] = min(self.mu * fz[wheels[1]], t_r / r_m)
+            else:
+                f_l, f_r = split_from_spec(cap_l, cap_r, f_avail, spec, r_mm)
+                out[wheels[0]] = f_l
+                out[wheels[1]] = f_r
+        return out
 
     def derivs(self, s: np.ndarray, delta: float, throttle: float,
                brake: float, dt: float, drs: bool = False) -> tuple[np.ndarray, dict]:
@@ -315,6 +400,8 @@ class VehiclePlanar:
         vx, vy, r = s[3], s[4], s[5]
         fz = self.wheel_loads(vx, drs)
         steer = self.steer_angles(delta)
+        # M16：轴级差速器分配（无规格的轴不在字典里 ⇒ 该轴沿用历史逐轮路径）
+        dshare = self._diff_shares(fz, throttle, vx)
         Fx = Fy = Mz = 0.0
         diag = {}
         for w in _WHEELS:
@@ -322,7 +409,7 @@ class VehiclePlanar:
             vx_w = vx - r * ly
             vy_w = vy + r * lx
             fw = self.wheel_force(w, vx_w, vy_w, steer.get(w, 0.0), fz[w],
-                                  throttle, brake, vx, dt)
+                                  throttle, brake, vx, dt, dshare.get(w))
             Fx += fw["fx"]
             Fy += fw["fy"]
             Mz += lx * fw["fy"] - ly * fw["fx"]
@@ -419,7 +506,11 @@ def run_track_sim(req: TrackSimRequest) -> dict:
     track_xy = np.array([[p.x, p.y] for p in req.track], float)
     tgt_speed = np.array([p.target_speed for p in req.track], float)
     L = v.wheelbase_mm / 1000.0
-    iz = req.iz_kg_m2 or v.mass_kg * (L * L + 1.6 * 1.6) / 12.0
+    # M15（2026-09-20）：缺省不再一律用均质矩形板近似（对 FSAE 偏高 41%），
+    # 改走 mass_properties.resolve_yaw_inertia 三档（显式 > FSAE 部件清单 > 矩形近似）
+    from src.api.mass_properties import resolve_yaw_inertia
+    iz, _iz_src = resolve_yaw_inertia(req.iz_kg_m2, v.mass_kg, v.wheelbase_mm)
+    _iz_source = _iz_src
     pt = req.powertrain.model_dump() if req.powertrain else {}
     # G31-P7：请求带 powertrain.ice 时，用其等效轮上扭矩上限覆盖 T_max（一档）；
     # 缺省（None 或无 ice）保持旧 T_max/P_kw 路径逐位不变（对拍锚）。
@@ -441,6 +532,8 @@ def run_track_sim(req: TrackSimRequest) -> dict:
             pt["P_kw"] = _p_kw
     aero = req.aero.model_dump() if req.aero else {}
     car = VehiclePlanar(v, req.tire, req.kc_luts, iz, pt, aero)
+    # M19：轮自由度开关（默认关 ⇒ 历史数值逐位不变）
+    car.wheel_dof = bool(getattr(req, "wheel_dof", False))
     drv = DriverPI(gain=req.lookahead_gain)
 
     state = np.zeros(6)
@@ -490,6 +583,9 @@ def run_track_sim(req: TrackSimRequest) -> dict:
                 row[f"fx_{w}"] = round(diag[w]["fx"], 1)
                 row[f"mu_{w}"] = round(diag[w]["mu_use"], 3)
                 row[f"slip_{w}"] = round(diag[w]["slip_k"], 4)   # M5：纵滑可观（原算出即丢）
+                # M19：轮自由度可观（关闭时恒 0，不改变既有输出语义）
+                row[f"kappa_{w}"] = round(diag[w]["kappa_qs"], 5)
+                row[f"omega_{w}"] = round(diag[w]["omega_qs"], 4)
                 row[f"cam_{w}"] = round(diag[w]["cam"], 2)
             ts.append(row.pop("t"))
             trace.append(row)

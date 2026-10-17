@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 function plotXYMulti(cv,title,unit,series,xr,curx){
   /* 多实线绘制（plotXYOverlay 的多线版本，供引擎结果面板使用） */
   const dpr=Math.min(3,window.devicePixelRatio||1);
@@ -111,8 +111,16 @@ function updateReadouts(){
       document.getElementById("tlltdLblF").textContent="前轴: "+qs.tlltd.toFixed(1)+"%";
       document.getElementById("tlltdLblR").textContent="后轴: "+(100-qs.tlltd).toFixed(1)+"%";
     }
-    const bias = qs.tlltd > 54 ? "倾向不足转向 (UNDERSTEER)" : (qs.tlltd < 47 ? "倾向过度转向 (OVERSTEER)" : "中性偏稳定 (NEUTRAL)");
-    setRO("roHandling", bias);
+    /* M7（2026-09-20）：操稳倾向改为以**实测侧偏角差**（US 梯度 = αf − αr）为主判据。
+       旧实现只看 TLLTD 的 54/47 阈值，与同屏的 US GRADIENT 直接冲突——实测
+       TLLTD 45.5%（<47 ⇒ 判"过度转向"）而 US 梯度 +0.21 °/g（>0 ⇒ 明确不足转向：
+       后胎 205 比前胎 175 宽、后轴更抓）。TLLTD 是"载荷转移分布"这一**间接代理量**，
+       在前后胎/刚度不同时不再等价于平衡方向；故把它降为括号里的辅注，
+       两个数字不再互相打架（hero 卡 HANDLING BIAS 与本节读数同源）。 */
+    const usg = (typeof qs.usGrad === "number" && isFinite(qs.usGrad)) ? qs.usGrad : 0;
+    const bias = Math.abs(usg) < 0.05 ? "中性 (NEUTRAL)"
+      : (usg > 0 ? "倾向不足转向 (UNDERSTEER)" : "倾向过度转向 (OVERSTEER)");
+    setRO("roHandling", bias + " · US " + (usg >= 0 ? "+" : "") + usg.toFixed(2) + "°/g");
 
     document.getElementById("sbTLLTD").textContent = qs.tlltd.toFixed(1)+"%";
     document.getElementById("sbRollGrad").textContent = qs.rollGrad.toFixed(2)+" °/g";

@@ -428,10 +428,11 @@ function sampleSweep(sw,tr,key){
 /* G24：缺省胎 = 真实 GT3 光头胎量级，与引擎 v3models.TireParams 同源（双端对拍锚）。
    Fy0/FzNom = 5250/3500 = μ 1.50；By=20 ⇒ 峰值侧偏角 8.27°、峰值滑移率 12.1%。
    旧值 8000/9（μ=2.29、峰值侧偏角 17.87°）是占位值，不真实，详见 TireParams 文档。 */
-let TIRE_MF_QS = { Fy0: 5250, FzNom: 3500, By: 20, Cy: 1.2, LS: 0.10 };
+let TIRE_MF_QS = { Fy0: 5250, FzNom: 3500, By: 20, Cy: 1.2, LS: 0.10, Cg: 6.0 };
 function applyTireCalib(p){
   if(!p || typeof p !== "object") return;
-  ["Fy0","FzNom","By","Cy","LS"].forEach(k=>{ if(isFinite(p[k])) TIRE_MF_QS[k]=p[k]; });
+  /* M11：Cg（外倾推力系数）也进标定刷新链——P12 外倾→抓地耦合要用它 */
+  ["Fy0","FzNom","By","Cy","LS","Cg"].forEach(k=>{ if(isFinite(p[k])) TIRE_MF_QS[k]=p[k]; });
   if(isFinite(p.Ey)) SIM.tireCalibEy = p.Ey;   /* Ey 仅赛道瞬态用 */
   SIM.tireCalib = Object.assign({}, TIRE_MF_QS);
   SIM.qsRes = solveQuasiStatic();              /* 立即用实胎特性重算操稳指标 */
@@ -541,18 +542,52 @@ function solveQuasiStatic(gyOverride){
   };
   const kW_F = widthScale(S.front.tire && S.front.tire.W, S.rear.tire && S.rear.tire.W);
   const kW_R = widthScale(S.rear.tire && S.rear.tire.W, S.front.tire && S.front.tire.W);
-  const caMF = (fzW, kW) => { if (fzW <= 0) return 0;
-    const r = fzW / TIRE_MF_QS.FzNom;
-    const d = TIRE_MF_QS.Fy0 * r * Math.max(0.1, 1 - TIRE_MF_QS.LS * (r - 1));
+  /* M8（2026-09-20）：载荷敏感性参考载荷（镜像引擎 chassis.quasi_loads）。
+     旧实现把 LS 一律相对 FzNom=3500（GT3 量级）计算，而方程式实际轮载约 580 N
+     ⇒ dμ/dFz 被稀释约 6 倍：实测 ARB 直径 0→30 时前轴滚转刚度 470→3351 N·m/°、
+     TLLTD 45.5%→74.9%、侧倾梯度 0.456→0.119 °/g，而 US 梯度只从 0.2104 动到
+     0.2262（+0.016 °/g）——载荷转移类杠杆（ARB/弹簧/配重）形同虚设。
+     现在以**整车静轮载均值 mT·g/4**作参考（与引擎、11-stages 瞬态层同一个数，
+     避免稳态/瞬态分叉），同一处杠杆约 +0.083 °/g。FzNom 仍管 D 的量级
+     （μ_nom=Fy0/FzNom 标定不变）。`TIRE_MF_QS.FzRef`（轮胎工坊/请求显式给出）
+     优先于按静载导出的值。 */
+  const fzRefNow = (typeof TIRE_MF_QS.FzRef === 'number' && TIRE_MF_QS.FzRef > 0)
+    ? TIRE_MF_QS.FzRef
+    : Math.max(1, mT * 9.81 / 4);
+  const caMF = (fzW, kW, fzRef) => { if (fzW <= 0) return 0;
+    const ref = (typeof fzRef === 'number' && fzRef > 0) ? fzRef : fzRefNow;
+    const d = TIRE_MF_QS.Fy0 * (fzW / TIRE_MF_QS.FzNom) * Math.max(0.1, 1 - TIRE_MF_QS.LS * (fzW / ref - 1));
     return (kW === undefined ? 1 : kW) * TIRE_MF_QS.By * TIRE_MF_QS.Cy * d; };
   let usGrad = 0, alphaFDeg = 0, alphaRDeg = 0;
   if (Math.abs(Gy) >= 0.02) {
     const fyF = mT * ay * (b / L), fyR = mT * ay * (a / L);
     const caF = caMF(fzFL, kW_F) + caMF(fzFR, kW_F);
     const caR = caMF(fzRL, kW_R) + caMF(fzRR, kW_R);
+    /* ── M11（2026-09-20）· P12 外倾→抓地耦合（镜像引擎 chassis.quasi_loads）──
+       真车上 ARB 的主平衡杠杆是"侧倾→轮跳差→外倾差→外倾推力差"，而旧模型 US 梯度
+       只含 Cα(Fz)，ARB 只能靠载荷敏感性间接影响平衡。建模：
+         dz = rollAngleRad · 半轮距（外轮压缩为正）
+         γ_w = state.cam0 + (cg°/25mm)/25 · dz_w           ← cg 取本轴扫掠在 0 行程的值
+         Fy_cam = Cg·(−radians(γ_w))·Fz_w                    ← 朝弯心为正
+         α_axle = (Fy_axle − ΣFy_cam) / ΣCα
+       符号自检：外轮压缩、增益为负 ⇒ γ 更负 ⇒ (−γ)>0 ⇒ 贡献正侧向力（帮忙）；
+       内轮反向。两侧之差 = "侧倾改变平衡"。只加推力项、不动 Cα（外倾对 Cα 是二阶量，
+       一起塞进来会让"这个数哪来的"不可审计）。 */
+    const camGainF = sampleSweep(SIM.swF, 0, "cg"), camGainR = sampleSweep(SIM.swR, 0, "cg");
+    const Cg = TIRE_MF_QS.Cg || 0;
+    const dzF = rollAngleRad * (tf * 1000 / 2), dzR = rollAngleRad * (tr * 1000 / 2);  /* mm */
+    const camThrust = (cam0, gain, dz, fzOut, fzIn) => {
+      if(!Cg || !gain) return 0;
+      const gOut = cam0 + (gain / 25) * dz * (Gy >= 0 ? 1 : -1);
+      const gIn  = cam0 - (gain / 25) * dz * (Gy >= 0 ? 1 : -1);
+      const fo = Gy >= 0 ? fzOut : fzIn, fi = Gy >= 0 ? fzIn : fzOut;
+      return Cg * (-gOut * D2R) * fo + Cg * (-gIn * D2R) * fi;
+    };
+    const camF = camThrust(S.front.cam0 || 0, camGainF, dzF, fzFR, fzFL);
+    const camR = camThrust(S.rear.cam0 || 0, camGainR, dzR, fzRR, fzRL);
     if (caF > 1e-6 && caR > 1e-6) {
-      alphaFDeg = (fyF / caF) * R2D;
-      alphaRDeg = (fyR / caR) * R2D;
+      alphaFDeg = ((fyF - camF) / caF) * R2D;
+      alphaRDeg = ((fyR - camR) / caR) * R2D;
       usGrad = (alphaFDeg - alphaRDeg) / Gy;   /* deg/g */
     }
   }

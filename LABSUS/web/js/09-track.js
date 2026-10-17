@@ -20,10 +20,13 @@ const TPHYS = (function(){
     const B=(p.By!==undefined?p.By:20), C=(p.Cy!==undefined?p.Cy:1.2),
           E=(p.Ey!==undefined?p.Ey:-0.5), D0=p.Fy0||5250,
           LS=(p.LS!==undefined?p.LS:0.10), FzN=p.FzNom||3500,
+          /* M8（2026-09-20）：LS 的参考载荷与 μ 量级参考（FzN）分离。
+             缺省退化为 FzN ⇒ 旧口径逐位不变；赛道仿真由 payload 传真实静轮载。 */
+          FzR=(typeof p.FzRef==='number'&&p.FzRef>0)?p.FzRef:FzN,
           Sh=p.Sh||0, Sv=p.Sv||0;
     return function fy(aRad,fz){
       if(fz<=0)return 0;
-      const d=D0*(fz/FzN)*(1-LS*(fz/FzN-1));
+      const d=D0*(fz/FzN)*(1-LS*(fz/FzR-1));
       const x=B*aRad+Sh;
       const arg=x-E*(x-Math.atan(x));
       return d*Math.sin(C*Math.atan(arg))+Sv;
@@ -94,7 +97,22 @@ const TPHYS = (function(){
     this.hf=Math.abs(v.front.points.WC[0])/1000;
     this.hr_=Math.abs(v.rear.points.WC[0])/1000;
     this.pos={FR:[this.a,+this.hf],FL:[this.a,-this.hf],RR:[-this.b,+this.hr_],RL:[-this.b,-this.hr_]};
-    this.iz=body.iz_kg_m2||v.mass_kg*(this.L*this.L+1.6*1.6)/12;
+    /* M15（2026-09-20）：横摆惯量三档解析（显式 > FSAE 部件清单 > 矩形近似），
+     与引擎 transient.py::resolve_yaw_inertia 同一真源。
+     ⚠ 这里**内联**而不调 02-presets.js::resolveYawInertia：本文件会被 tphys_parity
+     对拍沙箱**单独加载**（不含其他模块），硬调用会 ReferenceError 直接打死对拍
+     （本轮实测踩到）。故用特性探测：沙箱里自动退回矩形近似（对拍锚显式给 iz，不受影响），
+     完整应用里用部件清单。 */
+  const _izDecl = body.iz_kg_m2;
+  let _izVal, _izSrc;
+  if(_izDecl){ _izVal = _izDecl; _izSrc = "declared"; }
+  else if(typeof fsaeMassProps === "function" && Math.abs(v.mass_kg-235)<=1.5
+          && Math.abs(v.wheelbase_mm-1550)<=5){
+    _izVal = fsaeMassProps().Izz; _izSrc = "inventory:fsae";
+  } else {
+    _izVal = v.mass_kg*(this.L*this.L+1.6*1.6)/12; _izSrc = "rectangle:approx";
+  }
+  this.iz=_izVal; this.izSrc=_izSrc;
     this.LsT=Math.max(0.3,this.Ls);   /* F-24：σ 地板 0.3m，与 Python max(0.3,Ls) 对齐 */
     this.rollDeg=0; this.pitchDeg=0; this.prevAy=0; this.prevAx=0; this.tNow=0;
     this.alphaLat={FR:0,FL:0,RR:0,RL:0};
@@ -412,6 +430,8 @@ function trackPayload(){
       FzNom:ctlVal("ssFzN",3500),
       Ls:ctlVal("ssLs",0.35),
       Cg:ctlVal("ssCg",6.0),
+      /* M8：同 792 行处——LS 参考载荷与前端瞬态层同源，防两内核口径分叉 */
+      FzRef:Math.max(1,(typeof S!=="undefined"&&S.mTotal?S.mTotal:1000)*9.81/4),
       LS:0.10, By:20, Cy:1.2, Ey:-0.5}};
   /* G31-P10-4：动力工坊定制规格下发——仅当生效 spec 与 legacy-equivalent
      物理不等价时才叠加嵌套字段（PowertrainSpec 继承 PowertrainParams，
@@ -762,6 +782,9 @@ function trackStageRun(){
     tire:{Fy0:parseFloat(document.getElementById("ssFy0").value)||5250,
       FzNom:parseFloat(document.getElementById("ssFzN").value)||3500,
       Ls:parseFloat(document.getElementById("ssLs").value)||0.35, LS:0.10,
+      /* M8：载荷敏感性参考载荷＝整车静轮载均值，与前端 11-stages 瞬态层同一个数。
+         不发则引擎沿用 FzNom ⇒ 两端 LS 口径分叉（JS 用静载、PY 用 FzNom）。 */
+      FzRef:Math.max(1,(S.mTotal||1000)*9.81/4),
       Cg:parseFloat(document.getElementById("ssCg").value)||6.0}};
   /* G31-P10-4：动力工坊定制规格下发——仅当生效 spec 与 legacy-equivalent
      物理不等价时才叠加嵌套字段（PowertrainSpec 继承 PowertrainParams，
@@ -1013,7 +1036,9 @@ function buildTrackPanel(host){
   b.appendChild(d);
 }
 function buildTrackTelemetry(host){
-  const b2=sec(host,"赛道动态遥测","TRACK TELEMETRY · HUD",false,"purp");
+  /* M7（2026-09-20）：默认折叠。此前 col=false ⇒ 5 张画布（200+64+110+96+96px）
+     在未跑赛道仿真时全部空着展开，把右坞站拉长近 600px 且看起来像坏掉。 */
+  const b2=sec(host,"赛道动态遥测","TRACK TELEMETRY · HUD",true,"purp");
   const gg=E("canvas","plot");gg.id="trkGG";gg.style.height="200px";gg.style.width="100%";
   b2.appendChild(gg);
   const fz=E("canvas","plot");fz.id="trkFZ";fz.style.height="64px";fz.style.width="100%";

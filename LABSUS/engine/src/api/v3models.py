@@ -208,6 +208,11 @@ class AxleSpec(BaseModel):
     arch: str = "pushrod"                   # pushrod|pullrod（→ strut 附着拓扑）
     camber_deg: float = -1.2
     toe_deg: float = 0.05
+    # M11（2026-09-20）· P12：悬架外倾增益（°外倾变化 / 25mm 轮跳，生产方向负号）。
+    # 侧倾 → 轮跳差 → 外倾差 → 外倾推力差 = 真车上 ARB 影响平衡的主杠杆。
+    # 缺省 0 ⇒ 耦合项恒 0、历史行为逐位不变（直接调 API 的调用方不受影响）；
+    # 前端把自身扫掠得到的 cg（sampleSweep(sw,tr,"cg")）随 payload 下发。
+    camber_gain_deg_per_25mm: float = 0.0
     tire_radius: float = 325.0
     spring_rate: float = 110.0              # kS N/mm
     spring_mass_kg: float = 330.0           # 本轴簧载质量（CG 分配用）
@@ -380,6 +385,14 @@ class TireParams(BaseModel):
     Sv: float = 0.0
     FzNom: float = 3500.0
     LS: float = 0.10               # 载荷敏感性（重载 μ 递减；0 = 线性基线）
+    FzRef: float | None = None     # M8（2026-09-20）：载荷敏感性的**参考载荷**（N）。
+                                   # 与 FzNom 分离：FzNom 定 μ 量级（μ=Fy0/FzNom），
+                                   # FzRef 定"载荷翻倍 μ 降 LS"这句话相对哪个工作点。
+                                   # 旧实现混用 FzNom=3500（GT3 级）而 FSAE 实际轮载
+                                   # ~580 N ⇒ 敏感度稀释约 6 倍，载荷转移类杠杆
+                                   # （ARB/弹簧/配重）对 US 梯度几乎失效（实测
+                                   # ARB 0→30 只动 +0.016 °/g，而 TLLTD 45%→75%）。
+                                   # 缺省 None ⇒ 退化为 FzNom（历史调用逐位不变）。
     Cg: float = 6.0                # 外倾推力系数 1/rad（Fy += -Cg·γ·Fz）
                                    # G24-S3（2026-09-02）：0.5 → 6.0。0.5 只给 1750 N/rad
                                    # @ FzNom（真实 15~25 kN/rad），实测 camber 对总侧向力
@@ -389,6 +402,12 @@ class TireParams(BaseModel):
                                    #   叠加会顶破 μ·Fz（transient.wheel_force 用
                                    #   lat_avail=sqrt(μfz²-fx²) 钳位，前端 11-stages.js 同式）。
     Ls: float = 0.35               # 侧偏松弛长度 m（瞬态一阶滞后）
+    kappa_peak: float = 0.12       # M19：纵向峰值滑移率（无量纲）
+    # 用途：轮自由度模型的**准稳态代数解**要把驱动需求折算成滑移率 κ，而引擎轮胎模型
+    # 此前是纯侧向的（无纵向滑移刚度）。取 Cκ = μ·Fz/κ_peak：只引入一个物理含义清晰的
+    # 峰值滑移率，Cκ 随附着自动缩放（与 LS 载荷敏感性天然一致）。
+    # ⚠ **未标定**：0.12 取自赛车胎文献区间 0.10~0.15，需按实件（实测 μ-κ 曲线）校正。
+    # 该参数仅在求解器轮自由度开关打开时被消费；开关默认关 ⇒ 历史数值逐位不变。
     p: float | None = Field(default=None, exclude=True)
     # ↑ G29 轮胎工坊：胎压 kPa（信息字段，引擎不改缺省行为）。exclude=True：
     #   请求验证仍接受 p，但 model_dump() 不输出——transient.py 把 TireParams
@@ -402,9 +421,43 @@ class TireParams(BaseModel):
             raise ValueError(f"FzNom must be finite > 0, got {self.FzNom}")
         if not math.isfinite(self.By) or self.By <= 0:
             raise ValueError(f"By must be finite > 0, got {self.By}")
+        if not math.isfinite(self.kappa_peak) or not (0.0 < self.kappa_peak <= 1.0):
+            raise ValueError(f"kappa_peak must be finite in (0,1], got {self.kappa_peak}")
         for name, val in (("Cg", self.Cg), ("Ls", self.Ls), ("Fy0", self.Fy0)):
             if not math.isfinite(val):
                 raise ValueError(f"{name} must be finite, got {val}")
+        return self
+
+
+class DifferentialSpec(BaseModel):
+    """差速器规格（M19 / T2：**字段名对齐真源** `web/js/16-powertrain.js::distributeAxle`）。
+
+    ⚠ 字段名的历史坑：M16 初版用的是**力域**键（kind/preload_nm/bias_ratio），而真源用的是
+    **扭矩域**键（type/bias/lockNm/slipRefRadS）。两者名字不同 ⇒ 前端把规格原样发来时会被
+    pydantic 静默忽略、退化成 open（左右驱动力恒等），**看起来正常但物理是错的**。
+    现统一采用真源键名，前端规格可**原样下发**。
+
+    type        ：open（左右等扭矩）/ lsd（锁紧扭矩 = lockNm 与偏置共同决定）/ locked（两轮同速）
+    bias        ：扭矩偏置比 TBR ≥ 1（1.0 = 无偏置）
+    lockNm      ：锁紧扭矩 N·m（0 = 无锁紧能力，LSD 等同 open；也是转移量上限）
+    slipRefRadS ：满锁滑差 rad/s（缺省 8）；滑差越大锁紧越接近上限
+    """
+
+    type: str = "open"
+    bias: float = 1.0
+    lockNm: float = 0.0
+    slipRefRadS: float = 8.0
+
+    @model_validator(mode="after")
+    def _check(self):
+        if self.type not in ("open", "lsd", "locked"):
+            raise ValueError(f"差速器 type 非法：{self.type}（应为 open/lsd/locked）")
+        if not math.isfinite(self.bias) or self.bias < 1.0:
+            raise ValueError(f"bias(TBR) 必须 ≥ 1，got {self.bias}")
+        if not math.isfinite(self.lockNm) or self.lockNm < 0.0:
+            raise ValueError(f"lockNm 必须 ≥ 0，got {self.lockNm}")
+        if not math.isfinite(self.slipRefRadS) or self.slipRefRadS <= 0.0:
+            raise ValueError(f"slipRefRadS 必须 > 0，got {self.slipRefRadS}")
         return self
 
 
@@ -413,6 +466,9 @@ class PowertrainParams(BaseModel):
     T_max: float = 250.0           # 峰值扭矩 N·m
     P_kw: float = 80.0             # 峰值功率 kW
     drive_split_f: float = 0.0     # 前轴驱动比例（0=纯后驱）
+    # M16：差速器（None = 不使用，保持历史分配路径；显式给定才启用轴级分配）
+    front_diff: DifferentialSpec | None = None
+    rear_diff: DifferentialSpec | None = None
     brake_split_f: float = 0.6     # 前轴制动分配（剩余给后轴）
 
 
@@ -554,6 +610,10 @@ class TrackSimRequest(BaseModel):
     sim_time: float = Field(30.0, gt=0.0, le=300.0)
     kc_luts: dict[str, dict[str, list[float]]] = Field(default_factory=dict)
     tire: TireParams = Field(default_factory=TireParams)
+    # M19：轮自由度开关（**默认关**）。开启后纵向力受 μFz 限制（历史用 0.75μFz 余量）、
+    # 并输出准稳态滑移率 kappa_qs 与轮速 omega_qs（供差速器 Δω 使用）。
+    # 关闭时状态仍为平面 6 状态、数值逐位不变。
+    wheel_dof: bool = False
     # G31-P7：缺省 None（不污染对拍锚）；下发时可为旧标量（T_max/P_kw，继承）或
     # 详细动力链（ice/gearbox/...）。transient 用 `if req.powertrain is not None` 门控。
     powertrain: PowertrainSpec | None = None

@@ -974,7 +974,10 @@ function initViews(){
   const vp=document.getElementById("vp");
   VDEF.forEach((d)=>{
     const w=document.createElement("div");w.className="vw";w.dataset.k=d.key;
-    w.innerHTML='<div class="vwh"><b>'+d.zh+'</b>'+d.en+' <span class="vax">['+d.ax+']</span>'+
+    /* M7（2026-09-20）：视图名单独包一层 .vnm。单视口模式下顶栏 #v4VpTitle 已显示
+       同一个名字，视口内再写一遍是纯重复；四宫格时各口需要自标，故只收起名字、
+       保留轴向刻度 [X-Z] 与语义提示（+Y⊗车头）以及 F/M 按钮。 */
+    w.innerHTML='<div class="vwh"><span class="vnm"><b>'+d.zh+'</b>'+d.en+' <span class="vax">['+d.ax+']</span></span>'+
       '<span class="vi">'+d.note+'</span><span class="vb" title="适应">F</span><span class="vb" title="最大化">M</span></div>'+
       '<canvas></canvas>';
     vp.appendChild(w);
@@ -982,7 +985,7 @@ function initViews(){
       s:0.5,cx:0,cy:0,az:-35*D2R,elv:24*D2R,dist:3200,tgt:[420,0,340],mx:false});
     v.ctx=v.cv.getContext("2d"); VW.push(v);
     const bts=w.querySelectorAll(".vb");
-    bts[0].onclick=e=>{e.stopPropagation();fitView(v);};
+    bts[0].onclick=e=>{e.stopPropagation();v.sLocked=false;v.geoFitted=false;fitView(v);};   // M7：F=适应，交还自动取景
     bts[1].onclick=e=>{e.stopPropagation();toggleMax(v);};
     hookView(v);
     w.addEventListener("mouseenter",()=>{VW.forEach(q=>q.el.classList.remove("act"));w.classList.add("act");});
@@ -997,7 +1000,14 @@ function sizeView(v){
   if(v.w!==w||v.h!==h||v.dpr!==dpr){
     v.w=w;v.h=h;v.dpr=dpr;v.cv.width=w*dpr;v.cv.height=h*dpr;
     v.ctx.setTransform(dpr,0,0,dpr,0,0);
-    if(!v.inited){fitView(v);v.inited=true;}
+    /* M7（2026-09-20）：初次布局竞态修复 —— 改为"用户接管前一直自适应"。
+       旧实现只在第一次 sizeView 时 fitView 并立刻 `inited=true`，而启动期画布会经历
+       多次尺寸变化（四宫格 2×2 布局 → 单视口 .vp-single → 最终尺寸），首次往往拿到
+       四分之一大的格子（实测 iso 格 613×310，而终态 1238×794），一锁死就再不自适应
+       ⇒ 车只占视口 38%×27%、四宫格里还会裁出画面。现在：只要用户还没手动旋转/缩放/
+       平移（v.sLocked），尺寸每变一次就重新取景；用户一接管即永久让位。
+       手工适应入口（F 按钮 / 双击）会清掉 sLocked，交还给自动取景。 */
+    if(!v.sLocked) fitView(v);
   }
 }
 function toggleMax(v){
@@ -1030,17 +1040,39 @@ function fitPoints(){
 function fitView(v){
   if(v.w<20||v.h<20){v.s=0.5;return;}   // 防初次布局竞态 (2026-08-24)
   const pts=fitPoints();
+  /* M7（2026-09-20）：自适应必须计入"硬点之外的绘制量"。
+     fitPoints() 只给硬点节点，而实际画出的是轮胎圆（半径 R）、减振柱、鱼眼球、
+     尺寸标注线——它们会画到硬点云之外约一个轮胎半径。旧实现只按硬点云取景，
+     于是"贴合"时车实际被裁掉一圈（实测 1:2.0 时前后轮与尾翼全部出画）。
+     这里在包围盒两侧各加一个轮胎半径的余量；同时对整体留 82% 的目标占比。 */
+  const pad = (typeof S!=="undefined" && S.tire && S.tire.R) ? S.tire.R*1.05 : 260;
+  const FILL = 0.82;
   if(v.type==="o"){
     let a0=1e9,a1=-1e9,b0=1e9,b1=-1e9;
     pts.forEach(p=>{const a=dot(p,v.bx),b=dot(p,v.by);
       if(a<a0)a0=a;if(a>a1)a1=a;if(b<b0)b0=b;if(b>b1)b1=b;});
     v.cx=(a0+a1)/2;v.cy=(b0+b1)/2;
-    v.s=Math.min((v.w-30)/Math.max(1,a1-a0),(v.h-34)/Math.max(1,b1-b0));
+    v.s=FILL*Math.min((v.w-30)/Math.max(1,(a1-a0)+2*pad),(v.h-34)/Math.max(1,(b1-b0)+2*pad));
   }else{
     let c=[0,0,0];pts.forEach(p=>c=add(c,p));c=mul(c,1/pts.length);
     let r=1;pts.forEach(p=>r=Math.max(r,dst(p,c)));
-    v.tgt=c;v.dist=Math.max(2600,r*4.2);v.s=Math.min(v.w,v.h)/(r*2.2);
+    v.tgt=c;v.dist=Math.max(2600,r*4.2);
+    /* 等轴测：先用 s=1 试投影求屏幕包围盒，再按目标占比反解 s。
+       透视投影对 s 是线性的，所以这一步是精确解而不是再估一次
+       （旧实现 `s = min(w,h)/(r*2.2)` 用 3D 半径估，对"长而扁"车身严重失配：
+       单视口只占 38%×27%，四宫格里又横向裁出画面）。 */
     camIso(v);
+    let a0=1e9,a1=-1e9,b0=1e9,b1=-1e9,seen=0;
+    pts.forEach(p=>{
+      const q=sub(p,v.eye),z=dot(q,v.fw); if(z<80)return;
+      const f=v.dist/z,x=dot(q,v.rt)*f,y=dot(q,v.up)*f; seen++;
+      if(x<a0)a0=x;if(x>a1)a1=x;if(y<b0)b0=y;if(y>b1)b1=y;
+    });
+    if(seen>1&&a1>a0&&b1>b0){
+      v.s=FILL*Math.min((v.w-30)/Math.max(1,(a1-a0)+2*pad),(v.h-40)/Math.max(1,(b1-b0)+2*pad));
+    }else{
+      v.s=Math.min(v.w,v.h)/(r*1.45);   // 兜底：点云退化时退回半径估算
+    }
   }
 }
 
@@ -1234,7 +1266,15 @@ function drawOverlay(v){
 
 function drawAll(){
   const sc=buildScene(); PICK.length=0;
-  VW.forEach(v=>{if(document.getElementById("vp").classList.contains("max0")&&!v.mx)return;drawView(v,sc);});
+  VW.forEach(v=>{
+    if(document.getElementById("vp").classList.contains("max0")&&!v.mx)return;
+    /* M7（2026-09-20）：几何就绪后补一次取景。首个 sizeView 往往早于机构求解——
+       那时 fitPoints() 只有 fallback 点云（`if(!SIM.FR)return[[0,0,0],…]`），按它取景
+       会把真实车辆画到视口外。这里等 SIM.FR 出现且拿到真实尺寸后再定一次；
+       同样受 sLocked 保护，用户手动调过视角就不再打扰。 */
+    if(!v.sLocked && SIM.FR && v.w>=20 && v.h>=20 && !v.geoFitted){ fitView(v); v.geoFitted=true; }
+    drawView(v,sc);
+  });
 }
 function drawView(v,sc){
   const ctx=v.ctx; if(v.type==="p") camIso(v);

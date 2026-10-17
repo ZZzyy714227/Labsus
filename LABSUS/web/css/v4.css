@@ -150,3 +150,40 @@
 /* ---------- 底栏瘦身 ---------- */
 #sb{height:26px}
 #sb .c.v4-hide{display:none}
+
+/* ═══════════════════════════════════════════════════════════════════
+   M7（2026-09-20）· 顶栏信息分层
+   改前：2 个动作按钮 + 5 个只读胶囊 + 5 项工具 + 2 段导航挤在 42px 带子上，
+        权重几乎相同；"▶运行"与"内置 JS"并排（动作 vs 状态）；导航与状态混排。
+   改后：左＝身份 + 导航（平台 / 轴 / 模式）；右＝动作 + 状态 + 工具。
+        只读状态由"描边胶囊"降为"带色点文本"，顶栏从 8 个胶囊降到 1 个主按钮。
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* 副标题压成一行（原为 CN/EN 两行，纯装饰占掉 42px 带子的两行高） */
+#tb .tt{flex-direction:row;align-items:baseline;gap:0;padding:0 12px}
+#tb .tt span{white-space:nowrap}
+#tb .tt span:last-child{margin-top:0}
+#tb .tt span:last-child::before{content:"·";margin:0 7px;color:var(--ink-3)}
+
+/* 左簇贴左、右簇贴右：撤掉旧的大占位，改由主按钮吃掉剩余空间 */
+#tb .sp{flex:0 0 0}
+#v4RunBtn{margin-left:auto}
+
+/* 只读状态降级：不画边框、不占按钮语义，只留色点 + 小字 */
+.v4-pill.ro{border-color:transparent;background:transparent;color:var(--ink-3);
+  font-size:9px;padding:0 6px;gap:5px}
+.v4-pill.ro:hover{background:transparent;color:var(--ink-2)}
+/* 状态簇起始处的竖分隔（借首个状态胶囊的伪元素，不新增 DOM） */
+#tb .v4-pill.ro.ok::before{content:"";width:1px;height:16px;background:var(--glass-bd);margin-right:5px}
+
+/* 工具区（评价报告 / 透视 / 主题 / fps）与状态簇拉开呼吸 */
+#evalModalBtn{margin-left:12px}
+#tb .cell.slim:last-child{min-width:40px;padding:0 10px}
+
+/* 导航簇与右侧动作簇之间的留白 */
+#tb > #v4ModeSeg{margin-right:14px}
+
+/* M7：单视口模式下，视口内左上角的视图名与顶栏 #v4VpTitle 完全重复 → 收起名字，
+   只留轴向 [X-Z] 与语义提示；四宫格时各口仍需自标，故只在 .vp-single 下隐藏。 */
+#vp.vp-single .vwh .vnm{display:none}
+#vp.vp-single .vw.v4-cur .vwh{opacity:1}

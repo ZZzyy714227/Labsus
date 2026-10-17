@@ -204,7 +204,10 @@ function runChecks(webDir, ok, fail, opts) {
     'G23-P1b/7: 11-stages.js 使用引擎同名的外倾推力系数 Cg（接线前是硬编码 C_gamma=4500/3500，' +
     '在 γ=-2.8°/Fz=3300N 下给 220N，而引擎 Cg=0.5 给 80.7N，差 2.7 倍）');
   // G24-S3：JS 缺省须与 ENG_DEFAULT 的 Cg=6.0 逐字一致（引擎侧锚在 test_dom.js）
-  ok(/LS: 0\.10, Cg: 6\.0 \}/.test(stagesSrc),
+  // ⚠ M20：原正则写作 `/LS: 0\.10, Cg: 6\.0 \}/` —— 要求 Cg 是 D 字典的**最后一项**。
+  //   S2 往 D 里追加 `Ls: 0.35` 后立刻失配（不是物理错，是守卫写脆了）。
+  //   改为不依赖字段位置：只锚 "LS: 0.10," 后紧跟 "Cg: 6.0" 字面量。
+  ok(/LS: 0\.10,\s*Cg: 6\.0\b/.test(stagesSrc),
     'G24-S3/7: resolveTireParams 缺省 Cg=6.0 与 ENG_DEFAULT 同步（旧 0.5 给 1750 N/rad，camber 推力占比 ~2%）');
 
   /* ── 8. 回退：无标定数据时用引擎缺省，不崩不出 NaN ─────────── */

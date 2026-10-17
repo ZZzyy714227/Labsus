@@ -276,3 +276,91 @@ def test_transient_drive_split_front_wheels():
     accb = [p for p in base["trace"] if p["throttle"] > 0.5 and p["vx"] < 10.0]
     assert max(p["fx_RR"] for p in accb) > 50.0
     assert max(abs(p["fx_FR"]) for p in accb) < 1.0
+
+# ═══════════════════════════════════════════════════════════════════════════
+# M19（2026-09-20）· 轮自由度（准稳态代数解）验收 —— R-0931 计划步骤 1
+# ═══════════════════════════════════════════════════════════════════════════
+def _wd_track():
+    return [{"x": 0.0, "y": 0.0, "target_speed": 30.0},
+            {"x": 300.0, "y": 0.0, "target_speed": 30.0}]
+
+
+def _wd_body(**over):
+    """一条直道、全油门（目标速度给高）、12 m/s 起步。"""
+    return _body(_wd_track(), sim_time=over.pop("sim_time", 1.5),
+                 start_speed=over.pop("start_speed", 12.0), dt=0.01, **over)
+
+
+def test_wheel_dof_default_off_is_bit_identical():
+    """验收 ④：开关关闭时改 kappa_peak **不得**影响任何结果（证明开关真的隔离）。"""
+    a = client.post("/api/v3/chassis/simulate_track",
+                    json=_wd_body(tire={"kappa_peak": 0.05})).json()
+    b = client.post("/api/v3/chassis/simulate_track",
+                    json=_wd_body(tire={"kappa_peak": 0.30})).json()
+    assert a["status"] == "VALID" and b["status"] == "VALID"
+    assert a["summary"] == b["summary"], "开关关闭时 kappa_peak 不得影响结果（逐位不变）"
+    assert a["trace"][-1] == b["trace"][-1], "轨迹最后一行也必须逐位一致"
+
+
+def test_wheel_dof_off_reports_zero_outputs():
+    """验收 ④（输出面）：关闭时 kappa_*/omega_* 恒为 0。"""
+    b = client.post("/api/v3/chassis/simulate_track", json=_wd_body()).json()
+    assert b["status"] == "VALID"
+    keys = [f"{p}_{w}" for p in ("kappa", "omega") for w in ("FL", "FR", "RL", "RR")]
+    for row in b["trace"][:20]:
+        for k in keys:
+            assert k in row, f"输出应含 {k}（M19 可观测）"
+            assert row[k] == 0.0, f"关闭时 {k} 应为 0（实测 {row[k]}）"
+
+
+def test_wheel_dof_on_produces_physical_slip_and_spin():
+    """开启后：驱动轮出现**正滑移**与合理轮速，κ 落在 [−κ_peak, κ_peak]（验收 ①②）。"""
+    b = client.post("/api/v3/chassis/simulate_track",
+                    json=_wd_body(wheel_dof=True, tire={"kappa_peak": 0.12})).json()
+    assert b["status"] == "VALID"
+    rows = b["trace"]
+    kappas = [x["kappa_RL"] for x in rows]
+    assert any(abs(k) > 1e-6 for k in kappas), "全油门直道上驱动轮滑移率不应恒为 0"
+    assert all(-0.12 - 1e-9 <= k <= 0.12 + 1e-9 for k in kappas), "κ 必须落在 ±kappa_peak 内"
+    assert all(x["omega_RL"] > 0.0 for x in rows), "前进时轮速必须为正"
+    # ω 与 κ 自洽：ω = vx(1+κ)/Re（后胎半径 310mm）
+    for x in rows:
+        if x["vx"] > 3.0:
+            expect = x["vx"] * (1.0 + x["kappa_RL"]) / 0.310
+            assert abs(x["omega_RL"] - expect) / abs(expect) < 0.03, "ω 与 κ 应自洽"
+
+
+def test_wheel_dof_on_drives_no_slower_than_off():
+    """刻意差异（登记在案）：开启后单轮纵向上限由历史 0.75μFz 改为 μFz ⇒ 末速不应下降。
+
+    0.75 这个余量在代码里**出处未说明**；轮自由度模型下上限应由滑移曲线与附着共同决定。
+    这是模型改进，不是放宽门限（差异量级见 DEVLOG/R-0933）。
+    """
+    off = client.post("/api/v3/chassis/simulate_track", json=_wd_body()).json()
+    on = client.post("/api/v3/chassis/simulate_track",
+                     json=_wd_body(wheel_dof=True)).json()
+    assert off["status"] == "VALID" and on["status"] == "VALID"
+    assert on["trace"][-1]["vx"] >= off["trace"][-1]["vx"] - 1e-9, "上限放宽后末速不应下降"
+    assert len(on["t"]) == len(off["t"]), "时间轴长度应一致"
+
+def test_wheel_dof_with_differential_end_to_end():
+    """**集成缺口守卫**：开关开 + 差速器规格同时启用必须能跑通且输出物理量。
+
+    这条测试是为一个真实 bug 加的：`wheel_force` 里轮半径 `t_r_mm` 只在
+    `elif throttle > 0` 分支定义，而走差速器路径时该分支被跳过 ⇒ 引用它 UnboundLocalError。
+    只开开关（不给差速器）的单测覆盖不到这个组合 —— **集成缺口比 bug 本身更值得记**。
+    """
+    spec = {"type": "lsd", "bias": 1.6, "lockNm": 25.0, "slipRefRadS": 8.0}
+    b = _wd_body(wheel_dof=True, tire={"kappa_peak": 0.12},
+                 powertrain={"T_max": 250.0, "P_kw": 80.0, "drive_split_f": 0.0,
+                             "rear_diff": spec})
+    r = client.post("/api/v3/chassis/simulate_track", json=b)
+    assert r.status_code == 200, f"开关开 + 差速器必须能跑通（HTTP {r.status_code}）"
+    j = r.json()
+    assert j["status"] == "VALID", j
+    rows = j["trace"]
+    assert all(x["omega_RL"] > 0.0 for x in rows), "驱动轮轮速应为正"
+    assert all(-0.12 - 1e-9 <= x["kappa_RL"] <= 0.12 + 1e-9 for x in rows), "κ 应在 ±kappa_peak 内"
+    assert all(abs(x["fx_RL"]) < 1e6 and abs(x["fy_RL"]) < 1e6 for x in rows), "力必须有限且量级合理"
+    # 左右驱动扭矩不对称（LSD）：内外轮 fx 不应恒等
+    assert any(abs(x["fx_RL"] - x["fx_RR"]) > 1e-6 for x in rows), "LSD 下左右驱动力不应恒等"

@@ -1,5 +1,111 @@
 "use strict";
-function roadSignal(t){
+/* ═══════════════════════════════════════════════════════════════════════════
+   M13（2026-09-20）· P6 ISO 8608 随机路面谱
+   ───────────────────────────────────────────────────────────────────────────
+   此前的 `rand` 是 5 个谐波手工叠加的占位信号：幅值随频率按 1/k 衰减，与
+   实测路面统计无关。ISO 8608 规定路面**位移**功率谱密度按空间频率幂律衰减：
+       Gd(n) = Gd(n0) · (n/n0)^(−w)      n0 = 0.1 cycle/m，w = 2（标准值）
+   等级 A~H 由 Gd(n0) 分档（16 / 64 / 256 / 1024 / 4096 / 16384 / 65536 / 262144 ×10⁻⁶ m³）。
+   工程常用空间频率带 n ∈ [0.011, 2.83] cycle/m（对应波长 0.35~91 m）。
+
+   合成（band-limited random road，标准做法）：
+     把频带按对数分 N 个箱，第 i 个箱的中心频率 n_i、带宽 Δn_i，
+     取幅值 a_i = sqrt(2·Gd(n_i)·Δn_i)、随机相位 φ_i，则
+        z(s) = Σ a_i · cos(2π·n_i·s + φ_i)     （s = 行驶距离 m）
+     其均方满足 E[z²] = Σ a_i²/2 = Σ Gd(n_i)·Δn_i → ∫Gd(n)dn （谱一致）。
+     class A 在标准带上 RMS ≈ 3.8 mm，与教科书值一致。
+
+   两条工程细节：
+   1. **相位由固定种子生成（mulberry32）** ⇒ 每次打开得到同一条路，可复现、
+      两次截图读数一致（工作台的基本要求，也是测试可断言的前提）。
+   2. **后轴按轮距/车速延迟**：z_rear(t) = z_front(t − L/v)。同一条路后轴后到，
+      这是"前后轴输入不相关"这一常见说法在单轨直行下的正确形态；不延迟就等于
+      四轮同步抖动，会低估俯仰并高估一致性。
+   ═══════════════════════════════════════════════════════════════════════════ */
+const ROAD_ISO_N0 = 0.1;                  /* cycle/m：ISO 8608 参考空间频率 */
+const ROAD_ISO_W  = 2.0;                  /* 位移 PSD 幂律指数（ISO 8608 标准值） */
+const ROAD_ISO_NMIN = 0.011, ROAD_ISO_NMAX = 2.83;
+const ROAD_ISO_NH = 160;                  /* 谐波数（对数分箱） */
+const ROAD_ISO_SEED = 20260920;           /* 固定种子 ⇒ 同一条路可复现 */
+const ROAD_ISO = {
+  A:{gd:16,     zh:"A 级 很好"},   B:{gd:64,     zh:"B 级 好"},
+  C:{gd:256,    zh:"C 级 一般"},   D:{gd:1024,   zh:"D 级 差"},
+  E:{gd:4096,   zh:"E 级 很差"},   F:{gd:16384,  zh:"F 级 极差"},
+  G:{gd:65536,  zh:"G 级 试验场"}, H:{gd:262144, zh:"H 级 极恶劣"},
+};
+
+/* mulberry32：小而快的确定性 PRNG（相位用，不用于安全用途） */
+function isoRand(seed){
+  let a = seed >>> 0;
+  return function(){
+    a = (a + 0x6D2B79F5) >>> 0;
+    let x = Math.imul(a ^ (a >>> 15), 1 | a);
+    x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* 目标谱的解析 RMS（mm）：RMS² = ∫Gd dn，用于自检与面板显示 */
+function isoRmsMm(cls){
+  const c = ROAD_ISO[cls] || ROAD_ISO.A;
+  const g0 = c.gd * 1e-6;                                    /* m³ */
+  const integ = Math.pow(ROAD_ISO_N0, ROAD_ISO_W) *
+    ((Math.pow(ROAD_ISO_NMAX, 1-ROAD_ISO_W) - Math.pow(ROAD_ISO_NMIN, 1-ROAD_ISO_W)) / (1-ROAD_ISO_W));
+  return Math.sqrt(g0 * integ) * 1000;                       /* m → mm */
+}
+
+let _isoCache = { key:"", harm:null };
+function isoHarmonics(cls){
+  const key = cls + "|" + ROAD_ISO_NMIN + "|" + ROAD_ISO_NMAX + "|" + ROAD_ISO_NH + "|" + ROAD_ISO_SEED;
+  if(_isoCache.key === key) return _isoCache.harm;
+  const c = ROAD_ISO[cls] || ROAD_ISO.A, g0 = c.gd * 1e-6;
+  const rnd = isoRand(ROAD_ISO_SEED);
+  const lg0 = Math.log(ROAD_ISO_NMIN), lg1 = Math.log(ROAD_ISO_NMAX);
+  const harm = [];
+  for(let i=0;i<ROAD_ISO_NH;i++){
+    const nA = Math.exp(lg0 + (lg1-lg0)*i/ROAD_ISO_NH);
+    const nB = Math.exp(lg0 + (lg1-lg0)*(i+1)/ROAD_ISO_NH);
+    const dn = nB - nA, n = 0.5*(nA+nB);
+    const gd = g0 * Math.pow(n/ROAD_ISO_N0, -ROAD_ISO_W);     /* m³ */
+    const amp = Math.sqrt(2*gd*dn) * 1000;                    /* m → mm */
+    harm.push({ n, amp, ph: rnd()*2*Math.PI });
+  }
+  _isoCache = { key, harm };
+  return harm;
+}
+
+/* z(s)：**空间域**——s 为行驶距离 m，返回路面高程 mm（正 = 上凸）。
+   S3（M20，2026-10-17）：把台架原本"时间驱动"的实现拆出空间域版本，供整车内核用。
+   为什么必须拆：整车车速是**变化的**，而台架 isoProfileMm(t) 用固定参考车速
+   S.roadV 把 t 折成距离（s = v·t）——同一条路在不同车速下会被拉伸/压缩，
+   对整车不成立。空间域版本让"路面固定在地上"，车速只影响经过它的快慢。 */
+function isoProfileAtMm(sMeters, cls){
+  if(!(sMeters > 0)) return 0;               /* 驶入前路面为零（避免开局瞬态） */
+  const harm = isoHarmonics(cls || S.roadCls || "A");
+  let z = 0;
+  for(let i=0;i<harm.length;i++){
+    const h = harm[i];
+    z += h.amp * Math.cos(2*Math.PI*h.n*sMeters + h.ph);
+  }
+  return z;
+}
+
+/* z(t)：t 为时间 s，返回路面高程 mm（正 = 上凸）。
+   台架入口（固定参考车速折算距离）——改为调用空间域版本，**行为逐位不变**。 */
+function isoProfileMm(t){
+  if(t <= 0) return 0;                       /* 车辆驶入前路面为零（避免开局瞬态） */
+  const cls = S.roadCls || "A";
+  const v = Math.max(1, S.roadV || 20);      /* m/s */
+  return isoProfileAtMm(v * t, cls);
+}
+
+/* 后轴延迟：同一条路，后轴后到 L/v 秒（单轨直行下的严格关系） */
+function isoLag(axis){
+  if(S.road !== "iso" || axis !== "rear") return 0;
+  return (S.wb/1000) / Math.max(1, S.roadV || 20);
+}
+
+function roadSignal(t, axis){
   const A=S.rA;
   switch(S.road){
     case "step":  {const x=(t-0.40)/0.030;return A*0.5*(1+Math.tanh(clamp(x,-6,6)));}
@@ -7,6 +113,8 @@ function roadSignal(t){
     case "pulse": {const x=(t-0.5)/0.06;return A*Math.exp(-x*x);}
     case "chirp": {const f=0.4+ (S.rF)*Math.min(1,t/8);return A*sin(2*PI*f*t);}
     case "rand":  {let v=0;for(let k=1;k<=5;k++)v+=sin(2*PI*(1.1*k*S.rF*0.55)*t+k*2.399)/k;return A*v*0.45;}
+    /* ISO 8608：幅值由等级谱决定，不用 ROAD AMP（那是给确定性信号用的） */
+    case "iso":   return isoProfileMm(t - isoLag(axis));
     default: return 0;
   }
 }
@@ -20,7 +128,7 @@ function stepDyn(M,dt,rack,tSim,axis){
   setChassis(M,rack,axis);
 
   for(let s=0;s<NS;s++){
-    const tt=tSim+s*h, rz=M.roadZ0+roadSignal(tt);
+    const tt=tSim+s*h, rz=M.roadZ0+roadSignal(tt, axis);
     const rzv=clamp((roadSignal(tt+2e-4)-roadSignal(tt-2e-4))/4e-4,-4000,4000);
     for(let k=0;k<M.n.length;k++){const N=M.n[k];N.f[0]=0;N.f[1]=0;N.f[2]=N.w>0?-N.m*g:0;}
 

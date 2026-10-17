@@ -117,11 +117,21 @@ function hpImport(){const inp=document.createElement("input");
   inp.click();}
 function buildPersistencePanel(host){
   let b=sec(host,"硬点永久保存","HARDPOINT PERSISTENCE",false,"grn");
-  rowBtns(b,[["保存 SAVE",()=>hpSave()],["复位 RESET",hpReset],
-             ["导出 EXPORT",hpExport],["导入 IMPORT",hpImport]]);
+  /* M7（2026-09-20）：旧实现把 4 个按钮塞进一条 flex 行（.btnrow），每枚仅约 64px，
+     "导入 IMPORT" 直接被截成"导入 IM"。改为 2×2 网格，每枚约 128px，不再截断。 */
+  const g=E("div","btnrow");g.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:4px 10px";
+  [["保存 SAVE",()=>hpSave()],["复位 RESET",hpReset],
+   ["导出 EXPORT",hpExport],["导入 IMPORT",hpImport]].forEach(([lb,fn])=>{
+    const k=E("button","eng-btn");k.textContent=lb;k.style.width="100%";k.onclick=fn;g.appendChild(k);
+  });
+  b.appendChild(g);
   const st=E("div","ro"); st.appendChild(E("span",null,'自动保存 <u>AUTO</u>'));
   const v=E("b",null,"拖拽/编辑后即时写盘"); st.appendChild(v); b.appendChild(st);
-  b.appendChild(EH("div",null,'<i style="opacity:.65">localStorage 永久保存（刷新不丢）；导出 JSON 可跨机器备份。</i>'));
+  /* M7：说明文字改用与引擎面板一致的 .eng-status 段落（旧实现是一条裸 <i>，
+     在窄栏里折成三行且行距不齐）。 */
+  const hint=E("div","eng-status");
+  hint.textContent="localStorage 永久保存（刷新不丢）；导出 JSON 可跨机器备份。";
+  b.appendChild(hint);
 }
 function buildSystemShowPanel(host){
   let b=sec(host,"系统显示·默认分色","SYSTEM LAYERS",false,"amb");
@@ -147,8 +157,10 @@ function hookView(v){
       UI.drag={mode:"hp",v:v,id:hit.id,sx:hit.sx,axis:hit.axis,x0:e.clientX,y0:e.clientY,base:cpy(S[hit.axis].hp[hit.id])};
       UI.sync.forEach(f=>f());
     }else if(e.button===0&&v.type==="p"&&!e.shiftKey){
+      v.sLocked=true;   // M7：用户开始旋转 ⇒ 交还视角控制权，不再自动取景
       UI.drag={mode:"orb",v:v,x0:e.clientX,y0:e.clientY,az:v.az,el:v.elv};
     }else{
+      v.sLocked=true;   // M7：用户开始平移 ⇒ 同上
       UI.drag={mode:"pan",v:v,x0:e.clientX,y0:e.clientY,cx:v.cx,cy:v.cy,tgt:cpy(v.tgt)};
     }
     e.preventDefault();
@@ -167,9 +179,10 @@ function hookView(v){
   });
   cv.addEventListener("wheel",e=>{
     e.preventDefault();
+    v.sLocked=true;   // M7：用户滚轮缩放 ⇒ 同上
     const f=Math.pow(1.0015,-e.deltaY); v.s=clamp(v.s*f,0.02,15);
   },{passive:false});
-  cv.addEventListener("dblclick",()=>fitView(v));
+  cv.addEventListener("dblclick",()=>{v.sLocked=false;v.geoFitted=false;fitView(v);});   // M7：双击 = 手工适应，交还自动取景
   cv.addEventListener("contextmenu",e=>e.preventDefault());
 }
 

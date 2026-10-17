@@ -1,4 +1,4 @@
-﻿/* =====================================================================
+/* =====================================================================
    16-powertrain.js — G31 动力工坊（2026-09-05）
    段1 数据模型/校验/默认(legacy-equivalent)/状态/mapLookup
    段2 动力源(ICE/Motor) 段3 传动链 段4 电池 段5 组合器+step 段6 UI
@@ -836,6 +836,9 @@ const POWERTRAIN = {
       this._numRow("pt_diff_bias", "扭矩偏置比", 0.1, 1, 10, "") +
       this._numRow("pt_diff_lockNm", "锁止预紧", 1, 0, 3000, "N·m") +
       `<div id="ptRowDiffSlipRef">${this._numRow("pt_diff_slipRefRadS", "满锁速差", 0.5, 0.1, 100, "rad/s")}</div>`;
+    /* T3：内置预设的限滑参数是【文献量级、未标定】——标题上挂常驻提示，别让用户
+       把 1.6 / 25 N·m 当成实件值用。悬停给回填口径（台架测什么、回填哪个字段）。 */
+    const diffHint = ` <span title="内置预设的限滑参数取自文献区间（TBR 1.4~2.0 / breakaway 预紧 20~50 N·m），未按实件校正。台架或实车标定后回填：bias←实测 TBR、lockNm←实测 breakaway 扭矩、slipRefRadS←实测满锁速差。" style="font:400 9px var(--font-ui);color:#d29922;cursor:help;">⚠ 未标定</span>`;
     const centerBody = this._numRow("pt_splitFront", "前轴扭矩分配", 0.01, 0, 1, "0–1") +
       `<div id="ptSecCenterDiff">` +
       `<div style="font:10px var(--font-ui);color:#8b949e;margin:5px 0 2px;">中央差速锁止（仅 awd_center 生效）</div>` +
@@ -844,7 +847,7 @@ const POWERTRAIN = {
       `</div>`;
     return `${this._secBox("", "内置预设 BUILTIN", presetBody)}
       ${this._secBox("", "变速箱 GEARBOX", gbBody)}
-      ${this._secBox("", "差速器 DIFF", diffBody)}
+      ${this._secBox("", "差速器 DIFF", diffBody, diffHint)}
       ${this._secBox("ptSecCenter", "中央差速 CENTER（四驱）", centerBody)}`;
   },
   ratiosHTML(n) {
@@ -1643,7 +1646,15 @@ const POWERTRAIN_PRESETS = {
     motorF: null, motorR: null, battery: null,
     gearbox: { type: "seq", ratios: [3.6, 2.4, 1.9, 1.6, 1.35], finalDrive: 3.6,
                shiftTimeMs: 90, eff: 0.97, autoUpFrac: 0.95, autoDownFrac: 0.5 },
-    diff: { type: "open", bias: 1.0, lockNm: 0 }   // FSAE 多为开放式/死轴，无预紧
+    /* T3（2026-09）· 限滑 LSD：FSAE 后轴主流是摩擦片式（Salisbury/离合器式）限滑，
+       取代原「开放式/死轴」标注——该标注只对少数用死轴的车队成立，不具代表性。
+       ⚠ **未标定**：TBR 1.6 落在文献区间 1.4~2.0 内、breakaway（预紧）25 N·m 落在
+       20~50 N·m 内，两者都是「文献量级」而非本车实件测量值。台架/实车标定后回填：
+         bias        ← 实测 TBR（低速大速差稳态下 T_慢轮 / T_快轮）
+         lockNm      ← 实测 breakaway 扭矩（缓加载至输出轴开始相对转动）
+         slipRefRadS ← 实测「满锁速差」（预紧被速差完全抵消处的 Δω）
+       三者同时决定出弯牵引力上限与横摆力矩方向，A/B 实测见 test_powertrain 节 12。 */
+    diff: { type: "lsd", bias: 1.6, lockNm: 25, slipRefRadS: 8 }
   },
 
   /* 3) 纯电双电机扭矩矢量：前后各 250 kW / 350 N·m（量级：高性能双电机 EV），

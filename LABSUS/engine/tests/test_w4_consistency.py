@@ -104,13 +104,31 @@ def test_cornering_stiffness_single_source():
     import re
     from pathlib import Path
 
+    import pytest
+
     engine = Path(__file__).resolve().parents[1]
     src_files = [p for p in (engine / "src").rglob("*.py") if "__pycache__" not in p.parts]
+    # M8（2026-09-20）：正则放宽到"载荷敏感性算式"的通用形态（参考载荷可以是
+    # 变量 `r` 也可以是 `fz / ref`）——守卫目的是"只有一份实现"，不是锁定字面量。
     hits = [(p.name, m.start()) for p in src_files
-            for m in re.finditer(r"max\(0\.1,\s*1\.0\s*-\s*\w+\s*\*\s*\(r\s*-\s*1\.0\)\)",
+            for m in re.finditer(r"max\(0\.1,\s*1\.0\s*-\s*\w+\s*\*\s*\([^()]*-\s*1\.0\)\)",
                                  p.read_text(encoding="utf-8"))]
     assert len(hits) == 1, f"D(Fz) 载荷敏感性算式有 {len(hits)} 份（应为 1）: {hits}"
     assert hits[0][0] == "tire_mf.py", hits
+
+    # M8：参考载荷语义守卫——FzRef 处敏感度因子为 1，"载荷翻倍 μ 降 LS"成立。
+    from src.tire_mf import load_d
+    ref = 600.0
+    d_at_ref = load_d(ref, Fy0=5250.0, FzNom=3500.0, LS=0.10, FzRef=ref)
+    assert d_at_ref == pytest.approx(5250.0 * (ref / 3500.0)), "FzRef 处不得有载荷敏感性修正"
+    mu_ref = d_at_ref / ref
+    mu_2x = load_d(2 * ref, Fy0=5250.0, FzNom=3500.0, LS=0.10, FzRef=ref) / (2 * ref)
+    assert mu_2x / mu_ref == pytest.approx(1.0 - 0.10), "载荷翻倍应降 μ 恰为 LS"
+    # 缺省 None ⇒ 退化为 FzNom 旧口径（历史调用逐位不变）
+    assert load_d(700.0, Fy0=5250.0, FzNom=3500.0, LS=0.10) == \
+        load_d(700.0, Fy0=5250.0, FzNom=3500.0, LS=0.10, FzRef=None)
+    assert load_d(700.0, Fy0=5250.0, FzNom=3500.0, LS=0.10, FzRef=3500.0) == \
+        load_d(700.0, Fy0=5250.0, FzNom=3500.0, LS=0.10)
 
     from src.tire_mf import MagicFormulaSub, cornering_stiffness
     mf = MagicFormulaSub({"Fy0": 5250.0, "By": 20.0, "Cy": 1.2, "Ey": -0.5,

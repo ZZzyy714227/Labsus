@@ -123,6 +123,11 @@ def _run_node(body, ctx, case, html_file="dwb-pro-allinone.html"):
     try:
         r = subprocess.run([node, str(_MJS), str(inp), str(out)],
                            capture_output=True, text=True, timeout=180,
+                           # M15（2026-09-20）：必须显式 utf-8。此前用平台默认编码
+                           # （Windows=GBK），子进程 stderr 一旦含中文，reader 线程就抛
+                           # UnicodeDecodeError，**真实报错被吞掉**，只剩 "returncode==1"
+                           # 这种无法定位的失败（本轮就卡在这里）。
+                           encoding="utf-8", errors="replace",
                            cwd=str(_LABSUS / "web"), env=env)
         assert r.returncode == 0, f"node failed: {r.stderr}"
         return json.loads(out.read_text(encoding="utf-8"))

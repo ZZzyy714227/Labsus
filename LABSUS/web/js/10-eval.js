@@ -229,7 +229,318 @@ function openSuspensionEvaluation(){
 
   drawRadarChart(data.dimScores);
   modal.classList.add("show");
+  /* M9（T1-3）：导出按钮在每次打开报告时重绑，避免与关闭按钮的 handler 顺序耦合 */
+  const eb = document.getElementById("evalExportBtn");
+  if(eb) eb.onclick = exportDesignReport;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   M9（2026-09-20）· T1-3 一键设计报告导出（EXPORT DESIGN REPORT）
+   ───────────────────────────────────────────────────────────────────────────
+   比赛设计报告是刚需，而此前只能靠截图拼。这里把**当前状态**直接序列化成
+   一份自包含、可打印的 HTML：
+     车辆参数 · 综合评分与六维雷达 · 关键 KPI · 四视图快照 · 特性曲线 ·
+     操稳读数 · 敏感度扫描结果（若有）· 基准差异（若有）· 求解器状态与免责说明
+   设计约束：
+   1. **零依赖**：不引 jsPDF / 不联网，纯字符串 + canvas.toDataURL（与项目
+      "零构建、离线可用"一致）。打印用浏览器自带（Ctrl+P → 另存 PDF）。
+   2. **数据同源**：KPI 全部走 calculateEvaluationData()（与屏幕上的评价报告
+      同一个函数），敏感度走 SIM.sensRes（扫描引擎写的那份），视图与曲线直接
+      取画布像素——不另算一套，报告与屏幕不可能对不上。
+   3. **诚实标注**：报告末尾显式写清模型边界（准静态线性区、载荷敏感性参考、
+      未含项），避免拿去做超出模型的结论——本项目的红线。
+   ═══════════════════════════════════════════════════════════════════════════ */
+function exportDesignReport(){
+  let data = null;
+  try{ data = (typeof calculateEvaluationData === "function") ? calculateEvaluationData() : null; }catch(e){ data = null; }
+  const esc = s => String(s == null ? "" : s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const num = (v, d) => (typeof v === "number" && isFinite(v)) ? v.toFixed(d === undefined ? 2 : d) : "—";
+
+  /* 车辆与参数 */
+  const preset = (typeof VEHICLE_PRESETS !== "undefined" && VEHICLE_PRESETS[S.vehicleType]) || {};
+  const vehName = preset.name || S.vehicleType;
+  const tireF = (S.front && S.front.tire) || {}, tireR = (S.rear && S.rear.tire) || {};
+  const tq = (typeof TIRE_MF_QS !== "undefined") ? TIRE_MF_QS : {};
+  const fzRef = Math.max(1, (S.mTotal || 0) * 9.81 / 4);
+
+  const vehRows = [
+    ["车型平台", vehName],
+    ["轴距 wb", num(S.wb, 0) + " mm"],
+    ["整车总质量", num(S.mTotal, 0) + " kg"],
+    ["簧载总质量", num(S.mSprung, 0) + " kg"],
+    ["质心高 hcg / 簧载质心高 hs", num(S.hcg, 0) + " / " + num(S.hs, 0) + " mm"],
+    ["前后角簧上质量", num(S.front.mS, 1) + " / " + num(S.rear.mS, 1) + " kg"],
+    ["前后非簧载(单侧)", num(S.front.mU, 1) + " / " + num(S.rear.mU, 1) + " kg"],
+    ["前后主弹簧刚度", num(S.front.kS, 0) + " / " + num(S.rear.kS, 0) + " N/mm"],
+    ["前后轮胎垂向刚度", num(S.front.kT, 0) + " / " + num(S.rear.kT, 0) + " N/mm"],
+    ["前后 ARB 直径", num(S.front.arb && S.front.arb.d, 1) + " / " + num(S.rear.arb && S.rear.arb.d, 1) + " mm"],
+    ["前后轮胎宽度", num(tireF.W, 0) + " / " + num(tireR.W, 0) + " mm"],
+    ["轮胎 MF", "Fy0=" + num(tq.Fy0, 0) + " N · FzNom=" + num(tq.FzNom, 0) + " N · By=" + num(tq.By, 1)
+              + " · Cy=" + num(tq.Cy, 2) + " · LS=" + num(tq.LS, 3) + " · FzRef=" + num(fzRef, 0) + " N"],
+    ["准静态工况", "gy=" + num(S.qs && S.qs.gy, 2) + "g · gx=" + num(S.qs && S.qs.gx, 2)
+                 + "g · 气动下压 " + num(S.qs && S.qs.aeroF, 0) + " N"],
+  ];
+
+  /* KPI 表。两个真源，都不得另算：
+     · 四轮定位角（camber/toe/KPI/caster）——右坞站读数的同一个 metrics 对象
+       （`SIM.mFR/mRR`）；注意 calculateEvaluationData 的 `metrics` 里**没有**这四个键，
+       它们是整车定位量而非评价维度量。
+     · 其余评价类量 —— calculateEvaluationData().metrics[key].formatted
+       （值为 `{val, formatted}` 结构；直接 num() 会全渲染成 "—"）。 */
+  const mM = ((S.axis === "front" ? SIM.mFR : SIM.mRR) || {});
+  const kpi = (data && data.metrics) || {};
+  const kv = k => { const o = kpi[k];
+    if(o == null) return "—";
+    if(typeof o === "number") return num(o, 2);
+    if(o.formatted != null && o.formatted !== "") return String(o.formatted);
+    return (typeof o.val === "number" && isFinite(o.val)) ? num(o.val, 2) : "—";
+  };
+  const kpiRows = [
+    ["车轮外倾角 CAMBER", num(mM.cam, 2) + " °"],
+    ["车轮前束角 TOE", num(mM.toe, 3) + " °"],
+    ["主销内倾角 KPI / SAI", num(mM.kpi, 2) + " °"],
+    ["主销后倾角 CASTER", num(mM.cast, 2) + " °"],
+    ["主销接地偏移距 SCRUB", kv("scrubRadiusF") + " mm"],
+    ["主销后倾拖距 TRAIL", kv("casterTrailF") + " mm"],
+    ["外倾角增益 CAMBER GAIN", kv("camberGainF") + " °/25mm"],
+    ["跳动转向 BUMP STEER", kv("bumpSteerF") + " °/25mm"],
+    ["侧倾中心高 ROLL CTR H", kv("rcHeightF") + " mm"],
+    ["抗俯仰率 ANTI-DIVE", kv("antiDiveF") + " %"],
+    ["瞬态运动速比 MOTION RATIO", kv("motionRatioF")],
+    ["轮端等效刚度 WHEEL RATE", kv("wheelRateF") + " N/mm"],
+    ["簧载固有频率 RIDE FREQ", kv("rideFreqF") + " Hz"],
+    ["阻尼比 DAMPING RATIO", kv("dampingRatioF")],
+    ["前轴侧倾刚度占比", kv("rollStiffnessPct") + " %"],
+    ["阿克曼率 ACKERMANN", kv("ackermannPct") + " %"],
+    ["不足转向梯度 US GRADIENT", kv("usGradient") + " °/g"],
+  ];
+  const qs = SIM.qsRes || {};
+  const qsRows = [
+    ["稳态侧倾角", num(qs.rollDeg, 2) + " °"], ["整车侧倾梯度", num(qs.rollGrad, 2) + " °/g"],
+    ["前/后轴侧倾刚度", num(qs.kphi_f, 0) + " / " + num(qs.kphi_r, 0) + " N·m/°"],
+    ["前/后侧偏角", num(qs.alphaF, 2) + " / " + num(qs.alphaR, 2) + " °"],
+    ["TLLTD（前轴载荷转移占比）", num(qs.tlltd, 1) + " %"],
+    ["四轮接触载荷 FL/FR/RL/RR", qs.fz ? [qs.fz.FL, qs.fz.FR, qs.fz.RL, qs.fz.RR].map(v=>num(v,0)).join(" / ") + " N" : "—"],
+    ["Jacking 抬升", num(qs.jackingMm, 2) + " mm"],
+  ];
+
+  /* 画布 → 图片。
+     ⚠ 捕获前必须**强制重绘一次**：打开评价模态会改变布局 → ResizeObserver 触发
+     sizeView → 画布被 resize 清空，而下一帧 rAF 还没跑（同步代码里）⇒ 直接
+     toDataURL 会拍到空白帧（上一版实测：视图快照是白框、曲线图正常）。 */
+  try{ if(typeof drawAll === "function") drawAll(); }catch(e){}
+  const imgs = [];
+  const pushCanvas = (cv, label) => {
+    if(!cv || !cv.width || cv.width < 40) return;
+    let url = null;
+    try{
+      /* 降采样到 ≤900px 宽：视图画布是全分辨率（1238×794 @dpr2 = 493KB/张），
+         直接把 dataURL 塞进报告会让单份报告涨到 750KB+；打印 900px 足够，
+         并铺白底（打印不依赖透明）。曲线小图不动。 */
+      const MAXW = 900;
+      if(cv.width > MAXW){
+        const k = MAXW / cv.width;
+        const oc = document.createElement("canvas");
+        oc.width = MAXW; oc.height = Math.max(1, Math.round(cv.height * k));
+        const octx = oc.getContext("2d");
+        octx.fillStyle = "#ffffff"; octx.fillRect(0, 0, oc.width, oc.height);
+        octx.drawImage(cv, 0, 0, oc.width, oc.height);
+        url = oc.toDataURL("image/png");
+      } else {
+        url = cv.toDataURL("image/png");
+      }
+    }catch(e){ return; }
+    imgs.push({ label, url });
+  };
+  if(typeof VW !== "undefined") VW.forEach(v => { if(v && v.w > 60) pushCanvas(v.cv, (v.zh||"") + " " + (v.en||"")); });
+  if(typeof UI !== "undefined" && UI.plots) UI.plots.forEach((cv,i)=> pushCanvas(cv, "特性曲线 " + (i+1)));
+  pushCanvas(document.getElementById("usCurvePlot"), "不足转向特性 δ-ay");
+  pushCanvas(document.getElementById("evalRadarCanvas"), "六维评分雷达");
+
+  /* 敏感度扫描（T1-1 结果） */
+  const sr = SIM.sensRes;
+  let sensHtml = "<p class='mut'>本次会话尚未运行敏感度扫描（左侧「分析 → 灵敏度扫描」）。</p>";
+  if(sr && sr.rows){
+    const rows = sr.rows.slice().sort((a,b)=> Math.abs(b.S) - Math.abs(a.S));
+    sensHtml = "<p class='mut'>参数：<b>" + esc(sr.paramLabel) + "</b> ±" + num(sr.delta,1) + (sr.paramUnit||"")
+      + " · " + sr.n + " 点 · 共 " + rows.length + " 个目标 · 参数已还原为 " + num(sr.base,2) + (sr.paramUnit||"")
+      + "</p><table><thead><tr><th>目标</th><th>单位</th><th>基准</th><th>−Δ</th><th>+Δ</th><th>斜率 / 单位</th><th>敏感度</th></tr></thead><tbody>";
+    rows.forEach(r=>{
+      const bad = !isFinite(r.S);
+      sensHtml += "<tr><td>" + esc(r.label) + "</td><td>" + esc(r.unit) + "</td><td>" + num(r.v0,2) + "</td><td>"
+        + num(r.vLo,2) + "</td><td>" + num(r.vHi,2) + "</td><td>" + num(r.slope,4) + "</td><td class='"
+        + (bad ? "" : (Math.abs(r.S) >= 5 ? "hot" : "")) + "'>" + (bad ? "—" : ((r.S>=0?"+":"")+r.S.toFixed(1)+"%")) + "</td></tr>";
+    });
+    sensHtml += "</tbody></table>";
+  }
+
+  /* 双参数交互（E12 结果）：网格表 + 交互强度判定。
+     阈值判定走 sens2Verdict() 单一真源，避免面板与报告各写一套阈值后漂移。 */
+  const s2 = SIM.sens2Res;
+  let inter2Html = "<p class='mut'>本次会话尚未运行双参数交互扫描（左侧「分析 → 双参数交互扫描」）。</p>";
+  if(s2 && s2.M && s2.M.length){
+    const verdict = (typeof sens2Verdict === "function") ? sens2Verdict(s2.rel) : "";
+    inter2Html = "<p class='mut'>X：<b>" + esc(s2.xLabel) + "</b> ±" + num(s2.dx,1) + esc(s2.xUnit)
+      + " · Y：<b>" + esc(s2.yLabel) + "</b> ±" + num(s2.dy,1) + esc(s2.yUnit)
+      + " · " + s2.n + "×" + s2.n + " 网格 · 目标：" + esc(s2.objLabel) + " [" + esc(s2.objUnit) + "]</p>"
+      + "<table><thead><tr><th>Y ↓ / X →</th>"
+      + s2.xs.map(v=>"<th>" + num(v,1) + "</th>").join("") + "</tr></thead><tbody>";
+    for(let j = s2.n-1; j >= 0; j--){
+      inter2Html += "<tr><th>" + num(s2.ys[j],1) + "</th>"
+        + s2.M[j].map(v=>"<td>" + (isFinite(v) ? num(v,3) : "—") + "</td>").join("") + "</tr>";
+    }
+    inter2Html += "</tbody></table>"
+      + "<p>主效应 X " + (s2.mainX>=0?"+":"") + num(s2.mainX,4) + " · Y " + (s2.mainY>=0?"+":"") + num(s2.mainY,4)
+      + " · 交互项 " + (s2.inter>=0?"+":"") + num(s2.inter,4)
+      + "（相对强度 <b>" + (s2.rel*100).toFixed(0) + "%</b>）⇒ " + esc(verdict) + "</p>";
+  }
+
+  /* 多方案对比（E11 结果）：直接复用方案库的对比行，不另算 */
+  let setupCmpHtml = "<p class='mut'>未勾选方案（左侧「分析 → 方案库与对比」勾选 2~3 条即可）。</p>";
+  try{
+    if(typeof setupCompareRows === "function"){
+      const cmp = setupCompareRows();
+      if(cmp.sel.length >= 2){
+        setupCmpHtml = "<p class='mut'>"
+          + cmp.sel.map((r,i)=> (i===0?"基准：":"") + "<b>" + esc(r.name) + "</b>").join(" · ")
+          + "（Δ 相对基准列）</p><table><thead><tr><th>KPI</th><th>单位</th>"
+          + cmp.sel.map(r=>"<th>" + esc(r.name) + "</th>").join("") + "</tr></thead><tbody>";
+        cmp.rows.forEach(x=>{
+          const v0 = x.vals[0];
+          setupCmpHtml += "<tr><td>" + esc(x.label) + "</td><td>" + esc(x.unit) + "</td>";
+          x.vals.forEach((v,i)=>{
+            if(v == null){ setupCmpHtml += "<td>—</td>"; return; }
+            let cell = num(v,2);
+            if(i > 0 && v0 != null){
+              const dv = v - v0;
+              cell += " <span class='mut'>(" + (dv>=0?"+":"") + num(dv,2) + ")</span>";
+            }
+            setupCmpHtml += "<td>" + cell + "</td>";
+          });
+          setupCmpHtml += "</tr>";
+        });
+        setupCmpHtml += "</tbody></table>";
+      }
+    }
+  }catch(e){ /* 方案库不可用时保持占位文案，绝不让报告导出失败 */ }
+
+  /* 基准差异（若已锁定基准线） */
+  let baseHtml = "";
+  if(S.hasBaseline){
+    const items = [["外倾增益 CG","cg","°/25mm"],["跳动转向 BS","bs","°/25mm"],["运动速比 MR","mr","-"],
+                   ["侧倾中心 RC","rcH","mm"],["轮端刚度 WR","kw","N/mm"]];
+    baseHtml = "<h2>基准线差异（Baseline Delta）</h2><table><thead><tr><th>项目</th><th>当前 ACTIVE</th><th>基准 BASE</th><th>差异 DELTA</th></tr></thead><tbody>";
+    items.forEach(([lb,k,u])=>{
+      const g = id => { const e = document.getElementById(id); return e ? e.textContent : "—"; };
+      baseHtml += "<tr><td>" + lb + " <span class='mut'>" + u + "</span></td><td>" + esc(g("df_a_"+k))
+        + "</td><td>" + esc(g("df_b_"+k)) + "</td><td class='hot'>" + esc(g("df_d_"+k)) + "</td></tr>";
+    });
+    baseHtml += "</tbody></table>";
+  }
+
+  /* 评分与建议 */
+  let scoreHtml = "<p class='mut'>评价数据不可用（缺几何或扫掠结果）。</p>";
+  if(data && data.dimScores){
+    scoreHtml = "<table><thead><tr><th>维度</th><th>得分</th></tr></thead><tbody>";
+    for(const k in data.dimScores) scoreHtml += "<tr><td>" + esc(k) + "</td><td>" + Math.round(data.dimScores[k]) + " / 100</td></tr>";
+    scoreHtml += "<tr class='tot'><td>综合评分</td><td>" + (data.overall != null ? data.overall : "—") + " / 100</td></tr></tbody></table>";
+  }
+
+  const engineTxt = (typeof ENG !== "undefined" && ENG.ok)
+    ? ("已连接引擎 " + esc(ENG.url)) : "内置 JS 求解器（离线）";
+  const stamp = new Date().toLocaleString("zh-CN");
+  /* 残差取真源：状态栏同源求解残差（07-plots 写 sbRes），缺省回退到当前轴 metrics */
+  const resEl = document.getElementById("sbRes");
+  const residual = (resEl && resEl.textContent && resEl.textContent !== "—")
+    ? resEl.textContent
+    : ((SIM.mFR && typeof SIM.mFR.res === "number") ? num(SIM.mFR.res, 5) : "—");
+
+  const rowsTbl = (rows) => "<table><tbody>" + rows.map(r =>
+    "<tr><th>" + esc(r[0]) + "</th><td>" + esc(r[1]) + "</td></tr>").join("") + "</tbody></table>";
+
+  const html = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>LABSUS 设计报告 · ${esc(S.vehicleType)} · ${esc(stamp)}</title>
+<style>
+  :root{color-scheme:light}
+  body{font:13px/1.6 -apple-system,"Segoe UI",system-ui,"Microsoft YaHei",sans-serif;color:#1a1f28;background:#fff;margin:0;padding:28px 34px;max-width:1000px}
+  h1{font-size:20px;margin:0 0 2px} h2{font-size:14px;margin:22px 0 6px;padding-bottom:3px;border-bottom:1px solid #d8dee8}
+  .meta{color:#5b6675;font-size:12px;margin-bottom:14px}
+  table{border-collapse:collapse;width:100%;margin:4px 0 10px;font-size:12px}
+  th,td{border:1px solid #e2e8f0;padding:4px 8px;text-align:left;vertical-align:top}
+  thead th{background:#f4f7fb;font-weight:600}
+  tbody th{background:#fafcfe;font-weight:500;width:32%;white-space:nowrap}
+  td.hot{color:#c2410c;font-weight:600} tr.tot td{font-weight:700;background:#f4f7fb}
+  .mut{color:#64748b;font-size:11.5px}
+  .grid{display:flex;flex-wrap:wrap;gap:10px}
+  .grid figure{margin:0;border:1px solid #e2e8f0;border-radius:6px;padding:6px;background:#fbfdff}
+  .grid img{display:block;max-width:460px;height:auto}
+  figcaption{font-size:11px;color:#5b6675;margin-top:4px}
+  .note{margin-top:22px;padding:10px 12px;border-left:3px solid #94a3b8;background:#f8fafc;font-size:11.5px;color:#475569}
+  @media print{body{padding:0;max-width:none} h2{page-break-after:avoid} figure,table{page-break-inside:avoid}}
+</style></head><body>
+<h1>LABSUS 悬架设计报告</h1>
+<div class="meta">车型：<b>${esc(vehName)}</b> · 生成时间：${esc(stamp)} · 求解器：${engineTxt} · 最大约束残差：${esc(residual)} mm</div>
+
+<h2>一、车辆与调校参数</h2>
+${rowsTbl(vehRows)}
+
+<h2>二、综合评分</h2>
+${scoreHtml}
+
+<h2>三、关键设计 KPI</h2>
+${rowsTbl(kpiRows)}
+
+<h2>四、准静态操稳</h2>
+${rowsTbl(qsRows)}
+
+<h2>五、视图快照与特性曲线</h2>
+<div class="grid">${imgs.map(x => `<figure><img src="${x.url}" alt="${esc(x.label)}"><figcaption>${esc(x.label)}</figcaption></figure>`).join("") || "<p class='mut'>无可用画布。</p>"}</div>
+
+<h2>六、敏感度扫描</h2>
+${sensHtml}
+
+<h2>七、双参数交互扫描</h2>
+${inter2Html}
+
+<h2>八、多方案对比</h2>
+${setupCmpHtml}
+${baseHtml}
+
+<div class="note">
+<b>模型边界与免责说明</b>（避免超出模型的结论）：<br>
+① 稳态操稳量为<b>线性区准静态解</b>：侧偏角 α 由轴侧偏刚度线性换算，未含轮胎非线性饱和、瞬态松弛与热效应；<br>
+② 载荷敏感性按 <b>μ 每翻倍降 LS</b> 建模，参考载荷取整车静轮载均值 mT·g/4；<br>
+③ 未含项：衬套旋转柔度（δ_rot≡0）、camber→grip 耦合、路面谱激励、气动地面效应细化；<br>
+④ 敏感度扫描为<b>单参数局部扫描</b>（其余参数冻结），未含参数交互；跨参数结论需多变量验证；<br>
+⑤ 双内核（Python 引擎 / 前端 JS）通过 <code>tphys_parity</code> 对拍，最差相对差约 0.5%。
+</div>
+</body></html>`;
+
+  /* 打开新窗口；被拦截则退回 Blob 下载 */
+  let w = null;
+  try{ w = window.open("", "_blank"); }catch(e){ w = null; }
+  if(w && w.document){
+    w.document.open(); w.document.write(html); w.document.close();
+    try{ w.focus(); }catch(e){}
+  } else {
+    try{
+      const blob = new Blob([html], {type:"text/html;charset=utf-8"});
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "LABSUS_设计报告_" + S.vehicleType + "_" + new Date().toISOString().slice(0,10) + ".html";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    }catch(e){
+      const st = document.getElementById("evalOverallScore");
+      if(st) st.textContent = "导出失败：" + e.message;
+    }
+  }
+  /* 返回完整 HTML 串（便于自动化取证：把返回值写进隐藏节点再 --dump-dom 读回来），
+     而不是长度——旧实现 return html.length，导致"看起来成功、实际拿到的是个数字"。 */
+  return html;
+}
+window.exportDesignReport = exportDesignReport;
 
 function drawRadarChart(scores){
   const cv = document.getElementById("evalRadarCanvas");

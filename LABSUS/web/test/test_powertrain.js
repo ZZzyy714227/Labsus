@@ -1970,6 +1970,197 @@ T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
   T("POWERTRAIN.close(); POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
 }
 
+/* ═══ 12. T3：Formula SAE 预设挂限滑 LSD（TBR 1.6 / 预载 25 N·m）
+   —— 标定值锁 + 三处「未标定」标注守卫 + 赛道后果 A/B（整轴牵引力上限 / 横摆方向）═══ */
+console.log("=== 12. T3 FSAE LSD：标定值 / 未标定标注 / 整轴牵引力与横摆 A/B ===");
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+
+// ── 12.1 标定值锁：FSAE 预设 diff = lsd/bias1.6/lockNm25/slipRef8，且不波及其他预设 ──
+{
+  const fd12 = T("JSON.parse(JSON.stringify(POWERTRAIN_PRESETS['FSAE I4 RWD 5MT'].diff))");
+  assert(fd12.type === "lsd", `12.1 FSAE 预设 diff.type = "lsd"（实得 ${fd12.type}）`);
+  assert(fd12.bias === 1.6, `12.1 TBR bias = 1.6（文献区间 1.4~2.0 内；实得 ${fd12.bias}）`);
+  assert(fd12.lockNm === 25, `12.1 breakaway lockNm = 25 N·m（文献区间 20~50 内；实得 ${fd12.lockNm}）`);
+  assert(fd12.slipRefRadS === 8, `12.1 slipRefRadS = 8 rad/s（实得 ${fd12.slipRefRadS}）`);
+  assert(T("POWERTRAIN.validate(JSON.parse(JSON.stringify(POWERTRAIN_PRESETS['FSAE I4 RWD 5MT']))).ok") === true,
+    "12.1 挂 LSD 后 FSAE 预设仍通过 validate");
+  /* 波及面守卫：只动 FSAE，其余预设与 legacy 锚逐位不变 */
+  assert(T("POWERTRAIN_PRESETS['GT3 V8 RWD 6MT'].diff.bias") === 2.5 &&
+         T("POWERTRAIN_PRESETS['GT3 V8 RWD 6MT'].diff.lockNm") === 120,
+    "12.1 GT3 预设 LSD 参数未被波及（2.5/120）");
+  assert(T("POWERTRAIN_PRESETS['串联增程后驱'].diff.bias") === 2.0 &&
+         T("POWERTRAIN_PRESETS['串联增程后驱'].diff.lockNm") === 60,
+    "12.1 串联增程后驱预设 LSD 参数未被波及（2.0/60）");
+  assert(T("POWERTRAIN_PRESETS['EV 双电机 AWD-TV'].diff.type") === "open" &&
+         T("POWERTRAIN_PRESETS['THS 功率分流'].diff.type") === "open" &&
+         T("POWERTRAIN_PRESETS['P3 混动前驱'].diff.type") === "open",
+    "12.1 EV-TV / THS / P3 仍为 open（TV 逐轮分配、功率分流不靠机械 LSD）");
+  /* 默认规格是【全车型】圈速基线守门员：必须仍是 open，否则 09-track 的 legacy 门控会翻转 */
+  assert(T("POWERTRAIN.defaultSpec().diff.type") === "open" && T("POWERTRAIN.isLegacyEquivalent()") === true,
+    "12.1 defaultSpec().diff 仍为 open → isLegacyEquivalent()===true（未污染 GT3/Baja 基线）");
+}
+
+// ── 12.2 三处「未标定」标注守卫：② 预设字段注释 + ① 面板 UI 渲染（③ 说明给 Lead 写进 DEVLOG）──
+{
+  const pSrc12 = fs.readFileSync(path.join(__dirname, "..", "js", "16-powertrain.js"), "utf8");
+  const nMark12 = (pSrc12.match(/未标定/g) || []).length;
+  assert(nMark12 >= 2, `12.2 ② 源码含 ≥2 处「未标定」标注（实得 ${nMark12} 处）`);
+  assert(/TBR 1\.6 落在文献区间 1\.4~2\.0/.test(pSrc12),
+    "12.2 ② 字段注释写明「TBR 1.6 落在文献区间 1.4~2.0」");
+  assert(/20~50 N·m/.test(pSrc12) && /文献量级/.test(pSrc12),
+    "12.2 ② 字段注释写明 breakaway 20~50 N·m 区间 +「文献量级而非实件测量」");
+  assert(/回填/.test(pSrc12), "12.2 ② 字段注释给出回填口径（台架/实车标定后回填哪三个字段）");
+  /* ① 面板 UI：真渲染右栏，断言 innerHTML 真带「未标定」+ tooltip 区间（防文案静默丢失） */
+  T("POWERTRAIN._draft = JSON.parse(JSON.stringify(POWERTRAIN_PRESETS['FSAE I4 RWD 5MT'])); POWERTRAIN.renderForm();");
+  const right12 = T("POWERTRAIN._el('ptRight').innerHTML");
+  assert(typeof right12 === "string" && right12.length > 100,
+    "12.2 ① 前置：右栏渲染出非空 HTML（renderForm 真的写了 ptRight）");
+  assert(right12.indexOf("未标定") >= 0, "12.2 ① 面板 UI：差速器栏渲染出「⚠ 未标定」提示");
+  assert(right12.indexOf("1.4~2.0") >= 0 && right12.indexOf("20~50") >= 0,
+    "12.2 ① UI tooltip 带文献区间（TBR 1.4~2.0 / 预载 20~50 N·m）");
+  assert(/title="[^"]*未标定|未标定[\s\S]{0,400}title="/.test(right12) || right12.indexOf("cursor:help") >= 0,
+    "12.2 ① UI 提示带 title 悬停说明（回填口径）");
+}
+
+// ── 12.3 赛道后果 A/B · 整轴驱动力上限：开放式受「弱侧轮」限制 vs 限滑可用外轮余量 ──
+/* 工况：FSAE 后轴 2 挡 WOT，右弯 v=15 m/s R=20m（ay=1.5g，mu=1.5）。
+   量纲全部取自真源（02-presets.js 几何/质量 + 16-powertrain.js 齿比/轮胎），不手填。
+   物理：开放式两半轴【等扭矩】→ 内（弱侧）轮先打滑则外轮也被同一扭矩锁住
+        → 整轴上限 = 2×μ·Fz_弱侧；
+        限滑把【2×lockNm】扭矩差压到外轮（内轮空转时 Δω 反号，转移指向外轮）
+        → 整轴上限 = 2×μ·Fz_弱侧 + 2×lockNm/Re。 */
+const LSD12 = { type: "lsd", bias: 1.6, lockNm: 25, slipRefRadS: 8 };
+const OPEN12 = { type: "open", bias: 1.0, lockNm: 0, slipRefRadS: 8 };
+const V12 = T("JSON.parse(JSON.stringify(VEHICLE_PRESETS.formula))");
+const Re12 = V12.rear.tire.R / 1000;                        // 后胎半径 m
+const TRK12 = 2 * V12.rear.hp.WC[0] / 1000;                 // 后轮距 m
+const FZ12 = (V12.rear.mS + 2 * V12.rear.mU) * 9.81 / 2;    // 后轴单轮静载 N（mS 整轴 / mU 单侧）
+const MU12 = 1.5, AY12 = 1.5;
+const DFZ12 = V12.mTotal * AY12 * 9.81 * (V12.hcg / 1000) / TRK12 / 2;   // 侧向载荷转移 N
+const GRIP_IN12 = MU12 * (FZ12 - DFZ12), GRIP_OUT12 = MU12 * (FZ12 + DFZ12);
+const T_GRIP_IN12 = GRIP_IN12 * Re12;                       // 弱侧轮可吸收扭矩 N·m
+{
+  assert(Math.abs(FZ12 - 586) < 3, `12.3 前置 后轴单轮静载 ${FZ12.toFixed(0)} N（235kg 车重口径）`);
+  assert(GRIP_IN12 < GRIP_OUT12 * 0.25,
+    `12.3 前置 1.5g 侧倾使内轮只余 ${GRIP_IN12.toFixed(0)} N 抓地（外轮 ${GRIP_OUT12.toFixed(0)} N）`);
+
+  /* 开放式：等扭矩 → 双侧同受弱侧限制 */
+  const pOpen12 = T(`POWERTRAIN.distributeAxle(${2 * T_GRIP_IN12}, ${15 / Re12}, ${15 / Re12 + 10}, ` +
+    `${FZ12 - DFZ12}, ${FZ12 + DFZ12}, ${JSON.stringify(OPEN12)})`);
+  assert(Math.abs(pOpen12[0] - pOpen12[1]) < 1e-12,
+    "12.3 开放式：两半轴等扭矩（左=右），外轮无法使用自身余量");
+  const F_OPEN12 = 2 * GRIP_IN12;
+
+  /* 限滑：真 distributeAxle 给出转移量（wL=外轮(慢)、wR=内轮(快) → Δω>0 → 转移给外轮） */
+  const pLsd12 = T(`POWERTRAIN.distributeAxle(${2 * T_GRIP_IN12}, ${15 / Re12}, ${15 / Re12 + 10}, ` +
+    `${FZ12 - DFZ12}, ${FZ12 + DFZ12}, ${JSON.stringify(LSD12)})`);
+  const tTrans12 = Math.abs(pLsd12[0] - pLsd12[1]) / 2;
+  assert(Math.abs(tTrans12 - 25) < 1e-9,
+    `12.3 限滑转移量 = ${tTrans12.toFixed(3)} N·m（lockNm 上限；模型口径=单侧转移量）`);
+  const tOut12 = T_GRIP_IN12 + 2 * tTrans12, tIn12 = T_GRIP_IN12;
+  const F_OUT12 = Math.min(tOut12 / Re12, GRIP_OUT12), F_IN12 = Math.min(tIn12 / Re12, GRIP_IN12);
+  const F_LSD12 = F_IN12 + F_OUT12;
+  assert(Math.abs(F_OUT12 - GRIP_OUT12) > 1,
+    `12.3 限滑：外轮 ${F_OUT12.toFixed(0)} N 仍低于自身抓地上限 ${GRIP_OUT12.toFixed(0)} N（未溢出）`);
+  const gain12 = F_LSD12 / F_OPEN12 - 1;
+  assert(Math.abs(F_OPEN12 - 551) < 4, `12.3 整轴上限 开放式 = 2×弱侧 = ${F_OPEN12.toFixed(0)} N`);
+  assert(Math.abs(F_LSD12 - 764) < 6, `12.3 整轴上限 限滑 = 弱侧 + 外轮(弱侧+2×lockNm/Re) = ${F_LSD12.toFixed(0)} N`);
+  assert(gain12 > 0.35 && gain12 < 0.42,
+    `12.3 整轴驱动力上限提升 ${(gain12 * 100).toFixed(1)}%（${F_OPEN12.toFixed(0)} → ${F_LSD12.toFixed(0)} N，` +
+    `增量 ${(F_LSD12 - F_OPEN12).toFixed(0)} N 全部来自外轮）`);
+
+  /* WOT 需求 vs 上限：真 step() 稳态（150 步让油门一阶惯性 thrSm→1）*/
+  const steady12 = (diff, wIn, wOuter) => {
+    const sp12 = JSON.parse(JSON.stringify(T("POWERTRAIN_PRESETS['FSAE I4 RWD 5MT']")));
+    sp12.diff = diff;
+    T(`POWERTRAIN.setSpec(${JSON.stringify(sp12)}); POWERTRAIN.resetState(); POWERTRAIN.state.gearIdx = 1;`);
+    const wo12 = { FL: wOuter, FR: wOuter, RL: wOuter, RR: wIn };
+    let o12 = null;
+    for (let i = 0; i < 150; i++) o12 = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0}, ${JSON.stringify(wo12)})`);
+    return o12;
+  };
+  const spin12 = 10, wOut12 = 15 / Re12;
+  /* open 时 tWheel === null（模型只在左右非对称时产出 tWheel，legacy 锚语义）→ 回退 tRear */
+  const tLR12 = o => (o.tWheel ? [o.tWheel[2], o.tWheel[3]] : [o.tRear, o.tRear]);
+  const oSpinOpen12 = steady12(OPEN12, wOut12 + spin12, wOut12);
+  const oSpinLsd12 = steady12(LSD12, wOut12 + spin12, wOut12);
+  const [rlOpen12, rrOpen12] = tLR12(oSpinOpen12);
+  const [rlLsd12, rrLsd12] = tLR12(oSpinLsd12);
+  assert(oSpinOpen12.tWheel === null && Math.abs(rlOpen12 - rrOpen12) < 1e-12,
+    "12.3 开放式 rwd 后轴 tWheel === null（左右对称，走 tRear 老路径）");
+  assert(Array.isArray(oSpinLsd12.tWheel) && Math.abs(rlLsd12 - rrLsd12) > 1e-9,
+    "12.3 限滑 rwd 后轴 tWheel 非空且左右非对称（内轮空转 → 转移给外轮）");
+  assert(Math.abs((rlLsd12 + rrLsd12) - 2 * oSpinLsd12.tRear) < 1e-9,
+    "12.3 限滑分配守恒 tRL+tRR = 轴扭矩（不凭空生扭矩）");
+  const tAxWot12 = 2 * oSpinLsd12.tRear;
+  assert(tAxWot12 > 500,
+    `12.3 前置 WOT 轴扭矩 ${tAxWot12.toFixed(0)} N·m ≫ 上限 ${(2 * T_GRIP_IN12).toFixed(0)} N·m → 内轮必然空转`);
+  console.log(`      [A/B 实得] 整轴上限 open ${F_OPEN12.toFixed(0)} N → lsd ${F_LSD12.toFixed(0)} N` +
+    `（+${(gain12 * 100).toFixed(1)}%）| 外轮 ${(F_OPEN12 / 2).toFixed(0)} → ${F_OUT12.toFixed(0)} N` +
+    ` | WOT 轴扭矩 ${tAxWot12.toFixed(0)} N·m 中 open 落地 ${(2 * T_GRIP_IN12).toFixed(0)} N·m` +
+    `（${((1 - 2 * T_GRIP_IN12 / tAxWot12) * 100).toFixed(0)}% 变空转），lsd ${(2 * T_GRIP_IN12 + 50).toFixed(0)} N·m` +
+    `（${((1 - (2 * T_GRIP_IN12 + 50) / tAxWot12) * 100).toFixed(0)}% 空转）`);
+}
+
+// ── 12.4 赛道后果 A/B · 横摆方向：偏置力矩随 Δω 符号翻转（v3 口径 X=右 Y=前 Z=上 → Mz>0 = 左转）──
+/* Mz = (轮距/2)·(F_右 − F_左) = (轮距/2)·(tRR − tRL)/Re。右弯：内轮=右轮、外轮=左轮。 */
+{
+  const half12 = TRK12 / 2;
+  const steady12b = (diff, wIn, wOuter) => {
+    const sp12 = JSON.parse(JSON.stringify(T("POWERTRAIN_PRESETS['FSAE I4 RWD 5MT']")));
+    sp12.diff = diff;
+    T(`POWERTRAIN.setSpec(${JSON.stringify(sp12)}); POWERTRAIN.resetState(); POWERTRAIN.state.gearIdx = 1;`);
+    const wo12 = { FL: wOuter, FR: wOuter, RL: wOuter, RR: wIn };
+    let o12 = null;
+    for (let i = 0; i < 150; i++) o12 = T(`POWERTRAIN.step(0.004, {throttle:1, brake:0}, ${JSON.stringify(wo12)})`);
+    return o12;
+  };
+  const wOut12 = 15 / Re12, dW12 = (15 / 20) * TRK12 / Re12, spin12 = 10;
+  /* open 时 tWheel===null；限滑时 tWheel=[FL,FR,RL,RR]。Mz = (轮距/2)·(tRR − tRL)/Re */
+  const mz12 = o => half12 * ((o.tWheel ? o.tWheel[3] - o.tWheel[2] : 0)) / Re12;
+  const oOpen12 = steady12b(OPEN12, wOut12, wOut12);
+  const oMid12 = steady12b(LSD12, wOut12 - dW12 / 2, wOut12 + dW12 / 2);   // 内轮慢
+  const oSpin12 = steady12b(LSD12, wOut12 + spin12, wOut12);              // 内轮快（空转）
+  assert(Math.abs(mz12(oOpen12)) < 1e-9, "12.4 开放式 Mz ≡ 0（左右等扭矩，无驱动偏置横摆）");
+  assert(mz12(oMid12) > 50, `12.4 内轮慢：LSD 送扭矩给内轮 → Mz = ${mz12(oMid12).toFixed(0)} N·m > 0`);
+  assert(mz12(oSpin12) < -50, `12.4 内轮空转：LSD 压扭矩到外轮 → Mz = ${mz12(oSpin12).toFixed(0)} N·m < 0`);
+  assert(Math.abs(Math.abs(mz12(oMid12)) - Math.abs(mz12(oSpin12))) < 2,
+    "12.4 两方向幅值对称（同一 lockNm=25 → 扭矩差 2×25，|Mz|=123 N·m 量级）");
+  assert(Math.abs(Math.abs(mz12(oSpin12)) - 123) < 4,
+    `12.4 |Mz| = ${Math.abs(mz12(oSpin12)).toFixed(0)} N·m ≈ (轮距/2)·(2×lockNm)/Re = 123 N·m`);
+  /* 稳态判据：内轮抓地上限 ≪ WOT 需求 → 内轮必空转 → 车实际落在「转向增益」分支 */
+  assert(T_GRIP_IN12 / Re12 < oSpin12.tRear,
+    `12.4 内轮抓地上限 ${(T_GRIP_IN12 / Re12).toFixed(0)} N < WOT 单轮需求 ${oSpin12.tRear.toFixed(0)} N` +
+    ` → 空转必然发生 → 稳态 Mz 取「顺转向/甩尾」分支`);
+  console.log(`      [横摆实得] open Mz=${mz12(oOpen12).toFixed(0)} | lsd 内轮慢 Mz=${mz12(oMid12).toFixed(0)}` +
+    `（逆转向=稳定/推头） | lsd 内轮空转 Mz=${mz12(oSpin12).toFixed(0)} N·m（顺转向=转向增益/甩尾）`);
+}
+
+// ── 12.5 模型边界记录：lockNm=25 的 min() 上限使 bias 在 FSAE 扭矩水平下失效（防静默漂移）──
+/* Ttrans = min(lockNm, ((bias−1)/(bias+1))·|tAxle|/2 + ramp)。bias 项被 lockNm 截断的临界
+   |tAxle| = 2·lockNm·(bias+1)/(bias−1)；FSAE WOT 轴扭矩 500~700 N·m ≫ 该临界 → 名义 TBR
+   1.6 在整圈里几乎不起作用，lockNm=25 才是唯一有效参数。标定时必须按 breakaway 口径测。 */
+{
+  const crit12 = 2 * 25 * (1.6 + 1) / (1.6 - 1);
+  const trAt = (b, tAxle, dW) => {
+    const p = T(`POWERTRAIN.distributeAxle(${tAxle}, ${wOut12a()}, ${wOut12a() + dW}, 586, 586, ` +
+      `${JSON.stringify({ type: "lsd", bias: b, lockNm: 25, slipRefRadS: 8 })})`);
+    return Math.abs(p[0] - p[1]) / 2;
+  };
+  function wOut12a() { return 15 / Re12; }
+  assert(Math.abs(crit12 - 216.7) < 1,
+    `12.5 bias 项被 lockNm 截断的临界轴扭矩 = 2·25·2.6/0.6 = ${crit12.toFixed(1)} N·m`);
+  const hi12 = [1.4, 1.6, 2.0].map(b => trAt(b, 700, 10));
+  assert(hi12.every(v => Math.abs(v - 25) < 1e-9),
+    `12.5 |tAxle|=700 ≫ 临界 → bias 1.4/1.6/2.0 给出同一转移量 25 N·m（bias 失效，实得 ${hi12.map(v => v.toFixed(1)).join("/")}）`);
+  const loB14 = trAt(1.4, 100, 0), loB16 = trAt(1.6, 100, 0), loB20 = trAt(2.0, 100, 0);
+  assert(loB14 < loB16 && loB16 < loB20 && loB16 < 25,
+    `12.5 |tAxle|=100、Δω=0 → bias 项生效（1.4→${loB14.toFixed(2)} / 1.6→${loB16.toFixed(2)} / 2.0→${loB20.toFixed(2)} N·m）`);
+  console.log(`      [模型边界] bias 仅在 |tAxle| < ${crit12.toFixed(0)} N·m 时有效；` +
+    `FSAE WOT 轴扭矩远超 → lockNm=25 是唯一有效参数（标定须按 breakaway 口径实测）`);
+}
+T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
+
 console.log(`\n[cumulative] ${passed}/${total} passed`);
 
 process.exit(passed === total ? 0 : 1);

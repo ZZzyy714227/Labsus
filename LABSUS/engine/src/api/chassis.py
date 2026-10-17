@@ -350,23 +350,71 @@ def quasi_loads(vehicle: VehicleSpec, q: QuasiInputs,
     if tire is not None and abs(q.gy) >= 0.02:
         k_f = vehicle.front.tire_width_scale(vehicle.rear)
         k_r = vehicle.rear.tire_width_scale(vehicle.front)
+        # M8（2026-09-20）：把**整车静轮载均值 mT·g/4**作为载荷敏感性参考（单胎模型
+        # 只有一个工作点口径）。此前 LS 一律相对 FzNom=3500 计算，而 FSAE 轮载仅约
+        # 580 N ⇒ dμ/dFz 被稀释约 6 倍：实测 ARB 直径 0→30mm 时 kphi_f 470→3351
+        # N·m/°、TLLTD 45.5%→74.9%、侧倾梯度 0.456→0.119 °/g，US 梯度却只从
+        # 0.2104 动到 0.2262（+0.016 °/g）——载荷转移类杠杆形同虚设。改后同一处
+        # 杠杆约 +0.083 °/g。取均值（而非按轴）是为了与前端 03-mechanism.js 及
+        # 瞬态层 11-stages/transient 用**同一个数**，避免稳态/瞬态静默分叉。
+        # 注意 FzNom 仍用于 D 的量级（μ_nom=Fy0/FzNom 标定不变）。
+        fz_ref_v = max(1.0, mT * G / 4.0)
 
         def _ca_mf(fz_w: float, k: float = 1.0) -> float:
             """侧偏刚度 Cα（N/rad）——委托 tire_mf 的唯一实现（M5 单源化）。
 
             此前这里是该公式的第三份拷贝（另两份在 tire_mf 的
             evaluate_magic_formula_fy 与 MagicFormulaSub._d）。
+            M8：参考载荷取 `tire.FzRef`（请求显式给出时）否则整车静轮载均值。
             """
             return cornering_stiffness(fz_w, Fy0=tire.Fy0, By=tire.By,
                                        Cy=tire.Cy, FzNom=tire.FzNom,
-                                       LS=tire.LS, axle_scale=k)
+                                       LS=tire.LS, axle_scale=k,
+                                       FzRef=tire.FzRef if tire.FzRef else fz_ref_v)
         fy_f = mT * ay * (b / L)
         fy_r = mT * ay * (a / L)
         ca_f = _ca_mf(fz["FL"], k_f) + _ca_mf(fz["FR"], k_f)
         ca_r = _ca_mf(fz["RL"], k_r) + _ca_mf(fz["RR"], k_r)
+        # ── M11（2026-09-20）· P12 外倾→抓地耦合 ────────────────────────────
+        # 真车上 ARB 的另一条（常是主导的）平衡杠杆是"侧倾→外倾→抓地"，而旧模型
+        # 的 US 梯度只含 Cα(Fz)：ARB 只能靠载荷敏感性间接影响平衡。实测前 ARB
+        # 0→30mm 时 US 仅 +0.083 °/g（M8 修完参考载荷后），与真车"ARB 一动平衡
+        # 就变"的直觉仍不符。
+        #
+        # 建模（线性区标准处理）：侧倾使轮对车身产生行程差 dt = roll_rad·半轮距
+        # （上面已算出 dt_f/dt_r，原用于弹性载荷转移），经悬架外倾增益产生外倾变化，
+        # 而外倾在零侧偏角下就有侧向力（外倾推力）：
+        #     γ_w = camber_deg + (camber_gain°/25mm)/25 · dz_w
+        #     Fy_cam,w = Cg · (−radians(γ_w)) · Fz_w      （外倾推力，朝弯心为正）
+        # 于是轮到轴一级：α_axle = [Fy_axle − ΣFy_cam] / ΣCα
+        # 符号自检：外轮（受载侧）在压缩行程、增益为负 ⇒ γ 更负 ⇒ (−γ)>0 ⇒ 贡献正
+        # 侧向力（帮忙）；内轮反向 ⇒ 帮忙更少甚至帮倒忙。两侧之差正是"侧倾改变平衡"。
+        #
+        # 开关：两轴 `camber_gain_deg_per_25mm` 缺省 0 ⇒ 本项恒 0 ⇒ **历史行为逐位不变**
+        # （直接调 API 的调用方不受影响）；前端把自身扫掠得到的 cg 随 payload 下发。
+        # 只加推力项、不动 Cα：外倾对 Cα 是二阶小量，把两项都塞进来会让"这个数是
+        # 哪来的"变得不可审计。
+        cam_gain_f = vehicle.front.camber_gain_deg_per_25mm
+        cam_gain_r = vehicle.rear.camber_gain_deg_per_25mm
+        cam_f = cam_r = 0.0
+        if tire.Cg and (cam_gain_f or cam_gain_r):
+            def _camber_thrust(axle_camber, gain_per_25mm, dz_outer, fz_out, fz_in):
+                """外轮 dz=+dt、内轮 dz=−dt；返回该轴外倾推力之和（N，朝弯心为正）。"""
+                g_out = axle_camber + (gain_per_25mm / 25.0) * dz_outer
+                g_in = axle_camber - (gain_per_25mm / 25.0) * dz_outer
+                return (tire.Cg * (-math.radians(g_out)) * fz_out
+                        + tire.Cg * (-math.radians(g_in)) * fz_in)
+            # 受载侧：Gy>0 → FR；Gy<0 → FL。dt_f 的符号随 roll_rad（∝ay）自动跟随，
+            # 故只需按"外=+dt / 内=−dt"配对，无需再乘 sgnY（乘了会双重取反）。
+            if (q.gy or 0.0) >= 0:
+                cam_f = _camber_thrust(vehicle.front.camber_deg, cam_gain_f, dt_f, fz["FR"], fz["FL"])
+                cam_r = _camber_thrust(vehicle.rear.camber_deg, cam_gain_r, dt_r, fz["RR"], fz["RL"])
+            else:
+                cam_f = _camber_thrust(vehicle.front.camber_deg, cam_gain_f, dt_f, fz["FL"], fz["FR"])
+                cam_r = _camber_thrust(vehicle.rear.camber_deg, cam_gain_r, dt_r, fz["RL"], fz["RR"])
         if ca_f > 1e-6 and ca_r > 1e-6:
-            alpha_f = (fy_f / ca_f) * R2D
-            alpha_r = (fy_r / ca_r) * R2D
+            alpha_f = ((fy_f - cam_f) / ca_f) * R2D
+            alpha_r = ((fy_r - cam_r) / ca_r) * R2D
             us_grad = (alpha_f - alpha_r) / q.gy   # deg/g（gy 以 g 为单位）
     elif tire is not None and warnings is not None and abs(q.gy) < 0.02:
         warnings.append("|gy|<0.02g：不足转向梯度与前后侧偏角不计算（线性区除零保护）")

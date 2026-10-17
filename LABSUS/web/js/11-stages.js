@@ -288,6 +288,45 @@ class UniversalAutoPilot {
 /* M-2(G31-P6)：轮索引映射提为模块常量，避免每子步重复创建对象字面量 */
 const WHEEL_IDX = { FL: 0, FR: 1, RL: 2, RR: 3 };
 
+/* P26（M20，2026-10-17）· ISO 8608 路面等级的统一取值（三处舞台共用）。
+   复用台架面板既有的选择：`S.road === "iso"` + `S.roadCls`（"A"~"H"）。
+   S.road 缺省 "none" ⇒ 返回 null ⇒ 内核恒不加路面 ⇒ **逐位兼容**。
+   ⚠ 用 `typeof S !== 'undefined'` 探测：本文件会被沙箱单独求值（M15b 教训）。 */
+/* S15（M20，2026-10-17）· 车-墙碰撞（**冲量法**，纯函数便于单测）。
+   ───────────────────────────────────────────────────────────────────────────
+   旧实现：赛道出界只记**罚时 5 s + μ 降级**，`checkConeCollisions` 只是
+   "去过一次就记 id"的 OBB 计数 ⇒ **完全没有碰撞动力学**（撞墙不减速、不反弹、
+   不改变姿态，车会径直穿过缓冲区继续跑）。
+   新：超出物理边界时施加冲量（法向反弹 + 切向摩擦 + 擦墙横摆扰动）。
+   ⚠ **简化假设**：车体横向（st.v，车体 X 右）≈ 赛道法向。车头大致沿赛道方向时
+     成立；横摆很大的退化工况方向可能不准，但速度修正会持续减小 |ey| ⇒ 自动收敛。
+     精确解需要赛道切线/法向向量，属二期（真接触几何）。
+   ⚠ **恢复系数 e < 1 ⇒ 碰撞一定耗能**（这是 M 段最硬的验收锚：不增能）。
+   参数：`{restitution=0.2, friction=0.5, pushBack=0.6}`。 */
+function applyWallCollision(st, ey, EDGE, p) {
+  const pen = Math.abs(ey) - EDGE;
+  if (!(pen > 0)) return false;
+  const e = (p && typeof p.restitution === 'number') ? p.restitution : 0.2;
+  const muW = (p && typeof p.friction === 'number') ? p.friction : 0.5;
+  const push = (p && typeof p.pushBack === 'number') ? p.pushBack : 0.6;
+  const outward = ey > 0 ? 1 : -1;
+  const vLat = st.v || 0;
+  if ((vLat * outward) > 0) {
+    /* 仍在往外冲 ⇒ 法向反弹（e<1 耗能）+ 切向摩擦减速 + 擦墙横摆扰动 */
+    st.v = -e * vLat;
+    st.u = (st.u || 0) * Math.max(0.20, 1.0 - muW * 0.30);
+    st.r = (st.r || 0) - outward * 0.22 * Math.abs(vLat);
+  } else {
+    /* 已在往回走但仍嵌在墙里 ⇒ 给一个向内的最小速度，防止卡住 */
+    st.v = -outward * push;
+  }
+  return true;
+}
+
+function stageRoadIso() {
+  return (typeof S !== 'undefined' && S.road === 'iso') ? (S.roadCls || 'A') : null;
+}
+
 /* ────────────────────────────────────────────────────────────────────────────
    M5（2026-09-20）自由度口径校准 —— 名称与实现必须对得上
 
@@ -361,9 +400,46 @@ class VehicleDynamics15DOF {
     this.ReF = (this.tireF.R || 330) / 1000;
     this.ReR = (this.tireR.R || 330) / 1000;
     
-    this.I_pitch = this.m * (this.wb * 0.42) ** 2; 
-    this.I_roll = this.m * ((this.tF + this.tR) * 0.22) ** 2;
-    this.I_yaw = this.I_pitch + this.I_roll;
+    /* ── S1（M20，2026-10-17）· 惯量同源 ────────────────────────────────────
+       旧式 `I_yaw = I_pitch + I_roll` 是**平面薄板的垂直轴定理**，对三维车体不成立：
+         Izz      = Σm(x²+y²)
+         Ixx+Iyy  = Σm[(y²+z²)+(x²+z²)] = Izz + 2Σm·z²
+       即两者差 2Σm·z² > 0。实测（formula/FSAE，m=235、wb=1550）：
+         旧式 I_yaw = 162.94 kg·m²   vs   部件清单 Izz = 68.78 kg·m²  ⇒ **偏大 137%**
+         k_z/L = 0.537（行业带 0.30~0.36）⇒ 横摆响应被系统性算钝。
+       现改三档解析，与引擎 `mass_properties.resolve_yaw_inertia` 及 TPHYS
+       （09-track.js）同一真源：① 显式给定 → 用它；② 与 FSAE 口径吻合 → 部件清单；
+       ③ 其余车型 → 保留旧经验式**并标明来源**（GT3/Baja 数值逐位不变）。
+       ⚠ 用 `typeof fsaeMassProps === 'function'` 特性探测而非硬调用：
+          本文件可能被单独加载的沙箱求值，硬调用会 ReferenceError（M15b 教训）。
+       ⚠ 注意 `C_yaw_damp = I_yaw·0.75` 的时间常数 τ = I_yaw/C = 1/0.75 s，
+          **与 I_yaw 无关** ⇒ 本改动不改变人工横摆阻尼的时间常数，只改变
+          同样力矩下的角加速度（I_yaw 变小 ⇒ 转向响应变快，这正是修正目的）。 */
+    {
+      const _wbMm = Number(S_config.wb) || 0;
+      let _decIz = 0;
+      if (typeof S_config.iz_kg_m2 === 'number' && S_config.iz_kg_m2 > 0) _decIz = S_config.iz_kg_m2;
+      else if (typeof S_config.Izz === 'number' && S_config.Izz > 0) _decIz = S_config.Izz;
+      if (_decIz > 0) {
+        /* 只声明了 Izz 时，Ixx/Iyy 仍走经验式（与引擎单解析 Izz 的口径一致） */
+        this.I_pitch = this.m * (this.wb * 0.42) ** 2;
+        this.I_roll = this.m * ((this.tF + this.tR) * 0.22) ** 2;
+        this.I_yaw = _decIz;
+        this.inertiaSrc = 'declared';
+      } else if (typeof fsaeMassProps === 'function'
+                 && Math.abs(this.m - 235) <= 1.5 && Math.abs(_wbMm - 1550) <= 5) {
+        const _mp = fsaeMassProps();
+        this.I_pitch = _mp.Ixx;   // 绕 X（横向）→ 俯仰
+        this.I_roll = _mp.Iyy;    // 绕 Y（纵向）→ 侧倾
+        this.I_yaw = _mp.Izz;     // 绕 Z（垂向）→ 横摆
+        this.inertiaSrc = 'inventory:fsae';
+      } else {
+        this.I_pitch = this.m * (this.wb * 0.42) ** 2;
+        this.I_roll = this.m * ((this.tF + this.tR) * 0.22) ** 2;
+        this.I_yaw = this.I_pitch + this.I_roll;
+        this.inertiaSrc = 'empirical:legacy';
+      }
+    }
     this.Iw = Math.max(0.35, 1.2 * (this.m / 1250)); // Wheel rotational inertia (kg*m^2)
     
     this.Fz0_F = (this.m * 9.81 * (this.b / this.wb)) / 2.0;
@@ -394,6 +470,98 @@ class VehicleDynamics15DOF {
     const h_roll_axis = (h_rc_f + h_rc_r) / 2;
     this.h_roll_arm = Math.max(0.06, this.h_cg - h_roll_axis);
     
+    /* P0（M20）· 性能埋点计数器（整数自增，零开销） */
+    this._simStat = { steps: 0, subSteps: 0, roadQueries: 0 };
+    /* S3（M20）· 累积行驶距离（m）——ISO 8608 是**空间**谱，路面固定在地上，
+       后轴经过的是前轴 wb 之前的位置（比"时间延迟 L/v"更严格：后者只在匀速下成立）。 */
+    this._roadS = 0;
+    /* S2（M20）· 轮胎松弛状态（一阶滞后）。
+       alphaLat/kappaLat = 胎面"实际"滑移（喂给轮胎模型）；_alphaSt/_kappaSt = 本子步
+       算出的几何目标值。开关 `S.tireRelax === false` 可关闭（默认开启）。 */
+    this.alphaLat = { FL: 0, FR: 0, RL: 0, RR: 0 };
+    this.kappaLat = { FL: 0, FR: 0, RL: 0, RR: 0 };
+    this._alphaSt = { FL: 0, FR: 0, RL: 0, RR: 0 };
+    this._kappaSt = { FL: 0, FR: 0, RL: 0, RR: 0 };
+    this.relaxOn = !(S_config && S_config.tireRelax === false);
+    /* S2(b)：回正力矩拖距（m）。机械拖距 = 主销后倾拖距（实车 20~40 mm）；
+       气动拖距 = 接地印痕变形导致的力心后移（峰值约 0.05~0.08 m，随侧偏角衰减）。 */
+    this.alignOn = !(S_config && S_config.tireAlign === false);
+    this.trailMech = (S_config && typeof S_config.trailMechM === 'number' && S_config.trailMechM > 0)
+      ? S_config.trailMechM : 0.025;
+    this.trailPneu0 = (S_config && typeof S_config.trailPneu0M === 'number' && S_config.trailPneu0M > 0)
+      ? S_config.trailPneu0M : 0.060;
+    /* S2(c)（M20，2026-10-17）· 人工横摆阻尼 C_yaw_damp = I_yaw · yawDampK。
+       ⚠ 这是**补偿器不是物理**：它存在的唯一理由是"无轮胎松弛 + 无回正力矩"时
+         横摆缺天然阻尼。其时间常数恒为 τ = I_yaw/C = 1/yawDampK 秒（与 I_yaw 无关）。
+       **实测（physics_audit I 段扫描，S2(a)(b) 落地后）**：
+         yawDampK 从 0.75 退到 0.00，六种工况全部稳定——
+           自由衰减 r_end ≈ 5e-17（收敛到 0）、稳态符号翻转 0 次（无持续振荡）、
+           T63 恒为 41 ms、稳态 |r| 仅变 1.58%。
+       ⇒ 轮胎侧偏力本身 + 回正力矩已提供**全部**横摆阻尼；0.75 是**重复计入**，
+         它人为压制横摆（等效给车加了一个 1.33 s 的额外衰减）。故缺省改为 **0**。
+       ⚠ 保留通道：若未来某工况出现横摆振荡，可设 `S.yawDampK` 临时调回 0.75。 */
+    this.yawDampK = (S_config && typeof S_config.yawDampK === 'number' && isFinite(S_config.yawDampK))
+      ? S_config.yawDampK : 0.0;
+    /* S6（M20，2026-10-17）· 转向系统动力学。
+       `ctrl.steer` 是**驾驶员/控制器给出的指令**（度），真实车要经转向柱 → 齿条 →
+       横拉杆 → 车轮，有惯量、扭转柔性、助力阀响应（实车指令→齿条约 50~100 ms）。
+       旧实现把指令**直接**当车轮转角用 ⇒ 打方向的瞬间轮胎立刻到位，
+       这是开环阶跃 T63 只有 41 ms（真实车 150~350 ms）的主要成因（P27）。
+       现插一阶滞后：steerActual →(τ)→ 前轮实际转角。
+       **τ 选档依据（audit J 段实测扫描）**：
+         τ=0 ⇒ T63 41 ms / 超调 16.7%　τ=0.05 ⇒ 80 ms / **4.8%**　τ=0.20 ⇒ 209 ms / 3.3%
+       只有 τ=0.20 能把 T63 顶进真实带(150~350 ms)，但**那是"驾驶员反应"量级，不是机械
+       量级**——实车转向柱→齿条→车轮约 50~100 ms。取 **τ = 0.05 s**（机械部分真实值）：
+       闭环里 MPC(15-mpc.js) 自身的 0.10 s 低通代表控制器/人，两者叠加后总响应
+       ≈0.15 s ⇒ 有效 T63 落入真实带。把机械与人为混在一个 τ 里物理上不诚实。
+       ⚠ 与控制器侧的速率限/低通**不重复**：MPC 与 Stanley(11-stages.js:223) 的限幅是
+         "手速上限"（人打方向盘的极限），本项是"齿条到车轮的传递"。
+       ⚠ 副作用（好的）：超调 16.7%→4.8% —— 原先的大超调是"指令瞬间到位"的假象。 */
+    this.steerActual = 0.0;
+    this.steerTau = (S_config && typeof S_config.steerTauS === 'number'
+                     && isFinite(S_config.steerTauS) && S_config.steerTauS >= 0)
+      ? S_config.steerTauS : 0.05;
+    /* P28（M20，2026-10-17）· 俯仰/侧倾人工阻尼系数 —— **已退到 0**。
+       与已移除的 `C_yaw_damp` 同类（`k·√(K·I)` 形式的经验阻尼），而减振器力
+       `calcDamper(dtr)` 已经在 `Fz` 里提供了真实的俯仰/侧倾阻尼。
+       **实测（audit K 段扫描 + 本轮对照探针）**：
+         k: 0 → 0.45 → 5.0 时，阶跃后 φ 的变化只有 **1e-7 ~ 5e-6 量级**
+         （φ −5.2029206397e-3 → −5.2033308479e-3 → −5.2074730442e-3）；
+         要到 k=50 才开始明显影响（φ −9.4e-3、p −0.34）。
+       ⇒ 在 0~0.45 的**正常工作区间内这两行几乎是死代码**，减振器阻尼远大于它。
+         故缺省改为 0（让代码诚实：不再留无作用的"看起来有物理"的项）。
+       ⚠ 通道保留（S.pitchDampK / S.rollDampK），若某工况出现俯仰/侧倾振荡可临时调回。 */
+    this.pitchDampK = (S_config && typeof S_config.pitchDampK === 'number' && isFinite(S_config.pitchDampK))
+      ? S_config.pitchDampK : 0.0;
+    this.rollDampK = (S_config && typeof S_config.rollDampK === 'number' && isFinite(S_config.rollDampK))
+      ? S_config.rollDampK : 0.0;
+    /* ── S13（M20，2026-10-17）· 真 15-DOF：簧下质量 + 轮胎垂向柔度 ──────────
+       旧口径（本文件 :291-317 自认）：车轮被**运动学钉在路面上**，
+       `tr = z_road − z_corner` 是代数量，`Fz` 由"弹簧+阻尼+ARB+缓冲块"直接算出后
+       作用到车身 ⇒ **没有非簧载质量的垂向惯性，也没有轮胎垂向柔度 DOF**。
+       已知后果：10~16 Hz 轮跳模态缺失；过路肩/减速带车轮不"脱开"路面。
+       新：每轮引入 2 个状态（接地点高度 zw、速度 vzw），轮胎用**穿透量**接触模型
+       （同台架 04-dynamics.js:138-144 的 `fz = kT·pen + cT·(żr − żw)`），
+       悬挂力作用在簧上与簧下之间。
+       ⚠ **默认关闭**（`S.wheelDof`）⇒ 缺省行为逐位不变，风险可控、可回退。
+       ⚠ 参数：mU（非簧载质量/角，kg）、kT（轮胎垂向刚度 N/mm）、
+         cT（轮胎垂向阻尼，由阻尼比 ζ 推导，缺省 0.06）。 */
+    this.wheelDof = !!(S_config && S_config.wheelDof);
+    this.zw = { FL: 0, FR: 0, RL: 0, RR: 0 };
+    this.vzw = { FL: 0, FR: 0, RL: 0, RR: 0 };
+    this._zRoadPrev = { FL: 0, FR: 0, RL: 0, RR: 0 };
+    this.mU_f = (S_config && S_config.front && typeof S_config.front.mU === 'number' && S_config.front.mU > 0)
+      ? S_config.front.mU : 12.0;
+    this.mU_r = (S_config && S_config.rear && typeof S_config.rear.mU === 'number' && S_config.rear.mU > 0)
+      ? S_config.rear.mU : 12.0;
+    this.kT_f = ((S_config && S_config.front && S_config.front.tire && S_config.front.tire.kT) || 260) * 1000.0;
+    this.kT_r = ((S_config && S_config.rear && S_config.rear.tire && S_config.rear.tire.kT) || 260) * 1000.0;
+    /* 轮胎垂向阻尼：cT = 2·ζ·√(kT·mU)，ζ 缺省 0.06（轮胎垂向阻尼比典型 0.05~0.1） */
+    const _zeta = (S_config && typeof S_config.tireDampRatio === 'number' && S_config.tireDampRatio > 0)
+      ? S_config.tireDampRatio : 0.06;
+    this.cT_f = 2.0 * _zeta * Math.sqrt(this.kT_f * this.mU_f);
+    this.cT_r = 2.0 * _zeta * Math.sqrt(this.kT_r * this.mU_r);
+
     this.state = {
       X: 0, Y: 0, Z: 0,           // World Position (m): X (Right), Y (Forward), Z (Up)
       phi: 0, theta: 0, psi: 0,   // Euler Angles (rad): Roll (Y), Pitch (X), Yaw (Z)
@@ -436,7 +604,9 @@ class VehicleDynamics15DOF {
      G29（2026-09-04）：优先级链插入 SIM.userTire（轮胎工坊自定义参数，14-tire-lab.js
      写入）；实测标定仍最高。缺省 D 表未动，test_dom.js:217 正则锁与 tphys_parity 不受影响。 */
   resolveTireParams() {
-    const D = { Fy0: 5250.0, By: 20.0, Cy: 1.2, Ey: -0.5, FzNom: 3500.0, LS: 0.10, Cg: 6.0 };
+    /* Ls = 侧偏松弛长度 m（S2，M20 2026-10-17）。缺省 0.35 与引擎 v3models.py:404
+       `Ls: float = 0.35` 及 TPHYS 09-track.js:92 同值。 */
+    const D = { Fy0: 5250.0, By: 20.0, Cy: 1.2, Ey: -0.5, FzNom: 3500.0, LS: 0.10, Cg: 6.0, Ls: 0.35 };
     const tc = (this.SIM && this.SIM.tireCalib) ? this.SIM.tireCalib : null;
     const ut = (this.SIM && this.SIM.userTire) ? this.SIM.userTire : null;   // G29 轮胎工坊
     const pick = (k, minExclusive) => {
@@ -455,6 +625,12 @@ class VehicleDynamics15DOF {
       Fy0, FzNom, By, Cy: pick('Cy'), Ey,
       LS: Math.max(0.0, Math.min(1.0, pick('LS'))),   // LS 钳到 [0,1]，防负值/过大括高
       Cg: pick('Cg'),
+      /* S2：侧偏松弛长度（m），>0 才生效。σ = max(0.3, Ls) 与引擎/TPHYS 同式。 */
+      Ls: pick('Ls', 0),
+      /* M8（2026-09-20）：载荷敏感性参考载荷 = 当前车型静轮载（mTotal·g/4）。
+         与 03-mechanism 的 US 梯度（按轴静载 Fzf0/2、Fzr0/2）同源同量级；
+         瞬态层是单胎模型，故取整车均值。缺 S 时退化为 FzNom。 */
+      FzRef: (typeof S !== 'undefined' && S.mTotal > 0) ? (S.mTotal * 9.81 / 4) : FzNom,
       // 相对【引擎缺省胎】归一的拓地力比例：未标定时 = 1，行为与路面 μ 语义不变
       gripScale: (Fy0 / FzNom) / (D.Fy0 / D.FzNom),
       Bx: By * 1.2                                    // 与 tire_mf.py fx() 的 b = By*1.2 同约定
@@ -467,7 +643,10 @@ class VehicleDynamics15DOF {
          κ_peak = 2.901/Bx = 2.901/24 = 0.1209（12.1%，真实胎 8~15% ✓）
          α_peak = atan(2.901/20) = 8.27°（真实光头胎 6~10° ✓）
        Cy < 1 时无内部峰值（力渐近上升），退到大滑移量。按标定参数缓存。 */
-    const key = [p.By, p.Bx, p.Cy, p.Ey, p.FzNom, p.LS, p.Fy0, p.Cg].join('|');
+    /* M8：FzRef 必须进缓存键——它由 S.mTotal 导出，换车型/改质量后若不失效，
+       会继续沿用上一台车的参考载荷（载荷敏感性口径静默漂移）。 */
+    /* S2：Ls 进缓存键（同 FzRef 的理由——换胎/改标定后必须失效） */
+    const key = [p.By, p.Bx, p.Cy, p.Ey, p.FzNom, p.LS, p.Fy0, p.Cg, p.FzRef, p.Ls].join('|');
     if (this._tpCacheKey === key && this._tpCache) return this._tpCache;
     const argT = (p.Cy >= 1.0) ? Math.tan(Math.PI / (2 * p.Cy)) : Infinity;
     let sPeak = 3.0;
@@ -510,7 +689,10 @@ class VehicleDynamics15DOF {
     const tp = this.resolveTireParams();
     // 载荷敏感性（Jensen 效应）：重载 μ 递减——载荷转移损失轴总拓地力、
     // 以及稳态不足转向梯度的轮胎侧根基。钳位与引擎 _d() 的 max(0.1, ...) 同式。
-    const r = Fz / tp.FzNom;
+    // M8（2026-09-20）：参考载荷与 FzNom 分离——FzNom 管 μ 量级，FzRef 管
+    // "载荷翻倍 μ 降 LS"相对哪个工作点。缺省退化为 FzNom（旧口径逐位不变）。
+    const ref = (typeof tp.FzRef === 'number' && tp.FzRef > 0) ? tp.FzRef : tp.FzNom;
+    const r = Fz / ref;
     const lsF = Math.max(0.1, 1.0 - tp.LS * (r - 1.0));
     const D = mu_peak * tp.gripScale * Fz * lsF;
 
@@ -533,12 +715,59 @@ class VehicleDynamics15DOF {
     };
   }
 
+  /* ── S4（M20，2026-10-17）· 阿克曼转向几何 ─────────────────────────────────
+     旧实现左右前轮共用同一个 δ：低速大转角时内外轮同角，两前轮的转向圆心不重合
+     ⇒ 轮胎互相"较劲"（内轮被拖、外轮被推），真实梯形转向机构不会这样。
+     与 TPHYS（09-track.js::steer）同式，按转弯半径 R = L/tanδ 分内外轮：
+       内轮 δ_in  = atan(L / (R − hf))      外轮 δ_out = atan(L / (R + hf))
+     符号：δ>0 = 右转 ⇒ 内侧是右轮（wheels 表 FR 的 x = +tF/2）。
+       · δ→0 时两者都→δ（阿克曼是小转角下的高阶修正）⇒ 高速小转角工况几乎不变
+       · 主要影响：低速掉头、麋鹿测试、定圆（大转角段）
+     ⚠ `Math.max(0.5, R − hf)` 防 R→hf 时除零/反号（同 09-track 的保护）。
+     ⚠ **必须限幅**：上式在大转角时内轮会发散到非物理值——δ=30° 时 R=2.68 m、
+       R−hf=1.93 ⇒ δ_in = atan(1.55/1.93) = **38.8°**；δ=40° 时更到 54.6°。
+       实车齿条行程有限，前轮有机械限位（FSAE 典型 30~35°）。
+       实测教训：不加限幅直接接线 ⇒ 赛道闭环峰值侧偏角 21.5°→25.1° 击穿 24° 阈值。 */
+  ackermann(delta) {
+    if (!(Math.abs(delta) > 1e-6)) return { left: 0, right: 0 };
+    const L = this.wb, hf = this.tF / 2.0;
+    /* 转向机构机械限位（rad）。缺省 32°（FSAE 典型 30~35°），可由轴级覆盖。 */
+    let lim = 32.0 * Math.PI / 180.0;
+    const _ov = (this.S && this.S.front) ? this.S.front.maxSteerDeg : undefined;
+    if (typeof _ov === 'number' && isFinite(_ov) && _ov > 0) lim = _ov * Math.PI / 180.0;
+    /* 转弯半径取**几何值** R = L/tanδ（与 TPHYS 09-track.js::steer 同式）。
+       ⚠ 曾尝试改用"实际运动学半径" R = u/|r|（想让阿克曼反映真实的不足转向），
+         实测**病态**：四轮侧偏角全部塌成 0.000°。原因是形成正反馈自锁——
+         用状态量(r)反推控制输入(δ_in/δ_out)，而 r 又由 δ 产生 ⇒ 系统锁定在
+         "侧偏恒为零"的退化解上，车不再产生侧偏力。
+       ⚠ 结论（重要，别再改回去）：**阿克曼是转向梯形几何，只由转向角决定**，
+         与实际转弯半径无关。它在设计上就是按"低速无侧偏"标定的；高速大侧向
+         加速度下内轮侧偏反而增大是**真实且工程界熟知的物理**（正因如此赛道车
+         才常用反阿克曼 anti-Ackermann），不是 bug。 */
+    const sgn = delta > 0 ? 1 : -1;
+    const R = Math.abs(L / Math.tan(delta));
+    const cl = d => Math.max(-lim, Math.min(lim, d));
+    const d_in = cl(Math.atan(L / Math.max(0.5, R - hf)));
+    const d_out = cl(Math.atan(L / (R + hf)));
+    return sgn > 0 ? { left: sgn * d_out, right: sgn * d_in }
+                   : { left: sgn * d_in, right: sgn * d_out };
+  }
+
   step(ctrl, env, dt_sec) {
+    /* P0（M20）· 性能埋点：只做整数自增，不调 performance.now()，开销可忽略。
+       审计 R-1017 实测：物理 0.023 ms/子步（17 子步 ≈ 0.39 ms/帧），
+       **帧瓶颈是每 3 帧一次的 K&C 多体重建，不是物理** —— 埋点用来守住这个结论。 */
+    if (this._simStat) this._simStat.steps++;
     const MAX_SUB_DT = 0.001; // 1000Hz Sub-stepping
     let t_remain = Math.min(0.05, dt_sec);
     const alpha_slope = env.grade || 0;
     const cosA = Math.cos(alpha_slope);
     const sinA = Math.sin(alpha_slope);
+    /* S3（M20）· ISO 8608 路面开关：env.roadIso = "A"~"H" 才启用；falsy ⇒ 恒 0。
+       ⚠ 用 `typeof isoProfileAtMm === 'function'` 特性探测（本文件可能被单独
+         加载的沙箱求值，硬调用会 ReferenceError —— M15b 教训）。 */
+    const _isoCls = env.roadIso || null;
+    const _isoOn = !!(_isoCls && typeof isoProfileAtMm === 'function');
 
     const liveTune = (typeof SLOPE_STAGE !== 'undefined' && SLOPE_STAGE.active && SLOPE_STAGE.liveTuning)
       ? SLOPE_STAGE.liveTuning
@@ -667,19 +896,46 @@ class VehicleDynamics15DOF {
 
     while(t_remain > 0) {
       const dt = Math.min(MAX_SUB_DT, t_remain);
+      if (this._simStat) this._simStat.subSteps++;
       const st = this.state;
+      /* S3：累积行驶距离放在**本子步路面计算之前**，使 `telemetry.z_road` 与
+         `_roadS` 严格对应（否则会有一子步偏移，审计对不上）。带符号：倒车时回退。 */
+      if (_isoOn) this._roadS += st.u * dt;
       const cPsi = Math.cos(st.psi), sPsi = Math.sin(st.psi);
       
       // 1. Evaluate Individual 4-Wheel Contact Patch Position, Road Kerb Elevation & K&C Kinematics
       const wheelStates = {};
       let numWheelsAirborne = 0;
+      /* S6（M20）：转向指令 → 实际齿条位置（一阶滞后，解析精确指数）。
+         τ=0 时直接跟随（缺省，逐位兼容）。推进放子步开头 ⇒ 本子步的轮循环
+         立刻使用新值，滞后量恰为一个子步，语义清晰。 */
+      const _steerCmd = (typeof ctrl.steer === 'number' && isFinite(ctrl.steer)) ? ctrl.steer : 0.0;
+      if (this.steerTau > 0) {
+        this.steerActual += (_steerCmd - this.steerActual) * (1.0 - Math.exp(-dt / this.steerTau));
+      } else {
+        this.steerActual = _steerCmd;
+      }
+      /* S4（M20，2026-10-17）· 阿克曼转向几何：左右前轮不再共用同一个 δ。
+         每子步算一次（不随轮变），结果 {left, right} 供下方轮循环取用。 */
+      const _ack = this.ackermann(this.steerActual * Math.PI / 180.0);
 
       for (const w of wheels) {
         const X_w = st.X - w.y * sPsi + w.x * cPsi;
         const Y_w = st.Y + w.y * cPsi + w.x * sPsi;
         
+        if (this._simStat) this._simStat.roadQueries++;
         const rInfo = pathObj ? pathObj.getRoadElevation(X_w, Y_w) : { z_road: 0, isKerb: false, mu: mu_eff };
-        const z_road_w = (rInfo.z_road || 0) + (env.bumpNoise || 0);
+        /* S3（M20）· ISO 8608 随机路面（可选）。
+           开关：`env.roadIso` 给等级字符串（"A"~"H"）才启用；未给 ⇒ 恒 0
+           ⇒ **缺省逐位不变**（三处舞台调用点现均不传）。
+           后轴取 `s − wb`（同一条路，后轴经过前轴 wb 之前碾压过的位置）——
+           比台架的"时间延迟 L/v"更严格，后者隐含匀速假设。 */
+        let z_iso = 0;
+        if (_isoOn && typeof isoProfileAtMm === 'function') {
+          const sW = this._roadS - (w.axle === 'rear' ? this.wb : 0.0);
+          z_iso = isoProfileAtMm(sW, _isoCls) / 1000.0;   /* mm → m */
+        }
+        const z_road_w = (rInfo.z_road || 0) + z_iso + (env.bumpNoise || 0);
         const mu_w = (rInfo.mu !== undefined ? rInfo.mu : mu_eff);
         
         // Chassis corner vertical displacement & velocity (+X right, +Y forward)
@@ -691,8 +947,39 @@ class VehicleDynamics15DOF {
         const isAirborne = (z_corner - maxDroop > z_road_w);
         if (isAirborne) numWheelsAirborne++;
 
-        let tr_w, dtr_w;
-        if (isAirborne) {
+        let tr_w, dtr_w, Fz_tire_w = 0;
+        if (this.wheelDof) {
+          /* ── S13：真簧下质量路径 ──────────────────────────────────────────
+             zw = 轮胎**接地点**高度（状态），z_road = 路面高度。
+             轮胎穿透 pen = z_road − zw（正 = 压），接触力同台架
+             （04-dynamics.js:138-144）：F = kT·pen + cT·(ż_road − ż_w)，只压不拉。
+             悬挂行程改为 **tr = zw − z_corner**（簧下相对车身向上 = 压缩）。
+             ⚠ 首次进入时按静平衡预压缩初始化 zw = z_road − Fz0/kT，
+               否则开局 F_tire=0 ≠ 静载 ⇒ 车会先坠落再弹回（假瞬态）。 */
+          const _kT = (w.axle === 'front') ? this.kT_f : this.kT_r;
+          const _cT = (w.axle === 'front') ? this.cT_f : this.cT_r;
+          if (!this._zwInit) {
+            const _Fz0 = (w.axle === 'front') ? this.Fz0_F : this.Fz0_R;
+            this.zw[w.id] = z_road_w - _Fz0 / _kT;   // 预压缩
+            this._zRoadPrev[w.id] = z_road_w;
+          }
+          const _dzRoad = dt > 0 ? (z_road_w - this._zRoadPrev[w.id]) / dt : 0;
+          this._zRoadPrev[w.id] = z_road_w;
+          const pen = z_road_w - this.zw[w.id];
+          if (pen > 0) {
+            Fz_tire_w = _kT * pen + _cT * (_dzRoad - this.vzw[w.id]);
+            if (Fz_tire_w < 0) Fz_tire_w = 0;      // 轮胎只压不拉 ⇒ 天然表达离地
+          }
+          tr_w = this.zw[w.id] - z_corner;
+          dtr_w = this.vzw[w.id] - dz_corner;
+          /* 悬挂伸长限位（droop）：tr 不得小于 −maxDroop，撞限位则停住相对速度 */
+          if (tr_w < -maxDroop) {
+            this.zw[w.id] = z_corner - maxDroop;
+            if (this.vzw[w.id] < dz_corner) this.vzw[w.id] = dz_corner;
+            tr_w = -maxDroop;
+            dtr_w = this.vzw[w.id] - dz_corner;
+          }
+        } else if (isAirborne) {
           tr_w = -maxDroop;
           dtr_w = 0;
         } else {
@@ -704,7 +991,23 @@ class VehicleDynamics15DOF {
         if (tr_w > maxBumpStop) {
           const excess = tr_w - maxBumpStop;
           const Kw_cur = (w.axle === 'front' ? Kw_F_eff : Kw_R_eff);
-          F_bumpstop = Kw_cur * (excess * 8.0 + excess * excess * 200.0);
+          /* S5（M20，2026-10-17）· 缓冲块刚度独立参数化（**通道先建，标定待办**）。
+             旧式 `Kw_cur * (...)` 把缓冲块刚度**寄生在轮端弹簧刚度**上 ⇒ 调主弹簧
+             刚度会连带改缓冲块特性（两个物理环节耦合，无法独立调校；而缓冲块是
+             压缩行程末端的主角，实车是两个独立零件）。
+             新：优先取轴级 `kBSNm`（N/m）；未提供 ⇒ 回退 Kw_cur ⇒ **数值逐位不变**。
+             ⚠⚠ 单位陷阱（本轮实踩）：预设里已有 `S.kBS = 1000`，但那是**台架口径**
+               （04-dynamics.js 用 mm 制 + FS 缩放，kBS 单位 N/mm）。直接当 N/m 用
+               会得到 1e6 N/m ⇒ excess=10mm 时输出 **10 吨**力（比 Kw_cur 大 30 倍）。
+               故**刻意不用** S.kBS，另起字段名 kBSNm 避免两套口径互相污染。
+             ⚠ 行程阈值 maxBumpStop 仍硬编码 0.055/0.065 m —— 与预设 `S.bsU`
+               （limF[1]，mm，机构限位）语义不同（缓冲块起点 vs 机构行程极限），
+               对齐属独立项，此处不动，登记待办。 */
+          const _axS = (w.axle === 'front') ? this.S.front : this.S.rear;
+          const _kBSnm = _axS ? _axS.kBSNm : undefined;
+          const kBS_eff = (typeof _kBSnm === 'number' && isFinite(_kBSnm) && _kBSnm > 0)
+            ? _kBSnm : Kw_cur;
+          F_bumpstop = kBS_eff * (excess * 8.0 + excess * excess * 200.0);
           if (typeof SLOPE_STAGE !== 'undefined' && SLOPE_STAGE.active && SLOPE_STAGE.stats) {
             SLOPE_STAGE.stats.bottomOutCount[w.id] = (SLOPE_STAGE.stats.bottomOutCount[w.id] || 0) + 1;
           }
@@ -723,6 +1026,8 @@ class VehicleDynamics15DOF {
           isBump: rInfo.isBump,
           isPothole: rInfo.isPothole,
           isAirborne: isAirborne,
+          /* S13：真实轮胎接触力（穿透量模型）。wheelDof 关闭时恒 0（不被消费）。 */
+          Fz_tire: Fz_tire_w,
           F_bumpstop: F_bumpstop,
           mu: mu_w,
           tr: tr_w,
@@ -755,7 +1060,26 @@ class VehicleDynamics15DOF {
       const Fz_RR = wheelStates.RR.isAirborne ? 0.0 : Math.max(0.0, Fz0_R_slope + Kw_R_eff * tr_RR + calcDamper(CwB_R_eff, Cw_R_eff, vkB_R, vkR_R, dtr_RR) - F_arb_R + wheelStates.RR.F_bumpstop);
       
       const F_susp = { FL: Fz_FL, FR: Fz_FR, RL: Fz_RL, RR: Fz_RR };
-      
+
+      /* S13：车身受**悬挂力**，轮胎模型受**接触力**（真 15-DOF 下两者不再相等）。
+         关闭 wheelDof 时 FzContact ≡ F_susp ⇒ 逐位兼容。 */
+      const FzContact = this.wheelDof
+        ? { FL: wheelStates.FL.Fz_tire, FR: wheelStates.FR.Fz_tire,
+            RL: wheelStates.RL.Fz_tire, RR: wheelStates.RR.Fz_tire }
+        : F_susp;
+      if (this.wheelDof) {
+        /* 簧下质量垂向积分：mU·azw = F_tire − F_susp。
+           这是"10~16 Hz 轮跳模态"的来源；轮胎只压不拉 ⇒ 离地时 F_tire=0，
+           簧下在悬挂力作用下回落，直到重新接触（天然表达车轮脱开路面）。 */
+        for (const w of wheels) {
+          const mU = (w.axle === 'front') ? this.mU_f : this.mU_r;
+          const a = (FzContact[w.id] - F_susp[w.id]) / mU;
+          this.vzw[w.id] += a * dt;
+          this.zw[w.id] += this.vzw[w.id] * dt;
+        }
+        this._zwInit = true;
+      }
+
       let SumFx_tire = 0.0, SumFy_tire = 0.0;
       let SumMz_tire = 0.0;
 
@@ -815,23 +1139,31 @@ class VehicleDynamics15DOF {
 
       for(const w of wheels) {
         const ws = wheelStates[w.id];
-        const Fz_w = F_susp[w.id];
+        const Fz_w = FzContact[w.id];
         
         // Wheel contact point velocities in body frame (+X right, +Y forward)
         const v_cp_x = st.v - st.r * w.y;
         const v_cp_y = st.u + st.r * w.x;
         
         // Steer angle delta includes driver steer command + K&C bump steer
-        const steer_driver = (w.axle === 'front' ? (ctrl.steer * Math.PI / 180.0) : 0.0);
+        /* S4：前轮取阿克曼分角（内轮大、外轮小），后轮 0 */
+        const steer_driver = (w.axle === 'front' ? _ack[w.side] : 0.0);
         const steer_total = steer_driver + ws.bump_steer_rad;
         
         // Transform velocities into wheel heading frame
         const v_tire_long = v_cp_x * Math.sin(steer_total) + v_cp_y * Math.cos(steer_total);
         const v_tire_lat  = v_cp_x * Math.cos(steer_total) - v_cp_y * Math.sin(steer_total);
         
-        const alpha = Math.atan2(v_tire_lat, Math.max(0.5, Math.abs(v_tire_long)));
+        /* S2（M20）· 轮胎松弛：这里算出的是**瞬时**滑移（几何目标值），
+           真正喂给轮胎模型的是 `alphaLat/kappaLat`（一阶滞后后的"胎面实际"滑移）。
+           推进在子步末尾用解析精确指数做一次（见该处注释）。 */
+        const alpha_inst = Math.atan2(v_tire_lat, Math.max(0.5, Math.abs(v_tire_long)));
         const v_rot = st.omega[w.id] * w.Re;
-        const kappa = (v_rot - v_tire_long) / Math.max(0.5, Math.abs(v_tire_long));
+        const kappa_inst = (v_rot - v_tire_long) / Math.max(0.5, Math.abs(v_tire_long));
+        this._alphaSt[w.id] = alpha_inst;
+        this._kappaSt[w.id] = kappa_inst;
+        const alpha = this.relaxOn ? this.alphaLat[w.id] : alpha_inst;
+        const kappa = this.relaxOn ? this.kappaLat[w.id] : kappa_inst;
         
         // Pacejka tire forces (Fx_t: tractive/braking along tire rolling, Fy_t: cornering grip)
         let Fx_t = 0, Fy_t_base = 0, mf = null;
@@ -871,6 +1203,26 @@ class VehicleDynamics15DOF {
         SumFx_tire += Fx_body;
         SumFy_tire += Fy_body;
         SumMz_tire += w.x * Fy_body - w.y * Fx_body;
+
+        /* ── S2(b)（M20）· 回正力矩 Mz = trail · Fy_t ──────────────────────
+           真实轮胎的侧向力作用点不在轮心正下方，而在接地印痕中心之后（拖距），
+           于是产生绕垂轴的回正力矩。这是横摆**天然阻尼**的主要来源之一
+           （另一个是松弛长度），缺了它才要靠 `C_yaw_damp = I_yaw·0.75` 人工兜底。
+           拖距 = 气动拖距（随侧偏角衰减）+ 机械拖距（主销后倾，近似常数）：
+             t_p(α) = t_p0 · exp(−(α/α_peak)²)，t_m ≈ 常数
+           **符号推导**（本坐标 X右/Y前/Z上，右手系）：
+             印痕相对轮心 r = (0, −t)（沿前进方向反方向）；
+             力 F = (Fy_t, Fx_t)（沿侧向、前进）；
+             Mz = r_x·F_y − r_y·F_x = t·Fy_t。
+           物理校验：右转时 δ>0 ⇒ α = atan2(v_lat, v_long) < 0 ⇒ Fy_t > 0
+             ⇒ Mz > 0（逆时针，向左）⇒ 与 r(<0，右转) 反号 ⇒ **提供阻尼** ✓
+           ⚠ 若哪天改坐标或改 Fy 符号，这条必须重推——用「阶跃响应超调应下降」实测守。 */
+        if (this.alignOn && Fz_w > 1.0) {
+          const aPeak = Math.max(0.02, tpStep.alphaPeak || 0.144);
+          const q = alpha / aPeak;   // alpha 已是松弛后的值（relaxOn 关闭时 = 瞬时值）
+          const tPneu = this.trailPneu0 * Math.exp(-q * q);
+          SumMz_tire += (tPneu + this.trailMech) * Fy_t;
+        }
         
         // Wheel spin acceleration with dynamic live brake bias and TCS
         let throttleCmd = ctrl.throttle;
@@ -946,17 +1298,39 @@ class VehicleDynamics15DOF {
       const numQ = (v, d) => (typeof v === 'number' && isFinite(v)) ? v : d;
       const aeroF = numQ(qsA.aeroF, 500);
       const aeroRefSpeed = numQ(qsA.speed, 160) * (1000/3600);
-      const v2 = st.u * st.u;
+      /* S7（M20）· 气动力改用**合速度** √(u²+v²) 而不是只用 u。
+         旧式只取纵向分速 ⇒ 大侧滑角（漂移、高速弯）时阻力与下压力被系统性低估。
+         ⚠ 这是一处**修正**不是缺陷补偿：真实气动力取决于相对空气的合速度。 */
+      const v2 = st.u * st.u + st.v * st.v;
       const aeroScale = v2 / (aeroRefSpeed * aeroRefSpeed + 1e-5);
       const drsOn = !!(ctrl && ctrl.drs);
-      const F_drag = 0.5 * 1.225 * 0.35 * (this.m < 400 ? 0.9 : 1.8) * v2 * (st.u >= 0 ? 1.0 : -1.0)
+      /* S7：CdA 显式参数（m²）。缺省 = 旧拍板常数的乘积（轻车 0.35×0.9=0.315、
+         重车 0.35×1.8=0.63）⇒ **缺省逐位兼容**，但现在是**可标定量**而非常数。
+         ⚠ 旧式把 Cd(0.35) 与面积(1.8 m²) 糊成一个系数，无法按真车 CdA 标定
+            （带翼 GT3 的 CdA 量级与 FSAE 差 2 倍以上）。 */
+      const CdA = numQ(qsA.cdA, (this.m < 400 ? 0.35 * 0.9 : 0.35 * 1.8));
+      const F_drag = 0.5 * 1.225 * CdA * v2 * (st.u >= 0 ? 1.0 : -1.0)
                    * (drsOn ? numQ(qsA.drsCdScale, 0.72) : 1.0);
       const geHref = numQ(qsA.geHrefMm, 100) / 1000.0;
       const geGain = numQ(qsA.geGain, 0.5);
       const geHmin = numQ(qsA.geHminMm, 30) / 1000.0;
       const geFloor = numQ(qsA.geFloor, 0.80);
       const geMax = 1.0 + geGain * (geHref / geHmin - 1.0);
-      const aeroGe = (hM) => Math.max(geFloor, Math.min(geMax, 1.0 + geGain * (geHref / Math.max(hM, geHmin) - 1.0)));
+      /* S7：地面效应**失速段**（可选，缺省关闭 ⇒ 逐位兼容）。
+         真实地效车在车底净高过低时气流被截断/分离，下压力会**崩塌**而不是继续按
+         1/h 单调上升。旧式 ge(h) 单调 1/h 且钳到 geMax，没有失速环节。
+         `geStallMm`：开始失速的净高；低于它用 smoothstep 把 cl 平滑衰减到 0
+         （用 smoothstep 而非阶跃：避免与车身 Z 的闭环出现"吸地→失速→弹起→再吸地"
+         的双稳态跳变）。缺省 0 = 关闭。 */
+      const geStall = numQ(qsA.geStallMm, 0) / 1000.0;
+      const aeroGe = (hM) => {
+        let g = Math.max(geFloor, Math.min(geMax, 1.0 + geGain * (geHref / Math.max(hM, geHmin) - 1.0)));
+        if (geStall > 0 && hM < geStall) {
+          const t = Math.max(0.0, hM) / geStall;
+          g *= t * t * (3.0 - 2.0 * t);   // smoothstep：h→0 ⇒ g→0
+        }
+        return g;
+      };
       const biasF = numQ(qsA.aeroBias, 0.5);
       const aeroF_f = aeroF * biasF;
       const aeroF_r = aeroF * (1.0 - biasF);
@@ -990,9 +1364,12 @@ class VehicleDynamics15DOF {
       }
 
       // Rotational damping to prevent undamped resonance oscillations
-      const C_pitch_damp = Math.sqrt(this.Kw_F * this.a * this.a * this.I_pitch) * 0.45;
-      const C_roll_damp = Math.sqrt(this.Kw_F * (this.tF / 2.0)**2 * this.I_roll) * 0.45;
-      const C_yaw_damp = this.I_yaw * 0.75;
+      /* S2(c) 先例（横摆那条已退到 0 且完全稳定）⇒ 这两条同样参数化，便于扫描退阻尼。
+         ⚠ 旧式**只用前轴刚度** Kw_F 算参考临界阻尼，忽略后轴 ⇒ 实际阻尼比低于名义值。 */
+      const C_pitch_damp = Math.sqrt(this.Kw_F * this.a * this.a * this.I_pitch) * this.pitchDampK;
+      const C_roll_damp = Math.sqrt(this.Kw_F * (this.tF / 2.0)**2 * this.I_roll) * this.rollDampK;
+      /* S2(c)：系数改为可配置（缺省 0.75 = 历史值）⇒ 退阻尼时不必改代码。 */
+      const C_yaw_damp = this.I_yaw * this.yawDampK;
 
       // Restoring Pitch moment
       // P2a：删 0.15·(b−a) 近似（旧 F_aero_pitch）——分轴下压按其轴平面力臂作用：
@@ -1040,6 +1417,22 @@ class VehicleDynamics15DOF {
       this.telemetry.az = SumFz / (this.m * 9.81);
       this.telemetry.aero = { downF_f: F_down_f, downF_r: F_down_r, downF: F_down, drag: F_drag, geF: geF, geR: geR, hF: hAeroF, hR: hAeroR, drs: drsOn };
       
+      /* ── S2（M20）· 轮胎松弛推进（子步末尾、每子步一次）────────────────────
+         用**解析精确指数** 1 − e^(−dt·vx/σ)，不是显式欧拉：
+         引擎侧 transient.py 的注释已实测「显式欧拉在 dt·vx/σ > 2 时发散，
+         dt=0.05 / vx=40 / σ=0.3 时比率高达 6.7」。解析解无条件稳定。
+         ⚠ 系数与轮无关（同一子步四轮共用），故提到轮循环外只算一次 exp。
+         ⚠ 必须在子步末尾统一推进：若在轮循环内逐轮推进，会让同一子步内
+           后算的轮"看到"别的轮已更新的状态，破坏对称性（左右不等价）。 */
+      if (this.relaxOn) {
+        const sigma = Math.max(0.3, tpStep.Ls);
+        const fRelax = 1.0 - Math.exp(-dt * Math.abs(st.u) / sigma);
+        for (const w of wheels) {
+          this.alphaLat[w.id] += (this._alphaSt[w.id] - this.alphaLat[w.id]) * fRelax;
+          this.kappaLat[w.id] += (this._kappaSt[w.id] - this.kappaLat[w.id]) * fRelax;
+        }
+      }
+
       t_remain -= dt;
     }
   }
@@ -1408,10 +1801,15 @@ function slopeStageLoop(now){
     currentGrade = slp.slopeAngle || 0;
   }
 
+  /* S3（M20）· 试验场接入 ISO 8608 随机路面。
+     复用台架面板既有的路面选择（S.road === "iso" + S.roadCls 等级）⇒ 零新增 UI。
+     S.road 缺省 "none" ⇒ roadIso = null ⇒ 逐位不变。 */
+  const _stageIso = stageRoadIso();
   const env = { 
     grade: currentGrade, 
     path: window.straightTestPath,
-    bumpNoise: 0
+    bumpNoise: 0,
+    roadIso: _stageIso
   };
   
   // 1. Autonomous / Manual Pilot Control
@@ -2839,7 +3237,7 @@ function skidpadStageLoop(now){
   }
 
   if(SKIDPAD_STAGE.playing && eng) {
-    eng.step(ctrl, { grade: 0, bumpNoise: 0 }, dt);
+    eng.step(ctrl, { grade: 0, bumpNoise: 0, roadIso: stageRoadIso() }, dt);
     
     // Lap Timing detection (crossing positive X-axis in CCW / CW)
     const st = eng.state;
@@ -4383,6 +4781,13 @@ function trackLimitsAndLaps(pt, eng) {
   const EDGE = hw + kw + 0.95;
   const ey = pt.crossTrackError;
   const offTrack = Math.abs(ey) > EDGE;
+  /* S15（M20）· 车-墙碰撞动力学（开关 `S.wallCollision`，**默认关闭** ⇒ 逐位兼容）。
+     旧行为只罚时 + μ 降级，车会径直穿过缓冲区继续跑——没有碰撞动力学。
+     开启后在超出物理边界时施加冲量（见 applyWallCollision 的说明与简化假设）。 */
+  if (typeof S !== 'undefined' && S.wallCollision && eng && eng.state) {
+    applyWallCollision(eng.state, ey, EDGE,
+      (S.wallCollision && typeof S.wallCollision === 'object') ? S.wallCollision : null);
+  }
   if(offTrack && !ls.onGravel) {
     ls.onGravel = true;
     ls.lapOffs++; ls.totalOffs++;
@@ -4459,7 +4864,7 @@ function circuitStageLoop(now) {
   }
 
   if (CIRCUIT_STAGE.playing && eng) {
-    eng.step(ctrl, { grade: 0, bumpNoise: 0 }, dt);
+    eng.step(ctrl, { grade: 0, bumpNoise: 0, roadIso: stageRoadIso() }, dt);
   }
 
   try {

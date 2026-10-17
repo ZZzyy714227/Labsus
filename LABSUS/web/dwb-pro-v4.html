@@ -25,10 +25,8 @@
         <option value="gt3_sport">🚗 FIA GT3 (日常模式)</option>
         <option value="baja">🏜️ SAE Baja (越野赛车)</option>
       </select>
-      <button id="tireLabBtn" onclick="if(typeof TIRE_LAB!=='undefined')TIRE_LAB.open()" title="自定义轮胎/轮毂尺寸与参数"
-        style="background:rgba(47,169,214,0.12);border:1px solid rgba(47,169,214,0.4);color:#2fa9d6;border-radius:999px;padding:3px 10px;font:600 11px var(--font-ui);cursor:pointer;">🛞 轮胎</button>
-      <button id="ptLabBtn" onclick="if(typeof POWERTRAIN!=='undefined')POWERTRAIN.open()" title="自定义动力总成（架构/ICE/电机/变速箱）"
-        style="background:rgba(240,136,62,0.12);border:1px solid rgba(240,136,62,0.45);color:#f0883e;border-radius:999px;padding:3px 10px;font:600 11px var(--font-ui);cursor:pointer;">🔧 动力</button>
+      <button id="tireLabBtn" class="v4-mini" onclick="if(typeof TIRE_LAB!=='undefined')TIRE_LAB.open()" title="自定义轮胎/轮毂尺寸与参数">🛞 轮胎</button>
+      <button id="ptLabBtn" class="v4-mini" onclick="if(typeof POWERTRAIN!=='undefined')POWERTRAIN.open()" title="自定义动力总成（架构/ICE/电机/变速箱）">🔧 动力</button>
     </div>
 
     <!-- 前轴 / 后轴 -->
@@ -127,6 +125,7 @@
         <span class="susp-eval-subtitle" id="evalVehSubtitle">FIA GT3</span>
         <span class="susp-eval-subtitle">综合评分: <b id="evalOverallScore">88.5</b> / 100</span>
       </div>
+      <button class="susp-eval-close-btn" id="evalExportBtn" title="把当前评价、KPI、四视图快照、特性曲线与敏感度扫描导出为可打印的 HTML 报告">📄 导出 HTML 报告</button>
       <button class="susp-eval-close-btn" id="evalCloseBtn">✖ 关闭报告</button>
     </div>
     
