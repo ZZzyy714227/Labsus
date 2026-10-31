@@ -117,7 +117,7 @@ function loadReal(webDir) {
   if (te > 0 && ev.slice(0, te).includes('initTheme')) ev = ev.slice(te + 5);
   vm.runInContext(ev, ctx, { filename: '10-eval.js' });
 
-  const st = fs.readFileSync(path.join(webDir, 'js', '11-stages.js'), 'utf8');
+  const st = [fs.readFileSync(path.join(webDir, 'js', '10b-vehicle-core.js'), 'utf8'), fs.readFileSync(path.join(webDir, 'js', '11-stages.js'), 'utf8')].join('\n');
   const a = st.indexOf('class UniversalAutoPilot {');
   const b = st.indexOf('window.VehicleDynamics15DOF = VehicleDynamics15DOF;');
   if (a < 0 || b < 0 || b <= a) throw new Error('无法定位 UniversalAutoPilot / VehicleDynamics15DOF 边界');

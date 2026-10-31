@@ -82,7 +82,7 @@
   > slaved wheels", **not** the textbook "6 chassis + 4 unsprung vertical + 4 wheel spin"
   > 15-DOF form. Consequences and the upgrade path are registered in
   > `INTENTIONAL_DIFFERENCES.md` ("15-DOF caliber") and in the caliber comment above the
-  > class declaration in `web/js/11-stages.js`. The engine-side
+  > class declaration in `web/js/10b-vehicle-core.js`. The engine-side
   > `/api/v3/chassis/simulate_track` is a planar 3-DOF model with algebraic quasi-static
   > roll/pitch — a **different** model from this stage kernel (the cross-language parity
   > test targets the built-in TPHYS closure, not this kernel).
@@ -161,7 +161,7 @@ python scripts/sync_root_docs.py --check   # root <-> LABSUS README/LICENSE byte
 
 # ── Frontend defense lines (per suite) ──────────────────────────────────
 node web/test/test_dom.js              # 342 assertions: shell structure / dual-entry parity / bug regressions
-node web/test/stage_boot_check.js      # 46 assertions: module order / TDZ / 3 stages x 20 frames
+node web/test/stage_boot_check.js      # 47 assertions: module order / TDZ / 3 stages x 20 frames
 node web/test/test_lap_15dof.js        # 23 assertions: 2 laps of 5.45 km + 6 powertrain parity checks
 node web/test/test_15dof_steady.js     # 14 assertions: analytic steady-state anchors for the 15-DOF kernel
 node web/test/test_powertrain.js       # 625 assertions (7 powertrain architectures)
@@ -215,7 +215,8 @@ LABSUS/                           # Engineering Root Directory
 │   │   ├── 08-interact.js        # State persistence & viewport interaction
 │   │   ├── 09-track.js           # TPHYS physics engine & track playback
 │   │   ├── 10-eval.js            # Comprehensive engineering report & racing line planner
-│   │   ├── 11-stages.js          # 15-DOF hill-climb / skidpad / SIC track stages
+│   │   ├── 10b-vehicle-core.js   # 15-DOF vehicle physics core + autopilot (pure numeric layer)
+│   │   ├── 11-stages.js          # Stage layer: scenario orchestration / rendering / HUD / telemetry
 │   │   ├── 12-v4-arrange.js      # V4 UI layout orchestration & key results card
 │   │   ├── 13-engine-sound.js    # WebAudio dynamic RPM exhaust acoustic synthesizer
 │   │   ├── 14-tire-lab.js        # Tire Laboratory (MF5.2 Brush / Magic Formula fit)

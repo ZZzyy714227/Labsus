@@ -1661,7 +1661,7 @@ T("POWERTRAIN.setSpec(POWERTRAIN.defaultSpec());");
 /* ── 8.8 接线层（11-stages.js）源码扫描：本沙箱不加载 11-stages.js（见 7.8 前置断言），
       故沿用 7.14 先例做源码级断言，锁住 C2/I1/I3/C3 的接线不被回退 ── */
 console.log("--- 8.8 11-stages.js wiring source scan ---");
-const stSrc = fs.readFileSync(path.join(__dirname, "../js/11-stages.js"), "utf8");
+const stSrc = [fs.readFileSync(path.join(__dirname, "../js/10b-vehicle-core.js"), "utf8"), fs.readFileSync(path.join(__dirname, "../js/11-stages.js"), "utf8")].join("\n");
 assert(stSrc.indexOf("(ctrl.throttle > 1e-6) ? (throttleCmd / ctrl.throttle) : 1") >= 0,
   "8.8 C2 接线：松油门 tcsScale = 1（TCS 只在给油切驱动时介入）");
 assert(stSrc.indexOf("(throttleCmd / ctrl.throttle) : 0") < 0,

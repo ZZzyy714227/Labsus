@@ -95,7 +95,7 @@ const T = code => vm.runInContext(code, ctx);
 
 for (const f of ["01-core.js", "02-presets.js", "03-mechanism.js", "04-dynamics.js",
   "05-scene3d.js", "06-ui-panels.js", "07-plots.js", "08-interact.js",
-  "09-track.js", "10-eval.js", "11-stages.js", "14-tire-lab.js"]) {
+  "09-track.js", "10-eval.js", "10b-vehicle-core.js", "11-stages.js", "14-tire-lab.js"]) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, "../js", f), "utf8"), ctx);
 }
 

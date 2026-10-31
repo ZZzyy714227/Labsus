@@ -29,7 +29,7 @@ const ctx = {
 ctx.globalThis = ctx; ctx.window.document = stubDoc; ctx.window.addEventListener = _n;
 ctx.window.matchMedia = () => ({ matches: false }); ctx.CIRCUIT_STAGE = undefined;
 vm.createContext(ctx);
-const st = fs.readFileSync(path.join(ROOT, "web/js/11-stages.js"), "utf8");
+const st = [fs.readFileSync(path.join(ROOT, "web/js/10b-vehicle-core.js"), "utf8"), fs.readFileSync(path.join(ROOT, "web/js/11-stages.js"), "utf8")].join("\n");
 vm.runInContext(st.slice(st.indexOf("class UniversalAutoPilot {"),
   st.indexOf("window.VehicleDynamics15DOF = VehicleDynamics15DOF;")) +
   "\nwindow.UAP=UniversalAutoPilot;window.VD=VehicleDynamics15DOF;", ctx);

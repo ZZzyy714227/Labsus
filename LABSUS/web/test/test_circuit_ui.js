@@ -144,7 +144,7 @@ ctx.window = Object.assign(ctx.window, ctx);
 const modules = [
   'js/01-core.js', 'js/02-presets.js', 'js/03-mechanism.js', 'js/04-dynamics.js',
   'js/05-scene3d.js', 'js/06-ui-panels.js', 'js/07-plots.js', 'js/08-interact.js',
-  'js/09-track.js', 'js/10-eval.js', 'js/11-stages.js'
+  'js/09-track.js', 'js/10-eval.js', 'js/10b-vehicle-core.js', 'js/11-stages.js'
 ];
 
 for (const m of modules) {

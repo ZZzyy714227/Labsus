@@ -90,7 +90,7 @@ function loadReal(webDir) {
   // CIRCUIT_STAGE.mu 是 step() 读路面 μ 的来源（typeof 守卫），测试里需要可注入
   ctx.CIRCUIT_STAGE = undefined;
   vm.createContext(ctx);
-  const st = fs.readFileSync(path.join(webDir, 'js', '11-stages.js'), 'utf8');
+  const st = [fs.readFileSync(path.join(webDir, 'js', '10b-vehicle-core.js'), 'utf8'), fs.readFileSync(path.join(webDir, 'js', '11-stages.js'), 'utf8')].join('\n');
   const cS = st.indexOf('class VehicleDynamics15DOF {');
   const cE = st.indexOf('window.VehicleDynamics15DOF = VehicleDynamics15DOF;');
   if (cS < 0 || cE < 0 || cE <= cS) throw new Error('无法定位 VehicleDynamics15DOF 类边界');
@@ -197,7 +197,7 @@ function runChecks(webDir, ok, fail, opts) {
     `峰值角 ${cE.peakAlphaDeg.toFixed(2)}° vs ${c0.peakAlphaDeg.toFixed(2)}°）`);
 
   /* ── 7. 外倾推力系数 Cg 与引擎同式（Cg·γ·Fz，缺省 6.0）─────── */
-  const stagesSrc = fs.readFileSync(path.join(webDir, 'js', '11-stages.js'), 'utf8');
+  const stagesSrc = [fs.readFileSync(path.join(webDir, 'js', '10b-vehicle-core.js'), 'utf8'), fs.readFileSync(path.join(webDir, 'js', '11-stages.js'), 'utf8')].join('\n');
   ok(/tireCalib|TIRE_MF_QS/.test(stagesSrc),
     'G23-P1b/7: 11-stages.js 引用轮胎标定数据（tireCalib / TIRE_MF_QS）');
   ok(/Cg/.test(stagesSrc),

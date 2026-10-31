@@ -91,7 +91,7 @@ function loadReal(webDir) {
 
   // 11-stages.js：只切出 UniversalAutoPilot 类（紧邻 VehicleDynamics15DOF 之前），
   // 避开整个文件的 DOM/舞台顶层依赖。
-  const stagesSrc = fs.readFileSync(path.join(webDir, 'js', '11-stages.js'), 'utf8');
+  const stagesSrc = [fs.readFileSync(path.join(webDir, 'js', '10b-vehicle-core.js'), 'utf8'), fs.readFileSync(path.join(webDir, 'js', '11-stages.js'), 'utf8')].join('\n');
   const cStart = stagesSrc.indexOf('class UniversalAutoPilot {');
   const cEnd = stagesSrc.indexOf('class VehicleDynamics15DOF {');
   if (cStart < 0 || cEnd < 0 || cEnd <= cStart) throw new Error('无法定位 UniversalAutoPilot 类边界');

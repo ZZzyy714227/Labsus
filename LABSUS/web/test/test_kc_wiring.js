@@ -82,7 +82,7 @@ function loadReal(webDir) {
   ctx.globalThis = ctx;
   vm.createContext(ctx);
 
-  const stagesSrc = fs.readFileSync(path.join(webDir, 'js', '11-stages.js'), 'utf8');
+  const stagesSrc = [fs.readFileSync(path.join(webDir, 'js', '10b-vehicle-core.js'), 'utf8'), fs.readFileSync(path.join(webDir, 'js', '11-stages.js'), 'utf8')].join('\n');
   const cS = stagesSrc.indexOf('class VehicleDynamics15DOF {');
   const cE = stagesSrc.indexOf('window.VehicleDynamics15DOF = VehicleDynamics15DOF;');
   if (cS < 0 || cE < 0 || cE <= cS) throw new Error('无法定位 VehicleDynamics15DOF 类边界');
@@ -218,7 +218,7 @@ function runChecks(webDir, ok, fail, opts) {
   ok(!badErr, `G23/7: swF.rows 为空时不抛错${badErr ? '（' + badErr.message + '）' : ''}`);
 
   /* ── 8. 源码级守卫：硬编码常数不得再是唯一来源 ──────────────── */
-  const stagesSrc = fs.readFileSync(path.join(webDir, 'js', '11-stages.js'), 'utf8');
+  const stagesSrc = [fs.readFileSync(path.join(webDir, 'js', '10b-vehicle-core.js'), 'utf8'), fs.readFileSync(path.join(webDir, 'js', '11-stages.js'), 'utf8')].join('\n');
   ok(/sampleSweep\s*\(/.test(stagesSrc),
     'G23/8: 11-stages.js 中出现 sampleSweep( 调用（K&C LUT 已接线）');
   ok(/swF|swR/.test(stagesSrc),

@@ -84,7 +84,7 @@
   > ⚠️ 口径说明：上述实现是「6 车身 DOF + 4 轮自转 + 4 个运动学从动轮」，
   > 不是教科书的「6 车身 + 4 非簧载垂向 + 4 轮自转」形式。后果与升级路径
   > 登记于 `INTENTIONAL_DIFFERENCES.md`「15-DOF 口径」与
-  > `web/js/11-stages.js` 类声明上方的口径注释。引擎侧
+  > `web/js/10b-vehicle-core.js` 类声明上方的口径注释。引擎侧
   > `/api/v3/chassis/simulate_track` 则是平面 3-DOF + 准静态侧倾/俯仰代数解，
   > 与前端舞台**不是同一个模型**（跨语言对拍针对的是内置 TPHYS 闭包，非本内核）。
 - **Pacejka Magic Formula 复合滑移轮胎模型**：
@@ -161,7 +161,7 @@ python scripts/sync_root_docs.py --check   # 根 ↔ LABSUS 的 README/LICENSE �
 
 # ── 前端防线（逐套件）──────────────────────────────────────────────
 node web/test/test_dom.js              # 342 断言：薄壳结构 / 双端同构 / 已知 bug 回访
-node web/test/stage_boot_check.js      # 46 断言：模块加载顺序 / TDZ / 三舞台 20 帧无抛错
+node web/test/stage_boot_check.js      # 47 断言：模块加载顺序 / TDZ / 三舞台 20 帧无抛错
 node web/test/test_lap_15dof.js        # 23 断言：2 圈 5.45km 全闭环 + 6 项 powertrain parity
 node web/test/test_15dof_steady.js     # 14 断言：15-DOF 内核解析稳态锚（自由落体/静载/自行车模型/左右对称）
 node web/test/test_powertrain.js       # 625 断言：七架构动力总成
@@ -215,7 +215,8 @@ LABSUS/                           # 工程代码根（下同）
 │   │   ├── 08-interact.js        # 持久化与视图交互
 │   │   ├── 09-track.js           # TPHYS 离线物理闭包与赛道回放
 │   │   ├── 10-eval.js            # 综合评价报告与赛车线路径规划
-│   │   ├── 11-stages.js          # 15-DOF 爬坡/定圆/上海赛道瞬态仿真舞台
+│   │   ├── 10b-vehicle-core.js   # 15-DOF 车辆物理内核 + 自动驾驶（P2 拆出的纯数值层）
+│   │   ├── 11-stages.js          # 舞台层：场景编排 / 渲染 / HUD / 遥测
 │   │   ├── 12-v4-arrange.js      # V4 布局编排 / 结论卡 / 诊断建议
 │   │   ├── 13-engine-sound.js    # WebAudio 动态转速与排气声浪合成器
 │   │   ├── 14-tire-lab.js        # 轮胎实验室 (MF5.2 刷子/Magic Formula 拟合)

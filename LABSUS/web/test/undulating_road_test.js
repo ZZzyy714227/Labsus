@@ -109,7 +109,7 @@ const ctx = vm.createContext(sb);
 const files = [
   '01-core.js', '02-presets.js', '03-mechanism.js', '04-dynamics.js',
   '05-scene3d.js', '06-ui-panels.js', '07-plots.js', '08-interact.js',
-  '09-track.js', '10-eval.js', '11-stages.js'
+  '09-track.js', '10-eval.js', '10b-vehicle-core.js', '11-stages.js'
 ];
 
 for (const f of files) {
