@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.11+](https://img.shields.io/badge/Python-3.11%2B-brightgreen.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-v3%20REST%20API-009688.svg)](https://fastapi.tiangolo.com/)
-[![Tests: 100% Passed](https://img.shields.io/badge/pytest-323%20passed-success.svg)]()
+[![Tests: 100% Passed](https://img.shields.io/badge/pytest-337%20passed-success.svg)]()
 [![Platform: Web & Desktop](https://img.shields.io/badge/Platform-Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-orange.svg)]()
 
 > A modern full-chassis suspension engineering workbench tailored for **Formula Student (FSAE), FIA GT3 racing, and Baja off-road vehicles**.
@@ -150,7 +150,7 @@ python tools/gates/check_all.py           # 21 checks: ruff / pytest / 16 node s
 python tools/gates/check_all.py --quick   # 3 sub-second checks (ruff / provenance / docs)
 
 # ── Python engine: physics assertions / gates / API-contract guard / TPHYS parity / stress ──
-pytest engine/tests -q                 # 323 passed / 1 skipped (skip = OptimumK rows not entered, explicit)
+pytest engine/tests -q                 # 337 passed / 1 skipped (skip = OptimumK rows not entered, explicit)
                                        #   · test_api_contract            frontend/backend key-set contract
                                        #   · test_static_split_invariant  static load-split invariant
                                        #   · test_tire_width_balance      tire width -> cornering stiffness
@@ -227,7 +227,7 @@ LABSUS/                           # Engineering Root Directory
 │   ├── server.py                 # FastAPI server entry (:8001)
 │   ├── src/                      # Solvers (K&C / Bushing / Pacejka / Tire Fit / Transient)
 │   ├── data/                     # External data assets (sha256-locked, see src/provenance.py)
-│   └── tests/                    # pytest unit test suite (323 passed / 1 explicit skip)
+│   └── tests/                    # pytest unit test suite (337 passed / 1 explicit skip)
 ├── tools/gates/                  # One-command gate runner (single source of truth for CI)
 ├── scripts/                      # Utility and automation scripts
 ├── requirements.txt              # Python runtime dependencies (exact verified pins)

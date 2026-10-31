@@ -47,6 +47,8 @@ M5 的前后轴静载对调就是三内核一致地错 —— 双端对拍与镜
 | 惯量恒等式 / 能量单调 / 步长收敛 / 阿克曼 / ISO 路面空间延迟 / 静载守恒 / 碰撞耗能 | `web/test/physics_audit.js`（**57 项，已进 CI**） | ✅ 在位 |
 | 数据资产内容 hash | `engine/tests/test_provenance.py` | ✅ 在位（P0-3） |
 | K&C 样条开关零影响验证 | `engine/tests/test_transient.py` | ✅ 在位（P1 新增 3 项） |
+| 求解结果契约（残差门限单一真源 / 非有限归一 / 收敛状态） | `engine/tests/test_solver_contract.py` | ✅ 在位（P1-2 新增 7 项） |
+| 输入边界（设计位/载荷/半径/轮距/MF 形状参数） | `engine/tests/test_f45_validation.py` | ✅ 在位（P1-2 新增 7 项） |
 
 ### L2 · 跨实现对拍 —— 只覆盖一条链
 
@@ -110,3 +112,4 @@ M5 的前后轴静载对调就是三内核一致地错 —— 双端对拍与镜
 | 日期 | 变更 |
 |---|---|
 | 2026-10-31 | 首版。`physics_audit.js` 57 项进 CI（`--ci` 跳过 2 项性能阈值）；CI 与本地清单收敛到 `tools/gates/check_all.py` 单一真源；数据资产内容 hash 锁定 |
+| 2026-10-31 | P1-2：求解结果契约（`converged`/`status`/`message`/`degraded`）与输入边界校验落地；引擎 pytest 337 项 |

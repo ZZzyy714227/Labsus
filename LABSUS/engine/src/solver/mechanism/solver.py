@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+import math
 import time
 from dataclasses import dataclass
 
@@ -23,6 +24,9 @@ from .models import Mechanism
 
 _STATE_IDS = ["UP1", "UP2", "UP3", "UP4", "UP5", "FL1"]
 
+# 约束残差门限 mm（G1 规格）。ok 的历史语义就是"残差 < 该值"。
+RESIDUAL_TOL_MM = 0.02
+
 
 @dataclass
 class SolveReport:
@@ -33,6 +37,21 @@ class SolveReport:
     rocker_ok: bool = False
     rocker_theta: float | None = None
     damper_len: float | None = None
+    # ── P1-2（2026-10-31）：优化器终止状态，可作为独立判断依据 ─────────────
+    # 为什么单独暴露：`ok` 只看残差。scipy 可能在 max_nfev 处停下（status=0，
+    # success=False）而残差恰好已低于 0.02mm —— 这种解**可以用**，但它不是
+    # "收敛"来的，不该与真正收敛的解混淆。
+    # 这里保持 `ok` 的历史语义（残差判据）不变，另给 converged/status/message，
+    # 让调用方按需区分"数值上够好"与"优化器正常收敛"。
+    converged: bool = True     # scipy res.success
+    status: int = 0            # scipy res.status（0=命中容差或迭代上限，>0=收敛）
+    message: str = ""          # scipy res.message（原始文本，便于定位）
+    residual_tol_mm: float = RESIDUAL_TOL_MM
+
+    @property
+    def degraded(self) -> bool:
+        """残差合格但优化器未正常收敛 ⇒ 可用但需告警。"""
+        return bool(self.ok and not self.converged)
 
 
 def _state(m: Mechanism) -> np.ndarray:
@@ -172,15 +191,24 @@ def solve_pose(
     res = least_squares(fun, _state(m), method="trf", xtol=tol, ftol=tol, gtol=tol, max_nfev=max_nfev)
     _apply(m, res.x)
     rocker_ok, theta, dmp_len = solve_rocker(m)
+    # P1-2：非有限残差（NaN/Inf）必须显式归一为 inf。
+    # 旧式 `np.max(np.abs(...))` 会得到 nan，而 `nan < 0.02` 恰好是 False ——
+    # 行为"对"但报告里留下一个 nan，下游拿它做比较/格式化时是隐患。
     r = float(np.max(np.abs(res.fun))) if res.fun.size else 0.0
+    if not math.isfinite(r):
+        r = math.inf
     return SolveReport(
         residual=r,
         iterations=int(res.nfev),
-        ok=bool(r < 0.02),
+        ok=bool(r < RESIDUAL_TOL_MM),
         ms=(time.perf_counter() - t0) * 1000.0,
         rocker_ok=rocker_ok,
         rocker_theta=theta,
         damper_len=dmp_len,
+        converged=bool(res.success),
+        status=int(res.status),
+        message=str(res.message),
+        residual_tol_mm=RESIDUAL_TOL_MM,
     )
 
 

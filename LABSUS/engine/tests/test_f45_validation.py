@@ -116,3 +116,74 @@ def test_chassis_rejects_nonfinite_axle_point():
         }
     }
     assert client.post("/api/v3/chassis/solve", json=body).status_code == 422
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# P1-2（2026-10-31）：输入契约补强 —— DesignSpec / CaseLoad / 半径与轮距 / MF 形状参数
+# ═══════════════════════════════════════════════════════════════════════════
+# 此前这些字段只有 float 类型约束：NaN/Inf 与 0/负半径能穿过服务边界，
+# 症状出现在很远的下游（"某轮 Fz 是 nan"、"接地点反了"）。
+
+
+def test_pose_rejects_nonfinite_design():
+    """设计位 NaN 会让"travel=0 精确返回设计 cam/toe"这条自洽锚静默失效。"""
+    for bad in ({"camber_deg": "NaN"}, {"toe_deg": "Infinity"}):
+        r = client.post("/api/v3/solve/pose", json={"design": bad})
+        assert r.status_code == 422, bad
+
+
+def test_pose_rejects_absurd_design_angle():
+    """|camber|>90° 不像真实设计位（防止单位错填，如把弧度当度）。"""
+    r = client.post("/api/v3/solve/pose", json={"design": {"camber_deg": 120.0}})
+    assert r.status_code == 422
+
+
+def test_pose_rejects_nonpositive_tire_radius():
+    """P1-2：tire_radius 是接地点计算的尺度，<=0 会让接地点反向/重合。"""
+    for bad in (0.0, -325.0):
+        r = client.post("/api/v3/solve/pose", json={"tire_radius": bad})
+        assert r.status_code == 422, bad
+
+
+def test_pose_rejects_nonfinite_travel():
+    r = client.post("/api/v3/solve/pose", json={"travel": "NaN"})
+    assert r.status_code == 422
+
+
+def test_bump_rejects_bad_case_load_and_geometry_scale():
+    """准静态载荷 6 分量非有限、轮距 <=0 均 422。"""
+    assert client.post("/api/v3/kandc/bump",
+                       json={"case": {"fz": "NaN"}}).status_code == 422
+    assert client.post("/api/v3/kandc/bump",
+                       json={"case": {"mx": "Infinity"}}).status_code == 422
+    assert client.post("/api/v3/kandc/roll",
+                       json={"track_width": 0.0}).status_code == 422
+    assert client.post("/api/v3/kandc/roll",
+                       json={"track_width": -1580.0}).status_code == 422
+    assert client.post("/api/v3/kandc/bump",
+                       json={"tire_radius": 0.0}).status_code == 422
+
+
+def test_tire_rejects_bad_shape_params():
+    """P1-2：Cy/Ey/LS/FzRef 是 MF 形状参数，非法值会静默污染整条力曲线。"""
+    body = {
+        "vehicle": {
+            "wheelbase_mm": 1620.0, "mass_kg": 480.0, "sprung_mass_kg": 420.0,
+            "hcg_mm": 320.0, "hs_mm": 330.0,
+            "front": {"points": _base_points(), "arch": "pushrod",
+                      "camber_deg": -1.2, "toe_deg": 0.05, "tire_radius": 305.0,
+                      "spring_rate": 110.0, "spring_mass_kg": 300.0,
+                      "unsprung_kg": 38.0},
+            "rear": {"points": _base_points(), "arch": "pullrod",
+                     "camber_deg": -1.5, "toe_deg": 0.1, "tire_radius": 310.0,
+                     "spring_rate": 130.0, "spring_mass_kg": 340.0,
+                     "unsprung_kg": 42.0},
+        },
+        "track": [{"x": 0.0, "y": 0.0, "target_speed": 10.0},
+                  {"x": 50.0, "y": 0.0, "target_speed": 10.0}],
+    }
+    for tire in ({"Cy": 0.0}, {"Cy": -1.0}, {"Ey": "NaN"},
+                 {"LS": -0.1}, {"FzRef": 0.0}, {"Ls": -0.5}):
+        bad = {**body, "tire": tire}
+        assert client.post("/api/v3/chassis/simulate_track",
+                           json=bad).status_code == 422, tire

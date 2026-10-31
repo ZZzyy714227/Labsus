@@ -77,19 +77,45 @@ class SweepSpec(BaseModel):
 
 
 class DesignSpec(BaseModel):
-    """设计位轮轴参数（前端 PRESETS cam0/toe0；决定 camber/toe 的绝对基准）。"""
+    """设计位轮轴参数（前端 PRESETS cam0/toe0；决定 camber/toe 的绝对基准）。
+
+    P1-2（2026-10-31）：补有限性与物理范围校验。此前只靠 pydantic 的 float 类型，
+    NaN/Inf 可直达角度基准 —— 会让"设计位自洽锚"（travel=0 精确返回设计 cam/toe）
+    在无任何报错的情况下失效。
+    """
     camber_deg: float = -1.2
     toe_deg: float = 0.05
 
+    @model_validator(mode="after")
+    def _check(self):
+        for name, v in (("camber_deg", self.camber_deg), ("toe_deg", self.toe_deg)):
+            if not math.isfinite(v):
+                raise ValueError(f"design.{name} must be finite, got {v!r}")
+            if abs(v) > 90.0:
+                raise ValueError(f"design.{name} |{v}| > 90° 不像真实设计位，拒绝")
+        return self
+
 
 class CaseLoad(BaseModel):
-    """接地点准静态载荷（N / N·mm，全局坐标）。"""
+    """接地点准静态载荷（N / N·mm，全局坐标）。
+
+    P1-2：六分量全部要求有限。此前 NaN 载荷会穿过准静态解算，最终表现为
+    "某轮 Fz 是 nan" 这种远离源头的症状，定位成本高。
+    """
     fx: float = 0.0
     fy: float = 0.0
     fz: float = 3000.0
     mx: float = 0.0
     my: float = 0.0
     mz: float = 0.0
+
+    @model_validator(mode="after")
+    def _check(self):
+        for name in ("fx", "fy", "fz", "mx", "my", "mz"):
+            v = getattr(self, name)
+            if not math.isfinite(v):
+                raise ValueError(f"case.{name} must be finite, got {v!r}")
+        return self
 
 
 class KandcRequest(BaseModel):
@@ -101,8 +127,10 @@ class KandcRequest(BaseModel):
     case: CaseLoad = Field(default_factory=CaseLoad)
     design: DesignSpec = Field(default_factory=DesignSpec)
     compliance_axis: str = "fy"                    # compliance 工况扫掠力轴：fx|fy|mz
-    tire_radius: float = 325.0                     # 接地点计算
-    track_width: float = 1580.0                    # roll 工况两侧轮距（mm）
+    # P1-2：轮胎半径与轮距是接地点/侧倾刚度的**除数量纲**，<=0 会让结果静默失真
+    # （接地点偏移反向、roll 工况轮距参与分母）。要求有限且严格为正。
+    tire_radius: float = Field(default=325.0, gt=0)   # 接地点计算
+    track_width: float = Field(default=1580.0, gt=0)  # roll 工况两侧轮距（mm）
 
     @model_validator(mode="after")
     def _check(self):
@@ -116,6 +144,8 @@ class KandcRequest(BaseModel):
             _check_points_values(self.points)   # F-45：3 分量 + 有限性
         if self.compliance_axis not in ("fx", "fy", "mz"):
             raise ValueError("compliance_axis must be fx|fy|mz")
+        if not (math.isfinite(self.tire_radius) and math.isfinite(self.track_width)):
+            raise ValueError("tire_radius / track_width must be finite")
         return self
 
 
@@ -136,11 +166,17 @@ class PoseRequest(BaseModel):
     arch: str = "pushrod"
     travel: float = 0.0
     rack: float = 0.0
-    tire_radius: float = 325.0
+    # P1-2：有限性 + 正值校验（理由同 KandcRequest）
+    tire_radius: float = Field(default=325.0, gt=0)
     design: DesignSpec = Field(default_factory=DesignSpec)
 
     @model_validator(mode="after")
     def _check(self):
+        for name, v in (("travel", self.travel), ("rack", self.rack)):
+            if not math.isfinite(v):
+                raise ValueError(f"{name} must be finite, got {v!r}")
+        if not math.isfinite(self.tire_radius):
+            raise ValueError("tire_radius must be finite")
         if self.points is not None:
             bad = set(self.points) - DWB_KEYS
             if bad:
@@ -430,9 +466,21 @@ class TireParams(BaseModel):
             raise ValueError(f"By must be finite > 0, got {self.By}")
         if not math.isfinite(self.kappa_peak) or not (0.0 < self.kappa_peak <= 1.0):
             raise ValueError(f"kappa_peak must be finite in (0,1], got {self.kappa_peak}")
+        # P1-2：Cy 出现在峰值滑移率解析式 tan(π/(2·Cy)) 内，Cy=0 直接除零；
+        # Ey 与 LS 同属 MF 形状参数，非有限值会静默污染整条力曲线。
+        if not math.isfinite(self.Cy) or self.Cy <= 0:
+            raise ValueError(f"Cy must be finite > 0, got {self.Cy}")
+        if not math.isfinite(self.Ey):
+            raise ValueError(f"Ey must be finite, got {self.Ey}")
+        if not (math.isfinite(self.LS) and self.LS >= 0):
+            raise ValueError(f"LS must be finite >= 0, got {self.LS}")
+        if self.FzRef is not None and not (math.isfinite(self.FzRef) and self.FzRef > 0):
+            raise ValueError(f"FzRef must be finite > 0 when given, got {self.FzRef}")
         for name, val in (("Cg", self.Cg), ("Ls", self.Ls), ("Fy0", self.Fy0)):
             if not math.isfinite(val):
                 raise ValueError(f"{name} must be finite, got {val}")
+        if self.Ls < 0:
+            raise ValueError(f"Ls（松弛长度）must be >= 0, got {self.Ls}")
         return self
 
 

@@ -60,7 +60,15 @@ def corner_pose(ax: AxleSpec, points: dict, travel: float, rack: float,
     rep = solve_pose(mech, travel, rack)
     m = pose_metrics(mech, ax.tire_radius,
                      DesignSpec(camber_deg=ax.camber_deg, toe_deg=ax.toe_deg))
-    warn = [] if rep.ok else [f"{'L' if left else 'R'} corner residual {rep.residual:.3f} mm"]
+    side = "L" if left else "R"
+    if not rep.ok:
+        warn = [f"{side} corner residual {rep.residual:.3f} mm"]
+    elif rep.degraded:
+        # P1-2：残差达标但优化器未正常收敛 ⇒ 可用但必须可见
+        warn = [f"{side} corner converged=False (status={rep.status}: {rep.message})，"
+                f"residual {rep.residual:.4f} mm 仍在门限内"]
+    else:
+        warn = []
     m["residual"] = float(rep.residual)
     return m, float(rep.residual), warn
 

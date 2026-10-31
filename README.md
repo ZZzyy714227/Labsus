@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.11+](https://img.shields.io/badge/Python-3.11%2B-brightgreen.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-v3%20REST%20API-009688.svg)](https://fastapi.tiangolo.com/)
-[![Tests: 100% Passed](https://img.shields.io/badge/pytest-323%20passed-success.svg)]()
+[![Tests: 100% Passed](https://img.shields.io/badge/pytest-337%20passed-success.svg)]()
 [![Platform: Web & Desktop](https://img.shields.io/badge/Platform-Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-orange.svg)]()
 
 > 面向 **FSAE 方程式赛车、GT3 房车赛车及全地形越野车** 的现代化全车底盘悬架工程分析平台。
@@ -150,7 +150,7 @@ python tools/gates/check_all.py           # 21 项：ruff / pytest / 16 套 node
 python tools/gates/check_all.py --quick   # 3 项秒级检查（ruff / 溯源 / 文档）
 
 # ── Python 引擎：物理断言 / 门禁 / 契约守卫 / TPHYS 双端对拍 / 对抗应力 ──
-pytest engine/tests -q                 # 323 passed / 1 skipped（skip = OptimumK 未录入，显式）
+pytest engine/tests -q                 # 337 passed / 1 skipped（skip = OptimumK 未录入，显式）
                                        #   · test_api_contract          前后端键集契约
                                        #   · test_static_split_invariant 静态载荷分配不变量
                                        #   · test_tire_width_balance      胎宽→侧偏刚度配平
@@ -227,7 +227,7 @@ LABSUS/                           # 工程代码根（下同）
 │   ├── server.py                 # FastAPI 入口服务 (:8001)
 │   ├── src/                      # 求解器核心源码 (K&C/衬套/Pacejka/轮胎标定/瞬态)
 │   ├── data/                     # 外部数据资产（锁 sha256，见 src/provenance.py）
-│   └── tests/                    # pytest 单元测试套件 (323 项通过 / 1 显式 skip)
+│   └── tests/                    # pytest 单元测试套件 (337 项通过 / 1 显式 skip)
 ├── tools/gates/                  # 一键全门禁运行器（check_all.py，CI 清单单一真源）
 ├── scripts/                      # 开发与运维工具脚本
 ├── requirements.txt              # Python 运行依赖（精确锁定已验证版本）

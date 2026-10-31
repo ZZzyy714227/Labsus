@@ -95,6 +95,22 @@ def make_bushings(specs: list[BushingSpec],
     return out
 
 
+def _pose_warnings(rep) -> list[str]:
+    """把 SolveReport 的三种结果翻译成用户可见的 warnings（P1-2）。
+
+    · 残差合格且优化器收敛 ⇒ 空列表（正常路径）；
+    · 残差合格但优化器未正常收敛（status/message 指向迭代上限等）⇒ 告警，
+      因为这类解**可用但不是收敛来的**，与真正收敛的解不该混淆；
+    · 残差不合格 ⇒ 报残差与门限。
+    """
+    if not rep.ok:
+        return [f"kinematics residual {rep.residual:.3f} mm > {rep.residual_tol_mm} mm"]
+    if rep.degraded:
+        return [f"kinematics converged=False (status={rep.status}: {rep.message}); "
+                f"residual {rep.residual:.4f} mm 仍在门限内，结果可用但非收敛解"]
+    return []
+
+
 def _qsload(c: CaseLoad) -> QSLoad:
     return QSLoad(fx=c.fx, fy=c.fy, fz=c.fz, mx=c.mx, my=c.my, mz=c.mz)
 
@@ -248,7 +264,7 @@ def _solve_point(points, bushings, case: CaseLoad, travel: float, rack: float,
         return pose_metrics(mech, tire_R, design), status, warn, res
     rep = solve_pose(mech, travel, rack)
     status = "VALID" if rep.ok else "SOLVER_FAILED"
-    warn = [] if rep.ok else [f"kinematics residual {rep.residual:.3f} mm > 0.02"]
+    warn = _pose_warnings(rep)
     return pose_metrics(mech, tire_R, design), status, warn, None
 
 
@@ -446,7 +462,7 @@ def run_pose(req: PoseRequest) -> PoseResponse:
         travel=req.travel, rack=req.rack, pose=pose,
         metrics={k: (None if v is None else round(float(v), 6)) for k, v in m.items()},
         rocker=rocker,
-        warnings=[] if rep.ok else [f"kinematics residual {rep.residual:.3f} mm"],
+        warnings=_pose_warnings(rep),
     )
 
 
