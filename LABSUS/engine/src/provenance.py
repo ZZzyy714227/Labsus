@@ -23,16 +23,32 @@
 
 ⚠ 一个文件可同时是 `vendored` 且内含 `lab-fit`/`proposed` 数据 —— 这种情况在 `note`
 里必须写清"文件级别"与"内容级别"的区别。
+
+## 内容 hash（P0-3，2026-10-31 补强）
+
+路径级登记只能防"漏登记"，防不住"文件被换掉"。外部/实测资产（`vendored` /
+`measured` / `lab-fit` / `literature`）必须登记 `sha256`，由 `hash_mismatches()`
+逐字节校验：内容变了就红，而不是等三个月后有人发现标定依据被悄悄替换。
+
+`derived` 资产不强制：它由本项目代码重新生成，内容变化是预期行为。
 """
 
 from __future__ import annotations
 
+import hashlib
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 DATA_ROOT = Path(__file__).resolve().parents[1] / "data"
 
 ALLOWED_LEVELS = ("measured", "lab-fit", "literature", "proposed", "derived", "vendored")
+
+# 必须锁内容 hash 的级别：这些是**外部/实测**资产，静默改动会污染标定依据。
+# `derived` 不要求：它由本项目代码生成，重新生成时内容本就允许变化。
+HASH_REQUIRED_LEVELS = ("measured", "lab-fit", "literature", "vendored")
+
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 @dataclass(frozen=True)
@@ -42,6 +58,7 @@ class AssetProvenance:
     path: str                      # 相对 engine/data 的路径
     level: str                     # 见 ALLOWED_LEVELS
     source: str                    # 出处（URL / 生成脚本 / 实测说明）
+    sha256: str = ""               # 内容 SHA-256（外部/实测资产**必填**，derived 可空）
     note: str = ""                 # 已知局限、缺陷、使用禁区
     content_level: str = ""        # 可选：文件级别之外，内容本身的可信级别
     tags: tuple[str, ...] = field(default_factory=tuple)
@@ -53,12 +70,19 @@ class AssetProvenance:
             raise ValueError(f"{self.path}: content_level={self.content_level!r} 非法")
         if not self.source.strip():
             raise ValueError(f"{self.path}: source 不得为空（必须能追到出处）")
+        if self.sha256 and not _SHA256_RE.match(self.sha256):
+            raise ValueError(f"{self.path}: sha256 必须是小写 64 位十六进制")
+        if self.level in HASH_REQUIRED_LEVELS and not self.sha256:
+            raise ValueError(
+                f"{self.path}: level={self.level} 属外部/实测资产，必须锁内容 sha256"
+                "（否则文件被静默替换无从发现）")
 
 
 REGISTRY: tuple[AssetProvenance, ...] = (
     AssetProvenance(
         path="ttc/hoosier-43075-r20-simple.xml",
         level="vendored",
+        sha256="3452fc976022bed56fa9e784a85c3004246d2427ad5de081841af5af7e90504e",
         content_level="lab-fit",
         source=("github.com/Alphabet1671/Simplified-Vehicle-Models :: "
                 "models/tires/hoosier-43075-r20-simple.xml → TTC B2356 runs 8/72"),
@@ -70,6 +94,7 @@ REGISTRY: tuple[AssetProvenance, ...] = (
     AssetProvenance(
         path="ttc/iem24_murphy_real_unitire.xml",
         level="vendored",
+        sha256="cc448d95a65ec8c95386dd8b62b2590a8ee4cfe68c6d41e3de342097c3cc2a8e",
         content_level="derived",
         source=("同源派生：hoosier-43075-r20-simple.xml 的四个 mu_0_*/mu_s_* 各 ×2/3"),
         note="2/3 为 TTC Round 9 队伍经验的**路面先验**，非本车验证；用途仅作路面量级参考",
@@ -78,6 +103,7 @@ REGISTRY: tuple[AssetProvenance, ...] = (
     AssetProvenance(
         path="dampers/multimatic_dssv_vc01_front.csv",
         level="vendored",
+        sha256="c0f0d9e010b6bb05fe75ae5720a53d70d31aff6d2c4297860651a6e4f8c5e06b",
         content_level="measured",
         source=("github.com/Alphabet1671/Simplified-Vehicle-Models :: tests/fixtures/damper_vc01.csv"
                 "（Multimatic DSSV VC01 实车台架数据；上游私有工作簿标识未入库）"),
@@ -134,6 +160,38 @@ def requires_level(path: str, *, min_levels: tuple[str, ...]) -> bool:
     return effective in min_levels
 
 
+def file_sha256(path: Path) -> str:
+    """文件内容 SHA-256（小写十六进制）。分块读，避免大文件整块进内存。"""
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def hash_mismatches(root: Path | None = None) -> list[tuple[str, str, str]]:
+    """校验已锁 hash 的资产内容，返回 [(相对路径, 登记值, 实际值)]。
+
+    空列表 = 外部/实测资产**逐字节未被改动**。
+    只检查 `sha256` 非空的条目：`derived` 资产允许重新生成后变化。
+    文件缺失不在此列（那是 `stale_entries()` 的职责）。
+    """
+    base = Path(root) if root is not None else DATA_ROOT
+    out: list[tuple[str, str, str]] = []
+    for item in REGISTRY:
+        if not item.sha256:
+            continue
+        p = base / item.path
+        if not p.is_file():
+            continue
+        actual = file_sha256(p)
+        if actual != item.sha256:
+            out.append((item.path, item.sha256, actual))
+    return out
+
+
 def summarise() -> str:
     """一行摘要（供门禁输出）。"""
-    return f"{len(REGISTRY)} 个数据资产已登记，级别覆盖 {sorted({i.level for i in REGISTRY})}"
+    locked = sum(1 for i in REGISTRY if i.sha256)
+    return (f"{len(REGISTRY)} 个数据资产已登记（{locked} 个锁内容 hash），"
+            f"级别覆盖 {sorted({i.level for i in REGISTRY})}")

@@ -41,10 +41,11 @@ NODE_SUITES = (
 
 PROVENANCE_CMD = (
     "import sys;sys.path.insert(0,'engine');"
-    "from src.provenance import unregistered_files,stale_entries;"
-    "u=unregistered_files();s=stale_entries();"
-    "print('未登记:',u,'失效:',s);"
-    "sys.exit(1 if (u or s) else 0)"
+    "from src.provenance import unregistered_files,stale_entries,hash_mismatches,summarise;"
+    "u=unregistered_files();s=stale_entries();h=hash_mismatches();"
+    "print(summarise());"
+    "print('未登记:',u,'失效:',s,'hash不符:',[(p,e[:8],a[:8]) for p,e,a in h]);"
+    "sys.exit(1 if (u or s or h) else 0)"
 )
 
 

@@ -1,7 +1,18 @@
-# LABSUS engine 运行依赖（2026-08-30，F-73：环境依赖未声明）
+# LABSUS engine 运行依赖
+#
 # Python >= 3.11（开发基线 3.13）；安装：pip install -r requirements.txt
-fastapi>=0.110
-uvicorn>=0.29
-pydantic>=2.6
-numpy>=1.26
-scipy>=1.11
+#
+# ── 版本策略（P0-3，2026-10-31 收紧）──────────────────────────────────
+# 此前只写下限（如 fastapi>=0.110），任何一次 `pip install -r` 都可能装到
+# 与实测不同的版本 —— 本项目的物理断言（1e-13 级残差、0.51% 对拍）对
+# 数值库版本敏感，宽范围等于放弃复现性。
+# 现改为**精确锁定**：下列版本是在 Python 3.13 + Windows 上跑通全部 21 项
+# 门禁（ruff / pytest / 16 套 node / tphys_parity / 溯源 / 文档）的组合。
+#
+# 升级流程：改版本 → `python tools/gates/check_all.py` 全绿 → 再提交。
+# 升级后必须重跑 tphys_parity（跨语言物理对拍，门限 5%）与 physics_audit。
+fastapi==0.136.3
+uvicorn==0.49.0
+pydantic==2.13.4
+numpy==2.3.2
+scipy==1.16.1

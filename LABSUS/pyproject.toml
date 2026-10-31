@@ -12,7 +12,10 @@ description = "LABSUS 悬架运动学/K&C/准静态操稳计算引擎（FastAPI�
 requires-python = ">=3.11"
 readme = "README.md"
 license = { file = "LICENSE" }
-# 运行期依赖见 requirements.txt（此处仅登记元数据，避免与 pip 流程重复）
+# 运行期依赖的**唯一真源**是 requirements.txt（精确锁定已验证版本）。
+# 本表不参与安装：项目以源码方式运行（python engine/server.py / start.bat），
+# 不是发布到 PyPI 的分发包，也没有 [build-system]。此处留空是刻意的，
+# 不表示"零依赖"——不要据此推断可以用 pip install . 装起来。
 dependencies = []
 
 [tool.ruff]

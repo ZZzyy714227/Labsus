@@ -13,8 +13,11 @@ import pytest
 from src.provenance import (
     ALLOWED_LEVELS,
     DATA_ROOT,
+    HASH_REQUIRED_LEVELS,
     REGISTRY,
+    file_sha256,
     get,
+    hash_mismatches,
     requires_level,
     stale_entries,
     summarise,
@@ -89,3 +92,60 @@ def test_summary_is_informative():
     s = summarise()
     assert str(len(REGISTRY)) in s
     assert "登记" in s
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 内容 hash 锁定（P0-3，2026-10-31）
+# ═══════════════════════════════════════════════════════════════════════════
+# 路径级登记只能防"漏登记"，防不住"文件被换掉"。外部/实测资产必须锁 hash。
+
+
+def test_external_assets_must_declare_sha256():
+    """**核心契约**：外部/实测资产（vendored/measured/lab-fit/literature）必须锁 hash。"""
+    missing = [i.path for i in REGISTRY
+               if i.level in HASH_REQUIRED_LEVELS and not i.sha256]
+    assert not missing, (
+        "以下外部/实测资产未锁内容 sha256（文件被静默替换将无从发现）:\n  "
+        + "\n  ".join(missing))
+
+
+def test_derived_assets_may_omit_sha256():
+    """`derived` 允许不锁：它由本项目代码重新生成，内容变化是预期行为。"""
+    parity = get("diff_parity_cases.json")
+    assert parity.level == "derived"
+    assert parity.sha256 == "", "derived 资产不应强行锁 hash（会与重新生成冲突）"
+
+
+def test_registered_hashes_are_well_formed():
+    for item in REGISTRY:
+        if not item.sha256:
+            continue
+        assert len(item.sha256) == 64, item.path
+        assert item.sha256 == item.sha256.lower(), f"{item.path}: 必须小写"
+        int(item.sha256, 16)                      # 非法十六进制会抛 ValueError
+
+
+def test_file_contents_match_registered_hashes():
+    """**内容完整性**：已锁 hash 的资产必须逐字节未被改动。
+
+    触发场景：有人换了 vendored 台架数据却没更新登记（或反之）。
+    修法：确认改动是有意的 ⇒ 更新 REGISTRY 里的 sha256 并在 note 说明原因。
+    """
+    bad = hash_mismatches()
+    assert not bad, (
+        "数据资产内容与登记的 sha256 不一致（疑似被静默替换）:\n  "
+        + "\n  ".join(f"{p}: 登记 {e[:12]}… 实际 {a[:12]}…" for p, e, a in bad))
+
+
+def test_file_sha256_matches_hashlib(tmp_path=None):
+    """`file_sha256` 与标准库 hashlib 对同一字节序列给同一结果（控制实验）。"""
+    import hashlib
+    import tempfile
+    from pathlib import Path
+
+    payload = "a,b\n1,2\n".encode()
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "x.csv"
+        p.write_bytes(payload)
+        assert file_sha256(p) == hashlib.sha256(payload).hexdigest()
+        assert len(file_sha256(p)) == 64
