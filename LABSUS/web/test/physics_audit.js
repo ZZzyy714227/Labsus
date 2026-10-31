@@ -5,8 +5,12 @@
  * **没有** sim 性能埋点。这三件是 S13 真 15-DOF 与 S15 碰撞的前置——没有它们，
  * 改完无法判断"改对了"还是"改稳了（用人工阻尼压住了）"。
  *
- * 本文件是**诊断工具**（与 preset_balance_sweep / mpc_diag_g30 同类），默认不进
- * 回归清单；但它内部的 assert 项在改动前后都应成立，可按需并入 CI。
+ * 回归状态（P1-1，2026-10-31 起）：**已进 CI 回归清单**。
+ *   · 默认 `node web/test/physics_audit.js` —— 全部 57 项（含性能阈值）。
+ *   · `--ci` 模式跳过 2 项**环境敏感**的性能阈值断言（CI runner 时钟噪声大，
+ *     实测本机 0.022 ms/子步、阈值 2.0 ms，余量 90×；但纳秒级计时在共享 runner
+ *     上会抖动）。其余 55 项物理性质断言全部保留 —— 它们只依赖数值，不依赖机器。
+ *   · 之所以整体可进回归：实测两次运行仅性能计时行不同，物理结果逐位一致。
  *
  * 覆盖：
  *   A. 惯量读数与来源（服务 S1）—— 抓 `I_yaw = I_pitch + I_roll` 这类恒等式误用
@@ -14,10 +18,14 @@
  *   C. 能量审计 L2（软观察）：带转向工况的能量曲线，只打印
  *   D. 步长收敛：dt = 4/2/1/0.5 ms 的末态应收敛
  *   E. 性能埋点：ms/子步（定位"物理慢还是几何慢"）
+ *   F~M. 阶跃响应 / 阿克曼 / ISO 路面 / 横摆与俯仰阻尼 / 真 wheel DOF / 碰撞
  *
- * 用法：node web/test/physics_audit.js
+ * 用法：node web/test/physics_audit.js [--ci]
  */
 const { loadStage } = require('./_stage_harness.js');
+
+/** CI 模式：跳过环境敏感的性能阈值断言（物理断言一项不减）。 */
+const CI_MODE = process.argv.includes('--ci');
 
 const { ctx, run, G, mkCtrl, ENV_FLAT } = loadStage();
 const S = ctx.S;
@@ -178,7 +186,8 @@ section('E. 性能埋点（ms/子步）');
   note(`${N} 子步耗时 ${ms} ms ⇒ ${perSub.toFixed(4)} ms/子步（${(1000 / perSub).toFixed(0)} 子步/s）`);
   note(`60fps 单帧 17 子步 ⇒ 物理约 ${(perSub * 17).toFixed(2)} ms/帧`);
   if (v._simStat) note(`内建计数：steps=${v._simStat.steps} subSteps=${v._simStat.subSteps} roadQueries=${v._simStat.roadQueries}`);
-  assert(perSub < 2.0, `单子步耗时 ${perSub.toFixed(4)} ms < 2.0 ms（物理不是帧瓶颈）`);
+  if (CI_MODE) note(`[SKIP] 性能阈值（--ci：共享 runner 计时噪声大；本机阈值 2.0 ms）`);
+  else assert(perSub < 2.0, `单子步耗时 ${perSub.toFixed(4)} ms < 2.0 ms（物理不是帧瓶颈）`);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -345,7 +354,8 @@ section('H. ISO 8608 随机路面（S3 专项）');
   assert(A.rmsW < C.rmsW && C.rmsW < E.rmsW,
     `路面等级响应严格递增（A ${A.rmsW.toFixed(5)} < C ${C.rmsW.toFixed(5)} < E ${E.rmsW.toFixed(5)}）`);
   const perOpen = A.ms / A.n, perOff = off.ms / off.n;
-  assert(perOpen < 1.0,
+  if (CI_MODE) note(`[SKIP] ISO 路面性能阈值（--ci：共享 runner 计时噪声大；本机阈值 1.0 ms/子步，实测 ${perOpen.toFixed(4)}）`);
+  else assert(perOpen < 1.0,
     `开启 ISO 后单子步 ${perOpen.toFixed(4)} ms < 1.0 ms（开销 ${(perOpen / Math.max(perOff, 1e-9)).toFixed(1)}×，仍在预算内）`);
 
   /* 后轴 = 前轴 wb 之前的同一条路（空间域，比时间延迟 L/v 更严格） */

@@ -173,8 +173,10 @@ node web/test/test_p2a_aero.js         # 14 · test_circuit_ui.js 100% (64 ids +
 # ── Cross-language physics parity (JS TPHYS <-> Python transient, 5% threshold) ──
 node web/test/tphys_parity.cjs         # measured worst 0.51%
 
+# ── Physics audit (57 checks, **in the CI regression**; --ci skips 2 timing thresholds) ──
+node web/test/physics_audit.js         # inertia identities / energy / step convergence / Ackermann / ISO road / wheel DOF / collision
+
 # ── Diagnostic tools (not part of the regression) ───────────────────────
-node web/test/physics_audit.js         # 57 physics checks (inertia/energy/step convergence/Ackermann/ISO road/collision)
 node web/test/preset_balance_sweep.cjs # preset balance sweep (US / TLLTD vs sprung split / ARB / tire width)
 node web/test/mpc_diag_g30.cjs         # MPC tuning diagnostics · mpc_calib_g30.cjs calibration grid
 ```
@@ -220,17 +222,18 @@ LABSUS/                           # Engineering Root Directory
 │   │   ├── 15-mpc.js             # Model Predictive Control (MPC) trajectory solver
 │   │   ├── 16-powertrain.js      # Powertrain & torque vectoring calculations
 │   │   └── 17-damper4q.js        # 4-quadrant damper table (shape-preserving spline + click blending)
-│   └── test/                     # 16 automated frontend test suites + diagnostics
+│   └── test/                     # 16 regression suites + physics_audit + diagnostics
 ├── engine/                       # High-Performance Python Numerical Engine
 │   ├── server.py                 # FastAPI server entry (:8001)
 │   ├── src/                      # Solvers (K&C / Bushing / Pacejka / Tire Fit / Transient)
 │   ├── data/                     # External data assets (sha256-locked, see src/provenance.py)
 │   └── tests/                    # pytest unit test suite (323 passed / 1 explicit skip)
-├── tools/gates/                  # One-command gate runner (check_all.py)
+├── tools/gates/                  # One-command gate runner (single source of truth for CI)
 ├── scripts/                      # Utility and automation scripts
 ├── requirements.txt              # Python runtime dependencies (exact verified pins)
 ├── requirements-dev.txt          # Dev / test / lint dependencies
 ├── start.bat                     # Windows one-click startup script
+├── VERIFICATION.md               # Verification evidence tiers (L0 regression -> L4 measured, incl. gaps)
 ├── INTENTIONAL_DIFFERENCES.md    # Source-of-truth dual-kernel architectural conventions
 ├── AUDIT_AND_REFACTOR_LOG.md     # Full codebase audit & remediation log
 ├── LICENSE                       # MIT Open Source License

@@ -175,8 +175,10 @@ node web/test/test_p2a_aero.js         # 14 断言 · test_circuit_ui.js 100%（
 # ── 跨语言物理对拍（JS TPHYS ↔ Python transient，门限 5%）────────────
 node web/test/tphys_parity.cjs         # 实测 worst 0.51%
 
+# ── 物理审计（57 项，**已进 CI 回归**；--ci 跳过 2 项环境敏感的性能阈值）──
+node web/test/physics_audit.js         # 惯量恒等式 / 能量单调 / 步长收敛 / 阿克曼 / ISO 路面 / wheel DOF / 碰撞
+
 # ── 诊断工具（不参与回归）─────────────────────────────────────────
-node web/test/physics_audit.js         # 物理审计 57 项（惯量/能量/步长收敛/阿克曼/ISO 路面/碰撞）
 node web/test/preset_balance_sweep.cjs # 预设配平扫描（US / TLLTD ← 簧载份额 / ARB / 胎宽）
 node web/test/mpc_diag_g30.cjs         # MPC 整定诊断 · mpc_calib_g30.cjs 校准网格
 ```
@@ -220,17 +222,18 @@ LABSUS/                           # 工程代码根（下同）
 │   │   ├── 15-mpc.js             # 赛道自适应模型预测控制 (MPC)
 │   │   ├── 16-powertrain.js      # 动力总成与扭矩矢量分配解算
 │   │   └── 17-damper4q.js        # 四象限减振器表求值（保形样条 + 档位混合）
-│   └── test/                     # 前端 16 套自动化测试套件 + 诊断工具
+│   └── test/                     # 前端 16 套回归 + physics_audit + 诊断工具
 ├── engine/                       # Python 高性能数值计算引擎
 │   ├── server.py                 # FastAPI 入口服务 (:8001)
 │   ├── src/                      # 求解器核心源码 (K&C/衬套/Pacejka/轮胎标定/瞬态)
 │   ├── data/                     # 外部数据资产（锁 sha256，见 src/provenance.py）
 │   └── tests/                    # pytest 单元测试套件 (323 项通过 / 1 显式 skip)
-├── tools/gates/                  # 一键全门禁运行器（check_all.py）
+├── tools/gates/                  # 一键全门禁运行器（check_all.py，CI 清单单一真源）
 ├── scripts/                      # 开发与运维工具脚本
 ├── requirements.txt              # Python 运行依赖（精确锁定已验证版本）
 ├── requirements-dev.txt          # 开发/测试/代码质量依赖
 ├── start.bat                     # Windows 一键启动脚本
+├── VERIFICATION.md               # 验证证据分级（L0 回归锚 → L4 实测相关性，含当前缺口）
 ├── INTENTIONAL_DIFFERENCES.md    # 双端故意差异登记真源
 ├── AUDIT_AND_REFACTOR_LOG.md     # 全系统代码审计与重构归档报告
 ├── LICENSE                       # MIT 开源许可证

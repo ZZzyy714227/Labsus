@@ -66,20 +66,11 @@ jobs:
       - name: 安装引擎依赖（tphys_parity.cjs 会拉起 Python 参考实现）
         run: |
           pip install -r LABSUS/requirements.txt
+      # 前端清单单一真源 = LABSUS/tools/gates/check_all.py 的 NODE_SUITES。
+      # 此前 ci.yml 与 check_all.py 各维护一份 suite 列表，靠人工保持一致；
+      # 一旦漂移就会出现"本机全绿、CI 红"（或反过来）。现在 CI 直接调用同一入口。
       - name: 前端防线（逐套件，任一失败即红）
         working-directory: LABSUS
         env:
           LABSUS_PY: python
-        run: |
-          fail=0
-          for f in test_dom stage_boot_check test_15dof_steady test_lap_15dof \
-                   proving_ground_test undulating_road_test test_p2a_aero \
-                   test_p2b_damper test_circuit_ui test_racingline \
-                   test_tire_wiring test_kc_wiring test_mpc test_powertrain \
-                   test_tire_lab test_engine_sound; do
-            echo "── $f"
-            node "web/test/$f.js" || fail=1
-          done
-          echo "── tphys_parity（跨语言物理对拍，门限 5%）"
-          node web/test/tphys_parity.cjs || fail=1
-          exit $fail
+        run: python tools/gates/check_all.py --node-only

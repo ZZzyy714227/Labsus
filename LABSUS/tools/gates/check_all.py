@@ -30,14 +30,29 @@ PY = sys.executable
 #   （PYTHONIOENCODING/PYTHONUTF8），两侧口径统一。
 _CHILD_ENV = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
 
-# 前端 16 套（与 .github/workflows/ci.yml 的清单保持一致）
+# 前端回归清单 —— **单一真源**：CI 的 web job 直接调用本文件（--node-only），
+# 不再在 ci.yml 里重复维护一份 suite 列表（此前两处清单靠人工保持一致，
+# 一旦漂移就会出现"本机全绿、CI 红"或反过来）。
 NODE_SUITES = (
     "test_dom.js", "stage_boot_check.js", "test_15dof_steady.js", "test_lap_15dof.js",
     "proving_ground_test.js", "undulating_road_test.js", "test_p2a_aero.js",
     "test_p2b_damper.js", "test_circuit_ui.js", "test_racingline.js",
     "test_tire_wiring.js", "test_kc_wiring.js", "test_mpc.js", "test_powertrain.js",
     "test_tire_lab.js", "test_engine_sound.js",
+    # P1-1：physics_audit 57 项进回归。实测物理结果逐位确定，只有性能计时浮动，
+    # 故以 --ci 模式跳过 2 项环境敏感的性能阈值断言（见该文件头部说明）。
+    "physics_audit.js",
 )
+
+# 需要额外参数的套件（缺省无参）
+NODE_ARGS: dict[str, tuple[str, ...]] = {
+    "physics_audit.js": ("--ci",),
+}
+
+
+def node_cmd(name: str) -> list[str]:
+    """某个前端套件的完整命令行。"""
+    return ["node", f"web/test/{name}", *NODE_ARGS.get(name, ())]
 
 PROVENANCE_CMD = (
     "import sys;sys.path.insert(0,'engine');"
@@ -63,8 +78,21 @@ def _run(cmd: list[str], *, cwd: Path | None = None) -> tuple[bool, str]:
     return r.returncode == 0, tail
 
 
-def gates(quick: bool = False) -> list[tuple[str, list[str]]]:
-    g: list[tuple[str, list[str]]] = [
+def gates(quick: bool = False, node_only: bool = False) -> list[tuple[str, list[str]]]:
+    """构造待跑清单。
+
+    三种模式：
+      · full（默认）  —— ruff / pytest / 前端全套 / 对拍 / 溯源 / 文档
+      · --quick       —— 秒级：ruff / 溯源 / 文档
+      · --node-only   —— 只跑前端全套 + 对拍（CI 的 web job 用这个；需要已装好引擎依赖，
+                         `tphys_parity` 会拉起 Python 参考实现）
+    """
+    if node_only:
+        g: list[tuple[str, list[str]]] = [(f"node {n}", node_cmd(n)) for n in NODE_SUITES]
+        g.append(("跨语言对拍 tphys_parity", ["node", "web/test/tphys_parity.cjs"]))
+        return g
+
+    g = [
         ("ruff（引擎静态检查）", [PY, "-m", "ruff", "check", "engine"]),
         ("溯源注册表覆盖", [PY, "-c", PROVENANCE_CMD]),
         ("文档一致性（根↔LABSUS）", [PY, "scripts/sync_root_docs.py", "--check"]),
@@ -72,7 +100,7 @@ def gates(quick: bool = False) -> list[tuple[str, list[str]]]:
     if not quick:
         g.insert(1, ("pytest（引擎测试）", [PY, "-m", "pytest", "engine/tests", "-q",
                                           "-p", "no:warnings", "--tb=line"]))
-        g += [(f"node {n}", ["node", f"web/test/{n}"]) for n in NODE_SUITES]
+        g += [(f"node {n}", node_cmd(n)) for n in NODE_SUITES]
         g.append(("跨语言对拍 tphys_parity", ["node", "web/test/tphys_parity.cjs"]))
     return g
 
@@ -88,10 +116,13 @@ def main() -> int:
             pass
     ap = argparse.ArgumentParser(description="跑完 LABSUS 的全部门禁")
     ap.add_argument("--quick", action="store_true", help="只跑秒级检查（ruff/溯源/文档）")
+    ap.add_argument("--node-only", action="store_true",
+                    help="只跑前端全套 + 跨语言对拍（CI 的 web job 用）")
     args = ap.parse_args()
 
-    todo = gates(args.quick)
-    print(f"LABSUS 门禁：共 {len(todo)} 项（{'quick' if args.quick else 'full'}）\n")
+    todo = gates(args.quick, args.node_only)
+    mode = "node-only" if args.node_only else ("quick" if args.quick else "full")
+    print(f"LABSUS 门禁：共 {len(todo)} 项（{mode}）\n")
     failures: list[str] = []
     t0 = time.perf_counter()
     for name, cmd in todo:
