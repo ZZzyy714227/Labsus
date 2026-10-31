@@ -188,6 +188,68 @@ function T(name, cond, extra) {
     "wMax=" + wMax.toFixed(3) + " Z=" + eng.state.Z.toFixed(4) + " u=" + eng.state.u.toFixed(1));
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// T5/P4 · 四象限表求值（web/js/17-damper4q.js）
+// ═══════════════════════════════════════════════════════════════════════════
+{
+  const src4q = fs.readFileSync(path.join(ROOT, "web/js/17-damper4q.js"), "utf8");
+  const ctx4q = { module: { exports: {} } };
+  vm.createContext(ctx4q);
+  vm.runInContext(src4q, ctx4q);
+  const D = ctx4q.DAMPER4Q;
+  T("4Q 表结构 12 档 × 25 点", D.F.length === 12 && D.V.length === 25,
+    "clicks=" + D.F.length + " pts=" + D.V.length);
+
+  // 契约：零速度零力（各档）
+  T("4Q 零速度零力", [0, 6, 11].every(c => Math.abs(D.force(0, c, c)) < 1e-9),
+    "F(0,0)=" + D.force(0, 0, 0).toFixed(6));
+
+  // 节点值与 vendored CSV 一致（抽三个，含上游自述缺陷）
+  T("4Q 节点值 +100@click0 = 124 N", Math.abs(D.force(0.100, 0, 0) - 124) < 1e-9,
+    "得到 " + D.force(0.100, 0, 0));
+  T("4Q 节点值 -500@click0 = -813 N", Math.abs(D.force(-0.500, 0, 0) + 813) < 1e-9,
+    "得到 " + D.force(-0.500, 0, 0));
+  T("4Q 上游自述缺陷保留 (click8@+300=671)", Math.abs(D.force(0.300, 8, 8) - 671) < 1e-9,
+    "得到 " + D.force(0.300, 8, 8) + "（应为 671，不是 761）");
+
+  // 符号：压缩为正、复原为负
+  T("4Q 压缩为正/复原为负",
+    D.force(0.100, 5, 5) > 0 && D.force(-0.100, 5, 5) < 0,
+    "C=" + D.force(0.100, 5, 5).toFixed(1) + " R=" + D.force(-0.100, 5, 5).toFixed(1));
+
+  // 档位越大越硬（避开缺陷速度点）
+  {
+    let mono = true;
+    for (let c = 0; c < 11; c++) if (!(D.force(0.100, c + 1, c + 1) > D.force(0.100, c, c))) mono = false;
+    T("4Q 档位越大越硬 (+100 mm/s)", mono, "click0=" + D.force(0.100, 0, 0) + " click11=" + D.force(0.100, 11, 11));
+  }
+
+  // 小数档位 = 相邻两档线性混合
+  {
+    const a = D.force(0.100, 7, 7), b = D.force(0.100, 8, 8), m = D.force(0.100, 7.5, 7.5);
+    T("4Q 小数档位线性混合", Math.abs(m - 0.5 * (a + b)) < 1e-9, "7.5=" + m.toFixed(2));
+  }
+
+  // 表外：外推且计数
+  {
+    const before = D.out.count;
+    D.force(0.600, 5, 5);
+    const during = D.out.count;
+    D.force(0.100, 5, 5);
+    T("4Q 越界外推计数（表外 +1、表内不增）", during === before + 1 && D.out.count === during,
+      "count " + before + "→" + during + "→" + D.out.count);
+  }
+
+  // 表外应为端点斜率的线性延续（差分近似）
+  {
+    const vmax = D.V[D.V.length - 1] / 1000;
+    const f0 = D.force(vmax, 5, 5), f1 = D.force(vmax + 0.01, 5, 5), f2 = D.force(vmax + 0.02, 5, 5);
+    T("4Q 表外严格线性", Math.abs((f2 - f1) - (f1 - f0)) < 1e-6,
+      "斜率 " + ((f1 - f0) / 0.01).toFixed(1) + " vs " + ((f2 - f1) / 0.01).toFixed(1));
+  }
+}
+
 console.log("\n========================================");
 console.log("P2b 四象限减振器测试 " + pass + "/" + (pass + fail) + " Passed");
 if (fail > 0) { console.log("FAILED: " + fail); process.exit(1); }

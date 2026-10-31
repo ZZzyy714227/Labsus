@@ -136,7 +136,10 @@ function stepDyn(M,dt,rack,tSim,axis){
     const d=sub(B.p,A.p),L=len(d)||1e-9,u=mul(d,1/L);
     const rel=dot(sub(B.v,A.v),u);
     const Fk=M.springF0+kS*(M.damperL0-L);
-    const Fc=-(rel<0?cB:cR)*rel;
+    // T5/P4：四象限表阻尼（17-damper4q.js）。开关关闭或缺模块时退回线性两常数模型。
+    const Fc=(typeof damperForce4Q==='function'&&SIM&&SIM.damperTableOn)
+      ?damperForce4Q(-rel/1000,(SIM.clickC!=null?SIM.clickC:5),(SIM.clickR!=null?SIM.clickR:7))
+      :-(rel<0?cB:cR)*rel;
     let F=Fk+Fc; if(F<0)F=0;
     A.f=add(A.f,mul(u,-F));
     Fs=Fk; Fd=Fc;
