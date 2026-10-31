@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     VENDORED COPY —— 原样取自外部仓库，仅追加本溯源头，参数值未改动。
+     源: https://github.com/Alphabet1671/Simplified-Vehicle-Models/blob/main/models/tires/hoosier-43075-r20-simple.xml
+     取用日期: 2026-10-20
+     上游头注释声明的原始拟合来源:
+       Hoosier_R20_Combined_Simple.mat sha256=ed46ac5c5eb19ceeca359a10a5c4b279b26e468dec00bec229df3033848f1500
+       Hoosier 43075 R20, 12 psi, 8 inch rim, TTC (Tire Test Consortium) B2356 runs 8 and 72
+     ⚠ 可信级别:
+       - k_x_*/k_y_*/d_*/e_1/mu_* : 台架(TTC)拟合值（lab-fit）
+       - k_y_0=10000, k_y_1=20000, k_x_1=20000 为**整数** ⇒ 疑为拟合时固定的下界/约束值，
+         不是自由拟合结果；引用 Cα/Cκ 时必须带上这条不确定性。
+       - 台架带面摩擦 mu_0 为 2.3~2.4 量级；**路面**须乘 2/3 先验（TTC Round 9 队伍经验，非本车验证）。
+       - k_11..k_23 与 m_x_r_* 在本拟合中全为 0 ⇒ 无回正力矩 / 无翻转力矩；k_rl_*/f_rr_*=0 ⇒ 无滚阻。
+     ⚠ 尺度提醒: 该胎为 43075 R20（18.0/6.0-10 量级），f_z_rated=660 N；用到 LABSUS 的 FSAE 工况
+       （单轮静载约 580 N）属外推范围内侧，但外倾角未建模（subtype=unitire-simple 为零外倾）。
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<model schema-version="1.0" id="hoosier-43075-r20-simple" type="tire-model" subtype="unitire-simple">
+    <!-- Simplified steady-state UniTire, zero inclination angle. Ported from unitire_simple_solve.m in the FSAE-VD-Personal-Scripts Yaw Dynamics/Tire Model directory.-->
+    <!-- Source: Hoosier_R20_Combined_Simple.mat sha256=ed46ac5c5eb19ceeca359a10a5c4b279b26e468dec00bec229df3033848f1500 (Hoosier 43075 R20, 12 psi, 8 inch rim, TTC B2356 runs 8 and 72).-->
+    <!-- Each polynomial coefficient is one parameter. The trailing number is the degree of the normalized load Fzn. Example: k_x_2 multiplies Fzn squared.-->
+    <!-- Units are derived from the source structure, not from a unit table. k_11 to k_23 and m_x_r_1 to m_x_r_3 are zero in this fit. The source Mx2 term is dimensionally inhomogeneous, so the declared N*m unit is the linear-term unit only. stiff_eps is one numerical floor that the source applies to stiffness terms with different units.-->
+    <parameters>
+        <parameter name="f_z_rated" value="660.0" unit="N" />
+        <parameter name="k_cx" value="300000.0" unit="N/m" />
+        <parameter name="k_cy" value="200000.0" unit="N/m" />
+        <parameter name="k_x_2" value="7660.409078173158" unit="N" />
+        <parameter name="k_x_1" value="20000.0" unit="N" />
+        <parameter name="k_x_0" value="8191.007990757677" unit="N" />
+        <parameter name="k_y_2" value="654.9807055362467" unit="N" />
+        <parameter name="k_y_1" value="19999.998862085806" unit="N" />
+        <parameter name="k_y_0" value="10000.0" unit="N" />
+        <parameter name="d_x_0_1" value="0.017161153667128677" unit="m" />
+        <parameter name="d_x_0_0" value="0.01086440175777713" unit="m" />
+        <parameter name="d_e_1" value="0.000204667577986678" unit="m" />
+        <parameter name="d_e_0" value="-0.0003704676842493648" unit="m" />
+        <parameter name="d_1_1" value="0.007939258612776067" unit="1" />
+        <parameter name="d_1_0" value="0.183063014147267" unit="1" />
+        <parameter name="d_2_1" value="0.06468408760663874" unit="1" />
+        <parameter name="d_2_0" value="0.03685184791816076" unit="1" />
+        <parameter name="e_1" value="-0.01547791924434061" unit="1" />
+        <parameter name="mu_0_x" value="2.3361624600071096" unit="1" />
+        <parameter name="mu_s_x" value="2.0159412226800204" unit="1" />
+        <parameter name="h_x" value="2.2955432513388416" unit="1" />
+        <parameter name="v_m_x" value="3.0" unit="m/s" />
+        <parameter name="mu_0_y" value="2.3803804777987394" unit="1" />
+        <parameter name="mu_s_y" value="2.053563821658717" unit="1" />
+        <parameter name="h_y" value="0.020000000000250366" unit="1" />
+        <parameter name="v_m_y" value="2.999207661856495" unit="m/s" />
+        <parameter name="k_11" value="0.0" unit="N*m" />
+        <parameter name="k_12" value="0.0" unit="N*m" />
+        <parameter name="k_13" value="0.0" unit="N*m" />
+        <parameter name="k_21" value="0.0" unit="N*m" />
+        <parameter name="k_22" value="0.0" unit="N*m" />
+        <parameter name="k_23" value="0.0" unit="N*m" />
+        <parameter name="m_x_r_1" value="0.0" unit="N*m" />
+        <parameter name="m_x_r_2" value="0.0" unit="N*m" />
+        <parameter name="m_x_r_3" value="0.0" unit="N*m" />
+        <parameter name="r_1" value="0.2045" unit="m" />
+        <parameter name="r_2" value="-0.008316" unit="m" />
+        <parameter name="r_3" value="5.673291e-05" unit="m" />
+        <parameter name="f_y_shift_0" value="0.0" unit="N" />
+        <parameter name="f_y_shift_fz" value="0.0" unit="N" />
+        <parameter name="k_rl_0" value="0.0" unit="m/N^2" />
+        <parameter name="k_rl_1" value="0.0" unit="m/N^2" />
+        <parameter name="k_rl_2" value="0.0" unit="m/N^2" />
+        <parameter name="f_rr_0" value="0.0" unit="1" />
+        <parameter name="f_rr_1" value="0.0" unit="1" />
+        <parameter name="f_rr_2" value="0.0" unit="1" />
+        <parameter name="h_rr" value="0.0" unit="1" />
+        <parameter name="omega_cr" value="1000000.0" unit="rad/s" />
+        <parameter name="omega_eps" value="1e-06" unit="rad/s" />
+        <parameter name="vroll_min" value="0.1" unit="m/s" />
+        <parameter name="force_eps" value="1.0" unit="N" />
+        <parameter name="stiff_eps" value="1.0" unit="1" />
+        <parameter name="slip_eps" value="1e-09" unit="1" />
+    </parameters>
+</model>
