@@ -364,3 +364,72 @@ def test_wheel_dof_with_differential_end_to_end():
     assert all(abs(x["fx_RL"]) < 1e6 and abs(x["fy_RL"]) < 1e6 for x in rows), "力必须有限且量级合理"
     # 左右驱动扭矩不对称（LSD）：内外轮 fx 不应恒等
     assert any(abs(x["fx_RL"] - x["fx_RR"]) > 1e-6 for x in rows), "LSD 下左右驱动力不应恒等"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# M21 / T2 · K&C 查表 C1 单调样条开关（kc_lut_spline）
+# ═══════════════════════════════════════════════════════════════════════════
+# 非线性的外倾-轮跳曲线：节点间与分段线性差异明显，用于证明开关真的起作用
+_KC_TRAVEL = [-50.0, -25.0, 0.0, 25.0, 50.0]
+# 斜率**突变**的曲线（0 → 0 → -5 → 0）：线性插值在 [0,25] 段是直线，
+# 保形样条会沿斜率变化弯曲 ⇒ 节点间偏差可达 0.2° 量级，能在舍入后的响应里测出。
+# 早前用斜率缓变的曲线 [-0.30,-0.90,-1.50,-2.30,-3.40] 偏差仅约 0.002°，
+# 被响应四舍五入淹没 ⇒ 测不出开关效果（已实测）。
+_KC_CAM = [-1.0, -1.0, -1.0, -6.0, -6.0]
+
+
+def _kc_circle():
+    """必须用**弯道**才能让轮跳离开 0 节点 —— 直道上侧倾≈0、travel 恒为 0，
+    而节点上样条与分段线性**完全相同**（那正是等价性断言的内容），测不出差别。"""
+    R = 30.0
+    return [{"x": R * math.cos(th), "y": R * math.sin(th), "target_speed": 12.0}
+            for th in np.linspace(0, 2 * math.pi, 25)[:-1]]
+
+
+def _kc_body(**over):
+    b = _body(_kc_circle(), sim_time=6.0, start_speed=12.0, dt=0.01)
+    b["kc_luts"] = {"front": {"travel": list(_KC_TRAVEL), "cam": list(_KC_CAM),
+                              "toe": [0.10, 0.075, 0.05, 0.025, 0.0]},
+                    "rear": {"travel": list(_KC_TRAVEL), "cam": list(_KC_CAM),
+                             "toe": [0.10, 0.075, 0.05, 0.025, 0.0]}}
+    b.update(over)
+    return b
+
+
+def test_kc_spline_flag_default_off_uses_legacy_path():
+    """默认关闭：summary 必须报告 kc_lut_spline=False，且不产生夹紧计数。"""
+    j = client.post("/api/v3/chassis/simulate_track", json=_kc_body()).json()
+    assert j["status"] == "VALID"
+    assert j["flags"]["kc_lut_spline"] is False
+    assert j["summary"]["kc_clamp_events"] == 0.0
+
+
+def test_kc_spline_flag_on_switches_interpolation_and_is_bounded():
+    """开关打开：走 C1 样条 ⇒ 结果与分段线性**不同**，但差异受控（<1%）。
+
+    · 必须不同：否则说明开关没接线（这是控制实验的反面）；
+    · 必须受控：插值方式变化不该让整车结果跳变。
+    """
+    off = client.post("/api/v3/chassis/simulate_track", json=_kc_body()).json()
+    on = client.post("/api/v3/chassis/simulate_track",
+                     json=_kc_body(kc_lut_spline=True)).json()
+    assert off["status"] == "VALID" and on["status"] == "VALID"
+    assert on["flags"]["kc_lut_spline"] is True
+    v_off, v_on = off["trace"][-1]["vx"], on["trace"][-1]["vx"]
+    ay_off = max(abs(x["ay"]) for x in off["trace"])
+    ay_on = max(abs(x["ay"]) for x in on["trace"])
+    # 至少有一个指标必须变化（证明接线生效）
+    changed = abs(v_on - v_off) > 1e-9 or abs(ay_on - ay_off) > 1e-9
+    assert changed, "开启样条后结果毫无变化 ⇒ 开关未接线"
+    # 差异受控
+    rel_v = abs(v_on - v_off) / max(1.0, abs(v_off))
+    rel_ay = abs(ay_on - ay_off) / max(1.0, ay_off)
+    assert rel_v < 0.01 and rel_ay < 0.01, f"差异过大：Δv={rel_v:.4%} Δay={rel_ay:.4%}"
+
+
+def test_kc_spline_flag_on_without_tables_is_identical_to_off():
+    """**零影响验证**：没有 kc_luts 时，开关打开与关闭必须逐位一致（无表可插）。"""
+    base = _wd_body()
+    off = client.post("/api/v3/chassis/simulate_track", json=base).json()
+    on = client.post("/api/v3/chassis/simulate_track",
+                     json=dict(base, kc_lut_spline=True)).json()
+    assert off["trace"] == on["trace"], "无表时开关不得改变任何输出"

@@ -402,12 +402,19 @@ class TireParams(BaseModel):
                                    #   叠加会顶破 μ·Fz（transient.wheel_force 用
                                    #   lat_avail=sqrt(μfz²-fx²) 钳位，前端 11-stages.js 同式）。
     Ls: float = 0.35               # 侧偏松弛长度 m（瞬态一阶滞后）
-    kappa_peak: float = 0.12       # M19：纵向峰值滑移率（无量纲）
-    # 用途：轮自由度模型的**准稳态代数解**要把驱动需求折算成滑移率 κ，而引擎轮胎模型
-    # 此前是纯侧向的（无纵向滑移刚度）。取 Cκ = μ·Fz/κ_peak：只引入一个物理含义清晰的
-    # 峰值滑移率，Cκ 随附着自动缩放（与 LS 载荷敏感性天然一致）。
-    # ⚠ **未标定**：0.12 取自赛车胎文献区间 0.10~0.15，需按实件（实测 μ-κ 曲线）校正。
-    # 该参数仅在求解器轮自由度开关打开时被消费；开关默认关 ⇒ 历史数值逐位不变。
+    kappa_peak: float = 0.029     # 纵向峰值滑移率（无量纲）——**台架数据推导**，非文献猜测
+    # 定义与来源（T1，2026-10-20；推导实现在 src/tire_data.py）：
+    #   κ_pk = μ_road · Fz / Cκ，其中 Cκ 取自 TTC（Tire Test Consortium）台架对
+    #   Hoosier 43075 R20（12 psi / 8" rim，B2356 runs 8 & 72）的简化 UniTire 拟合。
+    #   在 f_z_rated=660 N 处：Cκ = 35.85 kN/单位κ、μ_road = 1.5574（带面 2.3362 × 2/3）
+    #   ⇒ κ_pk ≈ **0.0287**；FSAE 前轴静载 592 N ⇒ 0.0286，后轴 560 N ⇒ 0.0284。
+    #   ⇒ 取 0.029（对载荷弱敏感，见 tests/test_tire_data.py::test_kappa_peak_is_weakly_load_dependent）。
+    # ⚠ **历史修正**：M19（2026-09-20）的缺省值是 **0.12**（文献区间 0.10~0.15 的猜测），
+    #   比台架数据高约 **4.2 倍**。改为数据值后，`wheel_dof=True` 路径的纵向力上限（μFz）不变，
+    #   但"达到该上限所需的滑移率"从 12% 降到 2.9% —— 即同样驱动力下**滑移率输出更真实**。
+    # ⚠ 残留不确定性：带面 μ 与路面 μ 的 2/3 是队伍经验先验（非本车验证）；台架纵向数据
+    #   取自 43100 R20 的 run 72（上游自述的代理）；本拟合零外倾、无回正力矩。
+    # 仅在求解器轮自由度开关打开时被消费；开关默认关 ⇒ 既有数值逐位不变。
     p: float | None = Field(default=None, exclude=True)
     # ↑ G29 轮胎工坊：胎压 kPa（信息字段，引擎不改缺省行为）。exclude=True：
     #   请求验证仍接受 p，但 model_dump() 不输出——transient.py 把 TireParams
@@ -614,6 +621,10 @@ class TrackSimRequest(BaseModel):
     # 并输出准稳态滑移率 kappa_qs 与轮速 omega_qs（供差速器 Δω 使用）。
     # 关闭时状态仍为平面 6 状态、数值逐位不变。
     wheel_dof: bool = False
+    # T2（2026-10-20）：K&C 查表插值方式。False（默认）走历史 `np.interp` 分段线性，
+    # 数值逐位不变；True 走 C1 单调样条（保形、导数连续），并把越界夹紧**显式计数**后
+    # 从 summary 暴露（旧实现是静默夹紧，无从发现表覆盖不足）。
+    kc_lut_spline: bool = False
     # G31-P7：缺省 None（不污染对拍锚）；下发时可为旧标量（T_max/P_kw，继承）或
     # 详细动力链（ice/gearbox/...）。transient 用 `if req.powertrain is not None` 门控。
     powertrain: PowertrainSpec | None = None
@@ -650,6 +661,10 @@ class TrackSimResponse(BaseModel):
     finished: bool = False
     t: list[float] = Field(default_factory=list)
     trace: list[dict] = Field(default_factory=list)
+    # T2：布尔开关单独走这个通道。`summary` 的契约是 `float | None`（KPI 数值），
+    # 把 bool 塞进去会被 pydantic 强转成 0.0/1.0（实测），而宽化联合类型又会把
+    # 既有数值 1.0 反解成 True ⇒ 只能分通道。
+    flags: dict[str, bool] = Field(default_factory=dict)
     summary: dict[str, float | None] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
 

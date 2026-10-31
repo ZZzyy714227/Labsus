@@ -140,6 +140,11 @@ class VehiclePlanar:
         # 供差速器的 Δω 使用。开关由请求字段 TrackSimRequest.wheel_dof 控制（默认关）。
         self.wheel_dof = False
         self.kappa_peak = float(getattr(tire, "kappa_peak", 0.12))
+        # T2：K&C 查表插值开关（默认关 ⇒ 历史 np.interp 路径逐位不变）
+        self.kc_lut_spline = False
+        self.kc_clamp_events = 0
+        self.lut_spline_f = None
+        self.lut_spline_r = None
         self.pt = powertrain
         self.aero_p = aero
         self._ts = {w: TireState() for w in _WHEELS}
@@ -257,15 +262,51 @@ class VehiclePlanar:
         return {"FR": sgn * d_in if sgn > 0 else sgn * d_out,
                 "FL": sgn * d_out if sgn > 0 else sgn * d_in}
 
+    def enable_kc_spline(self) -> None:
+        """把现有 kc_luts 适配成 per-corner 数据集（T2）。
+
+        越界策略取 **clamp**：求解器步进中不能 raise（会打断积分），因此选择显式夹紧
+        并**计数**；计数从 summary 的 `kc_clamp_events` 暴露，表覆盖不足时立刻可见。
+        """
+        from src.components.suspension_lut import POLICY_CLAMP, from_kc_lut
+        self.kc_lut_spline = True
+        for axis, lut, name in (("front", self.lut_f, "lut_spline_f"),
+                                ("rear", self.lut_r, "lut_spline_r")):
+            try:
+                base = from_kc_lut(axis, lut)
+            except Exception:      # 表缺失/不合法 ⇒ 该轴退化为无查表（与旧路径一致）
+                setattr(self, name, None)
+                continue
+            setattr(self, name, type(base)(
+                travel_mm=base.travel_mm, channels=base.channels, kinds=base.kinds,
+                units=base.units, zero_travel_mm=base.zero_travel_mm,
+                extrapolation=POLICY_CLAMP, sign_convention=base.sign_convention))
+
+    def _kc_deg(self, w: str, travel_mm: float, key: str) -> float:
+        """K&C 角度查表（deg）。默认历史 np.interp；开关打开后走 C1 单调样条。"""
+        lut = self.lut_f if w in ("FR", "FL") else self.lut_r
+        if not self.kc_lut_spline:
+            return _lut(lut, travel_mm, key, 0.0)
+        ds = self.lut_spline_f if w in ("FR", "FL") else self.lut_spline_r
+        if ds is None or key not in ds.channels:
+            self._kc_zeros = getattr(self, "_kc_zeros", 0) + 1
+            return 0.0
+        self._kc_spline_hits = getattr(self, "_kc_spline_hits", 0) + 1
+        lo, hi = ds.travel_range_mm
+        if travel_mm < lo or travel_mm > hi:
+            self.kc_clamp_events += 1
+        from src.components.suspension_lut import evaluate as _eval
+        return _eval(ds, key, travel_mm)
+
     # ── 单轮力（★复合/松弛/外倾）────────────────────────────────
     def wheel_force(self, w: str, vx_w: float, vy_w: float, delta: float,
                     fz: float, throttle: float, brake: float,
                     vx: float, dt: float,
                      diff_force_n: float | None = None) -> dict:
-        lut = self.lut_f if w in ("FR", "FL") else self.lut_r
         travel_mm = math.radians(self.roll_deg) * abs(self.pos[w][1]) * 1000.0
-        toe_deg = _lut(lut, travel_mm, "toe", 0.0)
-        cam_deg = _lut(lut, travel_mm, "cam", 0.0) * D2R
+        # T2：开关打开时走 C1 单调样条（默认关 ⇒ 仍为 np.interp，逐位不变）
+        toe_deg = self._kc_deg(w, travel_mm, "toe")
+        cam_deg = self._kc_deg(w, travel_mm, "cam") * D2R
         d = delta + toe_deg * D2R
 
         cd, sd = math.cos(d), math.sin(d)
@@ -534,6 +575,8 @@ def run_track_sim(req: TrackSimRequest) -> dict:
     car = VehiclePlanar(v, req.tire, req.kc_luts, iz, pt, aero)
     # M19：轮自由度开关（默认关 ⇒ 历史数值逐位不变）
     car.wheel_dof = bool(getattr(req, "wheel_dof", False))
+    if bool(getattr(req, "kc_lut_spline", False)):
+        car.enable_kc_spline()
     drv = DriverPI(gain=req.lookahead_gain)
 
     state = np.zeros(6)
@@ -612,6 +655,14 @@ def run_track_sim(req: TrackSimRequest) -> dict:
                     "max_slip_deg": round(max(lats, default=0.0), 2),
                     "aero_n": round(car._aero_down_n, 1),
                     "drs_frac": round(drs_steps / max(1, n_steps), 5),
-                    "ge_f": round(car._ge_f, 4), "ge_r": round(car._ge_r, 4)},
+                    "ge_f": round(car._ge_f, 4), "ge_r": round(car._ge_r, 4),
+                    # T2（M21）：越界夹紧计数（数值型；布尔开关见下方 flags 通道）
+                    "kc_clamp_events": float(getattr(car, "kc_clamp_events", 0)),
+                    "kc_spline_hits": float(getattr(car, "_kc_spline_hits", 0))},
+        # 布尔开关单列（summary 是 float 契约，见 v3models.TrackSimResponse 注释）
+        # 布尔开关单列（summary 是 float 契约，见 v3models.TrackSimResponse 注释）
+        "flags": {"kc_lut_spline": bool(getattr(car, "kc_lut_spline", False)),
+                  "kc_spline_ready": bool(car.lut_spline_f is not None and car.lut_spline_r is not None),
+                  "wheel_dof": bool(getattr(car, "wheel_dof", False))},
         "warnings": warnings,
     })
