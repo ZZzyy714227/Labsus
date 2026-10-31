@@ -7,9 +7,9 @@
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://www.python.org/)
+[![Python: 3.11+](https://img.shields.io/badge/Python-3.11%2B-brightgreen.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-v3%20REST%20API-009688.svg)](https://fastapi.tiangolo.com/)
-[![Tests: 100% Passed](https://img.shields.io/badge/pytest-189%20passed-success.svg)]()
+[![Tests: 100% Passed](https://img.shields.io/badge/pytest-323%20passed-success.svg)]()
 [![Platform: Web & Desktop](https://img.shields.io/badge/Platform-Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-orange.svg)]()
 
 > A modern full-chassis suspension engineering workbench tailored for **Formula Student (FSAE), FIA GT3 racing, and Baja off-road vehicles**.
@@ -145,37 +145,44 @@ DOM/Canvas stubs; only the TPHYS parity check is cross-language:
 ```bash
 cd LABSUS
 
+# ── One command for every gate (recommended; non-zero exit = failure) ───
+python tools/gates/check_all.py           # 21 checks: ruff / pytest / 16 node suites / parity / provenance / docs
+python tools/gates/check_all.py --quick   # 3 sub-second checks (ruff / provenance / docs)
+
 # ── Python engine: physics assertions / gates / API-contract guard / TPHYS parity / stress ──
-pytest engine/tests -q                 # 189 passed / 1 skipped (skip = OptimumK rows not entered, explicit)
+pytest engine/tests -q                 # 323 passed / 1 skipped (skip = OptimumK rows not entered, explicit)
                                        #   · test_api_contract            frontend/backend key-set contract
                                        #   · test_static_split_invariant  static load-split invariant
                                        #   · test_tire_width_balance      tire width -> cornering stiffness
                                        #   · test_legacy_isolation        V1 frozen-line isolation guard
+                                       #   · test_provenance              data-asset registry + content sha256
 ruff check engine                      # All checks passed (config in pyproject.toml, rules E/F/W/I)
 python scripts/sync_root_docs.py --check   # root <-> LABSUS README/LICENSE byte-identical
 
 # ── Frontend defense lines (per suite) ──────────────────────────────────
-node web/test/test_dom.js              # 274 assertions: shell structure / dual-entry parity / bug regressions
-node web/test/stage_boot_check.js      # 45 assertions: module order / TDZ / 3 stages x 20 frames
+node web/test/test_dom.js              # 342 assertions: shell structure / dual-entry parity / bug regressions
+node web/test/stage_boot_check.js      # 46 assertions: module order / TDZ / 3 stages x 20 frames
 node web/test/test_lap_15dof.js        # 23 assertions: 2 laps of 5.45 km + 6 powertrain parity checks
 node web/test/test_15dof_steady.js     # 14 assertions: analytic steady-state anchors for the 15-DOF kernel
-node web/test/test_powertrain.js       # 587 assertions (7 powertrain architectures)
+node web/test/test_powertrain.js       # 625 assertions (7 powertrain architectures)
 node web/test/test_tire_lab.js         # 65 · test_tire_wiring.js 36 · proving_ground_test.js 36
 node web/test/test_racingline.js       # 30 · test_engine_sound.js 26 · test_kc_wiring.js 25
-node web/test/undulating_road_test.js  # 21 · test_mpc.js 19 · test_p2b_damper.js 18
+node web/test/undulating_road_test.js  # 21 · test_mpc.js 19 · test_p2b_damper.js 28 (incl. 4Q damper table)
 node web/test/test_p2a_aero.js         # 14 · test_circuit_ui.js 100% (64 ids + 22 classes)
 
 # ── Cross-language physics parity (JS TPHYS <-> Python transient, 5% threshold) ──
 node web/test/tphys_parity.cjs         # measured worst 0.51%
 
 # ── Diagnostic tools (not part of the regression) ───────────────────────
+node web/test/physics_audit.js         # 57 physics checks (inertia/energy/step convergence/Ackermann/ISO road/collision)
 node web/test/preset_balance_sweep.cjs # preset balance sweep (US / TLLTD vs sprung split / ARB / tire width)
 node web/test/mpc_diag_g30.cjs         # MPC tuning diagnostics · mpc_calib_g30.cjs calibration grid
 ```
 
-> Numbers reflect the current workspace (baseline 2026-09-20). After frontend edits run at
+> Numbers reflect the current workspace (**baseline 2026-10-31**). After frontend edits run at
 > least `test_dom` + `stage_boot_check`; after engine edits run `pytest engine/tests` +
 > `ruff check engine`; after touching TPHYS/inlined physics run `tphys_parity.cjs`.
+> When numbers change, update this section together with DEVLOG.
 >
 > **Automated gates**: `.github/workflows/ci.yml` (lint / pytest / node jobs, runs on every PR);
 > pre-commit hooks in `.pre-commit-config.yaml` (fast checks + 2 MB large-file guard + README
@@ -211,14 +218,18 @@ LABSUS/                           # Engineering Root Directory
 │   │   ├── 13-engine-sound.js    # WebAudio dynamic RPM exhaust acoustic synthesizer
 │   │   ├── 14-tire-lab.js        # Tire Laboratory (MF5.2 Brush / Magic Formula fit)
 │   │   ├── 15-mpc.js             # Model Predictive Control (MPC) trajectory solver
-│   │   └── 16-powertrain.js      # Powertrain & torque vectoring calculations
-│   └── test/                     # 16 automated frontend test suites
+│   │   ├── 16-powertrain.js      # Powertrain & torque vectoring calculations
+│   │   └── 17-damper4q.js        # 4-quadrant damper table (shape-preserving spline + click blending)
+│   └── test/                     # 16 automated frontend test suites + diagnostics
 ├── engine/                       # High-Performance Python Numerical Engine
 │   ├── server.py                 # FastAPI server entry (:8001)
 │   ├── src/                      # Solvers (K&C / Bushing / Pacejka / Tire Fit / Transient)
-│   └── tests/                    # pytest unit test suite (164 tests, 100% pass)
+│   ├── data/                     # External data assets (sha256-locked, see src/provenance.py)
+│   └── tests/                    # pytest unit test suite (323 passed / 1 explicit skip)
+├── tools/gates/                  # One-command gate runner (check_all.py)
 ├── scripts/                      # Utility and automation scripts
-├── requirements.txt              # Python dependencies
+├── requirements.txt              # Python runtime dependencies (exact verified pins)
+├── requirements-dev.txt          # Dev / test / lint dependencies
 ├── start.bat                     # Windows one-click startup script
 ├── INTENTIONAL_DIFFERENCES.md    # Source-of-truth dual-kernel architectural conventions
 ├── AUDIT_AND_REFACTOR_LOG.md     # Full codebase audit & remediation log

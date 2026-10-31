@@ -7,9 +7,9 @@
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://www.python.org/)
+[![Python: 3.11+](https://img.shields.io/badge/Python-3.11%2B-brightgreen.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-v3%20REST%20API-009688.svg)](https://fastapi.tiangolo.com/)
-[![Tests: 100% Passed](https://img.shields.io/badge/pytest-189%20passed-success.svg)]()
+[![Tests: 100% Passed](https://img.shields.io/badge/pytest-323%20passed-success.svg)]()
 [![Platform: Web & Desktop](https://img.shields.io/badge/Platform-Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-orange.svg)]()
 
 > 面向 **FSAE 方程式赛车、GT3 房车赛车及全地形越野车** 的现代化全车底盘悬架工程分析平台。
@@ -145,39 +145,45 @@ node `vm` 无头沙箱（自带 DOM/Canvas stub），唯一跨语言的是 TPHYS
 ```bash
 cd LABSUS
 
+# ── 一条命令跑完全部门禁（推荐；退出码非零即失败）────────────────────
+python tools/gates/check_all.py           # 21 项：ruff / pytest / 16 套 node / 对拍 / 溯源 / 文档
+python tools/gates/check_all.py --quick   # 3 项秒级检查（ruff / 溯源 / 文档）
+
 # ── Python 引擎：物理断言 / 门禁 / 契约守卫 / TPHYS 双端对拍 / 对抗应力 ──
-pytest engine/tests -q                 # 189 passed / 1 skipped（skip = OptimumK 未录入，显式）
+pytest engine/tests -q                 # 323 passed / 1 skipped（skip = OptimumK 未录入，显式）
                                        #   · test_api_contract          前后端键集契约
                                        #   · test_static_split_invariant 静态载荷分配不变量
                                        #   · test_tire_width_balance      胎宽→侧偏刚度配平
                                        #   · test_legacy_isolation        V1 冻结线隔离守卫
+                                       #   · test_provenance              数据资产登记 + 内容 sha256
 ruff check engine                      # All checks passed（配置见 pyproject.toml，规则 E/F/W/I）
 python scripts/sync_root_docs.py --check   # 根 ↔ LABSUS 的 README/LICENSE 逐字节一致
 
 # ── 前端防线（逐套件）──────────────────────────────────────────────
-node web/test/test_dom.js              # 274 断言：薄壳结构 / 双端同构 / 已知 bug 回访
-node web/test/stage_boot_check.js      # 45 断言：模块加载顺序 / TDZ / 三舞台 20 帧无抛错
+node web/test/test_dom.js              # 342 断言：薄壳结构 / 双端同构 / 已知 bug 回访
+node web/test/stage_boot_check.js      # 46 断言：模块加载顺序 / TDZ / 三舞台 20 帧无抛错
 node web/test/test_lap_15dof.js        # 23 断言：2 圈 5.45km 全闭环 + 6 项 powertrain parity
 node web/test/test_15dof_steady.js     # 14 断言：15-DOF 内核解析稳态锚（自由落体/静载/自行车模型/左右对称）
-node web/test/test_powertrain.js       # 587 断言：七架构动力总成
+node web/test/test_powertrain.js       # 625 断言：七架构动力总成
 node web/test/test_tire_lab.js         # 65 断言：轮胎工坊
 node web/test/test_tire_wiring.js      # 36 断言 · proving_ground_test.js 36 断言（含 RIG 回归）
 node web/test/test_racingline.js       # 30 断言 · test_engine_sound.js 26 断言
 node web/test/test_kc_wiring.js        # 25 断言 · undulating_road_test.js 21 断言
-node web/test/test_mpc.js              # 19 断言 · test_p2b_damper.js 18 断言
+node web/test/test_mpc.js              # 19 断言 · test_p2b_damper.js 28 断言（含 4Q 减振器表）
 node web/test/test_p2a_aero.js         # 14 断言 · test_circuit_ui.js 100%（64 id + 22 class）
 
 # ── 跨语言物理对拍（JS TPHYS ↔ Python transient，门限 5%）────────────
 node web/test/tphys_parity.cjs         # 实测 worst 0.51%
 
 # ── 诊断工具（不参与回归）─────────────────────────────────────────
+node web/test/physics_audit.js         # 物理审计 57 项（惯量/能量/步长收敛/阿克曼/ISO 路面/碰撞）
 node web/test/preset_balance_sweep.cjs # 预设配平扫描（US / TLLTD ← 簧载份额 / ARB / 胎宽）
 node web/test/mpc_diag_g30.cjs         # MPC 整定诊断 · mpc_calib_g30.cjs 校准网格
 ```
 
-> 测试数字以本仓库当前工作区实测为准（2026-09-20 基线）。改前端后至少跑
+> 测试数字以本仓库当前工作区实测为准（**2026-10-31 基线**）。改前端后至少跑
 > `test_dom` + `stage_boot_check`；改引擎后跑 `pytest engine/tests` + `ruff check engine`；
-> 改 TPHYS/内联物理后跑 `tphys_parity.cjs`。
+> 改 TPHYS/内联物理后跑 `tphys_parity.cjs`。数字变更后请同步本段与 DEVLOG。
 >
 > **自动门禁**：`.github/workflows/ci.yml`（lint / pytest / node 三 job，PR 自动跑）；
 > 提交前钩子 `.pre-commit-config.yaml`（秒级检查 + 2 MB 大文件防护 + README 一致性检查，不含 pytest）。
@@ -212,14 +218,18 @@ LABSUS/                           # 工程代码根（下同）
 │   │   ├── 13-engine-sound.js    # WebAudio 动态转速与排气声浪合成器
 │   │   ├── 14-tire-lab.js        # 轮胎实验室 (MF5.2 刷子/Magic Formula 拟合)
 │   │   ├── 15-mpc.js             # 赛道自适应模型预测控制 (MPC)
-│   │   └── 16-powertrain.js      # 动力总成与扭矩矢量分配解算
-│   └── test/                     # 前端 16 套自动化测试套件
+│   │   ├── 16-powertrain.js      # 动力总成与扭矩矢量分配解算
+│   │   └── 17-damper4q.js        # 四象限减振器表求值（保形样条 + 档位混合）
+│   └── test/                     # 前端 16 套自动化测试套件 + 诊断工具
 ├── engine/                       # Python 高性能数值计算引擎
 │   ├── server.py                 # FastAPI 入口服务 (:8001)
 │   ├── src/                      # 求解器核心源码 (K&C/衬套/Pacejka/轮胎标定/瞬态)
-│   └── tests/                    # pytest 单元测试套件 (164 项全部通过)
+│   ├── data/                     # 外部数据资产（锁 sha256，见 src/provenance.py）
+│   └── tests/                    # pytest 单元测试套件 (323 项通过 / 1 显式 skip)
+├── tools/gates/                  # 一键全门禁运行器（check_all.py）
 ├── scripts/                      # 开发与运维工具脚本
-├── requirements.txt              # Python 依赖清单
+├── requirements.txt              # Python 运行依赖（精确锁定已验证版本）
+├── requirements-dev.txt          # 开发/测试/代码质量依赖
 ├── start.bat                     # Windows 一键启动脚本
 ├── INTENTIONAL_DIFFERENCES.md    # 双端故意差异登记真源
 ├── AUDIT_AND_REFACTOR_LOG.md     # 全系统代码审计与重构归档报告
