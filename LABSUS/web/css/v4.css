@@ -4,11 +4,15 @@
    本文件只做：布局骨架覆盖 + v4 新增组件 + 主题变量通道。
    主题令牌由 js/12-v4-arrange.js 以 inline setProperty 注入，
    此处变量仅作兜底默认值（墨蓝经典 · 深色）。
+   E10（2026-11-16）单源纪律：共享仪器风/组件语言只存 fullchassis.css；
+   本文件对基规则的每条覆盖必须带 WHY 注释（基规则行号见 fullchassis.css）；
+   同选择器不得拆成多条互相冲突的规则；响应式 media 必须写在被覆盖基规则之后。
    ============================================================ */
 @import "fullchassis.css";
 
 /* ---------- 布局骨架 ---------- */
 #main{gap:8px}
+/* 覆盖 fullchassis.css:111 .pnl（280px）：v4 左坞站 Tab+面板需要 300px 宽 */
 .pnl{width:300px;flex:0 0 300px}
 
 /* 左坞站：Tab 条 + 面板区（.sec 由 JS 生成，样式继承旧体系） */
@@ -40,6 +44,8 @@
   color:var(--ink-2);font:500 10px var(--font-ui);padding:3px 8px;border-radius:var(--r-md);cursor:pointer;transition:.15s}
 .v4-mini:hover{background:var(--glass-hov);color:var(--ink-1)}
 .v4-mini.on{background:var(--pri-fill);border-color:var(--pri-bd);color:var(--ink-1)}
+/* 覆盖 fullchassis.css:266 #vp（2x2 grid 基）：v4 舞台列内补 flex 尺寸与内边距；
+   grid 模板继承基规则，单视口模式见下方 .vp-single */
 #vp{flex:1 1 auto;min-height:0;padding:8px}
 /* 单视口模式：只显示当前 .vw（沿用 max0 的隐藏手法） */
 #vp.vp-single{grid-template-columns:1fr;grid-template-rows:1fr}
@@ -48,9 +54,10 @@
 
 /* 右坞站：结论卡（#v4Hero，位于 #rp 之外，避免 buildRight 重建时被清掉） */
 #v4right{display:flex;flex-direction:column;overflow:hidden}
-#rp{width:auto;flex:none;padding:0;overflow:visible}
+/* 覆盖 fullchassis.css:116 #rp（340px 固定）：v4 右坞站改自适应 + 结论卡外置；
+   原拆两条（flex:none 与 flex:0 0 auto 冲突）已合并，取后者为生效值 */
+#rp{width:auto;flex:0 0 auto;padding:0;overflow:visible}
 #v4scroll{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;min-height:0;display:flex;flex-direction:column;gap:8px;padding:0}
-#rp{overflow:visible;flex:0 0 auto}
 .v4-hero{flex:0 0 auto;background:var(--glass);border:1px solid var(--glass-bd);border-radius:var(--r-xl);padding:10px}
 .v4-hero-hd{display:flex;align-items:baseline;gap:7px;margin-bottom:8px}
 .v4-hero-hd b{font:600 11.5px var(--font-ui);color:var(--ink-1)}
@@ -71,6 +78,13 @@
 
 /* ---------- 顶栏（v4 版：决策与执行） ---------- */
 #tb{height:52px}
+/* M7 顶栏信息分层：副标题压成一行（覆盖 fullchassis.css:83-85 #tb .tt 的 column 基布局）。
+   级联顺序（E10 修）：基规则必须在下方窄屏 media 之前——改前基规则写在 media 之后，
+   ≤1560 档的 padding 收缩被基规则覆盖成死规则（G32 意图失效）。 */
+#tb .tt{flex-direction:row;align-items:baseline;gap:0;padding:0 12px}
+#tb .tt span{white-space:nowrap}
+#tb .tt span:last-child{margin-top:0}
+#tb .tt span:last-child::before{content:"·";margin:0 7px;color:var(--ink-3)}
 #tb .v4-run{display:flex;align-items:center;gap:6px;margin:0 6px;padding:0 16px;height:30px;
   border:none;border-radius:var(--r-md);cursor:pointer;color:#fff;
   font:600 11px var(--font-ui);letter-spacing:.04em;
@@ -87,15 +101,14 @@
 .v4-pill.ok{color:var(--ok);border-color:var(--ok)}
 .v4-pill.warn{color:var(--warn);border-color:var(--warn)}
 .v4-pill.err{color:var(--err);border-color:var(--err)}
-.v4-pill.ro{cursor:default}
 #tb .v4-axis{min-width:0}
 /* G32：轴切换 seg 禁止被 flex 压缩到内容宽以下——原 min-width:0 使「后轴 R」
    在所有视口都溢出容器右缘、画到相邻「几何/K&C」seg 上（宽屏也存在）。 */
 #tb .v4-seg.v4-axis{min-width:fit-content;flex:0 0 auto}
-#tb .cell.slim{min-width:0;padding:0 9px}
 /* G32：车型平台 cell 改行内布局——原 column 布局把 select+轮胎/动力按钮堆叠在
-   52px 高内，按钮溢出与下拉重叠（用户截图实证）。行内排列 + select 限宽。 */
-#tb .cell.slim{flex-direction:row;align-items:center;gap:6px;flex-wrap:nowrap}
+   52px 高内，按钮溢出与下拉重叠（用户截图实证）。行内排列 + select 限宽。
+   （原拆两条规则，2026-11-16 E10 合并为一条） */
+#tb .cell.slim{min-width:0;padding:0 9px;flex-direction:row;align-items:center;gap:6px;flex-wrap:nowrap}
 #tb .cell.slim i{flex:0 0 auto;margin-right:2px}
 #tb .cell.slim select{flex:1 1 auto;min-width:104px;max-width:220px;text-overflow:ellipsis}
 #tb .cell.slim button{flex:0 0 auto;white-space:nowrap}
@@ -106,14 +119,19 @@
   /* G32 终验二：1500 档 cell 被 flex 压到 221.6px < 内容 233.7px 仍溢出——
      内容下限压到 ≈212px（gap 4 + 按钮 padding 6 + select min 76），留 9px 冗余 */
   #tb .cell.slim{justify-content:flex-start;gap:4px;padding:0 6px}
-  #tb .cell.slim select{min-width:76px;max-width:132px}
-  #tb .cell.slim button{padding:3px 6px}
+  /* min-width 是 flex 收缩下限：76px 会顶住压缩使双按钮溢出裁切
+     （2026-11-16 实测 1500 档盒 172.6 < 内容 180.3）；降到 60 让 select 可压缩吃 ellipsis，
+     配 button padding 4px 留 ≈8px 冗余（G32 余量纪律） */
+  #tb .cell.slim select{min-width:60px;max-width:132px}
+  #tb .cell.slim button{padding:3px 4px}
   #tb .tt span:last-child{display:none}
   #tb .tt{padding:0 10px}
+  /* G32 逐级收缩再进一档（2026-11-16 实测 1440 档平台 cell 盒 112.6 < 最小内容 168.3）：
+     1400~1560 区间中文主标题仍占宽 ⇒ 整段 .tt 隐藏（身份由 LABSUS logo 保留） */
+  #tb .tt{display:none}
 }
 @media (max-width:1400px){
-  #tb .tt{display:none}
-  #tb .cell.slim select{min-width:76px;max-width:118px}
+  #tb .cell.slim select{min-width:60px;max-width:118px}
   #tb .cell.slim{gap:4px;padding:0 6px}
   #tb .v4-seg.v4-axis button{padding:3px 5px}
   #tb .v4-pill{padding:0 6px}
@@ -159,18 +177,15 @@
         只读状态由"描边胶囊"降为"带色点文本"，顶栏从 8 个胶囊降到 1 个主按钮。
    ═══════════════════════════════════════════════════════════════════ */
 
-/* 副标题压成一行（原为 CN/EN 两行，纯装饰占掉 42px 带子的两行高） */
-#tb .tt{flex-direction:row;align-items:baseline;gap:0;padding:0 12px}
-#tb .tt span{white-space:nowrap}
-#tb .tt span:last-child{margin-top:0}
-#tb .tt span:last-child::before{content:"·";margin:0 7px;color:var(--ink-3)}
+/* 副标题基规则已移至顶栏节首（media 之前，见该处级联顺序注释） */
 
 /* 左簇贴左、右簇贴右：撤掉旧的大占位，改由主按钮吃掉剩余空间 */
 #tb .sp{flex:0 0 0}
 #v4RunBtn{margin-left:auto}
 
-/* 只读状态降级：不画边框、不占按钮语义，只留色点 + 小字 */
-.v4-pill.ro{border-color:transparent;background:transparent;color:var(--ink-3);
+/* 只读状态降级：不画边框、不占按钮语义，只留色点 + 小字
+   （cursor:default 原在文件前部单列一条，2026-11-16 E10 并入本条） */
+.v4-pill.ro{cursor:default;border-color:transparent;background:transparent;color:var(--ink-3);
   font-size:9px;padding:0 6px;gap:5px}
 .v4-pill.ro:hover{background:transparent;color:var(--ink-2)}
 /* 状态簇起始处的竖分隔（借首个状态胶囊的伪元素，不新增 DOM） */
