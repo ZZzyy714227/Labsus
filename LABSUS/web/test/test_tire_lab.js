@@ -301,6 +301,19 @@ T("SIM.tireCalib = null; TIRE_LAB.renderForm();");
 assert(T("document.getElementById('tl_mf_Fy0').disabled") === false, "MF inputs re-enabled when calibration cleared");
 T("TIRE_LAB.close();");
 
+/* ═══ 6. 已存列表渲染 escape（2026-11-16 工程债：DOM 注入） ═══ */
+console.log('=== 6. saved-list escape ===');
+T(`TIRE_LAB.customs = { '<img src=x onerror="window.__pwn=1">"onmouseover="alert(1)':
+    { meta: { savedAt: '2026-11-16T00:00:00Z', sourceVehicle: '<b>x</b>' } } };
+   TIRE_LAB.renderSavedList();`);
+const _evilHtml = T("String(document.getElementById('tlSavedList').innerHTML)");
+assert(!/<img/.test(_evilHtml), '6.1 恶意名字不得产生裸 <img 标签');
+assert(_evilHtml.includes('&lt;img'), '6.2 名字以 escape 文本呈现');
+assert(!/data-tl-del="<img/.test(_evilHtml), '6.3 data-tl-del 属性值已 escape');
+assert(!/<b>x<\/b>/.test(_evilHtml), '6.4 sourceVehicle 同样 escape');
+assert(_evilHtml.includes('&quot;onmouseover'), '6.5 属性内双引号被 escape');
+T(`TIRE_LAB.customs = {}; TIRE_LAB.renderSavedList();`);
+
 console.log(`\n[cumulative] ${passed}/${total} passed`);
 
 process.exit(passed === total ? 0 : 1);

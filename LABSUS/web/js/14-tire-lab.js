@@ -9,6 +9,9 @@
    F-61 约束：window 导出与定义同文件；TIRE_LAB 挂 window。
    ===================================================================== */
 "use strict";
+const _tlEsc = (s) => String(s).replace(/[&<>"']/g, (ch) => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+));
 const TIRE_LAB = {
   MAX_CUSTOMS: 20,
   KT_K: 0.55,    // 胎压→垂刚：气压承载份额 ~55% 线性近似
@@ -166,9 +169,9 @@ const TIRE_LAB = {
       const c = this.customs[n];
       const when = (c.meta && c.meta.savedAt) ? c.meta.savedAt.slice(0, 10) : "";
       html += `<div style="display:flex;align-items:center;gap:8px;padding:2px 0;">
-        <span style="flex:1;font:11px var(--font-ui);color:#c9d1d9;">🛞 ${n}` +
-        `<span style="color:#8b949e;"> · ${when} · ${c.meta && c.meta.sourceVehicle ? c.meta.sourceVehicle : ""}</span></span>` +
-        `<button data-tl-del="${n}" style="background:none;border:1px solid #30363d;color:#f85149;border-radius:4px;padding:1px 8px;cursor:pointer;font:11px var(--font-ui);">删除</button>` +
+        <span style="flex:1;font:11px var(--font-ui);color:#c9d1d9;">🛞 ${_tlEsc(n)}` +
+        `<span style="color:#8b949e;"> · ${_tlEsc(when)} · ${_tlEsc(c.meta && c.meta.sourceVehicle ? c.meta.sourceVehicle : "")}</span></span>` +
+        `<button data-tl-del="${_tlEsc(n)}" style="background:none;border:1px solid #30363d;color:#f85149;border-radius:4px;padding:1px 8px;cursor:pointer;font:11px var(--font-ui);">删除</button>` +
         `</div>`;
     });
     box.innerHTML = html;
