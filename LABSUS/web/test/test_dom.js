@@ -542,6 +542,24 @@ require('./test_tire_wiring')(webDir, ok, failures.push.bind(failures), { log(){
   }
 }
 
+/* ── track flags 消费守卫（2026-11-16 工程债：引擎 flags/越界夹紧计数不得被丢弃） ── */
+{
+  const src = fs.readFileSync(path.join(webDir, 'js', '09-track.js'), 'utf8');
+  const m = src.match(/function trackFlagsNote\(resp\)\s*\{[\s\S]*?\n\}/);
+  ok(m, 'trackFlagsNote 纯函数存在且可抽取');
+  if (m) {
+    const fn = new Function('return ' + m[0])();
+    ok(fn({ flags: { kc_lut_spline: true, kc_spline_ready: false }, summary: {} }).includes('样条'),
+      'track flags: spline 请求但未就绪 ⇒ 提示回退');
+    ok(fn({ flags: {}, summary: { kc_clamp_events: 3 } }).includes('3'),
+      'track flags: 越界夹紧计数显式上报');
+    ok(fn({ flags: { kc_lut_spline: true, kc_spline_ready: true }, summary: { kc_clamp_events: 0 } }) === '',
+      'track flags: 正常工况零噪音');
+    ok(fn(null) === '', 'track flags: 空响应不抛错');
+  }
+  ok(/trackFlagsNote\(res\)/.test(src), 'track flags: 状态行实际消费（接线守卫）');
+}
+
 // ── 结果（必须在所有断言之后，见文件中部 M10b 注释）──────────────────────
 if (failures.length) {
   console.error(`DOM/结构测试 FAIL：${failures.length}/${checks} 项失败`);

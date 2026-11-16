@@ -482,11 +482,19 @@ async function trackRun(){
     fitTopViewToTrack();
     const sm=TRK.res.summary;
     setTrkStatus((res.builtin?"[内置JS] ":"")+`完成：${sm.path_length_m}m · v_max ${sm.v_max}m/s · max ${sm.max_ay_g}g · ${TRK.res.ms|0}ms`+
-      (TRK.res.finished?"（到达终点）":"（限时截止）"),C.ok);
+      (TRK.res.finished?"（到达终点）":"（限时截止）")+(trackFlagsNote(res)?" ⚠ "+trackFlagsNote(res):""),C.ok);
   }catch(err){setTrkStatus("仿真失败："+err.message,C.nodeFix);}
   finally{if(btn)btn.textContent="运行赛道仿真 RUN";}
   syncTrackUI();
 }
+function trackFlagsNote(resp) {
+  const f = (resp && resp.flags) || {}, s = (resp && resp.summary) || {};
+  const notes = [];
+  if (f.kc_lut_spline && !f.kc_spline_ready) notes.push('K&C 样条未就绪，已回退分段线性');
+  if ((s.kc_clamp_events || 0) > 0) notes.push('K&C 表越界夹紧 ' + s.kc_clamp_events + ' 次（表覆盖不足）');
+  return notes.join('；');
+}
+if (typeof window !== 'undefined') window.trackFlagsNote = trackFlagsNote;
 function trackExit(){TRK.active=false;TRK.playing=false;syncTrackUI();setTrkStatus("已退出回放（恢复本地求解模式）",C.txt3);}
 
 function applyTrackFrame(i){
@@ -817,7 +825,8 @@ function trackStageRun(){
     _stageSize();_stageOpen();STAGE.last=performance.now();requestAnimationFrame(stageTick);
     const sm=res.summary;
     document.getElementById("stStatus").textContent=
-      (res.builtin?"[内置JS] ":"")+sm.path_length_m+"m - v_max "+sm.v_max+"m/s - max "+sm.max_ay_g+"g - "+(res.ms|0)+"ms"+(res.finished?" (完赛)":"");
+      (res.builtin?"[内置JS] ":"")+sm.path_length_m+"m - v_max "+sm.v_max+"m/s - max "+sm.max_ay_g+"g - "+(res.ms|0)+"ms"+(res.finished?" (完赛)":"")+
+      (trackFlagsNote(res)?" ⚠ "+trackFlagsNote(res):"");
   };
   if(useEng){
     const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),120000);
