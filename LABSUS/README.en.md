@@ -160,12 +160,12 @@ ruff check engine                      # All checks passed (config in pyproject.
 python scripts/sync_root_docs.py --check   # root <-> LABSUS README/LICENSE byte-identical
 
 # ── Frontend defense lines (per suite) ──────────────────────────────────
-node web/test/test_dom.js              # 342 assertions: shell structure / dual-entry parity / bug regressions
+node web/test/test_dom.js              # 350 assertions: shell structure / dual-entry parity / bug regressions
 node web/test/stage_boot_check.js      # 47 assertions: module order / TDZ / 3 stages x 20 frames
 node web/test/test_lap_15dof.js        # 23 assertions: 2 laps of 5.45 km + 6 powertrain parity checks
 node web/test/test_15dof_steady.js     # 14 assertions: analytic steady-state anchors for the 15-DOF kernel
 node web/test/test_powertrain.js       # 625 assertions (7 powertrain architectures)
-node web/test/test_tire_lab.js         # 65 · test_tire_wiring.js 36 · proving_ground_test.js 36
+node web/test/test_tire_lab.js         # 70 · test_tire_wiring.js 36 · proving_ground_test.js 36
 node web/test/test_racingline.js       # 30 · test_engine_sound.js 26 · test_kc_wiring.js 25
 node web/test/undulating_road_test.js  # 21 · test_mpc.js 19 · test_p2b_damper.js 28 (incl. 4Q damper table)
 node web/test/test_p2a_aero.js         # 14 · test_circuit_ui.js 100% (64 ids + 22 classes)
