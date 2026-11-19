@@ -398,11 +398,35 @@ class VehicleDynamics15DOF {
     this.CwB_F = (cB_F * 1000) * (mrF * mrF);  // 压缩（bump）阻尼 N·s/m
     this.CwB_R = (cB_R * 1000) * (mrR * mrR);
 
+    /* 2026-11-19（P35 统一）：防倾杆刚度改走**机构侧同一实现** `arbRate()` ——
+       管扭转 G·J/L ÷ 力臂² × 运动比²，不再用 K1 自己那套 `d⁴ × 0.05` 硬编码系数。
+       此前同一根杆在两条路径上刚度不同（gt3 d=28：物理 ≈63 kN/m vs 旧式 ≈31 kN/m），
+       改材料/力臂在 K1 里毫无反应。现在只有**一个**公式。
+       `S_config.arbModel === 'legacy'` 可退回旧式（仅用于 A/B 对比与回退验证）。 */
+    const _arbK = (axleState, mr) => {
+      if (!axleState || !axleState.arb || !(axleState.arb.d > 0)) return 0;
+      const legacy = axleState.arb.d ** 4 * 0.05;
+      if (S_config.arbModel === 'legacy') return legacy;
+      if (typeof arbRate !== 'function') return legacy;   // 无机构层（精简沙箱）时退回
+      try {
+        const r = arbRate(mr, axleState);
+        return (r && isFinite(r.k) && r.k > 0) ? r.k * 1000.0 : 0;   // N/mm → N/m
+      } catch (e) { return legacy; }
+    };
+    this.K_arb_F = _arbK(S_config.front, mrF);
+    this.K_arb_R = _arbK(S_config.rear, mrR);
+
     // Roll Moment Arm: distance from sprung CG to physical roll axis
     const h_rc_f = (SIM_data && SIM_data.rcH_F !== null && SIM_data.rcH_F !== undefined ? SIM_data.rcH_F : 50) / 1000;
     const h_rc_r = (SIM_data && SIM_data.rcH_R !== null && SIM_data.rcH_R !== undefined ? SIM_data.rcH_R : 65) / 1000;
     const h_roll_axis = (h_rc_f + h_rc_r) / 2;
-    this.h_roll_arm = Math.max(0.06, this.h_cg - h_roll_axis);
+    /* 2026-11-19（P35 统一）：侧倾力臂用**簧载质心高** `hs`，不是整车质心高 `hcg`。
+       物理上侧倾的是簧上质量；簧下质量不随车身滚转（本模型里它只有垂向 DOF）。
+       用整车质心会系统性错配——formula 预设 hs=285 vs hcg=270，差 5.6%。
+       无 `hs` 时回退 hcg ⇒ 旧行为。 */
+    const h_roll_src = (S_config.hs !== undefined && S_config.hs !== null && isFinite(S_config.hs))
+      ? S_config.hs : this.h_cg * 1000;
+    this.h_roll_arm = Math.max(0.06, h_roll_src / 1000 - h_roll_axis);
     
     /* P0（M20）· 性能埋点计数器（整数自增，零开销） */
     this._simStat = { steps: 0, subSteps: 0, roadQueries: 0 };
@@ -1016,8 +1040,10 @@ class VehicleDynamics15DOF {
       
       const arbF_mult = liveTune ? (1.0 + (liveTune.arb_f_pct || 0) / 100.0) : 1.0;
       const arbR_mult = liveTune ? (1.0 + (liveTune.arb_r_pct || 0) / 100.0) : 1.0;
-      const K_arb_F = (this.S.front && this.S.front.arb && this.S.front.arb.d > 0) ? (this.S.front.arb.d**4 * 0.05 * arbF_mult) : 0.0;
-      const K_arb_R = (this.S.rear && this.S.rear.arb && this.S.rear.arb.d > 0) ? (this.S.rear.arb.d**4 * 0.05 * arbR_mult) : 0.0;
+      /* 2026-11-19（P35 统一）：刚度来自构造期算好的物理值（管扭转公式），
+         此处只乘 liveTune 的实时调整倍率。 */
+      const K_arb_F = this.K_arb_F * arbF_mult;
+      const K_arb_R = this.K_arb_R * arbR_mult;
       const F_arb_F = K_arb_F * (tr_FL - tr_FR);
       const F_arb_R = K_arb_R * (tr_RL - tr_RR);
       
