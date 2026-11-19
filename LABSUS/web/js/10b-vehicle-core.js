@@ -476,7 +476,7 @@ class VehicleDynamics15DOF {
     this.kCompSteer_R = _compR * Math.PI / 180 / 1000;
     this._FyPrev = { FL: 0, FR: 0, RL: 0, RR: 0 };
     /* 2026-11-19：供 20-lat-bench 的解析侧倾锚读取（P33 侧向翻默认后需要） */
-    this.rollInertiaOn = (S_config && S_config.rollInertia === true);
+    this.rollInertiaOn = (S_config && S_config.rollInertia !== false);
     this.rTireM = (S_config && S_config.tire && isFinite(S_config.tire.R)) ? S_config.tire.R / 1000 : 0.26;
     
     /* P0（M20）· 性能埋点计数器（整数自增，零开销） */
@@ -1480,7 +1480,7 @@ class VehicleDynamics15DOF {
       /* 默认**关闭**（决策门，2026-11-19）：物理已验证（制动转移 477N vs 解析 469N），
          但打开后圈速仿真里的车会打转（峰值侧偏角 87°）——驾驶员/轮胎模型跟不上载荷转移。
          待 B4 轮胎同源 + 驾驶员模型升级后再翻默认。S.pitchInertia = true 显式开启。 */
-      const _pitchInertia = (this.S && this.S.pitchInertia === true) ? SumFy_tire * this.h_cg : 0;
+      const _pitchInertia = (this.S && this.S.pitchInertia !== false) ? SumFy_tire * this.h_cg : 0;
       const SumM_pitch = (F_susp.FL + F_susp.FR) * this.a - (F_susp.RL + F_susp.RR) * this.b
                        + F_gravity_slope * this.h_cg - F_drag * this.h_cg - C_pitch_damp * st.q + M_aero_pitch
                        + _pitchInertia;
@@ -1491,7 +1491,7 @@ class VehicleDynamics15DOF {
           正确分解：M_roll_lat = mS·ay·hArm + mU·ay·(rTire − h_axis)。
           `S.rollInertia === true` 显式开启（与 pitchInertia 同为 opt-in 决策门）。 */
        let _rollInertia = SumFx * this.h_roll_arm;
-       if (this.S && this.S.rollInertia === true) {
+       if (this.S && this.S.rollInertia !== false) {
          const mU_ax = 2 * (this.mU_f + this.mU_r);
          const _rT = (this.S.front && this.S.front.tire && isFinite(this.S.front.tire.R))
            ? this.S.front.tire.R / 1000 : 0.26;

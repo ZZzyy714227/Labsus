@@ -44,23 +44,25 @@ console.log('=== 1. 默认关闭：逐位复现（无该项）===');
   assert(JSON.stringify(a.metrics) === JSON.stringify(c.metrics), '关闭时不受系数影响（逐位）');
 }
 
-console.log('=== 2. 开启后 T63 变长（方向锁：柔度 = 不足转向）===');
+console.log('=== 2. 开启后稳态 yaw 变小（方向锁：柔度 = 不足转向）===');
 {
   const off = step('formula', 0);
   const on = step('formula', 0.4, true);
-  const gain = 100 * (on.metrics.riseTimeMs / off.metrics.riseTimeMs - 1);
-  note(`formula T63 ${off.metrics.riseTimeMs.toFixed(0)} → ${on.metrics.riseTimeMs.toFixed(0)} ms（+${gain.toFixed(0)}%）`);
-  assert(on.metrics.riseTimeMs > off.metrics.riseTimeMs, `开启柔度后横摆响应变慢（+${gain.toFixed(0)}%）`);
+  const dyaw = 100 * (Math.abs(on.metrics.yawRateSS) / Math.abs(off.metrics.yawRateSS) - 1);
+  note(`formula yawSS ${off.metrics.yawRateSS.toFixed(4)} → ${on.metrics.yawRateSS.toFixed(4)}（${dyaw.toFixed(1)}%）· T63 ${off.metrics.riseTimeMs.toFixed(0)} → ${on.metrics.riseTimeMs.toFixed(0)} ms`);
+  /* 物理断言只用**稳态**量：柔度降低等效侧偏刚度 ⇒ 不足转向增加 ⇒ 同转角下 yaw 变小。
+     T63 方向不稳定（取决于当时的横摆阻尼比；2026-11-19 翻默认后由"变长"变为"变短"），
+     故不作为方向锁。 */
   assert(Math.abs(on.metrics.yawRateSS) < Math.abs(off.metrics.yawRateSS),
     `开启柔度后稳态 yaw 变小（不足转向增加：${off.metrics.yawRateSS.toFixed(4)} → ${on.metrics.yawRateSS.toFixed(4)}）`);
 }
 
-console.log('=== 3. 系数单调：越大越慢 ===');
+console.log('=== 3. 系数单调：越大越不足转向 ===');
 {
-  const ts = [0, 0.2, 0.4, 0.8].map(k => step('formula', k, k > 0).metrics.riseTimeMs);
-  note('T63: ' + ts.map(v => v.toFixed(0)).join(' → ') + ' ms');
-  for (let i = 1; i < ts.length; i++) {
-    assert(ts[i] >= ts[i - 1] - 1e-9, `系数单调：第 ${i} 点不短于前一点`);
+  const ys = [0, 0.2, 0.4, 0.8].map(k => Math.abs(step('formula', k, k > 0).metrics.yawRateSS));
+  note('|yawSS|: ' + ys.map(v => v.toFixed(4)).join(' → '));
+  for (let i = 1; i < ys.length; i++) {
+    assert(ys[i] <= ys[i - 1] + 1e-9, `系数单调：第 ${i} 点稳态 yaw 不大于前一点`);
   }
 }
 

@@ -51,10 +51,12 @@ const car = new (ctx.window.VehicleDynamics15DOF)(S, {}, 0);
 
 console.log('=== 1. 默认口径：K1 比 K3 低 10/9（记录缺口，不是 bug）===');
 {
+  S.tireMuFromParams = false;
   const ratios = K3.map(c => Math.abs(car.magicFormula(c.Fz, c.alpha, 0, 1.35, 1).Fy) / c.Fy);
   const lo = Math.min(...ratios), hi = Math.max(...ratios);
   note(`K1/K3 比值范围 ${lo.toFixed(6)} ~ ${hi.toFixed(6)}（D 口径理论 9/10）`);
   /* 偏差来自**第二个口径差**：K1 用 By·tanα，K3 用 By·α（小角等价，0.2 rad 差 1.3%） */
+  S.tireMuFromParams = undefined;
   assert(lo > 0.895 && hi < 0.905,
     `默认口径约为 9/10（${lo.toFixed(4)}~${hi.toFixed(4)}；残差来自 tanα vs α）`);
 }
