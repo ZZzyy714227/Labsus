@@ -52,6 +52,8 @@ NODE_SUITES = (
     "test_load_transfer.js",
     # 线 B · B2（2026-11-19）：柔度转向进时序（P27）——开环 T63 偏快的补丁
     "test_compliance_steer.js",
+    # 线 B · B4（2026-11-19）：四内核轮胎口径对拍（K1 vs K3 逐点；缺口 10/9 已量化）
+    "test_tire_parity.js",
     # P1-1：physics_audit 57 项进回归。实测物理结果逐位确定，只有性能计时浮动，
     # 故以 --ci 模式跳过 2 项环境敏感的性能阈值断言（见该文件头部说明）。
     "physics_audit.js",

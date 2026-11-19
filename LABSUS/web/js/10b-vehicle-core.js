@@ -1,4 +1,4 @@
-﻿/* ═══════════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════════════
    10b-vehicle-core.js —— 15-DOF 车辆物理与自动驾驶内核（P2 拆分，2026-10-31）
 
    从 11-stages.js 抽出（原 L95–L1440）。这里只有**数值层**：
@@ -692,7 +692,18 @@ class VehicleDynamics15DOF {
     const ref = (typeof tp.FzRef === 'number' && tp.FzRef > 0) ? tp.FzRef : tp.FzNom;
     const r = Fz / ref;
     const lsF = Math.max(0.1, 1.0 - tp.LS * (r - 1.0));
-    const D = mu_peak * tp.gripScale * Fz * lsF;
+    /* 线 B · B4（2026-11-19）：**四内核轮胎口径同源**。
+       实测 K1 与 K3（engine/tire_mf.py）在完全相同参数下 Fy 比值恒为 **10/9**
+       （精确，与 Fz/α 无关）——根因是 D 的量级基准不同：
+         K1: D = μ_surface(1.35) · Fz
+         K3: D = Fy0/FzNom(=5250/3500=1.5) · Fz      ← 轮胎标定值
+       K2（09-track TPHYS）也用 Fy0/FzNom ⇒ **K1 是唯一异类**。
+       `S.tireMuFromParams === true` 时把路面 μ 当作"相对干沥青的倍率"（1.35 为基准），
+       底层改用轮胎标定 μ ⇒ 与 K3/K2 逐点一致（×1.111）。默认关闭 ⇒ 逐位不变。 */
+    const _muTire = (tp.Fy0 > 0 && tp.FzNom > 0) ? tp.Fy0 / tp.FzNom : 1.35;
+    const muBase = (this.S && this.S.tireMuFromParams === true)
+      ? (mu_peak / 1.35) * _muTire : mu_peak;
+    const D = muBase * tp.gripScale * Fz * lsF;
 
     /* M5（2026-09-20）：axleScale = 按胎宽配平的轴刚度系数 k = W_axle / mean(W_f, W_r)。
        只放大**刚度因子**（侧向归一化滑移 sy 的 By），不动峰值 D —— 胎宽对接触斑
