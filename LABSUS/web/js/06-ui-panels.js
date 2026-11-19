@@ -275,6 +275,79 @@ function buildLeft(){
     setTimeout(()=>URL.revokeObjectURL(a2.href),1000);
   },null,"hl"]]);
 
+  /* ── 线 C · C1（2026-11-19）：方案库 N 方案对比 ────────────────────
+     A/B 两槽只够"改一下看一眼"。方案库（SETUPS，localStorage，12 条）能存住
+     多套底盘，这里一次性把库里的方案逐条灌入 → 跑三层台 → 并排。
+     ⚠ 必须刷新几何（rebuild/refreshDerived），否则 SIM 还是上一个方案的 LUT。 */
+  b=sec(host,"方案库对比","SCHEME LIBRARY",true);
+  const schOut=E("div","eng-status"); schOut.id="schOut";
+  schOut.textContent="在「方案库」里存几套底盘，这里一键并排（基准列 = 列表最上面那条）。";
+  b.appendChild(schOut);
+  const schTbl=E("table","hp"); schTbl.id="schTbl"; b.appendChild(schTbl);
+  if(typeof COMPARE!=="undefined" && typeof COMPARE.setRefreshHook==="function"){
+    COMPARE.setRefreshHook(()=>{
+      try{ if(typeof rebuild==="function") rebuild(); }catch(e){}
+      try{ if(typeof refreshDerived==="function") refreshDerived(true); }catch(e){}
+    });
+  }
+  const renderMulti=(d)=>{
+    schTbl.textContent="";
+    if(!d){ schOut.textContent="方案库至少要有 2 套方案"; return; }
+    const head=E("thead"), hr=E("tr");
+    hr.appendChild(E("th",null,"层")); hr.appendChild(E("th",null,"指标"));
+    d.labels.forEach((l,i)=>hr.appendChild(E("th",null,l+(i===0?"（基准）":""))));
+    d.labels.slice(1).forEach(l=>hr.appendChild(E("th",null,l+" Δ%")));
+    head.appendChild(hr); schTbl.appendChild(head);
+    const body=E("tbody");
+    d.rows.forEach(r=>{
+      const tr=E("tr");
+      tr.appendChild(E("td",null,r.layer));
+      tr.appendChild(E("td",null,r.name+(r.unit?" ("+r.unit+")":"")));
+      r.cells.forEach(c=>tr.appendChild(E("td",null,String(c.raw))));
+      r.pcts.slice(1).forEach(p=>{
+        const td=E("td",null,p===null?"—":(p>0?"+":"")+p.toFixed(2)+"%");
+        if(p!==null&&Math.abs(p)>1) td.className="hl";
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+    schTbl.appendChild(body);
+    const n=d.rows.filter(r=>r.pcts.some(p=>p!==null&&Math.abs(p)>1)).length;
+    schOut.textContent=`${d.labels.length} 套方案 · ${d.rows.length} 项指标 · ${n} 项差异 >1%`;
+  };
+  rowBtns(b,[
+    ["存为方案",()=>{
+      const nm=prompt("方案名（存进方案库，可对比 N 套）","方案 "+(SETUPS.list.length+1));
+      if(nm===null) return;
+      const r=setupSaveCurrent(nm);
+      schOut.textContent=r.ok?r.msg:"保存失败："+r.msg;
+    }],
+    ["对比方案库",()=>{
+      if(typeof COMPARE==="undefined"){ schOut.textContent="COMPARE 未加载"; return; }
+      setupListLoad();
+      const list=SETUPS.list.slice(0,6);           // 最多 6 列，再多表就糊了
+      if(list.length<2){ schOut.textContent="方案库至少要有 2 套方案"; return; }
+      schOut.textContent="正在采集 "+list.length+" 套方案（每套跑三层台）…";
+      setTimeout(()=>{
+        const recs=[];
+        for(const r of list) recs.push(COMPARE.captureScheme(r, r.name));
+        renderMulti(COMPARE.diffMulti(recs));
+      },10);
+    }]
+  ]);
+  rowBtns(b,[["导出多方案 CSV",()=>{
+    if(typeof COMPARE==="undefined") return;
+    setupListLoad();
+    const list=SETUPS.list.slice(0,6);
+    if(list.length<2){ schOut.textContent="方案库至少要有 2 套方案"; return; }
+    const recs=list.map(r=>COMPARE.captureScheme(r, r.name));
+    const csv=COMPARE.toCsvMulti(COMPARE.diffMulti(recs));
+    const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+    const a2=document.createElement("a");
+    a2.href=URL.createObjectURL(blob); a2.download="schemes_"+Date.now()+".csv"; a2.click();
+    setTimeout(()=>URL.revokeObjectURL(a2.href),1000);
+  },null,"hl"]]);
+
   /* 线 A · A1（2026-11-19）：侧倾/横向台。补的是**姿态量**——本会话 ARB 统一让
      侧倾角变 −33~41%，当时 24 项门禁零反应；这里给侧倾角/梯度/轮荷转移/yaw 一个台面，
      解析锚已进 CI（误差 <2%）。 */
@@ -332,6 +405,42 @@ function buildLeft(){
       latOut.textContent=`14 m/s / 4° 阶跃：yaw 稳态 ${m.yawRateSS.toFixed(4)} rad/s · 上升 ${m.riseTimeMs.toFixed(0)} ms · 超调 ${m.overshootPct.toFixed(1)}%`;
     },10);}]
   ]);
+
+  /* ── 线 C · C2（2026-11-19）：开发看板 ────────────────────────────
+     三层指标并排 + 状态判定。判定只用两种真源：EVAL_BENCHMARKS 的目标带，
+     或解析锚（偏差 <2% good / <5% warn）。既无目标带又无锚的量只给值。 */
+  b=sec(host,"开发看板","DEVELOPMENT DASHBOARD",true);
+  const dashOut=E("div","eng-status"); dashOut.id="dashOut";
+  dashOut.textContent="把静态/动态/赛道的指标按目标带或解析锚判成三态。点「刷新看板」。";
+  b.appendChild(dashOut);
+  const dashTbl=E("table","hp"); dashTbl.id="dashTbl"; b.appendChild(dashTbl);
+  rowBtns(b,[["刷新看板",()=>{
+    if(typeof COMPARE==="undefined"||typeof COMPARE.dashboard!=="function"){ dashOut.textContent="看板未加载"; return; }
+    dashOut.textContent="正在跑三层台…";
+    setTimeout(()=>{
+      const d=COMPARE.dashboard();
+      dashTbl.textContent="";
+      const head=E("thead"), hr=E("tr");
+      ["","层","指标","实测","目标 / 锚","偏差"].forEach(h=>hr.appendChild(E("th",null,h)));
+      head.appendChild(hr); dashTbl.appendChild(head);
+      const body=E("tbody");
+      const mark={good:"✓",warn:"!",bad:"✗"};
+      d.rows.forEach(r=>{
+        const tr=E("tr");
+        const c0=E("td",null,mark[r.grade]||"·"); if(r.grade==="bad") c0.className="hl";
+        tr.appendChild(c0);
+        tr.appendChild(E("td",null,r.layer));
+        tr.appendChild(E("td",null,r.name));
+        tr.appendChild(E("td",null,String(r.value)));
+        tr.appendChild(E("td",null,String(r.target)));
+        tr.appendChild(E("td",null,r.errPct===null?"—":r.errPct.toFixed(2)+"%"));
+        body.appendChild(tr);
+      });
+      dashTbl.appendChild(body);
+      dashOut.textContent=`${d.good} 项达标 · ${d.warn} 项边缘 · ${d.bad} 项越界 · ${d.unknown} 项无判据`
+        + (d.bad?"　（✗ 项见下表标红）":"");
+    },10);
+  },null,"hl"]]);
 
   b=sec(host,"3D 空间硬点表","HARDPOINTS [mm]",true);
   const tb=E("table","hp");
@@ -1026,6 +1135,19 @@ const SENS_OBJ = [
   { key:"bsR",   label:"后轴跳动转向", unit:"°/25mm", read:()=> sensSweepVal("rear","bs") },
   { key:"rcR",   label:"后侧倾中心高", unit:"mm",     read:()=> sensMetricVal("rear","rcH") },
   { key:"wrR",   label:"后轮端刚度",   unit:"N/mm",   read:()=> sensWheelRate("rear") },
+  /* 线 C · C3（2026-11-19）：把线 A 新建的**动态/赛道台**指标接进灵敏度目标。
+     此前目标全是准静态设计量（US/侧倾梯度/外倾增益…），问不到"哪个杠杆能改
+     峰值侧向加速度 / 稳态侧倾角 / 车身主频"。这三个是**慢目标**（每次读取要跑台架），
+     标签里标注，扫一次约多花几秒。 */
+  { key:"peakay", label:"峰值侧向加速度〔慢〕", unit:"g", read:()=>{
+      if(typeof LAT_BENCH==="undefined") return NaN;
+      return LAT_BENCH.steadyCircle({speed:14,steerDeg:5,dur:4,avgSecs:1.5}).metrics.ayG; } },
+  { key:"rollss", label:"稳态侧倾角〔慢〕", unit:"°", read:()=>{
+      if(typeof LAT_BENCH==="undefined") return NaN;
+      return LAT_BENCH.steadyCircle({speed:14,steerDeg:5,dur:4,avgSecs:1.5}).metrics.phiDeg; } },
+  { key:"ridefn", label:"车身主频〔慢〕", unit:"Hz", read:()=>{
+      if(typeof RIDE_BENCH==="undefined") return NaN;
+      return RIDE_BENCH.run('freedecay',{dur:2.5,over:{zeroDamping:true}}).metrics.dominantFreqHz; } },
 ];
 
 /* —— 目标量取值：与 07-plots.updateReadouts 同路径 —— */

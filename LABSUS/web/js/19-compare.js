@@ -1,4 +1,4 @@
-﻿/* 19-compare.js —— 三层对比：静态 / 动态 / 赛道（Phase D，2026-11-19）
+/* 19-compare.js —— 三层对比：静态 / 动态 / 赛道（Phase D，2026-11-19）
  *
  * 存在理由：三张表各自有真源，但从来没有并排过；更关键的是**赛道层没有受控指标**——
  * `test_lap_15dof` 的圈速由自动驾驶逐圈学习决定，几何差异被压到 0.017%（P29）。
@@ -189,10 +189,181 @@ const COMPARE = (function () {
     return lines.join('\n');
   }
 
+  /* ── 多方案对比（线 C · C1，2026-11-19）────────────────────────────
+     从 A/B 两槽扩到方案库 N 条。做法：逐条把方案快照灌进 S → 跑三层台 → 还原。
+     ⚠ 必须刷新几何（rebuild/refreshDerived），否则 SIM.swF/mrRefF 还是上一个方案的，
+       量出来的东西是"混合体"。node 沙箱里没有 DOM 刷新时退化为只跑参数派生的量，
+       测试用 `_refresh` 钩子显式注入。
+     ⚠ 方案库是 localStorage 里的 SETUPS（06-ui-panels），本模块只读不写。 */
+  let _refresh = null;
+  function setRefreshHook(fn) { _refresh = fn; }
+  function snapshotS() {
+    return {
+      veh: S.vehicleType, wb: S.wb, hcg: S.hcg, hs: S.hs,
+      mTotal: S.mTotal, mSprung: S.mSprung,
+      front: JSON.parse(JSON.stringify(S.front)),
+      rear: JSON.parse(JSON.stringify(S.rear))
+    };
+  }
+  function applyScheme(rec) {
+    if (!rec) return;
+    if (rec.veh !== undefined) S.vehicleType = rec.veh;
+    if (rec.wb !== undefined) S.wb = rec.wb;
+    if (rec.hcg !== undefined) S.hcg = rec.hcg;
+    if (rec.hs !== undefined) S.hs = rec.hs;
+    if (rec.mTotal !== undefined) S.mTotal = rec.mTotal;
+    if (rec.mSprung !== undefined) S.mSprung = rec.mSprung;
+    if (rec.front) S.front = JSON.parse(JSON.stringify(rec.front));
+    if (rec.rear) S.rear = JSON.parse(JSON.stringify(rec.rear));
+    if (typeof _refresh === 'function') _refresh();
+  }
+  function restoreS(snap) {
+    S.vehicleType = snap.veh; S.wb = snap.wb; S.hcg = snap.hcg; S.hs = snap.hs;
+    S.mTotal = snap.mTotal; S.mSprung = snap.mSprung;
+    S.front = snap.front; S.rear = snap.rear;
+    if (typeof _refresh === 'function') _refresh();
+  }
+
+  /** 对一个方案快照采集三层指标（不动 UI） */
+  function captureScheme(rec, label) {
+    const snap = snapshotS();
+    let out = null;
+    try {
+      applyScheme(rec);
+      out = {
+        label: label || rec.name || '?',
+        hash: configHash(),
+        statics: staticRows(), dynamics: dynamicRows(), tracks: trackRows()
+      };
+    } finally {
+      restoreS(snap);
+    }
+    return out;
+  }
+
+  /** N 方案对比：第一列作基准，其余给 Δ% */
+  function diffMulti(records) {
+    if (!records || records.length < 2) return null;
+    const base = records[0];
+    const key = (layer, k) => layer + '|' + k;
+    const rows = [];
+    const layers = [['静态', 'statics'], ['动态', 'dynamics'], ['赛道', 'tracks']];
+    for (const [layerName, prop] of layers) {
+      for (const r of base[prop]) {
+        const cells = [];
+        let anyNum = false;
+        for (const rec of records) {
+          const hit = (rec[prop] || []).find(x => x.key === r.key);
+          const raw = hit ? hit.value : '—';
+          const num = parseFloat(raw);
+          cells.push({ raw: raw, num: Number.isFinite(num) ? num : null });
+          if (Number.isFinite(num)) anyNum = true;
+        }
+        if (!anyNum) { rows.push({ layer: layerName, key: r.key, name: r.name, unit: r.unit, cells: cells, pcts: cells.map(() => null) }); continue; }
+        const baseNum = cells[0].num;
+        const pcts = cells.map((c, i) => (i === 0 || c.num === null || baseNum === null || baseNum === 0)
+          ? null : (100 * (c.num - baseNum) / Math.abs(baseNum)));
+        rows.push({ layer: layerName, key: r.key, name: r.name, unit: r.unit, cells: cells, pcts: pcts });
+      }
+    }
+    return { labels: records.map(r => r.label), hashes: records.map(r => r.hash), rows: rows };
+  }
+
+  function toCsvMulti(d) {
+    if (!d) return '';
+    const head = ['layer', 'metric', 'unit'].concat(d.labels.map((l, i) => l + '(' + d.hashes[i] + ')'))
+      .concat(d.labels.slice(1).map(l => l + ' Δ%'));
+    const lines = [head.join(',')];
+    for (const r of d.rows) {
+      const vals = r.cells.map(c => c.raw);
+      const pcts = r.pcts.slice(1).map(p => p === null ? '' : p.toFixed(2));
+      lines.push([r.layer, '"' + r.name + '"', r.unit].concat(vals).concat(pcts).join(','));
+    }
+    return lines.join('\n');
+  }
+
+  /* ── 开发看板（线 C · C2，2026-11-19）──────────────────────────────
+     三层指标并排 + **状态判定**。判定只用两种真源，不编造阈值：
+       ① 静态：`EVAL_BENCHMARKS[k].eval()` 的目标带（good/warn/bad）——项目既有口径
+       ② 有解析锚的量：实测 vs 锚，偏差 <2% good / <5% warn / 否则 bad
+       ③ 既无目标带又无锚的量：只给值，状态 null（不假装有判据） */
+  function gradeByError(meas, anchor) {
+    if (!Number.isFinite(meas) || !Number.isFinite(anchor) || Math.abs(anchor) < 1e-9) return null;
+    const e = Math.abs(Math.abs(meas) - Math.abs(anchor)) / Math.abs(anchor) * 100;
+    return { grade: e < 2 ? 'good' : (e < 5 ? 'warn' : 'bad'), errPct: e };
+  }
+
+  function dashboard() {
+    const rows = [];
+
+    /* ① 静态 KPI —— 复用评价引擎的目标带 */
+    if (typeof calculateEvaluationData === 'function' && typeof EVAL_BENCHMARKS !== 'undefined') {
+      let ev = null;
+      try { ev = calculateEvaluationData(); } catch (e) { ev = null; }
+      const m = (ev && ev.metrics) || {};
+      for (const k of Object.keys(EVAL_BENCHMARKS)) {
+        const bm = EVAL_BENCHMARKS[k], cell = m[k];
+        const val = (cell && cell.formatted !== undefined) ? cell.formatted
+          : (cell && cell.value !== undefined ? String(cell.value) : '—');
+        let g = null;
+        /* ⚠ 评价引擎的单元字段名是 `val`（不是 value）——本轮踩过 */
+        const num = (cell && cell.val !== undefined) ? cell.val : (cell ? cell.value : undefined);
+        if (num !== null && num !== undefined && typeof bm.eval === 'function') {
+          try { g = bm.eval(num); } catch (e) { g = null; }
+        }
+        rows.push({ layer: '静态', key: k, name: bm.name, value: val, target: bm.target || '—', grade: g, errPct: null });
+      }
+    }
+
+    /* ② 动态 —— ride 台 + 自由衰减频率的解析锚 */
+    if (typeof RIDE_BENCH !== 'undefined') {
+      const st = RIDE_BENCH.run('step', { ampMm: 5, dur: 2.0 });
+      const fd = RIDE_BENCH.run('freedecay', { dur: 3.0, over: { zeroDamping: true } });
+      const car = (typeof VehicleDynamics15DOF !== 'undefined')
+        ? new (typeof VehicleDynamics15DOF !== 'undefined' ? VehicleDynamics15DOF : Object)(
+            S, (typeof SIM !== 'undefined' ? SIM : {}), 0) : null;
+      let fAnchor = null;
+      if (car) {
+        const keF = (car.Kw_F * car.kT_f) / (car.Kw_F + car.kT_f);
+        const keR = (car.Kw_R * car.kT_r) / (car.Kw_R + car.kT_r);
+        fAnchor = Math.sqrt((2 * keF + 2 * keR) / car.mSprung) / (2 * Math.PI);
+      }
+      const gr = fAnchor ? gradeByError(fd.metrics.dominantFreqHz, fAnchor) : null;
+      rows.push({ layer: '动态', key: 't63', name: '阶跃 T63', value: st.metrics.t63Ms.toFixed(0) + ' ms', target: '越小越好', grade: null, errPct: null });
+      rows.push({ layer: '动态', key: 'overshoot', name: '阶跃超调', value: st.metrics.overshootPct.toFixed(1) + ' %', target: '10~25%', grade: (st.metrics.overshootPct >= 10 && st.metrics.overshootPct <= 25) ? 'good' : 'warn', errPct: null });
+      rows.push({ layer: '动态', key: 'settle', name: '稳定时间', value: st.metrics.settleMs.toFixed(0) + ' ms', target: '越小越好', grade: null, errPct: null });
+      rows.push({
+        layer: '动态', key: 'fn', name: '车身主频', value: fd.metrics.dominantFreqHz.toFixed(2) + ' Hz',
+        target: fAnchor ? '解析 ' + fAnchor.toFixed(2) + ' Hz' : '—',
+        grade: gr ? gr.grade : null, errPct: gr ? gr.errPct : null
+      });
+    }
+
+    /* ③ 赛道 —— 受控定圆；侧倾角有解析锚 */
+    if (typeof LAT_BENCH !== 'undefined') {
+      const sc = LAT_BENCH.steadyCircle({ speed: 14, steerDeg: 5, dur: 6 });
+      const an = LAT_BENCH.analytic();
+      const phiPred = an.phiPredTotalDeg(sc.metrics.ayG * 9.81);
+      const gRoll = gradeByError(sc.metrics.phiDeg, phiPred);
+      rows.push({ layer: '赛道', key: 'peakAy', name: '峰值侧向加速度', value: sc.metrics.ayG.toFixed(3) + ' g', target: '越大越好', grade: null, errPct: null });
+      rows.push({
+        layer: '赛道', key: 'roll', name: '稳态侧倾角', value: sc.metrics.phiDeg.toFixed(3) + ' °',
+        target: '解析 ' + phiPred.toFixed(3) + ' °', grade: gRoll ? gRoll.grade : null, errPct: gRoll ? gRoll.errPct : null
+      });
+      rows.push({ layer: '赛道', key: 'tlltd', name: '轮荷转移分布', value: sc.metrics.tlltd.toFixed(3), target: '(0,1)', grade: null, errPct: null });
+    }
+
+    const count = (g) => rows.filter(r => r.grade === g).length;
+    return { rows: rows, good: count('good'), warn: count('warn'), bad: count('bad'), unknown: rows.filter(r => r.grade === null).length };
+  }
+
   return {
     capture: capture, diff: diff, toCsv: toCsv, slots: slots,
     staticRows: staticRows, dynamicRows: dynamicRows, trackRows: trackRows,
-    trackLimit: trackLimit, configHash: configHash
+    trackLimit: trackLimit, configHash: configHash,
+    captureScheme: captureScheme, diffMulti: diffMulti, toCsvMulti: toCsvMulti,
+    setRefreshHook: setRefreshHook, snapshotS: snapshotS,
+    dashboard: dashboard
   };
 })();
 

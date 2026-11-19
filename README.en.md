@@ -170,7 +170,7 @@ node web/test/test_racingline.js       # 30 · test_engine_sound.js 26 · test_k
 node web/test/undulating_road_test.js  # 21 · test_mpc.js 19 · test_p2b_damper.js 28 (incl. 4Q damper table)
 node web/test/test_p2a_aero.js         # 14 · test_circuit_ui.js 100% (64 ids + 22 classes)
 node web/test/test_ride_bench.js       # 17: step/sweep/impulse/random + repeatability + analytic anchor
-node web/test/test_compare.js          # 14: three-layer compare + controlled skidpad limit (P29)
+node web/test/test_compare.js          # 27: three-layer compare + controlled skidpad limit (P29)
 node web/test/test_lat_bench.js        # 20: roll/lateral bench + roll-angle analytic anchor
 node web/test/test_stability_audit.js  # 22: dt convergence + stiffness sweep (no NaN)
 
