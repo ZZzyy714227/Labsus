@@ -206,6 +206,32 @@ function buildLeft(){
       el.textContent=`ISO 8608 ${S.roadCls||"A"} 级：目标谱 RMS ${r.toFixed(2)} mm（标准带 0.011~2.83 cycle/m，w=2）· `
         + `车速 ${(S.roadV||20).toFixed(0)} m/s · 后轴延迟 ${(lag*1000).toFixed(0)} ms`; } });
 
+  /* Phase C（2026-11-19）：垂向 ride 测试台。跑的是真 15-DOF 内核（四轮独立路面
+     `env.rig`），不是下面的单角台架——台架没有簧下质量，测不到轮跳模态。 */
+  b=sec(host,"垂向 ride 测试台","RIDE BENCH",true);
+  const rbOut=E("div","eng-status"); rbOut.id="rideOut";
+  rbOut.textContent="点下面任一测试：跑真 15-DOF 内核，输出绝对量指标（阶跃 T63/超调、扫频共振、脉冲衰减、随机路面 RMS）。";
+  b.appendChild(rbOut);
+  const runRide=(kind)=>{
+    if(typeof RIDE_BENCH==="undefined"){ rbOut.textContent="RIDE_BENCH 未加载"; return; }
+    rbOut.textContent="运行中…（" + kind + "）";
+    setTimeout(()=>{
+      let r;
+      try { r=RIDE_BENCH.run(kind,{}); }
+      catch(e){ rbOut.textContent="失败："+e.message; return; }
+      const m=r.metrics; let s="";
+      if(kind==="step") s=`阶跃 ${r.spec.ampMm} mm：稳态 ${m.steadyMm.toFixed(2)} mm · T63 ${m.t63Ms.toFixed(0)} ms · 超调 ${m.overshootPct.toFixed(1)}% · 稳定 ${m.settleMs.toFixed(0)} ms`;
+      else if(kind==="sweep") s=`扫频：共振 ${m.peakFreqHz} Hz · 传递率 ${m.peakTrans.toFixed(2)} · ζ≈${isFinite(m.zeta)?m.zeta.toFixed(2):"—"}`;
+      else if(kind==="impulse") s=`脉冲：主频 ${m.dominantFreqHz.toFixed(1)} Hz · 包络衰减比 ${m.decayRatio.toFixed(3)} · 衰减到 5% ${m.decayTo5PctMs.toFixed(0)} ms`;
+      else if(kind==="random") s=`随机路面 ${r.spec.isoClass} 级：车身 RMS ${m.bodyRmsMm.toFixed(2)} mm · 峰值 ${m.bodyPeakMm.toFixed(2)} mm · 轮荷 RMS ${m.loadRmsN.toFixed(0)} N`;
+      else s=`自由衰减：主频 ${m.dominantFreqHz.toFixed(2)} Hz`;
+      rbOut.textContent=s+"　（数据已存，可导出 CSV）";
+    },10);
+  };
+  rowBtns(b,[["阶跃 STEP",()=>runRide("step")],["扫频 SWEEP",()=>runRide("sweep")],
+             ["脉冲 IMPULSE",()=>runRide("impulse")],["随机 RANDOM",()=>runRide("random")]]);
+  rowBtns(b,[["导出 CSV",()=>{ if(typeof RIDE_BENCH!=="undefined"&&RIDE_BENCH.last) RIDE_BENCH.download(RIDE_BENCH.last); },null,"hl"]]);
+
   b=sec(host,"3D 空间硬点表","HARDPOINTS [mm]",true);
   const tb=E("table","hp");
   tb.innerHTML="<thead><tr><th>硬点 ID</th><th>X 横向</th><th>Y 纵向</th><th>Z 垂向</th></tr></thead>";

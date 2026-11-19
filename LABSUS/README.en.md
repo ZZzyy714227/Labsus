@@ -1,4 +1,4 @@
-# 🏎️ LABSUS · Suspension Laboratory
+﻿# 🏎️ LABSUS · Suspension Laboratory
 
 **High-Performance Full-Chassis Suspension Analysis Workbench — Kinematics & Compliance / 15-DOF Dynamics / Quasi-Static Handling / Transient Track Simulation**
 
@@ -146,7 +146,7 @@ DOM/Canvas stubs; only the TPHYS parity check is cross-language:
 cd LABSUS
 
 # ── One command for every gate (recommended; non-zero exit = failure) ───
-python tools/gates/check_all.py           # 21 checks: ruff / pytest / 16 node suites / parity / provenance / docs
+python tools/gates/check_all.py           # 23 checks: ruff / pytest / 18 node suites / parity / provenance / docs
 python tools/gates/check_all.py --quick   # 3 sub-second checks (ruff / provenance / docs)
 
 # ── Python engine: physics assertions / gates / API-contract guard / TPHYS parity / stress ──
@@ -160,20 +160,21 @@ ruff check engine                      # All checks passed (config in pyproject.
 python scripts/sync_root_docs.py --check   # root <-> LABSUS README/LICENSE byte-identical
 
 # ── Frontend defense lines (per suite) ──────────────────────────────────
-node web/test/test_dom.js              # 350 assertions: shell structure / dual-entry parity / bug regressions
+node web/test/test_dom.js              # 352 assertions: shell structure / dual-entry parity / bug regressions
 node web/test/stage_boot_check.js      # 47 assertions: module order / TDZ / 3 stages x 20 frames
 node web/test/test_lap_15dof.js        # 23 assertions: 2 laps of 5.45 km + 6 powertrain parity checks
-node web/test/test_15dof_steady.js     # 14 assertions: analytic steady-state anchors for the 15-DOF kernel
+node web/test/test_15dof_steady.js     # 18 assertions: analytic steady-state anchors + kT source wiring
 node web/test/test_powertrain.js       # 625 assertions (7 powertrain architectures)
 node web/test/test_tire_lab.js         # 70 · test_tire_wiring.js 36 · proving_ground_test.js 36
 node web/test/test_racingline.js       # 30 · test_engine_sound.js 26 · test_kc_wiring.js 25
 node web/test/undulating_road_test.js  # 21 · test_mpc.js 19 · test_p2b_damper.js 28 (incl. 4Q damper table)
 node web/test/test_p2a_aero.js         # 14 · test_circuit_ui.js 100% (64 ids + 22 classes)
+node web/test/test_ride_bench.js       # 17: step/sweep/impulse/random + repeatability + analytic anchor
 
 # ── Cross-language physics parity (JS TPHYS <-> Python transient, 5% threshold) ──
 node web/test/tphys_parity.cjs         # measured worst 0.51%
 
-# ── Physics audit (57 checks, **in the CI regression**; --ci skips 2 timing thresholds) ──
+# ── Physics audit (60 checks, **in the CI regression**; --ci skips 2 timing thresholds) ──
 node web/test/physics_audit.js         # inertia identities / energy / step convergence / Ackermann / ISO road / wheel DOF / collision
 
 # ── Diagnostic tools (not part of the regression) ───────────────────────
@@ -223,7 +224,7 @@ LABSUS/                           # Engineering Root Directory
 │   │   ├── 15-mpc.js             # Model Predictive Control (MPC) trajectory solver
 │   │   ├── 16-powertrain.js      # Powertrain & torque vectoring calculations
 │   │   └── 17-damper4q.js        # 4-quadrant damper table (shape-preserving spline + click blending)
-│   └── test/                     # 16 regression suites + physics_audit + diagnostics
+│   └── test/                     # 18 regression suites + physics_audit + diagnostics
 ├── engine/                       # High-Performance Python Numerical Engine
 │   ├── server.py                 # FastAPI server entry (:8001)
 │   ├── src/                      # Solvers (K&C / Bushing / Pacejka / Tire Fit / Transient)

@@ -1,4 +1,4 @@
-# 🏎️ LABSUS · 悬架实验室 (Suspension Lab)
+﻿# 🏎️ LABSUS · 悬架实验室 (Suspension Lab)
 
 **全车底盘高性能悬架分析工作台 —— Kinematics & Compliance / 15-DOF 动力学 / 准静态操稳 / 赛道瞬态仿真**
 
@@ -146,7 +146,7 @@ node `vm` 无头沙箱（自带 DOM/Canvas stub），唯一跨语言的是 TPHYS
 cd LABSUS
 
 # ── 一条命令跑完全部门禁（推荐；退出码非零即失败）────────────────────
-python tools/gates/check_all.py           # 21 项：ruff / pytest / 16 套 node / 对拍 / 溯源 / 文档
+python tools/gates/check_all.py           # 23 项：ruff / pytest / 18 套 node / 对拍 / 溯源 / 文档
 python tools/gates/check_all.py --quick   # 3 项秒级检查（ruff / 溯源 / 文档）
 
 # ── Python 引擎：物理断言 / 门禁 / 契约守卫 / TPHYS 双端对拍 / 对抗应力 ──
@@ -160,7 +160,7 @@ ruff check engine                      # All checks passed（配置见 pyproject
 python scripts/sync_root_docs.py --check   # 根 ↔ LABSUS 的 README/LICENSE 逐字节一致
 
 # ── 前端防线（逐套件）──────────────────────────────────────────────
-node web/test/test_dom.js              # 350 断言：薄壳结构 / 双端同构 / 已知 bug 回访
+node web/test/test_dom.js              # 352 断言：薄壳结构 / 双端同构 / 已知 bug 回访
 node web/test/stage_boot_check.js      # 47 断言：模块加载顺序 / TDZ / 三舞台 20 帧无抛错
 node web/test/test_lap_15dof.js        # 23 断言：2 圈 5.45km 全闭环 + 6 项 powertrain parity
 node web/test/test_15dof_steady.js     # 14 断言：15-DOF 内核解析稳态锚（自由落体/静载/自行车模型/左右对称）
@@ -175,7 +175,7 @@ node web/test/test_p2a_aero.js         # 14 断言 · test_circuit_ui.js 100%（
 # ── 跨语言物理对拍（JS TPHYS ↔ Python transient，门限 5%）────────────
 node web/test/tphys_parity.cjs         # 实测 worst 0.51%
 
-# ── 物理审计（57 项，**已进 CI 回归**；--ci 跳过 2 项环境敏感的性能阈值）──
+# ── 物理审计（60 项，**已进 CI 回归**；--ci 跳过 2 项环境敏感的性能阈值）──
 node web/test/physics_audit.js         # 惯量恒等式 / 能量单调 / 步长收敛 / 阿克曼 / ISO 路面 / wheel DOF / 碰撞
 
 # ── 诊断工具（不参与回归）─────────────────────────────────────────
@@ -223,7 +223,7 @@ LABSUS/                           # 工程代码根（下同）
 │   │   ├── 15-mpc.js             # 赛道自适应模型预测控制 (MPC)
 │   │   ├── 16-powertrain.js      # 动力总成与扭矩矢量分配解算
 │   │   └── 17-damper4q.js        # 四象限减振器表求值（保形样条 + 档位混合）
-│   └── test/                     # 前端 16 套回归 + physics_audit + 诊断工具
+│   └── test/                     # 前端 18 套回归 + physics_audit + 诊断工具
 ├── engine/                       # Python 高性能数值计算引擎
 │   ├── server.py                 # FastAPI 入口服务 (:8001)
 │   ├── src/                      # 求解器核心源码 (K&C/衬套/Pacejka/轮胎标定/瞬态)

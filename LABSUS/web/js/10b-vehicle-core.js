@@ -899,7 +899,13 @@ class VehicleDynamics15DOF {
           const sW = this._roadS - (w.axle === 'rear' ? this.wb : 0.0);
           z_iso = isoProfileAtMm(sW, _isoCls) / 1000.0;   /* mm → m */
         }
-        const z_road_w = (rInfo.z_road || 0) + z_iso + (env.bumpNoise || 0);
+        /* 2026-11-19（Phase C · 4-Post ride 台）：`env.rig[id]` 给该轮**绝对**路面高度（m）
+           ⇒ 直接顶替 path/ISO/bumpNoise —— 台架的路面就是这四路信号本身，
+           可以各轮独立给相位（真 4-Post），这是 2D path 表达不了的。
+           未给 ⇒ 完全走旧路径，逐位不变。 */
+        const z_rig = (env && env.rig && typeof env.rig[w.id] === 'number') ? env.rig[w.id] : null;
+        const z_road_w = (z_rig !== null) ? z_rig
+          : ((rInfo.z_road || 0) + z_iso + (env.bumpNoise || 0));
         const mu_w = (rInfo.mu !== undefined ? rInfo.mu : mu_eff);
         
         // Chassis corner vertical displacement & velocity (+X right, +Y forward)

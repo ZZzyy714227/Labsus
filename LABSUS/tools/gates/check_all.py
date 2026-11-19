@@ -39,6 +39,9 @@ NODE_SUITES = (
     "test_p2b_damper.js", "test_circuit_ui.js", "test_racingline.js",
     "test_tire_wiring.js", "test_kc_wiring.js", "test_mpc.js", "test_powertrain.js",
     "test_tire_lab.js", "test_engine_sound.js",
+    # Phase C（2026-11-19）：垂向 ride 测试台——阶跃/扫频/脉冲/随机路面 +
+    # 可重复性、单调性、解析锚（自由衰减主频 vs 串联等效刚度，实测 1.6%）。
+    "test_ride_bench.js",
     # P1-1：physics_audit 57 项进回归。实测物理结果逐位确定，只有性能计时浮动，
     # 故以 --ci 模式跳过 2 项环境敏感的性能阈值断言（见该文件头部说明）。
     "physics_audit.js",

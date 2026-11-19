@@ -44,8 +44,8 @@ M5 的前后轴静载对调就是三内核一致地错 —— 双端对拍与镜
 | 手段 | 位置 | 状态 |
 |---|---|---|
 | 特征化快照（PRO 基线数值） | `engine/tests/test_v3_api.py`、`test_v3_chassis.py` | ✅ 在位（**非**正确性证明，代码注释已写明） |
-| 前端结构/接线断言 | `web/test/test_dom.js`（350 项） | ✅ 在位 |
-| 舞台加载与帧循环 | `web/test/stage_boot_check.js`（47 项） | ✅ 在位 |
+| 前端结构/接线断言 | `web/test/test_dom.js`（352 项） | ✅ 在位 |
+| 舞台加载与帧循环 | `web/test/stage_boot_check.js`（48 项） | ✅ 在位 |
 
 ### L1 · 内部不变量 —— 项目最强的一层
 
@@ -55,7 +55,8 @@ M5 的前后轴静载对调就是三内核一致地错 —— 双端对拍与镜
 | 镜像对称 | `test_mirror_symmetry.py` | ✅ 在位 |
 | 设计位自洽（travel=0 精确返回设计 cam/toe） | `test_w4_consistency.py` | ✅ 在位 |
 | 胎宽配平等价性（缺字段 ⇒ 逐位复现旧值） | `test_tire_width_balance.py` | ✅ 在位 |
-| 惯量恒等式 / 能量单调 / 步长收敛 / 阿克曼 / ISO 路面空间延迟 / 静载守恒 / 碰撞耗能 | `web/test/physics_audit.js`（**57 项，已进 CI**） | ✅ 在位 |
+| 惯量恒等式 / 能量单调（含簧下 KE/PE）/ 步长收敛 / 阿克曼 / ISO 路面空间延迟 / 静载守恒 / 簧载拆分 / 簧下承重 / 碰撞耗能 | `web/test/physics_audit.js`（**60 项，已进 CI**） | ✅ 在位 |
+| 垂向 ride 绝对量（阶跃 T63/超调、扫频共振、脉冲衰减、随机路面 RMS）+ 可重复性 + 单调性 + 解析锚 | `web/test/test_ride_bench.js`（**17 项，已进 CI**） | ✅ 在位（2026-11-19 Phase C） |
 | 数据资产内容 hash | `engine/tests/test_provenance.py` | ✅ 在位（P0-3） |
 | K&C 样条开关零影响验证 | `engine/tests/test_transient.py` | ✅ 在位（P1 新增 3 项） |
 | 求解结果契约（残差门限单一真源 / 非有限归一 / 收敛状态） | `engine/tests/test_solver_contract.py` | ✅ 在位（P1-2 新增 7 项） |
@@ -67,7 +68,7 @@ M5 的前后轴静载对调就是三内核一致地错 —— 双端对拍与镜
 |---|---|---|
 | TPHYS 闭包 JS ↔ Python transient | `web/test/tphys_parity.cjs`、`engine/tests/test_tphys_parity.py` | ✅ worst 0.51%（门限 5%） |
 | 差速器双实现 | `engine/tests/test_differential.py` + `engine/data/diff_parity_cases.json` | ✅ 162 例 |
-| **15-DOF 舞台内核 ↔ 引擎** | — | ❌ **无对拍**（仅行为阈值断言） |
+| **15-DOF 舞台内核 ↔ 引擎** | — | ❌ **无跨语言对拍**；但已有**绝对量解析锚**：ride 测试台的自由衰减主频 vs 串联等效刚度解析式（实测 1.6%）、阶跃稳态跟随、ISO 路面 RMS vs 理论谱 |
 | **K&C 扫掠 JS ↔ Python** | — | ❌ 无对拍（前端几何解与引擎机构解各自独立） |
 
 > 对拍范围要说清：`tphys_parity` 校验的是 `dwb-pro-allinone.html` 内联的 **TPHYS 闭包**，
