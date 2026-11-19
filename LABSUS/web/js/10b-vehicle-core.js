@@ -508,6 +508,20 @@ class VehicleDynamics15DOF {
     this.cT_f = 2.0 * _zeta * Math.sqrt(this.kT_f * this.mU_f);
     this.cT_r = 2.0 * _zeta * Math.sqrt(this.kT_r * this.mU_r);
 
+    /* ── A4（2026-11-19）· 质量拆分：簧载 / 非簧载 ──────────────────────────
+       旧口径：车身用 mTotal（= 含簧下），簧下质量只提供惯性、不提供重力。
+       S13 打开后簧下惯性被**数了两次**（mTotal 里一次 + 轮上 mU 一次），
+       而重量全由弹簧承担 ⇒ 总重与静载自洽，但**簧上模态频率偏低**。
+       探针实测（web/test/mass_split_probe.cjs，四预设）：实测 heave 频率贴
+       "总质量 + 弹簧/轮胎串联"口径（0.8~3.9%），与簧载口径差 11~22% ⇒ 拆分。
+       拆法：车身垂向用 mSprung、簧下方程补 mU·g；**平面方程保持 mTotal**
+       （纵横向总惯性本来就是对的，簧下随车一起平移）。 */
+    this.mSprung = Math.max(50, this.m - 2 * (this.mU_f + this.mU_r));
+    /* 弹簧预压（设计位 = 静平衡位）：S13 开时按簧载口径；关时沿用总口径（逐位兼容）。
+       注意 Fz0_F/Fz0_R 本身**不改**——那是轮胎额定载荷（接触力口径，= 簧载/4 + mU·g）。 */
+    this.FzSprF = (this.mSprung * 9.81 * (this.b / this.wb)) / 2.0;
+    this.FzSprR = (this.mSprung * 9.81 * (this.a / this.wb)) / 2.0;
+
     this.state = {
       X: 0, Y: 0, Z: 0,           // World Position (m): X (Right), Y (Forward), Z (Up)
       phi: 0, theta: 0, psi: 0,   // Euler Angles (rad): Roll (Y), Pitch (X), Yaw (Z)
@@ -997,8 +1011,10 @@ class VehicleDynamics15DOF {
       const F_arb_F = K_arb_F * (tr_FL - tr_FR);
       const F_arb_R = K_arb_R * (tr_RL - tr_RR);
       
-      const Fz0_F_slope = this.Fz0_F * cosA;
-      const Fz0_R_slope = this.Fz0_R * cosA;
+      /* A4（2026-11-19）：S13 打开时车身只承担**簧载**重量，弹簧预压随之改为簧载口径；
+         轮胎额定载荷 Fz0_* 仍是**总**载荷（接触力 = 簧载/4 + mU·g）。关闭时逐位不变。 */
+      const Fz0_F_slope = (this.wheelDof ? this.FzSprF : this.Fz0_F) * cosA;
+      const Fz0_R_slope = (this.wheelDof ? this.FzSprR : this.Fz0_R) * cosA;
       
       const Fz_FL = wheelStates.FL.isAirborne ? 0.0 : Math.max(0.0, Fz0_F_slope + Kw_F_eff * tr_FL + calcDamper(CwB_F_eff, Cw_F_eff, vkB_F, vkR_F, dtr_FL) + F_arb_F + wheelStates.FL.F_bumpstop);
       const Fz_FR = wheelStates.FR.isAirborne ? 0.0 : Math.max(0.0, Fz0_F_slope + Kw_F_eff * tr_FR + calcDamper(CwB_F_eff, Cw_F_eff, vkB_F, vkR_F, dtr_FR) - F_arb_F + wheelStates.FR.F_bumpstop);
@@ -1019,7 +1035,9 @@ class VehicleDynamics15DOF {
            簧下在悬挂力作用下回落，直到重新接触（天然表达车轮脱开路面）。 */
         for (const w of wheels) {
           const mU = (w.axle === 'front') ? this.mU_f : this.mU_r;
-          const a = (FzContact[w.id] - F_susp[w.id]) / mU;
+          /* A4：簧下质量也要**承重**（旧式漏了 mU·g，簧下只有惯性没有重力）。
+             静平衡时 F_tire = F_susp + mU·g ⇒ 四角接触力之和 = mTotal·g（守恒不变）。 */
+          const a = (FzContact[w.id] - F_susp[w.id] - mU * 9.81) / mU;
           this.vzw[w.id] += a * dt;
           this.zw[w.id] += this.vzw[w.id] * dt;
         }
@@ -1294,7 +1312,10 @@ class VehicleDynamics15DOF {
       // Accelerations in body frame (+Y Forward, +X Right, +Z Up)
       let SumFy = SumFy_tire - F_gravity_slope - F_drag;
       let SumFx = SumFx_tire;
-      let SumFz = (F_susp.FL + F_susp.FR + F_susp.RL + F_susp.RR) - (this.m * 9.81 * cosA + F_down);
+      /* A4：车身垂向惯量用**簧载质量**（S13 开）；关时沿用总质量，逐位兼容。
+         平面方程（SumFy/SumFx 与横摆/侧倾/俯仰力矩）仍用 this.m = mTotal —— 总惯性正确。 */
+      const mBody = this.wheelDof ? this.mSprung : this.m;
+      let SumFz = (F_susp.FL + F_susp.FR + F_susp.RL + F_susp.RR) - (mBody * 9.81 * cosA + F_down);
       
       // Chassis Bottoming Ground Collision Protection
       const roadCenterH = pathObj ? (pathObj.getRoadElevation(st.X, st.Y).z_road || 0) : 0;
@@ -1334,7 +1355,7 @@ class VehicleDynamics15DOF {
       
       const d_u = SumFy / this.m - st.v * st.r - st.w * st.q;
       const d_v = SumFx / this.m + st.u * st.r + st.w * st.p;
-      const d_w = SumFz / this.m;
+      const d_w = SumFz / mBody;
       
       const d_q = SumM_pitch / this.I_pitch;
       const d_p = SumM_roll / this.I_roll;
@@ -1360,7 +1381,7 @@ class VehicleDynamics15DOF {
       
       this.telemetry.ax = SumFy / (this.m * 9.81);
       this.telemetry.ay = -SumFx / (this.m * 9.81);
-      this.telemetry.az = SumFz / (this.m * 9.81);
+      this.telemetry.az = SumFz / (mBody * 9.81);
       this.telemetry.aero = { downF_f: F_down_f, downF_r: F_down_r, downF: F_down, drag: F_drag, geF: geF, geR: geR, hF: hAeroF, hR: hAeroR, drs: drsOn };
       
       /* ── S2（M20）· 轮胎松弛推进（子步末尾、每子步一次）────────────────────

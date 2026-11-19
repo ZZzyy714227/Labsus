@@ -572,6 +572,22 @@ section('L. 真 15-DOF（S13）');
     assert(Math.abs(sumC - v.m * G) / (v.m * G) < 0.02,
       `真 15-DOF 下静载守恒（ΣFz ${sumC.toFixed(1)} vs m·g ${(v.m * G).toFixed(1)}，误差 ${(100 * Math.abs(sumC - v.m * G) / (v.m * G)).toFixed(2)}%）`);
 
+    /* ②b A4（2026-11-19）：质量拆分与簧下承重
+       旧式簧下只有惯性没有重力、车身用 mTotal ⇒ 簧下惯性被数两次、簧上模态偏低。
+       拆后：车身垂向用 mSprung、簧下补 mU·g；静平衡恒等式 F_tire = FzSpr + mU·g。 */
+    {
+      const mSprungExp = v.m - 2 * (v.mU_f + v.mU_r);
+      note(`簧载质量 mSprung = ${v.mSprung.toFixed(2)} kg（mTotal − 2ΣmU = ${mSprungExp.toFixed(2)}）`);
+      assert(Math.abs(v.mSprung - mSprungExp) < 1e-9 && v.mSprung < v.m,
+        `簧载/非簧载已拆分（mSprung ${v.mSprung.toFixed(1)} < mTotal ${v.m.toFixed(1)}）`);
+      const lhsF = v.telemetry.Fz.FL - v.mU_f * G;
+      const lhsR = v.telemetry.Fz.RL - v.mU_r * G;
+      note(`F_tire − mU·g：前 ${lhsF.toFixed(2)} N vs FzSpr_F ${v.FzSprF.toFixed(2)} N；`
+        + `后 ${lhsR.toFixed(2)} N vs FzSpr_R ${v.FzSprR.toFixed(2)} N`);
+      assert(Math.abs(lhsF - v.FzSprF) < 1 && Math.abs(lhsR - v.FzSprR) < 1,
+        `簧下承重恒等式 F_tire − mU·g = FzSpr（残差 <1 N）`);
+    }
+
     /* 轮跳模态：扰动 FL 轮的簧下位置，数 zw 的零交叉估周期 */
     const base = v.zw.FL;
     v.zw.FL = base + 0.004;
