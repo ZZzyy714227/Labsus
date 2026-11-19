@@ -13,7 +13,7 @@
 [![Platform: Web & Desktop](https://img.shields.io/badge/Platform-Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-orange.svg)]()
 
 > A modern full-chassis suspension engineering workbench tailored for **Formula Student (FSAE), FIA GT3 racing, and Baja off-road vehicles**.
-> From double-wishbone/pushrod spatial hardpoint editing and K&C multi-body sweeps, to 4-Post dynamics, quasi-static load transfer, and **15-DOF autonomous circuit simulation**, all within a responsive, instrumented browser environment. Lightweight proprietary engine deeply benchmarked against OptimumKinematics and ADAMS/Car.
+> From double-wishbone/pushrod spatial hardpoint editing and K&C multi-body sweeps, to 4-Post dynamics, quasi-static load transfer, and **15-DOF autonomous circuit simulation**, all within a responsive, instrumented browser environment. Lightweight proprietary implementation whose **layering follows** OptimumKinematics and ADAMS/Car; **no vehicle-level calibration is claimed** — see `LABSUS/MODEL_SCOPE.md` and `LABSUS/VERIFICATION.md` for internal-reliability scope and modelling boundaries.
 >
 > 📁 **All engineering code lives in the [`LABSUS/`](LABSUS/) subdirectory**; all relative paths in this document are rooted there.
 
@@ -234,6 +234,7 @@ LABSUS/                           # Engineering Root Directory
 ├── requirements.txt              # Python runtime dependencies (exact verified pins)
 ├── requirements-dev.txt          # Dev / test / lint dependencies
 ├── start.bat                     # Windows one-click startup script
+├── MODEL_SCOPE.md                # Model-completeness register (4 kernels x DOF/constitutive/constraints/numerics/simplifications)
 ├── VERIFICATION.md               # Verification evidence tiers (L0 regression -> L4 measured, incl. gaps)
 ├── INTENTIONAL_DIFFERENCES.md    # Source-of-truth dual-kernel architectural conventions
 ├── AUDIT_AND_REFACTOR_LOG.md     # Full codebase audit & remediation log

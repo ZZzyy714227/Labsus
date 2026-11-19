@@ -13,7 +13,7 @@
 [![Platform: Web & Desktop](https://img.shields.io/badge/Platform-Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-orange.svg)]()
 
 > 面向 **FSAE 方程式赛车、GT3 房车赛车及全地形越野车** 的现代化全车底盘悬架工程分析平台。
-> 从双叉臂/推拉杆空间硬点编辑、多体运动学与 K&C 扫掠，到 4-Post 台架动力学、准静态载荷转移与 **15-DOF 全赛道自动驾驶瞬态仿真**，全部在一个精美现代的交互式仪器台中完成。轻量级自研实现，深度对标 OptimumKinematics 与 ADAMS/Car。
+> 从双叉臂/推拉杆空间硬点编辑、多体运动学与 K&C 扫掠，到 4-Post 台架动力学、准静态载荷转移与 **15-DOF 全赛道自动驾驶瞬态仿真**，全部在一个精美现代的交互式仪器台中完成。轻量级自研实现，**架构分层参考** OptimumKinematics 与 ADAMS/Car；**数值不做实车标定**——内部可靠性与建模边界见 `LABSUS/MODEL_SCOPE.md` 与 `LABSUS/VERIFICATION.md`。
 >
 > 📁 **工程代码位于 [`LABSUS/`](LABSUS/) 子目录**，本文所有相对路径均以其为根。
 
@@ -234,6 +234,7 @@ LABSUS/                           # 工程代码根（下同）
 ├── requirements.txt              # Python 运行依赖（精确锁定已验证版本）
 ├── requirements-dev.txt          # 开发/测试/代码质量依赖
 ├── start.bat                     # Windows 一键启动脚本
+├── MODEL_SCOPE.md                # 模型完整性登记（四内核 × 自由度/本构/约束/数值/简化 + 变更记录）
 ├── VERIFICATION.md               # 验证证据分级（L0 回归锚 → L4 实测相关性，含当前缺口）
 ├── INTENTIONAL_DIFFERENCES.md    # 双端故意差异登记真源
 ├── AUDIT_AND_REFACTOR_LOG.md     # 全系统代码审计与重构归档报告
