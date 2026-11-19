@@ -146,7 +146,7 @@ node `vm` 无头沙箱（自带 DOM/Canvas stub），唯一跨语言的是 TPHYS
 cd LABSUS
 
 # ── 一条命令跑完全部门禁（推荐；退出码非零即失败）────────────────────
-python tools/gates/check_all.py           # 27 项：ruff / pytest / 22 套 node / 对拍 / 溯源 / 文档
+python tools/gates/check_all.py           # 28 项：ruff / pytest / 23 套 node / 对拍 / 溯源 / 文档
 python tools/gates/check_all.py --quick   # 3 项秒级检查（ruff / 溯源 / 文档）
 
 # ── Python 引擎：物理断言 / 门禁 / 契约守卫 / TPHYS 双端对拍 / 对抗应力 ──
@@ -223,7 +223,7 @@ LABSUS/                           # 工程代码根（下同）
 │   │   ├── 15-mpc.js             # 赛道自适应模型预测控制 (MPC)
 │   │   ├── 16-powertrain.js      # 动力总成与扭矩矢量分配解算
 │   │   └── 17-damper4q.js        # 四象限减振器表求值（保形样条 + 档位混合）
-│   └── test/                     # 前端 22 套回归 + physics_audit + 诊断工具
+│   └── test/                     # 前端 23 套回归 + physics_audit + 诊断工具
 ├── engine/                       # Python 高性能数值计算引擎
 │   ├── server.py                 # FastAPI 入口服务 (:8001)
 │   ├── src/                      # 求解器核心源码 (K&C/衬套/Pacejka/轮胎标定/瞬态)

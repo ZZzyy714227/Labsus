@@ -50,6 +50,8 @@ NODE_SUITES = (
     "test_stability_audit.js",
     # 线 B · B1（2026-11-19）：纵向载荷转移锚（ΔFz = m·ax·h/wb）——刹车/加速台架的唯一判据
     "test_load_transfer.js",
+    # 线 B · B2（2026-11-19）：柔度转向进时序（P27）——开环 T63 偏快的补丁
+    "test_compliance_steer.js",
     # P1-1：physics_audit 57 项进回归。实测物理结果逐位确定，只有性能计时浮动，
     # 故以 --ci 模式跳过 2 项环境敏感的性能阈值断言（见该文件头部说明）。
     "physics_audit.js",

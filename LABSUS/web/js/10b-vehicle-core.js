@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════════════════════════
    10b-vehicle-core.js —— 15-DOF 车辆物理与自动驾驶内核（P2 拆分，2026-10-31）
 
    从 11-stages.js 抽出（原 L95–L1440）。这里只有**数值层**：
@@ -429,6 +429,14 @@ class VehicleDynamics15DOF {
     this.h_roll_arm = Math.max(0.06, h_roll_src / 1000 - h_roll_axis);
     /* P33 侧向（2026-11-19）：侧倾轴高要留到 step() 里算簧下横向分量，挂到实例上 */
     this.h_roll_axis = h_roll_axis;
+    /* 线 B · B2：柔度转向系数（rad/N）。deg/1000N → rad/N */
+    const _compF = (S_config && S_config.front && isFinite(S_config.front.compSteerDegPerKN))
+      ? S_config.front.compSteerDegPerKN : 0.4;
+    const _compR = (S_config && S_config.rear && isFinite(S_config.rear.compSteerDegPerKN))
+      ? S_config.rear.compSteerDegPerKN : 0.4;
+    this.kCompSteer_F = _compF * Math.PI / 180 / 1000;
+    this.kCompSteer_R = _compR * Math.PI / 180 / 1000;
+    this._FyPrev = { FL: 0, FR: 0, RL: 0, RR: 0 };
     
     /* P0（M20）· 性能埋点计数器（整数自增，零开销） */
     this._simStat = { steps: 0, subSteps: 0, roadQueries: 0 };
@@ -1161,7 +1169,21 @@ class VehicleDynamics15DOF {
         // Steer angle delta includes driver steer command + K&C bump steer
         /* S4：前轮取阿克曼分角（内轮大、外轮小），后轮 0 */
         const steer_driver = (w.axle === 'front' ? _ack[w.side] : 0.0);
-        const steer_total = steer_driver + ws.bump_steer_rad;
+        /* 线 B · B2（2026-11-19）：**柔度转向（compliance steer）**。
+           真实悬架在侧向力下衬套/摆臂变形，车轮会朝减小侧偏的方向偏转一个角
+           δ_c = −k_c·Fy（负反馈）。它等效于降低轮胎侧偏刚度
+           C_eff = C_α/(1 + C_α·k_c)，因此**拖慢横摆响应**（开环 T63 偏快 = P27）。
+           用上一子步的轮胎侧向力（1 ms 滞后可忽略）。
+           系数 `S.front.compSteerDegPerKN`（deg / 1000 N，缺省 0.015）——
+           ⚠ 这是**标定输入**（同 B5 性质），缺省值取保守量级；真实值应来自
+           K&C 力偏移工况实测（衬套供应商数据）。
+           `S.complianceSteer === true` 显式开启（默认关闭 ⇒ 逐位不变）。 */
+        let comp_steer = 0.0;
+        if (this.S && this.S.complianceSteer === true) {
+          const kc = (w.axle === 'front') ? this.kCompSteer_F : this.kCompSteer_R;
+          comp_steer = kc * (this._FyPrev[w.id] || 0);
+        }
+        const steer_total = steer_driver + ws.bump_steer_rad + comp_steer;
         
         // Transform velocities into wheel heading frame
         const v_tire_long = v_cp_x * Math.sin(steer_total) + v_cp_y * Math.cos(steer_total);
@@ -1213,6 +1235,7 @@ class VehicleDynamics15DOF {
         const Fx_body = Fx_t * Math.sin(steer_total) + Fy_t * Math.cos(steer_total);
         const Fy_body = Fx_t * Math.cos(steer_total) - Fy_t * Math.sin(steer_total);
         
+        this._FyPrev[w.id] = Fy_body;   // B2：柔度转向的反馈源（1 子步滞后）
         SumFx_tire += Fx_body;
         SumFy_tire += Fy_body;
         SumMz_tire += w.x * Fy_body - w.y * Fx_body;
