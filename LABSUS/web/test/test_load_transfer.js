@@ -12,7 +12,7 @@
  */
 'use strict';
 const { loadStage, MODULES_01_11 } = require('./_stage_harness.js');
-const { ctx } = loadStage(MODULES_01_11.concat(['18-ride-bench.js']));
+const { ctx } = loadStage(MODULES_01_11.concat(['18-ride-bench.js', '20-lat-bench.js']));
 const S = ctx.S;
 const V = ctx.window.VehicleDynamics15DOF;
 const ENV = { grade: 0, bumpNoise: 0 };
@@ -105,6 +105,36 @@ console.log('=== 5. 四预设方向一致 ===');
     const r = runManeuver(p, BRAKE, 0.5);
     assert(r.dF > 0 && r.dR < 0, `${p}：制动方向正确（前 ${r.dF.toFixed(0)} / 后 ${r.dR.toFixed(0)} N）`);
   }
+}
+
+/* ── 6. 侧向：簧下横向分量（P33 侧向，2026-11-19）──────────────────
+   原式 `SumFx·h_roll_arm` 把簧下横向力也乘了簧载臂；物理上簧下质量不随车身
+   滚转，其横向惯性力作用在轮轴高（≈胎半径）。开启 `S.rollInertia` 后侧倾力矩
+   变小 ⇒ 侧倾角幅值必须变小，且变化量与口径偏差同量级。 */
+console.log('=== 6. 侧向：簧下横向分量（P33 侧向，opt-in）===');
+{
+  for (const p of ['formula', 'baja', 'gt3']) {
+    ctx.loadVehiclePreset(p);
+    S.rollInertia = false;
+    const oldPhi = ctx.LAT_BENCH.steadyCircle({ speed: 14, steerDeg: 5, dur: 5, avgSecs: 2 }).metrics.phiDeg;
+    S.rollInertia = true;
+    const newPhi = ctx.LAT_BENCH.steadyCircle({ speed: 14, steerDeg: 5, dur: 5, avgSecs: 2 }).metrics.phiDeg;
+    S.rollInertia = false;
+    const drop = 100 * (1 - Math.abs(newPhi) / Math.abs(oldPhi));
+    note(`${p}: ${oldPhi.toFixed(4)}° → ${newPhi.toFixed(4)}°（侧倾减小 ${drop.toFixed(1)}%）`);
+    assert(Math.abs(newPhi) < Math.abs(oldPhi), `${p}：开启后侧倾幅值变小`);
+    assert(drop > 0.2 && drop < 15, `${p}：减小量在合理区间（${drop.toFixed(1)}%）`);
+  }
+  /* 默认关闭 ⇒ 与旧锚一致（逐位不变是纪律） */
+  ctx.loadVehiclePreset('formula');
+  S.rollInertia = undefined;
+  const a = ctx.LAT_BENCH.steadyCircle({ speed: 14, steerDeg: 5, dur: 5, avgSecs: 2 }).metrics.phiDeg;
+  const an = ctx.LAT_BENCH.analytic();
+  const b = an.phiPredTotalDeg(Math.abs(a) / 57.2957795 * 0 + 0); // 占位，下面用实测锚
+  const pred = ctx.LAT_BENCH.steadyCircle({ speed: 14, steerDeg: 5, dur: 5, avgSecs: 2 }).metrics;
+  const err = Math.abs(Math.abs(an.phiPredTotalDeg(pred.ayG * G)) - Math.abs(a)) / Math.abs(a) * 100;
+  note(`默认关闭：φ=${a.toFixed(4)}° vs 解析锚 ${an.phiPredTotalDeg(pred.ayG * G).toFixed(4)}°（${err.toFixed(2)}%）`);
+  assert(err < 2, `默认关闭时仍与既有解析锚一致（${err.toFixed(2)}% < 2%）`);
 }
 
 console.log(`\n========================================`);

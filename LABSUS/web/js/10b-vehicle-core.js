@@ -1,4 +1,4 @@
-﻿/* ═══════════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════════════
    10b-vehicle-core.js —— 15-DOF 车辆物理与自动驾驶内核（P2 拆分，2026-10-31）
 
    从 11-stages.js 抽出（原 L95–L1440）。这里只有**数值层**：
@@ -427,6 +427,8 @@ class VehicleDynamics15DOF {
     const h_roll_src = (S_config.hs !== undefined && S_config.hs !== null && isFinite(S_config.hs))
       ? S_config.hs : this.h_cg * 1000;
     this.h_roll_arm = Math.max(0.06, h_roll_src / 1000 - h_roll_axis);
+    /* P33 侧向（2026-11-19）：侧倾轴高要留到 step() 里算簧下横向分量，挂到实例上 */
+    this.h_roll_axis = h_roll_axis;
     
     /* P0（M20）· 性能埋点计数器（整数自增，零开销） */
     this._simStat = { steps: 0, subSteps: 0, roadQueries: 0 };
@@ -1407,10 +1409,25 @@ class VehicleDynamics15DOF {
       const SumM_pitch = (F_susp.FL + F_susp.FR) * this.a - (F_susp.RL + F_susp.RR) * this.b
                        + F_gravity_slope * this.h_cg - F_drag * this.h_cg - C_pitch_damp * st.q + M_aero_pitch
                        + _pitchInertia;
-      // Restoring Roll moment
-      const SumM_roll  = (F_susp.FL - F_susp.FR) * (this.tF / 2.0)
-                       + (F_susp.RL - F_susp.RR) * (this.tR / 2.0)
-                       - SumFx * this.h_roll_arm - C_roll_damp * st.p;
+       /* 线 B · P33 侧向（2026-11-19）：侧倾力矩的**簧下横向分量**。
+          原式 `SumFx·h_roll_arm` 把全部横向力（含簧下）都乘簧载臂——簧下质量
+          不随车身滚转（本模型里它只有垂向 DOF），其横向惯性力作用在**轮轴高**
+          （≈轮胎半径）而非簧载质心。实测口径偏差：formula +4.0% / baja +7.3%。
+          正确分解：M_roll_lat = mS·ay·hArm + mU·ay·(rTire − h_axis)。
+          `S.rollInertia === true` 显式开启（与 pitchInertia 同为 opt-in 决策门）。 */
+       let _rollInertia = SumFx * this.h_roll_arm;
+       if (this.S && this.S.rollInertia === true) {
+         const mU_ax = 2 * (this.mU_f + this.mU_r);
+         const _rT = (this.S.front && this.S.front.tire && isFinite(this.S.front.tire.R))
+           ? this.S.front.tire.R / 1000 : 0.26;
+         const hU_ax = Math.max(0, _rT - this.h_roll_axis);
+         const ayNow = Math.abs(SumFx) > 1e-9 ? SumFx / this.m : 0;
+         _rollInertia = this.mSprung * ayNow * this.h_roll_arm + mU_ax * ayNow * hU_ax;
+         if (!Number.isFinite(_rollInertia)) _rollInertia = SumFx * this.h_roll_arm;
+       }
+       const SumM_roll  = (F_susp.FL - F_susp.FR) * (this.tF / 2.0)
+                        + (F_susp.RL - F_susp.RR) * (this.tR / 2.0)
+                        - _rollInertia - C_roll_damp * st.p;
       const SumM_yaw   = SumMz_tire - C_yaw_damp * st.r;
       
       const d_u = SumFy / this.m - st.v * st.r - st.w * st.q;
