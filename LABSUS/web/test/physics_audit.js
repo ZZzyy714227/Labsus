@@ -49,12 +49,22 @@ function mkCar(speed) {
   return new V(S, SIM, speed === undefined ? 0 : speed);
 }
 const sumFz = v => v.telemetry.Fz.FL + v.telemetry.Fz.FR + v.telemetry.Fz.RL + v.telemetry.Fz.RR;
-/** 平动动能 + 转动动能 + 重力势能（悬挂势能因静载为常数项、Z=0 定义为配平位，单列观察） */
+/** 平动动能 + 转动动能 + 重力势能（悬挂势能因静载为常数项、Z=0 定义为配平位，单列观察）
+ *  2026-11-19（S13 转正）：簧下质量有独立的 KE/PE，必须计入——否则"能量不增"断言
+ *  会漏掉 4 个簧下振子，等于给未来的发散留后门。车身惯量随之改用 mSprung。 */
 const mechEnergy = v => {
   const st = v.state;
-  const lin = 0.5 * v.m * (st.u * st.u + st.v * st.v + st.w * st.w);
+  const mB = v.wheelDof ? v.mSprung : v.m;
+  const lin = 0.5 * mB * (st.u * st.u + st.v * st.v + st.w * st.w);
   const rot = 0.5 * (v.I_roll * st.p * st.p + v.I_pitch * st.q * st.q + v.I_yaw * st.r * st.r);
-  return lin + rot + v.m * G * st.Z;
+  let e = lin + rot + mB * G * st.Z;
+  if (v.wheelDof) {
+    for (const id of ['FL', 'FR', 'RL', 'RR']) {
+      const mU = (id[0] === 'F') ? v.mU_f : v.mU_r;
+      e += 0.5 * mU * v.vzw[id] * v.vzw[id] + mU * G * v.zw[id];
+    }
+  }
+  return e;
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -552,14 +562,25 @@ section('L. 真 15-DOF（S13）');
   const dt = 0.001;
   const settle = (v, n) => { for (let i = 0; i < n; i++) v.step(mkCtrl(), ENV_FLAT, dt); };
 
-  /* ① 逐位兼容：开关关闭时，与强制关闭的对照必须逐步一致 */
+  /* ① 回退路径：显式 `wheelDof:false` 必须复现 Phase B 转正前的末态。
+     锚值于 2026-11-19 转正前实测抓取（speed=15、600 步 ×1ms、平路），
+     用途是证明"关掉开关 = 回到旧物理"，而不是证明物理正确。 */
   {
-    const a = mkCar(15); settle(a, 600);
-    const b = mkCar(15); b.wheelDof = false; settle(b, 600);
-    const d = Math.abs(a.state.Z - b.state.Z) + Math.abs(a.state.u - b.state.u)
-            + Math.abs(a.state.phi - b.state.phi);
-    note(`关闭 wheelDof：与对照末态差 = ${d.toExponential(2)}（应严格 0）`);
-    assert(d === 0, `wheelDof 默认关闭时逐位兼容（差 ${d.toExponential(2)}）`);
+    const saved = S.wheelDof;
+    S.wheelDof = false;
+    const b = mkCar(15); settle(b, 600);
+    S.wheelDof = saved;
+    const LEGACY = {
+      Z: -0.0008614507486584983,
+      u: 14.900546902242374,
+      phi: -8.069582729042134e-20,
+      theta: -0.0001682322916275773
+    };
+    const d = Math.abs(b.state.Z - LEGACY.Z) + Math.abs(b.state.u - LEGACY.u)
+            + Math.abs(b.state.phi - LEGACY.phi) + Math.abs(b.state.theta - LEGACY.theta);
+    note(`显式关闭 wheelDof：与转正前锚末态差 = ${d.toExponential(2)}（应 <1e-15）`);
+    assert(d < 1e-15, `显式 wheelDof:false 逐位复现转正前行为（差 ${d.toExponential(2)}）`);
+    assert(b.zw.FL === 0 && b.vzw.FL === 0, '关闭时簧下状态不被更新（分支确实不执行）');
   }
 
   /* ② 静载守恒 + ③ 轮跳模态 */

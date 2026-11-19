@@ -244,6 +244,22 @@ Python 侧由 `tests/test_differential.py::test_distribute_axle_matches_cross_la
 逐例断言（实测 worst rel = 4.69e-15）；前端侧由 `web/test/test_dom.js` 读同一文件比对
 （相对差门限 1e-9）。**任一侧改公式而不同步工件，对拍立刻失败。**
 
+## 前端 S13 簧下垂向 DOF 开关（K1，2026-11-19 转正）
+
+⚠ **与下一节的"轮自由度开关"同名不同物，勿混**：
+
+| 开关 | 位置 | 管什么 | 默认 |
+|---|---|---|---|
+| `S.wheelDof` | 前端 K1 `10b-vehicle-core.js` | 簧下质量 + 轮胎垂向柔度（4 组 zw/vzw 状态） | **开**（`=== false` 才关） |
+| `TrackSimRequest.wheel_dof` | 引擎 K3 `transient.py` | 平面轮自转的准稳态代数解 | 关 |
+
+- **为什么转正**：动态测试（ride/路面/冲击）要的是簧上+簧下双模态；缺簧下质量时"4-Post"名实不符。
+- **回退**：`S.wheelDof = false` 逐位复现转正前行为，由 `physics_audit` 的特征化锚钉住
+  （2026-11-19 实测抓的末态，差 <1e-15）。
+- **语义变化**：`telemetry.Fz` 固定为**轮胎接触力**（转正前它恒等于悬挂力，所以两者曾可互换）。
+  需要悬挂力/阻尼力时用 `telemetry.Fdamp`（逐轮阻尼力）或 `F_susp` 内部量。
+- **已知简化**：非簧载**横向/纵向**惯性仍未建（只建了垂向）⇒ TLLTD 的非簧载侧向分量在 K1 缺失。
+
 ## 轮自由度开关（M19 / T1）
 
 `TrackSimRequest.wheel_dof`（默认 **False**）。这是**刻意差异开关**，不是"两种物理"：

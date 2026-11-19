@@ -78,8 +78,11 @@ function frameW(eng, w) {
   eng.step({ throttle: 0, brake: 0, drs: false, steer: 0 }, { grade: 0, path: null, bumpNoise: 0 }, STEP_DT);
   return eng;
 }
-const dFz_FR = (eng) => eng.telemetry.Fz.FR - eng.Fz0_F;   // 前轴阻尼力（FR 轮）
-const dFz_RR = (eng) => eng.telemetry.Fz.RR - eng.Fz0_R;   // 后轴阻尼力（RR 轮）
+/* 2026-11-19（S13 转正）：telemetry.Fz 变为**轮胎接触力**，不再是悬挂力；
+   阻尼力改用新通道 telemetry.Fdamp 直接读取（见 10b 的同名注释）。
+   旧式 `Fz − Fz0` 在 S13 下被轮胎柔度吃掉，实测 Δ≡0。 */
+const dFz_FR = (eng) => eng.telemetry.Fdamp.FR;   // 前轴阻尼力（FR 轮）
+const dFz_RR = (eng) => eng.telemetry.Fdamp.RR;   // 后轴阻尼力（RR 轮）
 
 let pass = 0, fail = 0;
 function T(name, cond, extra) {

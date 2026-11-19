@@ -101,7 +101,14 @@ function loadReal(webDir) {
 
 /* ── 单步探针：把车压到指定行程，读回遥测 ─────────────────────── */
 function probeAt(Engine, S, SIM, travelMm, axle) {
+  /* 2026-11-19（S13 转正）：`tr` 改由簧下状态 zw 决定，用车身位移驱动 `tr` 的方法失效
+     （轮胎柔度会吃掉偏移）。本测试考的是 **LUT 准静态几何映射**（tr → camber/toe），
+     与簧下动力学无关 ⇒ 显式走运动学分支（wheelDof:false），保证 tr 与 Z 的解析关系成立。
+     开关只在构造时读取，用完立刻还原，不影响后续用例。 */
+  const savedDof = S.wheelDof;
+  S.wheelDof = false;
   const eng = new Engine(S, SIM, 15.0);
+  S.wheelDof = savedDof;
   // z_corner = Z + 0 + 0 - 0；tr_w = -(z_corner - z_road)，z_road=0（env.path=null）
   // ⇒ Z = -travelMm/1000 得到 tr_w = +travelMm/1000 m（正=压缩）
   eng.state.Z = -travelMm / 1000;

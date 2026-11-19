@@ -477,10 +477,11 @@ class VehicleDynamics15DOF {
        新：每轮引入 2 个状态（接地点高度 zw、速度 vzw），轮胎用**穿透量**接触模型
        （同台架 04-dynamics.js:138-144 的 `fz = kT·pen + cT·(żr − żw)`），
        悬挂力作用在簧上与簧下之间。
-       ⚠ **默认关闭**（`S.wheelDof`）⇒ 缺省行为逐位不变，风险可控、可回退。
+       ⚠ **默认开启**（2026-11-19 Phase B 转正）：`S.wheelDof === false` 才关闭。
+         关闭时逐位复现转正前行为（`physics_audit` 用特征化锚钉住），可随时回退。
        ⚠ 参数：mU（非簧载质量/角，kg）、kT（轮胎垂向刚度 N/mm）、
          cT（轮胎垂向阻尼，由阻尼比 ζ 推导，缺省 0.06）。 */
-    this.wheelDof = !!(S_config && S_config.wheelDof);
+    this.wheelDof = !(S_config && S_config.wheelDof === false);
     this.zw = { FL: 0, FR: 0, RL: 0, RR: 0 };
     this.vzw = { FL: 0, FR: 0, RL: 0, RR: 0 };
     this._zRoadPrev = { FL: 0, FR: 0, RL: 0, RR: 0 };
@@ -536,7 +537,10 @@ class VehicleDynamics15DOF {
     };
     
     this.telemetry = { 
-      Fz: { FL: this.Fz0_F, FR: this.Fz0_F, RL: this.Fz0_R, RR: this.Fz0_R }, 
+      Fz: { FL: this.Fz0_F, FR: this.Fz0_F, RL: this.Fz0_R, RR: this.Fz0_R },
+      /* 阻尼力（悬挂力的一部分，不含弹簧/ARB/缓冲块）。
+         用途：阻尼器接线测试与台架对照；S13 转正后 Fz 是接触力，不能用 Fz 差分取阻尼。 */
+      Fdamp: { FL: 0, FR: 0, RL: 0, RR: 0 }, 
       Fx: { FL: 0, FR: 0, RL: 0, RR: 0 }, 
       Fy: { FL: 0, FR: 0, RL: 0, RR: 0 }, 
       tr: { FL: 0, FR: 0, RL: 0, RR: 0 },
@@ -1016,10 +1020,18 @@ class VehicleDynamics15DOF {
       const Fz0_F_slope = (this.wheelDof ? this.FzSprF : this.Fz0_F) * cosA;
       const Fz0_R_slope = (this.wheelDof ? this.FzSprR : this.Fz0_R) * cosA;
       
-      const Fz_FL = wheelStates.FL.isAirborne ? 0.0 : Math.max(0.0, Fz0_F_slope + Kw_F_eff * tr_FL + calcDamper(CwB_F_eff, Cw_F_eff, vkB_F, vkR_F, dtr_FL) + F_arb_F + wheelStates.FL.F_bumpstop);
-      const Fz_FR = wheelStates.FR.isAirborne ? 0.0 : Math.max(0.0, Fz0_F_slope + Kw_F_eff * tr_FR + calcDamper(CwB_F_eff, Cw_F_eff, vkB_F, vkR_F, dtr_FR) - F_arb_F + wheelStates.FR.F_bumpstop);
-      const Fz_RL = wheelStates.RL.isAirborne ? 0.0 : Math.max(0.0, Fz0_R_slope + Kw_R_eff * tr_RL + calcDamper(CwB_R_eff, Cw_R_eff, vkB_R, vkR_R, dtr_RL) + F_arb_R + wheelStates.RL.F_bumpstop);
-      const Fz_RR = wheelStates.RR.isAirborne ? 0.0 : Math.max(0.0, Fz0_R_slope + Kw_R_eff * tr_RR + calcDamper(CwB_R_eff, Cw_R_eff, vkB_R, vkR_R, dtr_RR) - F_arb_R + wheelStates.RR.F_bumpstop);
+      /* 2026-11-19：阻尼力单独暴露（telemetry.Fdamp）。
+         动机：S13 转正后 telemetry.Fz 是**轮胎接触力**，不再是悬挂力；
+         阻尼器接线测试若继续用 Fz 差分会被轮胎柔度吃掉（实测 Δ≡0）。 */
+      const Fd_FL = calcDamper(CwB_F_eff, Cw_F_eff, vkB_F, vkR_F, dtr_FL);
+      const Fd_FR = calcDamper(CwB_F_eff, Cw_F_eff, vkB_F, vkR_F, dtr_FR);
+      const Fd_RL = calcDamper(CwB_R_eff, Cw_R_eff, vkB_R, vkR_R, dtr_RL);
+      const Fd_RR = calcDamper(CwB_R_eff, Cw_R_eff, vkB_R, vkR_R, dtr_RR);
+      const Fz_FL = wheelStates.FL.isAirborne ? 0.0 : Math.max(0.0, Fz0_F_slope + Kw_F_eff * tr_FL + Fd_FL + F_arb_F + wheelStates.FL.F_bumpstop);
+      const Fz_FR = wheelStates.FR.isAirborne ? 0.0 : Math.max(0.0, Fz0_F_slope + Kw_F_eff * tr_FR + Fd_FR - F_arb_F + wheelStates.FR.F_bumpstop);
+      const Fz_RL = wheelStates.RL.isAirborne ? 0.0 : Math.max(0.0, Fz0_R_slope + Kw_R_eff * tr_RL + Fd_RL + F_arb_R + wheelStates.RL.F_bumpstop);
+      const Fz_RR = wheelStates.RR.isAirborne ? 0.0 : Math.max(0.0, Fz0_R_slope + Kw_R_eff * tr_RR + Fd_RR - F_arb_R + wheelStates.RR.F_bumpstop);
+      const Fdamp = { FL: Fd_FL, FR: Fd_FR, RL: Fd_RL, RR: Fd_RR };
       
       const F_susp = { FL: Fz_FL, FR: Fz_FR, RL: Fz_RL, RR: Fz_RR };
 
@@ -1229,6 +1241,7 @@ class VehicleDynamics15DOF {
         st.omega[w.id] += d_omega * dt;
         
         this.telemetry.Fz[w.id] = Fz_w;
+        this.telemetry.Fdamp[w.id] = Fdamp[w.id];
         this.telemetry.Fx[w.id] = Fx_body;
         this.telemetry.Fy[w.id] = Fy_body;
         this.telemetry.tr[w.id] = ws.tr;
