@@ -1,4 +1,4 @@
-# MODEL_SCOPE · 模型完整性登记表
+﻿# MODEL_SCOPE · 模型完整性登记表
 
 > **这份文件回答一个问题：这个仿真器到底建了什么、简化了什么、边界在哪？**
 >
@@ -122,6 +122,7 @@
 | 2026-11-19 | **P30-a**：kT 读预设轴级真源（旧只读 `.tire.kT` ⇒ 恒回退 260 N/mm） | S13 打开后四预设 kT 从"全 260"恢复为 120~280 | `test_15dof_steady` 14→18；`wheelDof` 关时逐位不变 |
 | 2026-11-19 | **A4**：质量拆分——车身垂向用 `mSprung`、簧下补 `mU·g`、弹簧预压改簧载口径 | 簧上 heave 频率 +7.7%~21.4%（四预设）；静载与总重不变 | `physics_audit` 57→59（新增 2 条恒等式）；`mass_split_probe` 静载 100.00%、残差 <1e-3 N |
 | 2026-11-19 | **Phase B**：S13 默认开（`S.wheelDof === false` 才关）；新增 `telemetry.Fdamp`；能量审计计入簧下 KE/PE | 三舞台与赛道默认走真 15-DOF；`telemetry.Fz` 语义固定为**接触力** | 门禁 22/22；`physics_audit` 59→60；`test_p2b_damper` 28/28、`test_kc_wiring` 25/25、`test_dom` 350 全绿；显式关闭仍逐位复现转正前末态 |
+| 2026-11-19 | **Phase D**：三层对比（`19-compare.js`）+ 受控赛道指标 | 赛道层改用**受控定圆峰值 ay**（定转角 + 速度保持扫速度），不依赖逐圈学习；A/B 槽位并排 29 项指标 | `test_compare.js` **14 项**进 CI；门禁 23→24；杠杆灵敏度 0.32% vs 圈速 0.017% |
 | 2026-11-19 | **Phase C**：ride 测试台（`18-ride-bench.js`）+ `env.rig` 四轮独立路面输入 | 新增阶跃/扫频/脉冲/随机四个标准测试与**绝对量**指标（此前 K1 只有行为阈值）；解析锚实测 1.6% | `test_ride_bench.js` **17 项**进 CI；门禁 22→23；`test_dom` 352、`stage_boot` 48 |
 
 **A4 的量化依据**（`web/test/mass_split_probe.cjs`，四预设）：

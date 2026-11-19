@@ -232,6 +232,49 @@ function buildLeft(){
              ["脉冲 IMPULSE",()=>runRide("impulse")],["随机 RANDOM",()=>runRide("random")]]);
   rowBtns(b,[["导出 CSV",()=>{ if(typeof RIDE_BENCH!=="undefined"&&RIDE_BENCH.last) RIDE_BENCH.download(RIDE_BENCH.last); },null,"hl"]]);
 
+  /* Phase D（2026-11-19）：三层对比。静态=评价引擎 KPI、动态=ride 台绝对量、
+     赛道=**受控定圆极限**（不是圈速——圈速被自动驾驶逐圈学习压到 0.017%，见 P29）。 */
+  b=sec(host,"三层对比 A/B","COMPARE A / B",true);
+  const cmpOut=E("div","eng-status"); cmpOut.id="cmpOut";
+  cmpOut.textContent="改完底盘 →「采集 A」→ 再改 →「采集 B」→「对比」。赛道层是受控定圆峰值 ay，不受逐圈学习掩盖。";
+  b.appendChild(cmpOut);
+  const cmpTbl=E("table","hp"); cmpTbl.id="cmpTbl"; b.appendChild(cmpTbl);
+  const renderCmp=(d)=>{
+    cmpTbl.textContent="";
+    if(!d){ cmpOut.textContent="请先采集 A 与 B"; return; }
+    const head=E("thead"), hr=E("tr");
+    ["层","指标","A","B","Δ%"].forEach(h=>hr.appendChild(E("th",null,h)));
+    head.appendChild(hr); cmpTbl.appendChild(head);
+    const body=E("tbody");
+    d.rows.forEach(r=>{
+      const tr=E("tr");
+      [r.layer, r.name, String(r.a)+(r.unit?" "+r.unit:""), String(r.b)+(r.unit?" "+r.unit:""),
+       (r.pct===null?"—":(r.pct>0?"+":"")+r.pct.toFixed(2)+"%")].forEach(v=>tr.appendChild(E("td",null,v)));
+      body.appendChild(tr);
+    });
+    cmpTbl.appendChild(body);
+    const n=d.rows.filter(r=>r.pct!==null&&Math.abs(r.pct)>0.1).length;
+    cmpOut.textContent=`A=${d.A.hash}（${d.A.preset}） · B=${d.B.hash}（${d.B.preset}） · `
+      + `${d.rows.length} 项指标，其中 ${n} 项差异 >0.1%`
+      + (d.sameConfig?"　⚠ 两次采集的配置相同":"");
+  };
+  rowBtns(b,[
+    ["采集 A",()=>{ if(typeof COMPARE==="undefined"){cmpOut.textContent="COMPARE 未加载";return;}
+      const r=COMPARE.capture("A"); cmpOut.textContent="已采集 A："+r.hash+"（"+r.preset+"）"; }],
+    ["采集 B",()=>{ if(typeof COMPARE==="undefined"){cmpOut.textContent="COMPARE 未加载";return;}
+      const r=COMPARE.capture("B"); cmpOut.textContent="已采集 B："+r.hash+"（"+r.preset+"）"; }],
+    ["对比",()=>{ if(typeof COMPARE==="undefined"){cmpOut.textContent="COMPARE 未加载";return;}
+      renderCmp(COMPARE.diff()); }]
+  ]);
+  rowBtns(b,[["导出对比 CSV",()=>{
+    if(typeof COMPARE==="undefined") return;
+    const d=COMPARE.diff(); if(!d){ cmpOut.textContent="请先采集 A 与 B"; return; }
+    const blob=new Blob([COMPARE.toCsv(d)],{type:"text/csv;charset=utf-8"});
+    const a2=document.createElement("a");
+    a2.href=URL.createObjectURL(blob); a2.download="compare_"+Date.now()+".csv"; a2.click();
+    setTimeout(()=>URL.revokeObjectURL(a2.href),1000);
+  },null,"hl"]]);
+
   b=sec(host,"3D 空间硬点表","HARDPOINTS [mm]",true);
   const tb=E("table","hp");
   tb.innerHTML="<thead><tr><th>硬点 ID</th><th>X 横向</th><th>Y 纵向</th><th>Z 垂向</th></tr></thead>";
