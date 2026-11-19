@@ -175,7 +175,7 @@ node web/test/test_p2a_aero.js         # 14 断言 · test_circuit_ui.js 100%（
 # ── 跨语言物理对拍（JS TPHYS ↔ Python transient，门限 5%）────────────
 node web/test/tphys_parity.cjs         # 实测 worst 0.51%
 
-# ── 物理审计（60 项，**已进 CI 回归**；--ci 跳过 2 项环境敏感的性能阈值）──
+# ── 物理审计（62 项，**已进 CI 回归**；--ci 跳过 2 项环境敏感的性能阈值）──
 node web/test/physics_audit.js         # 惯量恒等式 / 能量单调 / 步长收敛 / 阿克曼 / ISO 路面 / wheel DOF / 碰撞
 
 # ── 诊断工具（不参与回归）─────────────────────────────────────────

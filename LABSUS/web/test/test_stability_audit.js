@@ -100,6 +100,29 @@ console.log('=== 4. 生产步长锚（dt=1ms 与 0.5ms 的侧倾角一致）==='
   assert(err < 1.0, `生产步长锚：1ms vs 0.5ms 偏差 ${err.toFixed(3)}% < 1%`);
 }
 
+/* ── 5. 行程限位接线（A4/P36，2026-11-19）──────────────────────────
+   锁的是"参数真的进物理"：把 S.trMin/trMax 收窄，同一工况的响应必须变。
+   改动前 K1 硬编码 0.080/0.090 与 0.055/0.065，这两个参数完全无效。
+   ⚠ 必须用**会撞限位**的工况（单轮 80mm 脉冲）；稳态定圆永远碰不到限位。
+   ⚠ 也必须在物理包线内（E 级 12 m/s）——20 m/s 时车会翻，差异被淹没。 */
+console.log('=== 5. 行程限位接线（A4）===');
+{
+  load('formula');
+  const trMin0 = S.trMin, trMax0 = S.trMax;
+  const run = (trMin, trMax) => {
+    S.trMin = trMin; S.trMax = trMax;
+    return RB.run('impulse', { singleWheel: true, ampMm: 80, dur: 1.5 });
+  };
+  const wide = run(-90, 90);
+  const narrow = run(-20, 20);
+  S.trMin = trMin0; S.trMax = trMax0;
+  const back = run(-90, 90);
+  const d = Math.abs(narrow.metrics.rmsEarly - wide.metrics.rmsEarly);
+  note(`行程 -90/90 → -20/20：早期 RMS ${wide.metrics.rmsEarly.toExponential(4)} → ${narrow.metrics.rmsEarly.toExponential(4)}（Δ ${d.toExponential(2)}）`);
+  assert(d > 1e-6, `S.trMin/trMax 真的进物理（响应变化 ${d.toExponential(2)}）`);
+  assert(Math.abs(back.metrics.rmsEarly - wide.metrics.rmsEarly) < 1e-9, '还原后回到基准（无残留状态）');
+}
+
 console.log(`\n========================================`);
 console.log(`All ${passed}/${total} stability checks passed!`);
 console.log(`========================================`);

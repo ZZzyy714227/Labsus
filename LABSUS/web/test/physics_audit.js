@@ -317,18 +317,23 @@ section('G. 阿克曼几何（S4 专项）');
 section('H. ISO 8608 随机路面（S3 专项）');
 {
   const probeIso = (cls, T, speed) => {
-    const v = mkCar(speed === undefined ? 20 : speed);
+    const v = mkCar(speed === undefined ? 12 : speed);
     const env = { grade: 0, bumpNoise: 0, roadIso: cls };
     const dt = 0.001, n = Math.round(T / dt);
-    let sum2 = 0, cnt = 0;
+    let sum2 = 0, cnt = 0, maxTh = 0;
     const t0 = Date.now();
     for (let k = 0; k < n; k++) {
       v.step(mkCtrl(), env, dt);
       sum2 += v.state.w * v.state.w; cnt++;
+      /* A4（2026-11-19）：记录最大俯仰角。E 级 20 m/s 实测已翻到 θ=1.4 rad
+         （只是没 NaN）⇒ 旧断言"有限"是弱条件，且工况超出模型包线。 */
+      const th = Math.abs(v.state.theta);
+      if (Number.isFinite(th) && th > maxTh) maxTh = th;
     }
     return {
       rmsW: Math.sqrt(sum2 / cnt), ms: Date.now() - t0, n,
       finite: Number.isFinite(v.state.Z) && Number.isFinite(v.state.w),
+      maxTh: maxTh,
       roadS: v._roadS
     };
   };
@@ -342,6 +347,12 @@ section('H. ISO 8608 随机路面（S3 专项）');
   note(`性能：关闭 ${(off.ms / off.n).toFixed(4)} ms/子步 → 开启 ${(A.ms / A.n).toFixed(4)} ms/子步`);
 
   assert(off.finite && A.finite && C.finite && E.finite, `四级路面工况全部有限（无 NaN/Inf）`);
+  /* A4（2026-11-19）：**姿态断言**。旧版只查 isFinite，而实测 E 级 20 m/s 下
+     车已翻到 θ=1.4 rad（80°）却仍然"有限" ⇒ 断言靠运气通过。
+     实测包线：E 级 ≤14 m/s 时 max|θ| ≈ 0.08~0.13 rad；≥16 m/s 结果随机翻转。
+     故工况降到 12 m/s，并补"必须保持直立"这一条。 */
+  assert(E.maxTh < 0.35, `E 级工况保持直立（max|θ| = ${E.maxTh.toFixed(3)} rad < 0.35）`);
+  assert(A.maxTh < 0.20 && C.maxTh < 0.25, `A/C 级姿态合理（A ${A.maxTh.toFixed(3)} / C ${C.maxTh.toFixed(3)} rad）`);
   /* ⚠ 别用响应 RMS 判"关闭"：平路滑行时车在减速 ⇒ 俯仰平衡变化 ⇒ 车身仍有
      3.2e-3 m/s 的垂向本底，与"路面是否为 0"无关（首版用 RMS 比值判据，卡在
      4.9× vs 阈值 5× 上 —— 是本底噪声，不是缺陷）。

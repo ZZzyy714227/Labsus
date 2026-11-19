@@ -55,11 +55,11 @@ M5 的前后轴静载对调就是三内核一致地错 —— 双端对拍与镜
 | 镜像对称 | `test_mirror_symmetry.py` | ✅ 在位 |
 | 设计位自洽（travel=0 精确返回设计 cam/toe） | `test_w4_consistency.py` | ✅ 在位 |
 | 胎宽配平等价性（缺字段 ⇒ 逐位复现旧值） | `test_tire_width_balance.py` | ✅ 在位 |
-| 惯量恒等式 / 能量单调（含簧下 KE/PE）/ 步长收敛 / 阿克曼 / ISO 路面空间延迟 / 静载守恒 / 簧载拆分 / 簧下承重 / 碰撞耗能 | `web/test/physics_audit.js`（**60 项，已进 CI**） | ✅ 在位 |
+| 惯量恒等式 / 能量单调（含簧下 KE/PE）/ 步长收敛 / 阿克曼 / ISO 路面空间延迟 / 静载守恒 / 簧载拆分 / 簧下承重 / 碰撞耗能 | `web/test/physics_audit.js`（**62 项，已进 CI**） | ✅ 在位 |
 | 垂向 ride 绝对量（阶跃 T63/超调、扫频共振、脉冲衰减、随机路面 RMS）+ 可重复性 + 单调性 + 解析锚 | `web/test/test_ride_bench.js`（**17 项，已进 CI**） | ✅ 在位（2026-11-19 Phase C） |
 | 三层对比 + 受控赛道指标（定圆峰值 ay；对杠杆敏感 0.32%，圈速口径仅 0.017%） | `web/test/test_compare.js`（**14 项，已进 CI**） | ✅ 在位（2026-11-19 Phase D） |
 | 侧倾/横向台 + **姿态量解析锚**（稳态侧倾角 vs K_roll 解析式，四预设误差 <0.02%） | `web/test/test_lat_bench.js`（**20 项，已进 CI**） | ✅ 在位（2026-11-19 线 A） |
-| 积分稳定性（dt 4ms→0.5ms 无 NaN、侧倾角收敛 <1%、kS ×8 / ARB ×16 有界） | `web/test/test_stability_audit.js`（**22 项，已进 CI**） | ✅ 在位（2026-11-19 线 A） |
+| 积分稳定性（dt 4ms→0.5ms 无 NaN、侧倾角收敛 <1%、kS ×8 / ARB ×16 有界、**行程限位接线守卫**） | `web/test/test_stability_audit.js`（**24 项，已进 CI**） | ✅ 在位（2026-11-19 线 A） |
 | 数据资产内容 hash | `engine/tests/test_provenance.py` | ✅ 在位（P0-3） |
 | K&C 样条开关零影响验证 | `engine/tests/test_transient.py` | ✅ 在位（P1 新增 3 项） |
 | 求解结果契约（残差门限单一真源 / 非有限归一 / 收敛状态） | `engine/tests/test_solver_contract.py` | ✅ 在位（P1-2 新增 7 项） |

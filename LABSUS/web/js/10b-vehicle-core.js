@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════════════════════════
    10b-vehicle-core.js —— 15-DOF 车辆物理与自动驾驶内核（P2 拆分，2026-10-31）
 
    从 11-stages.js 抽出（原 L95–L1440）。这里只有**数值层**：
@@ -936,8 +936,11 @@ class VehicleDynamics15DOF {
         const z_corner = st.Z + rideOffset + w.y * st.theta - w.x * st.phi;
         const dz_corner = st.w + w.y * st.q - w.x * st.p;
         
-        const maxDroop = (w.axle === 'front' ? 0.080 : 0.090);
-        const maxBumpStop = (w.axle === 'front' ? 0.055 : 0.065);
+        const _limM = (v) => (v !== undefined && v !== null && isFinite(v) && Math.abs(v) > 1e-6)
+          ? Math.abs(v) / 1000 : null;
+        const _trMaxM = _limM(this.S && this.S.trMax), _trMinM = _limM(this.S && this.S.trMin);
+        const maxDroop = (_trMinM !== null) ? _trMinM : (w.axle === 'front' ? 0.080 : 0.090);
+        const maxBumpStop = (_trMaxM !== null) ? _trMaxM : (w.axle === 'front' ? 0.055 : 0.065);
         const isAirborne = (z_corner - maxDroop > z_road_w);
         if (isAirborne) numWheelsAirborne++;
 
