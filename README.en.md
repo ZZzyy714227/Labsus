@@ -146,7 +146,7 @@ DOM/Canvas stubs; only the TPHYS parity check is cross-language:
 cd LABSUS
 
 # ── One command for every gate (recommended; non-zero exit = failure) ───
-python tools/gates/check_all.py           # 26 checks: ruff / pytest / 21 node suites / parity / provenance / docs
+python tools/gates/check_all.py           # 27 checks: ruff / pytest / 22 node suites / parity / provenance / docs
 python tools/gates/check_all.py --quick   # 3 sub-second checks (ruff / provenance / docs)
 
 # ── Python engine: physics assertions / gates / API-contract guard / TPHYS parity / stress ──
@@ -172,7 +172,8 @@ node web/test/test_p2a_aero.js         # 14 · test_circuit_ui.js 100% (64 ids +
 node web/test/test_ride_bench.js       # 17: step/sweep/impulse/random + repeatability + analytic anchor
 node web/test/test_compare.js          # 27: three-layer compare + controlled skidpad limit (P29)
 node web/test/test_lat_bench.js        # 20: roll/lateral bench + roll-angle analytic anchor
-node web/test/test_stability_audit.js  # 22: dt convergence + stiffness sweep (no NaN)
+node web/test/test_load_transfer.js    # 13: longitudinal load transfer vs m*ax*h/wb
+node web/test/test_stability_audit.js  # 24: dt convergence + stiffness sweep (no NaN)
 
 # ── Cross-language physics parity (JS TPHYS <-> Python transient, 5% threshold) ──
 node web/test/tphys_parity.cjs         # measured worst 0.51%
@@ -227,7 +228,7 @@ LABSUS/                           # Engineering Root Directory
 │   │   ├── 15-mpc.js             # Model Predictive Control (MPC) trajectory solver
 │   │   ├── 16-powertrain.js      # Powertrain & torque vectoring calculations
 │   │   └── 17-damper4q.js        # 4-quadrant damper table (shape-preserving spline + click blending)
-│   └── test/                     # 21 regression suites + physics_audit + diagnostics
+│   └── test/                     # 22 regression suites + physics_audit + diagnostics
 ├── engine/                       # High-Performance Python Numerical Engine
 │   ├── server.py                 # FastAPI server entry (:8001)
 │   ├── src/                      # Solvers (K&C / Bushing / Pacejka / Tire Fit / Transient)

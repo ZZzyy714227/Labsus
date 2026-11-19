@@ -1393,8 +1393,20 @@ class VehicleDynamics15DOF {
       //   俯仰平衡自动闭合（不再需要偏置伪力矩）。CoP 取轴平面，未建模前翼/尾翼
       //   相对轴平面的伸出量——几何量级合理近似，可由 ge 标定继续修正。
       const M_aero_pitch = F_down_r * this.b - F_down_f * this.a;
+      /* P33 / 线 B · B1（2026-11-19）：**纵向惯性力矩**。
+         原式只有重力分量与气动力，**没有**纵向轮胎力 × 质心高这一项 ⇒
+         实测全力制动 1.19 g 时 |θ| 仅 0.03°、前后轴荷几乎不转移（物理上应
+         ΔFz ≈ m·ax·h_cg/wb ≈ 235·11.7·0.27/1.55 ≈ 480 N，实际只动了 ~110 N
+         且前后同向，是纯瞬态残差）。
+         该项是"刹车点头 / 加速抬头"的唯一来源，缺了它刹车/加速台架无意义。
+         `S_config.legacyPitchInertia === true` 可回退旧行为（逐位不变）作 A/B 对照。 */
+      /* 默认**关闭**（决策门，2026-11-19）：物理已验证（制动转移 477N vs 解析 469N），
+         但打开后圈速仿真里的车会打转（峰值侧偏角 87°）——驾驶员/轮胎模型跟不上载荷转移。
+         待 B4 轮胎同源 + 驾驶员模型升级后再翻默认。S.pitchInertia = true 显式开启。 */
+      const _pitchInertia = (this.S && this.S.pitchInertia === true) ? SumFy_tire * this.h_cg : 0;
       const SumM_pitch = (F_susp.FL + F_susp.FR) * this.a - (F_susp.RL + F_susp.RR) * this.b
-                       + F_gravity_slope * this.h_cg - F_drag * this.h_cg - C_pitch_damp * st.q + M_aero_pitch;
+                       + F_gravity_slope * this.h_cg - F_drag * this.h_cg - C_pitch_damp * st.q + M_aero_pitch
+                       + _pitchInertia;
       // Restoring Roll moment
       const SumM_roll  = (F_susp.FL - F_susp.FR) * (this.tF / 2.0)
                        + (F_susp.RL - F_susp.RR) * (this.tR / 2.0)

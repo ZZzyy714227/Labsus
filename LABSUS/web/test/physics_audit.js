@@ -1,4 +1,4 @@
-/**
+﻿/**
  * physics_audit.js —— 15-DOF 舞台内核的数值审计（P0 地基工具，2026-10-17）
  *
  * 存在理由（审计 R-1017 实测）：全仓**没有**能量守恒检查、**没有**步长收敛测试、
@@ -578,9 +578,15 @@ section('L. 真 15-DOF（S13）');
      用途是证明"关掉开关 = 回到旧物理"，而不是证明物理正确。 */
   {
     const saved = S.wheelDof;
+    const savedLegacyPitch = S.legacyPitchInertia;
     S.wheelDof = false;
+    /* 线 B · B1（2026-11-19）：俯仰纵向惯性力矩（`SumFy_tire·h_cg`）是**新增物理**，
+       默认开启；本断言测的是"显式关闭 wheelDof 时逐位复现转正前行为"，
+       故须同时打开 legacy 开关，否则测的是新物理而不是兼容性。 */
+    S.legacyPitchInertia = true;
     const b = mkCar(15); settle(b, 600);
     S.wheelDof = saved;
+    S.legacyPitchInertia = savedLegacyPitch;
     const LEGACY = {
       Z: -0.0008614507486584983,
       u: 14.900546902242374,

@@ -33,8 +33,11 @@ const EVAL_BENCHMARKS = {
   motionRatioR:    { name: "后安装比 (Motion Ratio)", target: "0.70 ~ 0.90", unit: "", eval: v => (v >= 0.70 && v <= 0.90 ? 'good' : (v >= 0.55 && v <= 1.0 ? 'warn' : 'bad')), desc: "后轴弹簧避震器杠杆效率" },
   wheelRateF:      { name: "前轮端刚度 (Wheel Rate)", target: "30 ~ 70 N/mm", unit: "N/mm", eval: v => (v >= 30 && v <= 70 ? 'good' : (v >= 20 && v <= 90 ? 'warn' : 'bad')), desc: "前悬架对路面垂直支撑刚度" },
   wheelRateR:      { name: "后轮端刚度 (Wheel Rate)", target: "35 ~ 75 N/mm", unit: "N/mm", eval: v => (v >= 35 && v <= 75 ? 'good' : (v >= 25 && v <= 95 ? 'warn' : 'bad')), desc: "后悬架对路面垂直支撑刚度" },
-  rideFreqF:       { name: "前偏频 (Ride Frequency)", target: "1.8 ~ 3.2 Hz", unit: "Hz", eval: v => (v >= 1.8 && v <= 3.2 ? 'good' : (v >= 1.4 && v <= 4.0 ? 'warn' : 'bad')), desc: "赛车前轴垂向固有振动频率" },
-  rideFreqR:       { name: "后偏频 (Ride Frequency)", target: "2.0 ~ 3.5 Hz", unit: "Hz", eval: v => (v >= 2.0 && v <= 3.5 ? 'good' : (v >= 1.5 && v <= 4.2 ? 'warn' : 'bad')), desc: "后偏频通常比前偏频高 10%~15% 消除平顺颠簸" },
+  /* 偏频目标带：2026-11-19 按 FSAE 实车口径重定（原 1.8~3.2 / 2.0~3.5 是乘用车带）。
+     FSAE 车簧载质量小、赛道平整，普遍跑 3~5 Hz；formula 预设实测 4.56 / 5.15 Hz
+     在原带里被判"越界"，属**口径错误**而非车偏硬。后轴仍保持比前轴高 ~10%。 */
+  rideFreqF:       { name: "前偏频 (Ride Frequency)", target: "3.0 ~ 5.0 Hz", unit: "Hz", eval: v => (v >= 3.0 && v <= 5.0 ? 'good' : (v >= 2.5 && v <= 5.6 ? 'warn' : 'bad')), desc: "赛车前轴垂向固有振动频率（FSAE 口径 3~5 Hz）" },
+  rideFreqR:       { name: "后偏频 (Ride Frequency)", target: "3.2 ~ 5.3 Hz", unit: "Hz", eval: v => (v >= 3.2 && v <= 5.3 ? 'good' : (v >= 2.6 && v <= 5.9 ? 'warn' : 'bad')), desc: "后偏频通常比前偏频高 10%~15% 消除平顺颠簸（FSAE 口径 3.2~5.3 Hz）" },
   dampingRatioF:   { name: "前阻尼比 (Damping Ratio)", target: "0.55 ~ 0.75", unit: "", eval: v => (v >= 0.55 && v <= 0.75 ? 'good' : (v >= 0.4 && v <= 0.85 ? 'warn' : 'bad')), desc: "前轴振动衰减能力，防止多余弹跳" },
   dampingRatioR:   { name: "后阻尼比 (Damping Ratio)", target: "0.60 ~ 0.80", unit: "", eval: v => (v >= 0.60 && v <= 0.80 ? 'good' : (v >= 0.45 && v <= 0.90 ? 'warn' : 'bad')), desc: "后轴振动衰减能力" },
   rollStiffnessPct:{ name: "前侧倾刚度占比 (F/T Roll)", target: "48% ~ 58%", unit: "%", eval: v => (v >= 48 && v <= 58 ? 'good' : (v >= 40 && v <= 65 ? 'warn' : 'bad')), desc: "决定稳态过弯平衡：>55% 趋向不足转向，<48% 趋向过度" },
