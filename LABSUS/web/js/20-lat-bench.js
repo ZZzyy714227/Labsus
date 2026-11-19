@@ -169,13 +169,24 @@ const LAT_BENCH = (function () {
     const KrollSpring = (keF * tF * tF) / 2 + (keR * tR * tR) / 2;
     const KrollArb = Kroll - KrollSpring;
     const mTotal = car.m, mS = car.mSprung, hArm = car.h_roll_arm;
+    /* 簧下横向分量（P33 侧向）：簧下质心近似在轮轴高 ≈ 轮胎半径 */
+    const _mU = 2 * ((car.mU_f || 0) + (car.mU_r || 0));
+    const _rT = (car.rTireM !== undefined) ? car.rTireM : 0.26;
+    const _hAxis = (car.h_roll_axis !== undefined) ? car.h_roll_axis : 0.043;
+    const _hU = Math.max(0, _rT - _hAxis);
+    const rollMom = (ay) => (car.rollInertiaOn === false)
+      ? mTotal * ay * hArm
+      : (mS * ay * hArm + _mU * ay * _hU);
     return {
       tF: tF, tR: tR, keF: keF, keR: keR,
       KrollSpring: KrollSpring, KrollArb: KrollArb, Kroll: Kroll,
       KrollF: KrollF, KrollR: KrollR,
       hRollArm: hArm, mTotal: mTotal, mSprung: mS,
-      /* 两种力矩口径：整车质量（K1 现状）vs 簧载质量（教科书） */
-      phiPredTotalDeg: (ay) => (mTotal * ay * hArm / Kroll) * 180 / Math.PI,
+      /* 2026-11-19（P33 侧向翻默认后）：侧倾力矩的**簧下横向分量**。
+         旧式 `mTotal·ay·hArm` 把簧下质量也乘了簧载力臂，实测高估 4~10%。
+         物理分解：M = mS·ay·hArm + mU·ay·(rTire − h_axis)。
+         `car.rollInertiaOn === false`（显式回退）时保持旧式。 */
+      phiPredTotalDeg: (ay) => (rollMom(ay) / Kroll) * 180 / Math.PI,
       phiPredSprungDeg: (ay) => (mS * ay * hArm / Kroll) * 180 / Math.PI
     };
   }

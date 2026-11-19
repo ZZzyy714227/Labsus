@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════════════════════════
    10b-vehicle-core.js —— 15-DOF 车辆物理与自动驾驶内核（P2 拆分，2026-10-31）
 
    从 11-stages.js 抽出（原 L95–L1440）。这里只有**数值层**：
@@ -152,6 +152,34 @@ class UniversalAutoPilot {
     
     let raw_steer = (steer_fb + steer_ff) * (180.0 / Math.PI);
     raw_steer = Math.max(-28, Math.min(28, raw_steer));
+
+    /* 线 B 后续 · 驾驶员模型升级（2026-11-19）：**横摆/侧滑稳定反馈**。
+       动机：开启载荷转移物理（pitchInertia/rollInertia）后，原控制器把车开转
+       （峰值侧偏角 87°、`test_lap_15dof` 4/23）——它只有位置/航向反馈，没有
+       "车正在转"的感知：后轴制动卸载 ⇒ 过度转向 ⇒ 无反馈 ⇒ 螺旋发散。
+       补两项（都是真实车手的本能反应，也只读 state，不碰物理）：
+         ① 横摆角速度闭环：r_target = u·κ（曲率前馈给出的期望 yaw rate），
+            偏差 r_target − r 直接加到转角上（等效 ESC 的 yaw-rate feedback）
+         ② 质心侧滑角抑制：β 增大时反打，并在 β 过大时**松制动**（后轴卸载时
+            继续重刹会加速失稳——这是"松刹车救车"的模型化）
+       系数保守起步（kYaw=0.10 deg per (rad/s)，kBeta=25 deg/rad），
+       可用 `pilot.kYaw/kBeta` 覆盖以便扫参。 */
+    const _r = (typeof state.r === 'number' && isFinite(state.r)) ? state.r : 0;
+    const _vv = (typeof state.v === 'number' && isFinite(state.v)) ? state.v : 0;
+    const _rTarget = u * (target.targetCurvature || 0);   /* κ>0=左弯，实测负转角→正 r，故同号 */
+    const _beta = Math.atan2(_vv, Math.max(3.0, u));            // 质心侧滑角（rad）
+    const kYaw = (typeof this.kYaw === 'number' && isFinite(this.kYaw)) ? this.kYaw : 0.04;
+    const kBeta = (typeof this.kBeta === 'number' && isFinite(this.kBeta)) ? this.kBeta : 0.0;
+    const yaw_deg = -(180.0 / Math.PI) * kYaw * (_rTarget - _r);   /* 左弯 r_err>0 ⇒ 需更负转角 */
+    /* β 只在**超出正常不足转向区**（>3°）时介入：稳态过弯 β 本就不为零，
+       全程反打会与 Stanley 抢方向（实测横向偏差 79.99m ⇒ 10.55m 那轮已暴露）。 */
+    const _bEx = Math.max(0, Math.abs(_beta) - 3.0 * Math.PI / 180);
+    const beta_deg = -Math.sign(_beta) * (180.0 / Math.PI) * kBeta * _bEx;   /* 左弯 β<0 ⇒ 反打右=正转角 */
+    raw_steer = Math.max(-28, Math.min(28, raw_steer + yaw_deg + beta_deg));
+    this.last_beta = _beta;
+
+    this.last_r_err = _rTarget - _r;
+    const _betaAbs = Math.abs(_beta);
     
     // Rate limit steering to avoid sudden snap-oversteer
     const max_steer_rate = 140.0; // deg/s
@@ -195,6 +223,16 @@ class UniversalAutoPilot {
       // Coasting Zone (-0.75 <= accel_cmd <= 0.08): Lift and Coast naturally, NO mechanical braking
       target_throttle = 0;
       target_brake = 0;
+    }
+
+    /* 侧滑抑制差动（同属驾驶员模型升级）：β 过大时松制动 + 断油。
+       物理依据：后轴在制动中卸载 ⇒ 继续施加制动只会更快失稳；
+       真实车手的反应正是"松刹车、回方向"。阈值 4° 起步（FSAE 后轴峰值侧偏
+       约 6~10°，4° 已属明显滑动）。 */
+    if (_betaAbs > 4.0 * Math.PI / 180) {
+      const over = Math.min(1.0, (_betaAbs - 4.0 * Math.PI / 180) / (12.0 * Math.PI / 180));
+      target_brake *= (1.0 - 0.85 * over);     // 最多松掉 85% 制动力
+      target_throttle *= (1.0 - over);
     }
     
     // 1st-Order Low-Pass Smoothing Filter to eliminate 60Hz square-wave chatter
@@ -437,6 +475,9 @@ class VehicleDynamics15DOF {
     this.kCompSteer_F = _compF * Math.PI / 180 / 1000;
     this.kCompSteer_R = _compR * Math.PI / 180 / 1000;
     this._FyPrev = { FL: 0, FR: 0, RL: 0, RR: 0 };
+    /* 2026-11-19：供 20-lat-bench 的解析侧倾锚读取（P33 侧向翻默认后需要） */
+    this.rollInertiaOn = (S_config && S_config.rollInertia === true);
+    this.rTireM = (S_config && S_config.tire && isFinite(S_config.tire.R)) ? S_config.tire.R / 1000 : 0.26;
     
     /* P0（M20）· 性能埋点计数器（整数自增，零开销） */
     this._simStat = { steps: 0, subSteps: 0, roadQueries: 0 };
