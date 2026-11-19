@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 /* 沙箱统一走 _stage_harness.js —— 不再内联第四份（见该文件头注释：内联会让沙箱口径漂移） */
 const vm = require('vm');
 const { loadStage, MODULES_01_11 } = require('./_stage_harness.js');
@@ -142,6 +142,36 @@ console.log('=== 6. CSV 导出 ===');
   const sw = RB.run('sweep', { freqs: [4, 5, 6], cycles: 4, dt: 0.004 });
   const csv2 = RB.toCsv(sw);
   assert(csv2.indexOf('freq_hz,transmissibility') > 0, '扫频 CSV 导出频响表而非时间序列');
+}
+
+/* ── 7. 轮跳阻尼状态锚（线 B · B5 决策材料，2026-11-19）────────────
+   P34 的争议点：formula 的轮跳模式 ζ≈1.83（过阻尼），gt3 ζ≈1.03（近临界）。
+   本轮把**现状**钉成锚，防止未来改动静默改变；并锁住"降阻尼 ⇒ 超调变大、
+   E 级路面变差"这个方向性事实（决策表见 DEVLOG）。 */
+console.log('=== 7. 轮跳阻尼状态锚（B5）===');
+{
+  const zetaOf = (preset) => {
+    ctx.loadVehiclePreset(preset);
+    const V = (ctx.window && ctx.window.VehicleDynamics15DOF) || null;
+    const car = new V(S, {}, 0);
+    const k = car.Kw_F + car.kT_f;
+    return { zeta: car.Cw_F / (2 * Math.sqrt(k * car.mU_f)), mU: car.mU_f, Cw: car.Cw_F };
+  };
+  const f = zetaOf('formula'), g = zetaOf('gt3');
+  note(`formula ζ=${f.zeta.toFixed(2)}（Cw ${f.Cw.toFixed(0)}, mU ${f.mU.toFixed(0)}）· gt3 ζ=${g.zeta.toFixed(2)}`);
+  assert(f.zeta > 1.4 && f.zeta < 2.2, `formula 轮跳 ζ 在文档带内（${f.zeta.toFixed(2)}，过阻尼）`);
+  assert(g.zeta > 0.85 && g.zeta < 1.25, `gt3 轮跳 ζ 近临界（${g.zeta.toFixed(2)}）`);
+
+  /* 方向锁：降阻尼 ⇒ 超调变大、E 级路面 RMS 变大 */
+  ctx.loadVehiclePreset('formula');
+  const base = RB.run('step', { ampMm: 5, dur: 2.0 });
+  const soft = RB.run('step', { ampMm: 5, dur: 2.0, over: { cR_scale: 0.45 } });
+  const rc0 = RB.run('random', { dur: 2.5, isoClass: 'E' });
+  const rc1 = RB.run('random', { dur: 2.5, isoClass: 'E', over: { cR_scale: 0.45 } });
+  note(`cR ×0.45：超调 ${base.metrics.overshootPct.toFixed(1)}% → ${soft.metrics.overshootPct.toFixed(1)}%，`
+    + `E 级 RMS ${rc0.metrics.bodyRmsMm.toFixed(2)} → ${rc1.metrics.bodyRmsMm.toFixed(2)} mm`);
+  assert(soft.metrics.overshootPct > base.metrics.overshootPct + 5, '降阻尼 ⇒ 超调变大');
+  assert(rc1.metrics.bodyRmsMm > rc0.metrics.bodyRmsMm, '降阻尼 ⇒ 粗糙路面更颠（E 级 RMS 变大）');
 }
 
 console.log(`\n========================================`);
