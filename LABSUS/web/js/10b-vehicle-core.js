@@ -488,8 +488,20 @@ class VehicleDynamics15DOF {
       ? S_config.front.mU : 12.0;
     this.mU_r = (S_config && S_config.rear && typeof S_config.rear.mU === 'number' && S_config.rear.mU > 0)
       ? S_config.rear.mU : 12.0;
-    this.kT_f = ((S_config && S_config.front && S_config.front.tire && S_config.front.tire.kT) || 260) * 1000.0;
-    this.kT_r = ((S_config && S_config.rear && S_config.rear.tire && S_config.rear.tire.kT) || 260) * 1000.0;
+    /* P30-a（2026-11-19）：预设把 kT 平铺在**轴级**（02-presets.js:38 `mU:12, kS:105, kT:180`），
+       而 `S[axle].tire` 只有 `{R,W,rim,disc,label}`——**没有 kT**。旧实现只读 `.tire.kT`
+       ⇒ 四款预设的 120~280 N/mm 全被忽略、恒回退 260。读法改为三级：
+       `.tire.kT`（tire-lab 覆盖层）> 轴级 `kT`（预设真源）> 260（旧缺省）。
+       `wheelDof` 关闭时 kT 不被消费 ⇒ 本修复对旧行为逐位兼容。 */
+    const _kTAxle = (ax) => {
+      const a = S_config && S_config[ax];
+      const t = a && a.tire && a.tire.kT;
+      if (typeof t === 'number' && t > 0) return t;
+      const k = a && a.kT;
+      return (typeof k === 'number' && k > 0) ? k : 260;
+    };
+    this.kT_f = _kTAxle('front') * 1000.0;
+    this.kT_r = _kTAxle('rear') * 1000.0;
     /* 轮胎垂向阻尼：cT = 2·ζ·√(kT·mU)，ζ 缺省 0.06（轮胎垂向阻尼比典型 0.05~0.1） */
     const _zeta = (S_config && typeof S_config.tireDampRatio === 'number' && S_config.tireDampRatio > 0)
       ? S_config.tireDampRatio : 0.06;

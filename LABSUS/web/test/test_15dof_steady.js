@@ -224,6 +224,43 @@ console.log('=== 6. 左右对称：δ→−δ 时 r 反号且幅值一致 ===');
     `左右幅值对称（|r| 相对差 ${(Math.abs(Math.abs(rNeg) - Math.abs(rPos)) / Math.abs(rPos) * 100).toFixed(2)}%）`);
 }
 
+console.log('=== 7. kT 通道读预设轴级真源（2026-11-19 P30-a）===');
+{
+  /* 事实基线：预设把 kT 平铺在**轴级**（02-presets.js:38 `mU:12, kS:105, kT:180`），
+     而 `S[axle].tire` 只有 `{R,W,rim,disc,label}`——**没有 kT**。旧实现只读
+     `S[axle].tire.kT` ⇒ 四款预设的 120~280 N/mm 全部被忽略、恒回退 260。
+     S13（wheelDof）关着时 kT 不被消费，所以这个 bug 长期无症状；一旦默认开就会静默改物理。 */
+  const f = ctx.S.front, r = ctx.S.rear;
+  const oldF = f.kT, oldR = r.kT;
+  const oldTF = f.tire && f.tire.kT, oldTR = r.tire && r.tire.kT;
+  const dropTireKt = () => { if (f.tire) delete f.tire.kT; if (r.tire) delete r.tire.kT; };
+
+  f.kT = 180; r.kT = 200;
+  dropTireKt();
+  const v = new ctx.VehicleDynamics15DOF(ctx.S, ctx.SIM, 0);
+  assert(v.kT_f === 180000,
+    `前轴 kT=${v.kT_f} N/m 应为 180000（预设 180 N/mm；旧代码恒 260000）`);
+  assert(v.kT_r === 200000,
+    `后轴 kT=${v.kT_r} N/m 应为 200000（预设 200 N/mm；旧代码恒 260000）`);
+
+  /* 嵌套口径优先：tire-lab 若写 S[axle].tire.kT 仍须生效 */
+  f.tire.kT = 999; r.tire.kT = 888;
+  const v2 = new ctx.VehicleDynamics15DOF(ctx.S, ctx.SIM, 0);
+  assert(v2.kT_f === 999000 && v2.kT_r === 888000,
+    `嵌套 .tire.kT 优先（实测 ${v2.kT_f} / ${v2.kT_r}，应 999000 / 888000）`);
+
+  /* 缺字段回退 260 N/mm（旧缺省，不得变成 0） */
+  delete f.kT; delete r.kT; dropTireKt();
+  const v3 = new ctx.VehicleDynamics15DOF(ctx.S, ctx.SIM, 0);
+  assert(v3.kT_f === 260000 && v3.kT_r === 260000,
+    `缺字段回退 260 N/mm（实测 ${v3.kT_f} / ${v3.kT_r}）`);
+
+  if (oldF === undefined) delete f.kT; else f.kT = oldF;
+  if (oldR === undefined) delete r.kT; else r.kT = oldR;
+  if (oldTF === undefined) dropTireKt(); else f.tire.kT = oldTF;
+  if (oldTR === undefined) dropTireKt(); else r.tire.kT = oldTR;
+}
+
 console.log(`\n========================================`);
 console.log(`All ${passed}/${total} 15-DOF steady-state anchor checks passed!`);
 console.log(`========================================`);
