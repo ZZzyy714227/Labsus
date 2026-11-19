@@ -44,8 +44,8 @@ M5 的前后轴静载对调就是三内核一致地错 —— 双端对拍与镜
 | 手段 | 位置 | 状态 |
 |---|---|---|
 | 特征化快照（PRO 基线数值） | `engine/tests/test_v3_api.py`、`test_v3_chassis.py` | ✅ 在位（**非**正确性证明，代码注释已写明） |
-| 前端结构/接线断言 | `web/test/test_dom.js`（354 项） | ✅ 在位 |
-| 舞台加载与帧循环 | `web/test/stage_boot_check.js`（49 项） | ✅ 在位 |
+| 前端结构/接线断言 | `web/test/test_dom.js`（356 项） | ✅ 在位 |
+| 舞台加载与帧循环 | `web/test/stage_boot_check.js`（50 项） | ✅ 在位 |
 
 ### L1 · 内部不变量 —— 项目最强的一层
 
@@ -58,6 +58,8 @@ M5 的前后轴静载对调就是三内核一致地错 —— 双端对拍与镜
 | 惯量恒等式 / 能量单调（含簧下 KE/PE）/ 步长收敛 / 阿克曼 / ISO 路面空间延迟 / 静载守恒 / 簧载拆分 / 簧下承重 / 碰撞耗能 | `web/test/physics_audit.js`（**60 项，已进 CI**） | ✅ 在位 |
 | 垂向 ride 绝对量（阶跃 T63/超调、扫频共振、脉冲衰减、随机路面 RMS）+ 可重复性 + 单调性 + 解析锚 | `web/test/test_ride_bench.js`（**17 项，已进 CI**） | ✅ 在位（2026-11-19 Phase C） |
 | 三层对比 + 受控赛道指标（定圆峰值 ay；对杠杆敏感 0.32%，圈速口径仅 0.017%） | `web/test/test_compare.js`（**14 项，已进 CI**） | ✅ 在位（2026-11-19 Phase D） |
+| 侧倾/横向台 + **姿态量解析锚**（稳态侧倾角 vs K_roll 解析式，四预设误差 <0.02%） | `web/test/test_lat_bench.js`（**20 项，已进 CI**） | ✅ 在位（2026-11-19 线 A） |
+| 积分稳定性（dt 4ms→0.5ms 无 NaN、侧倾角收敛 <1%、kS ×8 / ARB ×16 有界） | `web/test/test_stability_audit.js`（**22 项，已进 CI**） | ✅ 在位（2026-11-19 线 A） |
 | 数据资产内容 hash | `engine/tests/test_provenance.py` | ✅ 在位（P0-3） |
 | K&C 样条开关零影响验证 | `engine/tests/test_transient.py` | ✅ 在位（P1 新增 3 项） |
 | 求解结果契约（残差门限单一真源 / 非有限归一 / 收敛状态） | `engine/tests/test_solver_contract.py` | ✅ 在位（P1-2 新增 7 项） |

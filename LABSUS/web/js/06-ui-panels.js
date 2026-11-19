@@ -275,6 +275,64 @@ function buildLeft(){
     setTimeout(()=>URL.revokeObjectURL(a2.href),1000);
   },null,"hl"]]);
 
+  /* 线 A · A1（2026-11-19）：侧倾/横向台。补的是**姿态量**——本会话 ARB 统一让
+     侧倾角变 −33~41%，当时 24 项门禁零反应；这里给侧倾角/梯度/轮荷转移/yaw 一个台面，
+     解析锚已进 CI（误差 <2%）。 */
+  b=sec(host,"侧倾 / 横向台","LAT BENCH",true);
+  const latOut=E("div","eng-status"); latOut.id="latOut";
+  latOut.textContent="准稳态定圆（定转角+速度保持）：侧倾角 / 侧倾梯度 / 轮荷转移分布 / yaw。解析锚已进 CI。";
+  b.appendChild(latOut);
+  const latTbl=E("table","hp"); latTbl.id="latTbl"; b.appendChild(latTbl);
+  const renderLat=(rows)=>{
+    latTbl.textContent="";
+    const head=E("thead"), hr=E("tr");
+    ["指标","实测","解析锚","误差"].forEach(h=>hr.appendChild(E("th",null,h)));
+    head.appendChild(hr); latTbl.appendChild(head);
+    const body=E("tbody");
+    rows.forEach(r=>{
+      const tr=E("tr");
+      [r.name, r.value, r.anchor, r.err].forEach(v=>tr.appendChild(E("td",null,String(v))));
+      body.appendChild(tr);
+    });
+    latTbl.appendChild(body);
+  };
+  const fmtPct=(a,b)=> (a===null||b===null||a===undefined) ? '—'
+    : (Math.abs(a)<1e-9 ? '—' : (100*(Math.abs(b)-Math.abs(a))/Math.abs(a)).toFixed(2)+'%');
+  rowBtns(b,[
+    ["稳态定圆",()=>{ setTimeout(()=>{
+      if(typeof LAT_BENCH==="undefined"){latOut.textContent="LAT_BENCH 未加载";return;}
+      const st=LAT_BENCH.steadyCircle({speed:14,steerDeg:5,dur:8,avgSecs:3});
+      const an=LAT_BENCH.analytic();
+      const m=st.metrics, phiPred=an.phiPredTotalDeg(m.ayG*9.81);
+      renderLat([
+        {name:"侧倾角", value:m.phiDeg.toFixed(3)+" °", anchor:phiPred.toFixed(3)+" °", err:fmtPct(m.phiDeg,phiPred)},
+        {name:"侧向加速度", value:m.ayG.toFixed(3)+" g", anchor:"—", err:"—"},
+        {name:"轮荷转移分布 TLLTD", value:m.tlltd.toFixed(3), anchor:"(0,1)", err:"—"},
+        {name:"转弯半径", value:m.radius.toFixed(1)+" m", anchor:"—", err:"—"},
+        {name:"侧倾刚度 K_roll", value:an.Kroll.toFixed(0)+" N·m/rad", anchor:"杆占 "+(an.KrollArb/an.Kroll*100).toFixed(0)+"%", err:"—"}
+      ]);
+      latOut.textContent=`14 m/s / 5°：侧倾 ${m.phiDeg.toFixed(3)}°（解析 ${phiPred.toFixed(3)}°）· ay ${m.ayG.toFixed(3)} g · TLLTD ${m.tlltd.toFixed(3)}`;
+    },10);}],
+    ["侧倾梯度",()=>{ setTimeout(()=>{
+      if(typeof LAT_BENCH==="undefined"){latOut.textContent="LAT_BENCH 未加载";return;}
+      const g=LAT_BENCH.rollGradient({speeds:[8,10,12,14,16],dur:5});
+      renderLat(g.points.map(p=>({name:p.speed+" m/s", value:p.phiDeg.toFixed(3)+" °", anchor:p.ayG.toFixed(3)+" g", err:"—"}))
+        .concat([{name:"梯度", value:g.metrics.gradDegPerG.toFixed(3)+" °/g", anchor:"—", err:"—"}]));
+      latOut.textContent=`侧倾梯度 ${g.metrics.gradDegPerG.toFixed(3)} °/g（${g.points.length} 个速度点线性回归）`;
+    },10);}],
+    ["转向阶跃",()=>{ setTimeout(()=>{
+      if(typeof LAT_BENCH==="undefined"){latOut.textContent="LAT_BENCH 未加载";return;}
+      const s=LAT_BENCH.steerStep({speed:14,steerDeg:4,dur:3});
+      const m=s.metrics;
+      renderLat([
+        {name:"yaw 稳态角速度", value:m.yawRateSS.toFixed(4)+" rad/s", anchor:"—", err:"—"},
+        {name:"上升时间 (10-90%)", value:m.riseTimeMs.toFixed(0)+" ms", anchor:"—", err:"—"},
+        {name:"超调", value:m.overshootPct.toFixed(1)+" %", anchor:"—", err:"—"}
+      ]);
+      latOut.textContent=`14 m/s / 4° 阶跃：yaw 稳态 ${m.yawRateSS.toFixed(4)} rad/s · 上升 ${m.riseTimeMs.toFixed(0)} ms · 超调 ${m.overshootPct.toFixed(1)}%`;
+    },10);}]
+  ]);
+
   b=sec(host,"3D 空间硬点表","HARDPOINTS [mm]",true);
   const tb=E("table","hp");
   tb.innerHTML="<thead><tr><th>硬点 ID</th><th>X 横向</th><th>Y 纵向</th><th>Z 垂向</th></tr></thead>";
