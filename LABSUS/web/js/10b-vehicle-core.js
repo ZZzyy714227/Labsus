@@ -197,7 +197,18 @@ class UniversalAutoPilot {
        （理论最快圈），但驾驶员按 95% 跟踪——真实车手也不会每点压着极限开，
        且控制器有 140°/s 转向速率与 45 ms 油门滤波，压极限必然瞬态超调。
        该常数是**标定值**，不随圈数变化 ⇒ 保持确定性。 */
-    const capMargin = (typeof this.capMargin === 'number' && isFinite(this.capMargin)) ? this.capMargin : 0.85;
+    /* 2026-11-20（N3）：裕度改为**随剖面速度**变化，而不是全局一个数。
+       全局 0.85 ⇒ 整圈按 85% 速度跑，理论圈速就变成 156.4/0.85 ≈ 184 s（实测 190.8），
+       损失几乎全来自这个常数，而不是跟踪能力。
+       物理上需要余量的只有**高速制动区**（无 ABS 时高速抱死风险大）；
+       慢弯（v_max < 25 m/s）完全可以贴着极限跑。
+           margin(v) = 0.98 − 0.13·clamp(v/70, 0, 1)   ⇒  v=0:0.98，v=35:0.915，v≥70:0.85
+       可用 pilot.capMarginLow / capMarginHigh 覆盖两端。 */
+    const _vLoc = Math.max(1, target.targetSpeed || 20);      // 局部剖面速度
+    const _mLo = (typeof this.capMarginLow === 'number' && isFinite(this.capMarginLow)) ? this.capMarginLow : 0.87;
+    const _mHi = (typeof this.capMarginHigh === 'number' && isFinite(this.capMarginHigh)) ? this.capMarginHigh : 1.00;
+    const _f = Math.min(1, Math.max(0, _vLoc / 70));
+    const capMargin = _mHi + (_mLo - _mHi) * _f;
     const cid = (typeof target.cornerId === "number") ? target.cornerId : -1;
     const margin = _capMode ? capMargin
       : ((cid >= 0 && this.cornerMargins[cid] !== undefined) ? this.cornerMargins[cid] : 1.0);
