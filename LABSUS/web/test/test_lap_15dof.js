@@ -484,6 +484,9 @@ function runChecks(webDir, ok, fail, opts) {
 }
 
 module.exports = runChecks;
+/* 2026-11-20：暴露内部构造器，供"性能档位圈速矩阵"脚本复用**同一套**闭环裁判
+   （CircuitPath + UniversalAutoPilot + VehicleDynamics15DOF），避免另写一套跑法。*/
+module.exports._internals = { makeS, makeSweep, loadReal, runLaps };
 
 /* 单独运行（ok 回调必须尊重 cond） */
 if (require.main === module) {

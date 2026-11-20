@@ -95,6 +95,47 @@
   Python `PowertrainSpec` 以 `extra=ignore` 吸收 JS 专有字段。
   历史上"双端只通一半"的描述已作废。
 
+## 性能档位：轮胎 5 档 × 动力 5 档（2026-11-20）
+
+### 单一真源
+
+`web/js/16-powertrain.js` 末尾的 `TIRE_TIERS` / `POWER_TIERS` / `PERF` 是唯一真源；
+界面下拉（`perfTireSelect` / `perfPowerSelect`）、K1 15-DOF、K2 TPHYS、K3 引擎请求
+都从这里取值。**禁止**在别处另写一套档位数字（会出现"界面显示一档、物理跑另一档"）。
+
+### 两个维度的接线
+
+| 维度 | 写入点 | 说明 |
+|---|---|---|
+| 轮胎档 | `SIM.userTire` + `SIM.tireCalibEy` | `10b-vehicle-core.js::resolveTireParams` 的第②优先级层（实测标定 > 用户档 > 缺省）|
+| 动力档 | `POWERTRAIN.setSpec()` | K1 的扭矩曲线整体按 `tqScale` 缩放；K3 用档位表的 `T_max`/`P_kw` |
+
+### ⚠ 动力档为什么有两套口径
+
+`POWERTRAIN.defaultSpec()` 是 **LEGACY-EQUIVALENT 占位**（恒定 1200 的扭矩等效常数、
+ratios=[1]、finalDrive=1），它是**既有圈速与动力对拍锚**，不能直接当真实发动机参数。
+因此：
+
+- K1/K2 用 `tqScale`（×0.55 … ×1.80）缩放在这个占位基准上——
+  保证"档位越高车越快"，且不动锚的量纲；
+- K3（`PowertrainParams` 要真实量级）直接用档位表的 `tmax`/`kw`（40/45 … 117/150，
+  FSAE 受限进气 I4 量级）。
+
+由占位 spec 反算 kW 会得到 **2035 kW** 的荒谬值（曾实测），已禁止。
+
+### 无头环境守卫（重要）
+
+档位默认在**浏览器启动**时应用（`16-powertrain.js` 末尾，`initPerfTiers`），
+用 `document.getElementById('perfTireSelect')` 守卫：
+无头圈速裁判用桩 DOM（`getElementById` 恒 null）⇒ **自动跳过**，
+`POWERTRAIN.spec` 保持 LEGACY-EQUIVALENT ⇒ 既有圈速/动力对拍锚逐位不变。
+新增测试 `web/test/test_perf_tiers.js` 的 ④ 组专门守这一条。
+
+### 默认档
+
+`PERF_TIERS = { tire: 5, power: 5 }`（最好的轮胎 + 冗余动力），可按用户要求随时切回低档。
+低档不是残废而是标定基线：T3 仍与引擎缺省胎同为 μ1.50，便于与历史数据对照。
+
 ## 联合滑移（combined slip）三内核统一 · **2026-11-20 已翻默认**
 
 三个内核的轮胎力合成**现在是同一种写法**（相似法）：

@@ -1737,3 +1737,174 @@ try {
   POWERTRAIN.loadCustoms();
   POWERTRAIN.refreshPresetSelect();
 } catch (e) { console.warn("POWERTRAIN startup load failed:", e); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   性能档位（2026-11-20）：轮胎 5 档 × 动力 5 档，**两个维度自由组合**（5×5）
+   ──────────────────────────────────────────────────────────────────────────
+   设计原则（P：单一真源 + 真接线 + 可解释）
+   · 档位是**物理参数集**，不是贴标签：轮胎档改 `Magic Formula` 的 Fy0/By/LS/Cg/Ls
+     （⇒ 附着力、峰值侧偏角、载荷敏感性、外倾推力、松弛长度一起变），
+     动力档改扭矩曲线（⇒ 牵引力/功率包络一起变）。
+   · 只写**一个**真源：`TIRE_TIERS` / `POWER_TIERS`。前端 UI、K1 15-DOF、K2 TPHYS、
+     引擎请求都从这里取，避免"界面显示一档、物理跑另一档"的静默漂移。
+   · 默认 = **最好的轮胎 + 冗余动力**（tire 5 + power 5），符合"动力要够、胎要好"
+     的设定；随时可切回低档做对比（低档不是残废，是标定基线）。
+   · 轮胎档写入 `SIM.userTire`（`resolveTireParams` 的第②优先级层），
+     动力档通过 `POWERTRAIN.setSpec()` 写入——两者都是既有正统入口，不新增旁路。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* 轮胎 5 档：μ_nom = Fy0 / FzNom（FzNom=3500N 固定），By 控制峰值侧偏角，
+   LS 是载荷敏感性（越好的胎越"不挑载荷"），Cg 外倾推力系数，Ls 侧偏松弛长度。
+   档 3 = 引擎缺省胎（5250/3500 = μ1.50），**保持它就是历史标定锚**。 */
+const TIRE_TIERS = [
+  { id: 1, name: 'T1 经济街胎', mu: 1.10, Fy0: 3850, By: 15, Cy: 1.2, Ey: -0.5, FzNom: 3500, LS: 0.14, Cg: 4.5, Ls: 0.42 },
+  { id: 2, name: 'T2 街道性能', mu: 1.30, Fy0: 4550, By: 18, Cy: 1.2, Ey: -0.5, FzNom: 3500, LS: 0.12, Cg: 5.5, Ls: 0.38 },
+  { id: 3, name: 'T3 半热熔', mu: 1.50, Fy0: 5250, By: 20, Cy: 1.2, Ey: -0.5, FzNom: 3500, LS: 0.10, Cg: 6.0, Ls: 0.35 },
+  { id: 4, name: 'T4 全热熔', mu: 1.70, Fy0: 5950, By: 22, Cy: 1.2, Ey: -0.5, FzNom: 3500, LS: 0.09, Cg: 6.5, Ls: 0.32 },
+  { id: 5, name: 'T5 顶级光头胎', mu: 1.90, Fy0: 6650, By: 24, Cy: 1.2, Ey: -0.5, FzNom: 3500, LS: 0.08, Cg: 7.0, Ls: 0.30 }
+];
+
+/* 动力 5 档：对**基准规格**（`POWERTRAIN.defaultSpec()`，LEGACY-EQUIVALENT 锚）
+   的扭矩曲线整体缩放。tqScale 直接乘在 `ice.map` 的扭矩列上（形状不变 ⇒ 峰值转速
+   位置不变，只改量级）；kw/tmax 是给引擎侧（K3 `PowertrainParams`）的等效标量。 */
+const POWER_TIERS = [
+  /* 两套口径，各有其位：
+     · `tqScale`：乘在 K1/POWERTRAIN 的**基准扭矩曲线**上。基准 spec 是
+       LEGACY-EQUIVALENT 占位（恒定 1200 的扭矩等效常数、ratios=[1]、finalDrive=1），
+       它是既有圈速标定锚 —— 所以这里只能给"倍率"，不能给真实 N·m。
+     · `tmax`/`kw`：给**引擎侧 K3**（`PowertrainParams`，要求真实量级）的等效值，
+       按 FSAE 实际量级给（受限进气 I4：60~70 N·m / 80 kW 为基准）。
+     tqScale 与 tmax 单调同向，保证"K1 跑得快 ⇒ K3 也给得大"，不会两内核打架。 */
+  { id: 1, name: 'P1 入门 ×0.55', tqScale: 0.55, tmax: 40, kw: 45 },
+  { id: 2, name: 'P2 运动 ×0.75', tqScale: 0.75, tmax: 52, kw: 60 },
+  { id: 3, name: 'P3 赛道 ×1.00', tqScale: 1.00, tmax: 65, kw: 80 },
+  { id: 4, name: 'P4 强化 ×1.35', tqScale: 1.35, tmax: 88, kw: 110 },
+  { id: 5, name: 'P5 冗余 ×1.80', tqScale: 1.80, tmax: 117, kw: 150 }
+];
+
+/* 当前选择。默认按用户设定：**最好的轮胎 + 冗余动力**。 */
+const PERF_TIERS = { tire: 5, power: 5 };
+
+const PERF = {
+  TIRE_TIERS, POWER_TIERS, PERF_TIERS,
+
+  tireParams(id) {
+    const t = TIRE_TIERS.find(x => x.id === Number(id)) || TIRE_TIERS[2];
+    return { Fy0: t.Fy0, By: t.By, Cy: t.Cy, Ey: t.Ey, FzNom: t.FzNom, LS: t.LS, Cg: t.Cg, Ls: t.Ls, tier: t.id, tierName: t.name };
+  },
+  powerTier(id) {
+    return POWER_TIERS.find(x => x.id === Number(id)) || POWER_TIERS[2];
+  },
+  /** 生成该档位的动力规格：深拷贝基准规格后缩放扭矩曲线（不改其它字段） */
+  powerSpec(id) {
+    const tier = this.powerTier(id);
+    const sp = JSON.parse(JSON.stringify(POWERTRAIN.defaultSpec()));
+    if (sp.ice && Array.isArray(sp.ice.map)) {
+      sp.ice.map = sp.ice.map.map(([rpm, tq]) => [rpm, tq * tier.tqScale]);
+    }
+    sp.perfTier = tier.id;
+    sp.perfTierName = tier.name;
+    return sp;
+  },
+  /** 应用档位（夹具：轮胎→SIM.userTire；动力→POWERTRAIN.setSpec） */
+  apply(patch) {
+    if (patch) {
+      if (patch.tire !== undefined) PERF_TIERS.tire = Number(patch.tire);
+      if (patch.power !== undefined) PERF_TIERS.power = Number(patch.power);
+    }
+    const tp = this.tireParams(PERF_TIERS.tire);
+    if (typeof SIM !== 'undefined' && SIM) {
+      SIM.userTire = tp;                       // resolveTireParams 第②层
+      SIM.tireCalibEy = tp.Ey;                 // Ey 与引擎 payload 同口径
+    }
+    const sp = this.powerSpec(PERF_TIERS.power);
+    POWERTRAIN.setSpec(sp);
+    if (typeof S !== 'undefined' && S) {
+      S.perfTiers = { tire: PERF_TIERS.tire, power: PERF_TIERS.power };
+    }
+    /* 换档 ⇒ 车能力表必须重测（横向/制动/加速能力都随胎与动力变）。
+       指纹已含胎种与峰值扭矩，这里再加一道显式失效，杜绝任何遗漏路径让
+       "界面换了档、判定还是旧值"。 */
+    try {
+      if (typeof CAR_CAPABILITY !== 'undefined' && CAR_CAPABILITY &&
+          typeof CAR_CAPABILITY.invalidate === 'function') CAR_CAPABILITY.invalidate();
+    } catch (e) { /* 旧沙箱无能力表：忽略 */ }
+    return this.describe();
+  },
+  /** 引擎侧（K3）载荷：T_max / P_kw 按档位等效值 */
+  powerPayload() {
+    const tier = this.powerTier(PERF_TIERS.power);
+    /* ⚠ K3 的 `PowertrainParams` 要**真实量级**（T_max N·m / P_kw kW）；
+       而 K1 用的基准 spec 是 LEGACY-EQUIVALENT 占位（恒定 1200 扭矩等效），
+       由它反推 kW 会得到 2000+ kW 的荒谬值（实测 2035.8 kW）。故这里直接用档位表
+       的物理等效值，不从前端 spec 反算。 */
+    return {
+      T_max: tier.tmax,
+      P_kw: tier.kw,
+      drive_split_f: 0,
+      tire: this.tireParams(PERF_TIERS.tire)
+    };
+  },
+  describe() {
+    const t = TIRE_TIERS.find(x => x.id === Number(PERF_TIERS.tire));
+    const p = this.powerTier(PERF_TIERS.power);
+    return { tire: t, power: p, text: `${t ? t.name : '?'} × ${p ? p.name : '?'}` };
+  }
+};
+
+if (typeof window !== 'undefined') {
+  window.TIRE_TIERS = TIRE_TIERS;
+  window.POWER_TIERS = POWER_TIERS;
+  window.PERF_TIERS = PERF_TIERS;
+  window.PERF = PERF;
+}
+
+/* ⚠ 这里**不自动**应用档位：既有圈速/对拍锚要求 `POWERTRAIN.spec` 缺省保持
+   LEGACY-EQUIVALENT（`test_lap_15dof` 的动力对拍就靠它）。默认档在界面启动时
+   由 `11-stages.js` 末尾应用（浏览器路径），无头测试不受影响。 */
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   性能档位启动应用 + UI 接线（2026-11-20）
+   ──────────────────────────────────────────────────────────────────────────
+   ⚠ 两道守卫缺一不可：
+   1. **DOM 守卫**（`document.getElementById('perfTireSelect')` 存在）：浏览器里
+      才应用默认档；无头圈速裁判用桩 DOM（`getElementById` 恒 null）⇒ 自动跳过，
+      `POWERTRAIN.spec` 保持 LEGACY-EQUIVALENT，既有圈速与动力对拍锚逐位不变。
+   2. **`typeof PERF` 守卫**：脚本顺序保证 16 在末尾，但防御性保留。
+   为什么不在 11-stages：它比 16 **先**加载（PERF 尚未定义），放那儿是死代码。
+   ══════════════════════════════════════════════════════════════════════════ */
+(function initPerfTiers() {
+  try {
+    if (typeof document === 'undefined' || !document.getElementById) return;
+    var ts = document.getElementById('perfTireSelect');
+    var ps = document.getElementById('perfPowerSelect');
+    if (!ts || !ps) return;                       // 无头环境：保持历史缺省
+    if (typeof PERF === 'undefined' || !PERF) return;
+
+    PERF.apply();                                  // 默认 tire 5 + power 5
+
+    function fill(sel, list, cur) {
+      sel.innerHTML = list.map(function (x) {
+        var star = (x.id === 5) ? '★ ' : '';
+        return '<option value="' + x.id + '"' + (x.id === cur ? ' selected' : '') + '>' +
+               star + x.name + '</option>';
+      }).join('');
+    }
+    function sync() {
+      fill(ts, PERF.TIRE_TIERS, PERF.PERF_TIERS.tire);
+      fill(ps, PERF.POWER_TIERS, PERF.PERF_TIERS.power);
+      var d = PERF.describe();
+      ts.title = '轮胎档：' + (d.tire ? d.tire.name + '（μ ' + d.tire.mu + '）' : '');
+      ps.title = '动力档：' + (d.power ? d.power.name + '（' + d.power.kw + ' kW）' : '');
+    }
+    function onChange() {
+      PERF.apply({ tire: +ts.value, power: +ps.value });
+      sync();
+    }
+    ts.addEventListener('change', onChange);
+    ps.addEventListener('change', onChange);
+    sync();
+    if (typeof window !== 'undefined') window.__PERF_UI_READY = true;
+  } catch (e) { console.warn('PERF tiers init failed:', e); }
+})();

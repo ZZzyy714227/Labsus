@@ -48,6 +48,8 @@ NODE_SUITES = (
     "test_contact_chain.js",
     # 2026-11-20：K2（TPHYS）联合滑移开关——默认隔离 + 生效 + 物理有界
     "test_combined_slip.js",
+    # 2026-11-20：性能档位（轮胎 5 档 × 动力 5 档）——单一真源 / 真接线 / 无头守卫
+    "test_perf_tiers.js",
     # Phase C（2026-11-19）：垂向 ride 测试台——阶跃/扫频/脉冲/随机路面 +
     # 可重复性、单调性、解析锚（自由衰减主频 vs 串联等效刚度，实测 1.6%）。
     "test_ride_bench.js",

@@ -1,4 +1,4 @@
-﻿/* 21-car-capability.js —— 车能力表（CAR_CAPABILITY，2026-11-20）
+/* 21-car-capability.js —— 车能力表（CAR_CAPABILITY，2026-11-20）
  *
  * 存在理由（P29 的病根）
  * ─────────────────────────────────────────────────────────────────────
@@ -68,6 +68,22 @@ const CAR_CAPABILITY = (function () {
        旧式写 `S && S.m` ⇒ 指纹里恒为 "undefined"，用户只改总质量时缓存不失效，
        能力表会沿用旧测值。同理去掉不存在的 `S.tire` / `S.powertrain` 探测。 */
     const _tR = (a) => (a && a.tire && a.tire.R) || 0;
+    /* ★ 2026-11-20（性能档位）：**胎种与动力必须进指纹**。
+       旧实现只含轮胎半径（几何），换配方/换档位时缓存不失效 ⇒ 能力表沿用旧测值，
+       表现为"界面换了 T5 顶级胎，圈速与判定完全不变"（实测 T3/T4/T5 圈速差 <0.2 s）。
+       真源取 `SIM.userTire`（性能档位写入点）与 `POWERTRAIN.spec` 的峰值扭矩。 */
+    let _ut = null;
+    try {
+      if (typeof SIM !== 'undefined' && SIM && SIM.userTire) _ut = SIM.userTire;
+      else if (typeof window !== 'undefined' && window.SIM && window.SIM.userTire) _ut = window.SIM.userTire;
+    } catch (e) { _ut = null; }
+    let _peak = 0;
+    try {
+      const _sp = (typeof POWERTRAIN !== 'undefined' && POWERTRAIN && POWERTRAIN.spec) || null;
+      if (_sp && _sp.ice && Array.isArray(_sp.ice.map)) {
+        _peak = _sp.ice.map.reduce((m, r) => Math.max(m, Number(r[1]) || 0), 0);
+      }
+    } catch (e) { _peak = 0; }
     return [
       (S && S.vehicleType) || '?',
       (S && S.mTotal) || 0, (S && S.mSprung) || 0,
@@ -75,6 +91,8 @@ const CAR_CAPABILITY = (function () {
       ax(S && S.front), ax(S && S.rear),
       q.aeroF, q.speed,
       Math.max(_tR(S && S.front), _tR(S && S.rear)),
+      _ut ? [_ut.Fy0, _ut.By, _ut.LS, _ut.Cg, _ut.Ls].join(',') : 'dt',
+      _peak,
     ].join('|');
   }
 

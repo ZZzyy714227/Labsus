@@ -29,6 +29,14 @@
       <button id="ptLabBtn" class="v4-mini" onclick="if(typeof POWERTRAIN!=='undefined')POWERTRAIN.open()" title="自定义动力总成（架构/ICE/电机/变速箱）">🔧 动力</button>
     </div>
 
+
+    <!-- 性能档位（2026-11-20）：轮胎 5 档 × 动力 5 档，两个维度自由组合；默认 T5×P5 -->
+    <div class="cell slim" title="性能档位：轮胎与动力各 5 档，可任意组合。默认 = T5 顶级光头胎 + P5 冗余动力">
+      <i>性能档位</i>
+      <select id="perfTireSelect" style="background:transparent;border:none;color:var(--pri);font:600 11px var(--font)"></select>
+      <select id="perfPowerSelect" style="background:transparent;border:none;color:var(--pri);font:600 11px var(--font)"></select>
+    </div>
+
     <!-- 前轴 / 后轴 -->
     <div class="v4-seg v4-axis" title="切换调校轴（写入 S.axis）">
       <button id="v4AxisF" class="on">前轴 F</button>
