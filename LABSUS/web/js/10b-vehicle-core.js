@@ -1039,6 +1039,8 @@ class VehicleDynamics15DOF {
       const dt = Math.min(MAX_SUB_DT, t_remain);
       if (this._simStat) this._simStat.subSteps++;
       const st = this.state;
+      /* 子步快照：供子步末的发散兜底回退用（浅拷贝即可，state 全是标量）。 */
+      this._stateSnap = Object.assign({}, st);
       /* S3：累积行驶距离放在**本子步路面计算之前**，使 `telemetry.z_road` 与
          `_roadS` 严格对应（否则会有一子步偏移，审计对不上）。带符号：倒车时回退。 */
       if (_isoOn) this._roadS += st.u * dt;
@@ -1129,6 +1131,22 @@ class VehicleDynamics15DOF {
             tr_w = -maxDroop;
             dtr_w = this.vzw[w.id] - dz_corner;
           }
+          /* ★ 2026-11-20 修「飞坡落地被弹飞、随后 NaN 卡死」的根因之一：
+             **压缩侧同样必须有硬限位**。此前只限 droop，压缩侧不限 ⇒ 车身在
+             空中低头（起跳后前轴先离地、俯仰角速度 ~0.7 rad/s）时，前角点比
+             轮心下坠更快，tr 会无界增长（实测 364 mm，物理上不可能）。
+             tr 一旦长到几百 mm，缓冲块的二次项就把力打到 4e6 N 量级，
+             一步内把车身打飞、把 12 kg 簧下打到 −115 m/s ⇒ 不可恢复。
+             物理依据：knuckle 撞上车架后行程就到底了，几何上不可能再压。
+             允许压缩到 maxBumpStop + 30 mm 是缓冲块自身的可压行程
+             （实车缓冲块 20~40 mm），越过即按硬限位处理。 */
+          const _trCompMax = maxBumpStop + 0.030;
+          if (tr_w > _trCompMax) {
+            this.zw[w.id] = z_corner + _trCompMax;
+            if (this.vzw[w.id] > dz_corner) this.vzw[w.id] = dz_corner;
+            tr_w = _trCompMax;
+            dtr_w = this.vzw[w.id] - dz_corner;
+          }
         } else if (isAirborne) {
           tr_w = -maxDroop;
           dtr_w = 0;
@@ -1158,6 +1176,16 @@ class VehicleDynamics15DOF {
           const kBS_eff = (typeof _kBSnm === 'number' && isFinite(_kBSnm) && _kBSnm > 0)
             ? _kBSnm : Kw_cur;
           F_bumpstop = kBS_eff * (excess * 8.0 + excess * excess * 200.0);
+          /* ★ 2026-11-20：缓冲块力**必须有物理上限**。
+             二次项 `excess²·200` 是为"渐进硬化"设计的，但它没有上限——
+             一旦 excess 异常（例如上面的压缩行程 bug，或未来任何数值意外），
+             力会指数级放大并瞬间摧毁整个状态。
+             实车缓冲块是弹性体，压到底后由**车架硬点**接力，力不会无限增长；
+             取 8× 该角静载作为上限（FSAE 实车触底冲击的合理量级）。
+             正常底盘点冲击（excess≈5~15mm）时本上限不触发 ⇒ 既有标定不变。 */
+          const _FzCorner0 = (w.axle === 'front') ? this.Fz0_F : this.Fz0_R;
+          const _FbsCap = 8.0 * Math.max(1.0, _FzCorner0);
+          if (F_bumpstop > _FbsCap) F_bumpstop = _FbsCap;
           if (typeof SLOPE_STAGE !== 'undefined' && SLOPE_STAGE.active && SLOPE_STAGE.stats) {
             SLOPE_STAGE.stats.bottomOutCount[w.id] = (SLOPE_STAGE.stats.bottomOutCount[w.id] || 0) + 1;
           }
@@ -1239,7 +1267,18 @@ class VehicleDynamics15DOF {
              静平衡时 F_tire = F_susp + mU·g ⇒ 四角接触力之和 = mTotal·g（守恒不变）。 */
           const a = (FzContact[w.id] - F_susp[w.id] - mU * 9.81) / mU;
           this.vzw[w.id] += a * dt;
+          /* ★ 2026-11-20：轮心垂向速度**物理上限**。
+             落地瞬间轮胎按穿透量给出 kN 级力，作用在 12 kg 簧下上 ⇒ 一步内就能把
+             轮心打到 ±100 m/s（不物理）。而该速度经 dtr 进入阻尼器，会把同等量级
+             的冲击力回灌到车身，造成"落地弹飞 + 翻滚"。
+             实车就算 1 m 跌落也只有 4.4 m/s；取 8 m/s 是宽裕上限，
+             正常工况（含过坎、四立柱）永不触发 ⇒ 既有标定不变。 */
+          const _vzwCap = 8.0;
+          if (!isFinite(this.vzw[w.id])) this.vzw[w.id] = 0.0;
+          else if (this.vzw[w.id] > _vzwCap) this.vzw[w.id] = _vzwCap;
+          else if (this.vzw[w.id] < -_vzwCap) this.vzw[w.id] = -_vzwCap;
           this.zw[w.id] += this.vzw[w.id] * dt;
+          if (!isFinite(this.zw[w.id])) this.zw[w.id] = 0.0;
         }
         this._zwInit = true;
       }
@@ -1641,6 +1680,35 @@ class VehicleDynamics15DOF {
           this.alphaLat[w.id] += (this._alphaSt[w.id] - this.alphaLat[w.id]) * fRelax;
           this.kappaLat[w.id] += (this._kappaSt[w.id] - this.kappaLat[w.id]) * fRelax;
         }
+      }
+
+      /* ★ 2026-11-20 · **发散兜底**（"卡死"的最后一道防线）。
+         飞坡落地这类极端工况曾把状态打成 NaN，而 NaN 会顺着后续每一帧传播，
+         界面表现就是"仿真卡死"——用户只能刷新重开。
+         这里在子步末做一次体检：一旦发现非有限值或明显越界的速度，回退到本子步
+         开始前的快照、清零速度，并累加 `telemetry.diverged` 计数。
+         效果：即使未来出现新的数值病态，仿真也能继续跑并把异常暴露在遥测里，
+         而不是整页冻住。正常工况永不触发 ⇒ 既有结果逐位不变。 */
+      {
+        const _s = this.state;
+        const _bad = !isFinite(_s.Z) || !isFinite(_s.w) || !isFinite(_s.theta) || !isFinite(_s.q)
+          || !isFinite(_s.phi) || !isFinite(_s.p) || !isFinite(_s.X) || !isFinite(_s.Y)
+          || !isFinite(_s.psi) || !isFinite(_s.u) || !isFinite(_s.v) || !isFinite(_s.r)
+          || Math.abs(_s.w) > 60 || Math.abs(_s.q) > 25;
+        if (_bad) {
+          if (this._stateSnap) {
+            for (const k of Object.keys(this._stateSnap)) _s[k] = this._stateSnap[k];
+          }
+          _s.w = 0; _s.q = 0; _s.p = 0; _s.r = 0; _s.v = 0;
+          if (!isFinite(_s.u)) _s.u = 0;
+          for (const id of ['FL', 'FR', 'RL', 'RR']) {
+            if (this.zw && !isFinite(this.zw[id])) this.zw[id] = 0;
+            if (this.vzw) this.vzw[id] = 0;
+          }
+          this.diverged = (this.diverged || 0) + 1;
+          this.telemetry.diverged = this.diverged;
+        }
+        this._stateSnap = null;      // 本子步快照用完即弃
       }
 
       t_remain -= dt;

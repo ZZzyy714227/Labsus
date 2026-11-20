@@ -39,6 +39,9 @@ NODE_SUITES = (
     "test_p2b_damper.js", "test_circuit_ui.js", "test_racingline.js",
     "test_tire_wiring.js", "test_kc_wiring.js", "test_mpc.js", "test_powertrain.js",
     "test_tire_lab.js", "test_engine_sound.js",
+    # 2026-11-20：飞坡落地数值稳定性——压缩行程硬限位 / 缓冲块力上限 / 发散兜底。
+    # 修的 bug：直线上飞坡落地后被弹飞并卡死（NaN 沿帧传播）。
+    "test_ramp_landing.js",
     # Phase C（2026-11-19）：垂向 ride 测试台——阶跃/扫频/脉冲/随机路面 +
     # 可重复性、单调性、解析锚（自由衰减主频 vs 串联等效刚度，实测 1.6%）。
     "test_ride_bench.js",
