@@ -433,3 +433,74 @@ def test_kc_spline_flag_on_without_tables_is_identical_to_off():
     on = client.post("/api/v3/chassis/simulate_track",
                      json=dict(base, kc_lut_spline=True)).json()
     assert off["trace"] == on["trace"], "无表时开关不得改变任何输出"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ★ 2026-11-20 · 联合滑移（相似法）验收
+# ══════════════════════════════════════════════════════════════════════════
+
+def test_combined_force_never_exceeds_friction_circle():
+    """验收 ①：任意 (α, Fx 需求) 下合力不超 μFz（附着椭圆边界）。"""
+    from src.tire_mf import combined_force
+
+    p = {"By": 9.0, "Cy": 1.2, "Ey": 0.0}
+    mu_fz = 1350.0
+    worst = 0.0
+    for a_deg in (-20, -12, -6, -2, 0, 2, 6, 12, 20):
+        for fx in (-1.2 * mu_fz, -0.9 * mu_fz, -0.4 * mu_fz, 0.0,
+                   0.4 * mu_fz, 0.9 * mu_fz, 1.2 * mu_fz):
+            fx_o, fy_o = combined_force(alpha_rad=math.radians(a_deg), fx_demand=fx,
+                                        mu_fz=mu_fz, p=p, kappa_peak=0.12)
+            worst = max(worst, math.hypot(fx_o, fy_o))
+    assert worst <= mu_fz * 1.000001, f"合力 {worst:.1f} N 超出 μFz={mu_fz}（附着椭圆被击穿）"
+
+
+def test_combined_force_lateral_decays_monotonically_with_braking():
+    """验收 ②：固定侧偏角，制动需求增大 ⇒ |Fy| 单调衰减（不出现摩擦圆硬拐点）。"""
+    from src.tire_mf import combined_force
+
+    p = {"By": 9.0, "Cy": 1.2, "Ey": 0.0}
+    mu_fz = 1350.0
+    fys = []
+    for frac in (0.0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9):
+        _, fy_o = combined_force(alpha_rad=math.radians(5.0), fx_demand=frac * mu_fz,
+                                 mu_fz=mu_fz, p=p, kappa_peak=0.12)
+        fys.append(abs(fy_o))
+    for i in range(1, len(fys)):
+        assert fys[i] < fys[i - 1] + 1e-9, f"|Fy| 未单调衰减：{fys}"
+    assert fys[-1] < 0.85 * fys[0], "大制动需求下侧向力衰减应显著（>15%）"
+
+
+def test_combined_force_small_alpha_matches_lateral_curve():
+    """无纵向需求、小侧偏角时，应与纯侧向魔术公式一致（相似法的退化自检）。"""
+    from src.tire_mf import MagicFormulaSub, combined_force, load_tir_params
+
+    tire = MagicFormulaSub(load_tir_params({"Fy0": 5250.0, "FzNom": 3500.0,
+                                            "By": 9.0, "Cy": 1.2, "Ey": 0.0}))
+    fz = 1200.0
+    _, fy_c = combined_force(alpha_rad=math.radians(1.5), fx_demand=0.0,
+                             mu_fz=5250.0 * 1200.0 / 3500.0, p=tire.p, kappa_peak=0.12)
+    fy_ref = -float(tire.fy(1.5, fz))
+    rel = abs(abs(fy_c) - abs(fy_ref)) / max(abs(fy_ref), 1.0)
+    assert rel < 0.05, f"退化自检失败：combined={fy_c:.1f} vs 纯侧向={fy_ref:.1f}（相对差 {rel:.1%}）"
+
+
+def test_tire_combined_flag_off_is_bit_identical():
+    """验收 ③：开关默认关 ⇒ 显式关同样结果（证明开关隔离，不影响既有曲线）。"""
+    a = client.post("/api/v3/chassis/simulate_track", json=_wd_body()).json()
+    b = client.post("/api/v3/chassis/simulate_track",
+                    json=_wd_body(tire_combined=False)).json()
+    assert a["status"] == "VALID" and b["status"] == "VALID"
+    assert a["summary"] == b["summary"], "开关关闭时必须逐位不变"
+    assert a["trace"][-1] == b["trace"][-1], "轨迹最后一行也必须逐位一致"
+
+
+def test_tire_combined_flag_on_runs_and_stays_bounded():
+    """开关开启：能跑通、结果有限，且每轮横向利用率不超 1（物理护栏）。"""
+    b = client.post("/api/v3/chassis/simulate_track", json=_wd_body(tire_combined=True)).json()
+    assert b["status"] == "VALID"
+    for row in b["trace"]:
+        for w in ("FL", "FR", "RL", "RR"):
+            mu = row.get(f"mu_use_{w}")
+            if mu is not None:
+                assert 0.0 <= mu <= 1.000001, f"mu_use_{w}={mu} 越界"

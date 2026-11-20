@@ -174,3 +174,47 @@ class MagicFormulaSub:
         标注 APPROXIMATE；调用方应显式传入真实值以撤除占位。
         """
         return self.fy(alpha_deg, fz) * (trail_mm / 1000.0)
+
+def combined_force(
+    *,
+    alpha_rad: float,
+    fx_demand: float,
+    mu_fz: float,
+    p: dict[str, float],
+    s_peak: float = 1.0,
+    kappa_peak: float | None = None,
+) -> tuple[float, float]:
+    """相似法联合滑移（combined slip）—— 与前端 K1 `magicFormula` 同式。
+
+        归一化滑移：s_x = s_peak·(κ/κ_peak) ，s_y = By·tanα ，s = √(s_x²+s_y²)
+        曲线：      F(s) = μFz·sin(Cy·atan(s − Ey·(s − atan s)))
+        分解：      Fx = F·s_x/s ，Fy = −F·s_y/s
+
+    语义：纵向需求先反解成滑移率（与 `quasi_steady_slip` 同口径），再与侧偏角
+    合成一个**总滑移**，由该总滑移查魔术公式，最后按方向分解。
+
+    为什么优于"各自算 Fy 再用摩擦圆钳位"：
+      · 钳位在 |Fx| 接近 μFz 时给出**硬拐点**（Fy 突然被截断），而真实轮胎是
+        连续衰减 —— 相似法天然连续；
+      · 钳位下合力恒在椭圆上（|F|≡μFz 一旦饱和），相似法给出的是一条
+        从原点单调增长到峰值再回落的曲线，饱和后合力略降，符合实测。
+      两者都满足 |F| ≤ μFz（`sin` 有界），这是本函数的硬约束。
+
+    Returns: (Fx, Fy)；符号约定与 `transient.py` 一致（Fy 反抗侧滑）。
+    """
+    if mu_fz <= 1.0:
+        return 0.0, 0.0
+    by = float(p.get("By", 9.0))
+    cy = float(p.get("Cy", 1.2))
+    ey = float(p.get("Ey", 0.0))
+    kp = float(kappa_peak) if kappa_peak and kappa_peak > 0 else 0.12
+    # 纵向需求 → 滑移率（quasi_steady_slip 同式：Cκ = μFz/κ_peak）
+    kappa = max(-kp, min(kp, fx_demand * kp / mu_fz))
+    sx = s_peak * (kappa / kp)
+    sy = by * math.tan(alpha_rad)
+    s = math.hypot(sx, sy)
+    if s < 1e-12:
+        return 0.0, 0.0
+    x = s - ey * (s - math.atan(s))
+    f = mu_fz * math.sin(cy * math.atan(x))
+    return f * sx / s, -f * sy / s

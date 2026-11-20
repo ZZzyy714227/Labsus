@@ -40,6 +40,7 @@ _WHEELS = ("FR", "FL", "RR", "RL")
 
 from src.components.differential import distribute_axle, split_from_spec
 from src.solver.wheel_dof import quasi_steady_omega, quasi_steady_slip
+from src.tire_mf import combined_force
 
 
 class TireState:
@@ -139,6 +140,11 @@ class VehiclePlanar:
         # 打开后：纵向力受 μFz 限制（而非历史的 0.75μFz 余量）、并输出准稳态滑移率与轮速，
         # 供差速器的 Δω 使用。开关由请求字段 TrackSimRequest.wheel_dof 控制（默认关）。
         self.wheel_dof = False
+        # ★ 2026-11-20 · 联合滑移（相似法）开关。**默认关** ⇒ 走历史"各算各的 + 摩擦圆
+        # 钳位"，数值逐位不变。开启后用 `tire_mf.combined_force` 把纵向需求反解成滑移率、
+        # 与侧偏角合成总滑移后查魔术公式 ⇒ 制动/驱动时侧向力**连续**衰减（而非被硬拐点截断）。
+        # 由请求字段 TrackSimRequest.tire_combined 控制。
+        self.tire_combined = False
         self.kappa_peak = float(getattr(tire, "kappa_peak", 0.12))
         # T2：K&C 查表插值开关（默认关 ⇒ 历史 np.interp 路径逐位不变）
         self.kc_lut_spline = False
@@ -368,9 +374,20 @@ class VehiclePlanar:
                 kappa_q = quasi_steady_slip(fx_w, mu_fz, self.kappa_peak)
                 omega_q = quasi_steady_omega(vx, kappa_q, r_use_mm / 1000.0)
             # ★ 摩擦圆 + 利用率输出
-            lat_avail = math.sqrt(max(0.0, mu_fz * mu_fz - fx_w * fx_w))
-            fy_w = max(-lat_avail, min(lat_avail, fy_w))
-            mu_use = min(1.0, math.hypot(fx_w, fy_w) / max(mu_fz, 1.0))
+            if self.tire_combined:
+                # 联合滑移（相似法，2026-11-20）：纵向需求与侧偏角合成总滑移后查 MF
+                _fx_c, _fy_c = combined_force(
+                    alpha_rad=a_lat, fx_demand=fx_w, mu_fz=mu_fz,
+                    p=self.tires[w].p, s_peak=1.0, kappa_peak=self.kappa_peak)
+                fx_w = _fx_c
+                fy_w = _fy_c - self.Cg * cam_deg * fz      # 外倾推力（线性）叠加一次
+                _cap = math.sqrt(max(0.0, mu_fz * mu_fz - fx_w * fx_w))
+                fy_w = max(-_cap, min(_cap, fy_w))         # 外倾项可能越界 ⇒ 圆钳位兜底
+                mu_use = min(1.0, math.hypot(fx_w, fy_w) / max(mu_fz, 1.0))
+            else:
+                lat_avail = math.sqrt(max(0.0, mu_fz * mu_fz - fx_w * fx_w))
+                fy_w = max(-lat_avail, min(lat_avail, fy_w))
+                mu_use = min(1.0, math.hypot(fx_w, fy_w) / max(mu_fz, 1.0))
             slip_k = (vx - vwx) / max(vx, 0.5)
         return {"fx": fx_w * cd - fy_w * sd, "fy": fx_w * sd + fy_w * cd,
                 "alpha": math.degrees(alpha_st), "alpha_lat": math.degrees(ts.alpha_lat),
@@ -575,6 +592,7 @@ def run_track_sim(req: TrackSimRequest) -> dict:
     car = VehiclePlanar(v, req.tire, req.kc_luts, iz, pt, aero)
     # M19：轮自由度开关（默认关 ⇒ 历史数值逐位不变）
     car.wheel_dof = bool(getattr(req, "wheel_dof", False))
+    car.tire_combined = bool(getattr(req, "tire_combined", False))
     if bool(getattr(req, "kc_lut_spline", False)):
         car.enable_kc_spline()
     drv = DriverPI(gain=req.lookahead_gain)

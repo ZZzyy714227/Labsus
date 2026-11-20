@@ -674,6 +674,10 @@ class TrackSimRequest(BaseModel):
     # 并输出准稳态滑移率 kappa_qs 与轮速 omega_qs（供差速器 Δω 使用）。
     # 关闭时状态仍为平面 6 状态、数值逐位不变。
     wheel_dof: bool = False
+    # ★ 2026-11-20 · 联合滑移（相似法）。**默认关** ⇒ 历史「各算各的 + 摩擦圆钳位」，
+    # 数值逐位不变。开启后制动/驱动时侧向力连续衰减（消除摩擦圆的硬拐点），
+    # 与前端 K1 `magicFormula` 同式（见 tire_mf.combined_force）。
+    tire_combined: bool = False
     # T2（2026-10-20）：K&C 查表插值方式。False（默认）走历史 `np.interp` 分段线性，
     # 数值逐位不变；True 走 C1 单调样条（保形、导数连续），并把越界夹紧**显式计数**后
     # 从 summary 暴露（旧实现是静默夹紧，无从发现表覆盖不足）。
