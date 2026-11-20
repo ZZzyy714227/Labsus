@@ -197,7 +197,7 @@ class UniversalAutoPilot {
        （理论最快圈），但驾驶员按 95% 跟踪——真实车手也不会每点压着极限开，
        且控制器有 140°/s 转向速率与 45 ms 油门滤波，压极限必然瞬态超调。
        该常数是**标定值**，不随圈数变化 ⇒ 保持确定性。 */
-    const capMargin = (typeof this.capMargin === 'number' && isFinite(this.capMargin)) ? this.capMargin : 0.95;
+    const capMargin = (typeof this.capMargin === 'number' && isFinite(this.capMargin)) ? this.capMargin : 0.90;
     const cid = (typeof target.cornerId === "number") ? target.cornerId : -1;
     const margin = _capMode ? capMargin
       : ((cid >= 0 && this.cornerMargins[cid] !== undefined) ? this.cornerMargins[cid] : 1.0);
@@ -275,6 +275,34 @@ class UniversalAutoPilot {
       target_throttle *= (1.0 - over);
     }
     
+    /* ABS（车能力表模式专用，2026-11-20）。
+       动机：能力剖面按 100% 极限给刹车点，而本车**没有 ABS** —— 全力制动即抱死，
+       抱死就没有转向，于是"刹车 + 入弯"必然失稳（实测 β=−18°、峰值侧偏 83.8°）。
+       实现：用 `state.omega` 与车速算四轮纵向滑移率
+           κ = (ω·R − u) / max(2, |u|)        （制动时 κ < 0）
+       超过 10% 就开始减制动，35% 时减掉 92%（近似 ABS 的循环保压）。
+       半径取 `S.front/rear.tire.R`；缺省 0.23 m。 */
+    if (_capMode && state.omega && target_brake > 0.02) {
+      const _pickR = (ax) => {
+        const t = this.Scfg && this.Scfg[ax] && this.Scfg[ax].tire;
+        return (t && typeof t.R === 'number' && t.R > 0) ? t.R / 1000 : 0.23;
+      };
+      const _Rf = _pickR('front'), _Rr = _pickR('rear');
+      const _au = Math.max(2.0, Math.abs(u));
+      let _maxSlip = 0;
+      const _wheels = [['FL', _Rf], ['FR', _Rf], ['RL', _Rr], ['RR', _Rr]];
+      for (const _w of _wheels) {
+        const om = state.omega[_w[0]];
+        if (typeof om !== 'number' || !isFinite(om) || om < 0) continue;
+        const kappa = (om * _w[1] - u) / _au;
+        if (kappa < 0 && -kappa > _maxSlip) _maxSlip = -kappa;
+      }
+      if (_maxSlip > 0.10) {
+        const _cut = Math.min(0.92, (_maxSlip - 0.10) / 0.35);
+        target_brake *= (1.0 - _cut);
+      }
+    }
+
     // 1st-Order Low-Pass Smoothing Filter to eliminate 60Hz square-wave chatter
     const filter_alpha = Math.min(1.0, dt / 0.045);
     let ctrl_throttle = this.last_throttle + (target_throttle - this.last_throttle) * filter_alpha;

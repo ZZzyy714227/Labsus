@@ -137,7 +137,12 @@ const CAR_CAPABILITY = (function () {
     return best;
   }
 
-  /** 直线加速：全油门，测低速（附着段）与高速（功率段）两点 */
+  /** 直线加速：多点实测（2026-11-20 改）
+   *
+   * 早期版本只测 8 / 42 m/s 两点，然后用 `accHi·vHi/v` 外推功率段——
+   * 实测偏差很大（剖面假设 4.33 m/s²，实跑 ~2.7），导致包络在直道上过分乐观。
+   * 现改为在 10 / 25 / 40 / 60 m/s 四点实测，`accel(v)` 用**分段线性插值**，
+   * 超出范围按端点外推（低速用首段斜率、高速用末段斜率，且不为负）。 */
   function measureAccel(Ctor, S, dt) {
     const at = (u0, secs) => {
       const car = new Ctor(S, SIMref(), u0);
@@ -150,9 +155,44 @@ const CAR_CAPABILITY = (function () {
       }
       return ok ? (car.state.u - uA) / secs : NaN;
     };
-    const lo = at(8, 1.5);
-    const hi = at(42, 2.0);
-    return { acc0: isFinite(lo) && lo > 0 ? lo : 0, accHi: isFinite(hi) && hi > 0 ? hi : 0, vHi: 42 };
+    const pts = [];
+    for (const u0 of [10, 25, 40, 60]) {
+      const a = at(u0, 1.8);
+      if (isFinite(a) && a > 0.05) pts.push({ v: u0, a: a });
+    }
+    if (!pts.length) return { pts: [{ v: 10, a: 1.0 }], acc0: 1.0, accHi: 0, vHi: 42 };
+    pts.sort((p, q) => p.v - q.v);
+    return {
+      pts: pts,
+      acc0: pts[0].a,
+      accHi: pts[pts.length - 1].a,
+      vHi: pts[pts.length - 1].v
+    };
+  }
+
+  /** 分段线性插值加速能力（v → m/s²），端点按相邻段斜率外推且下限 0.3 */
+  function accelAt(pts, v) {
+    if (!pts || !pts.length) return 1.0;
+    const n = pts.length;
+    if (n === 1) return pts[0].a;
+    let a;
+    if (v <= pts[0].v) {
+      const k = (pts[1].a - pts[0].a) / (pts[1].v - pts[0].v);
+      a = pts[0].a + k * (v - pts[0].v);
+    } else if (v >= pts[n - 1].v) {
+      const k = (pts[n - 1].a - pts[n - 2].a) / (pts[n - 1].v - pts[n - 2].v);
+      a = pts[n - 1].a + k * (v - pts[n - 1].v);
+    } else {
+      a = pts[n - 1].a;
+      for (let i = 1; i < n; i++) {
+        if (v <= pts[i].v) {
+          const t = (v - pts[i - 1].v) / Math.max(1e-9, pts[i].v - pts[i - 1].v);
+          a = pts[i - 1].a + t * (pts[i].a - pts[i - 1].a);
+          break;
+        }
+      }
+    }
+    return Math.max(0.3, a);
   }
 
   /** 气动下压力（N）——与 10b step() 同式：aeroF·(v/vRef)² */
@@ -180,13 +220,19 @@ const CAR_CAPABILITY = (function () {
     const lat = measureLateral(Ctor, S, dt);
     const brk = measureBrake(Ctor, S, dt);
     const acc = measureAccel(Ctor, S, dt);
-    const m = (typeof S.m === 'number' && S.m > 0) ? S.m : 235;
+    /* 质量口径与内核一致（`10b`: this.m = max(150, S_config.mTotal || 1000)）。
+       ⚠ 2026-11-20 修正：早期取 `S.m`（预设里根本没有这个字段）⇒ 恒回落 235 kg，
+       于是气动增益 `1 + F_down/W` 对 gt3 被放大 5 倍（W 本该 12.3 kN 却按 2.3 kN 算），
+       实测 gt3 加速极限在 50 m/s 处谎报 4.39 m/s²（真值 ~2.2）。 */
+    const m = Math.max(150,
+      (typeof S.mTotal === 'number' && S.mTotal > 0) ? S.mTotal
+        : ((typeof S.m === 'number' && S.m > 0) ? S.m : 1000));
     const W = m * G;
 
     _cache = {
       source: 'car',
       ay0: lat.ay0, ayAt: lat.at,
-      brk0: brk, acc0: acc.acc0, accHi: acc.accHi, vHi: acc.vHi,
+      brk0: brk, acc0: acc.acc0, accHi: acc.accHi, vHi: acc.vHi, accPts: acc.pts,
       m: m, W: W,
       measuredAt: { dt: dt }
     };
@@ -211,13 +257,8 @@ const CAR_CAPABILITY = (function () {
       lateral: (v) => cap.ay0 * G * gain(v),
       /** 制动减速度上限（m/s²） */
       brake: (v) => cap.brk0 * gain(v),
-      /** 加速上限（m/s²）：低速附着受限、高速功率受限 */
-      accel: (v) => {
-        const vv = Math.max(1, v || 1);
-        const traction = cap.acc0 * gain(vv);
-        const power = (cap.accHi > 0) ? cap.accHi * (cap.vHi / vv) : Infinity;
-        return Math.min(traction, power);
-      }
+      /** 加速上限（m/s²）：四点实测分段线性插值（附气动增益） */
+      accel: (v) => accelAt(cap.accPts, Math.max(1, v || 1)) * gain(v)
     };
   }
 

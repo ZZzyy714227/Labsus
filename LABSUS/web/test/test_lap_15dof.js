@@ -178,6 +178,9 @@ function runLaps(ctx, wp, sim, nLaps, opts) {
      （`CAR_CAPABILITY` 与 10-eval 读 window.S）。 */
   ctx.S = S;
   ctx.window.S = S;
+  /* 2026-11-20：车能力表模式开关。`LAP_CAR_ENVELOPE=1` 时启用能力剖面
+     （不启用则走旧常数，逐位不变）。 */
+  if (process.env.LAP_CAR_ENVELOPE === '1') S.carEnvelope = true;
   const P = new ctx.window.CircuitPath(wp, 1.35, 1.0);
   const pts = P.pts, N = pts.length;
   const eng = new ctx.window.VehicleDynamics15DOF(S, sim, 5.0);
