@@ -40,7 +40,7 @@ _WHEELS = ("FR", "FL", "RR", "RL")
 
 from src.components.differential import distribute_axle, split_from_spec
 from src.solver.wheel_dof import quasi_steady_omega, quasi_steady_slip
-from src.tire_mf import combined_force
+from src.tire_mf import solve_s_peak
 
 
 class TireState:
@@ -375,12 +375,44 @@ class VehiclePlanar:
                 omega_q = quasi_steady_omega(vx, kappa_q, r_use_mm / 1000.0)
             # ★ 摩擦圆 + 利用率输出
             if self.tire_combined:
-                # 联合滑移（相似法，2026-11-20）：纵向需求与侧偏角合成总滑移后查 MF
-                _fx_c, _fy_c = combined_force(
-                    alpha_rad=a_lat, fx_demand=fx_w, mu_fz=mu_fz,
-                    p=self.tires[w].p, kappa_peak=self.kappa_peak)
-                fx_w = _fx_c
-                fy_w = _fy_c - self.Cg * cam_deg * fz      # 外倾推力（线性）叠加一次
+                # 联合滑移（相似法，2026-11-20）。
+                # ★ 制动力/驱动力**按附着利用率下达**，而不是按力下达：
+                #   踏板需求归一化成 u = |Fx_demand|/μFz ∈ [0,1]（= 目标总滑移占比），
+                #   目标总滑移 s_t = s_peak·u；侧向滑移 sy 由运动学固定，先占额度，
+                #   剩余才给纵向：sx = √(max(0, s_t² − sy²))。
+                # ⚠ 为什么必须这样：若把需求直接当力（旧写法），满制动 ⇒ κ=κ_peak，
+                #   一旦有侧偏，总滑移就**越过峰值**，侧向力被压掉且纵向也变小 ⇒
+                #   实测"直道 30 m/s 重刹入弯" max_slip 从 10.5° 涨到 82°（打转）。
+                #   改为利用率口径后：踏板 100% 恰落在峰上，转弯时自动让出纵向额度，
+                #   总力恒 ≤ μFz，不会再越过峰值。
+                P = self.tires[w].p
+                _by, _cy, _ey = (float(P.get("By", 9.0)), float(P.get("Cy", 1.2)),
+                                 float(P.get("Ey", 0.0)))
+                _kp = float(self.kappa_peak) if self.kappa_peak > 0 else 0.12
+                _sp = solve_s_peak(_cy, _ey)
+                _sy = _by * math.tan(a_lat)
+                _u = min(1.0, abs(fx_w) / max(mu_fz, 1.0))
+                _st = _sp * _u
+                _sx2 = _st * _st - _sy * _sy
+                _sx = math.sqrt(_sx2) if _sx2 > 0.0 else 0.0
+                if fx_w < 0.0:
+                    _sx = -_sx
+                _s = math.hypot(_sx, _sy)
+                if _s > 1e-12:
+                    _arg = _s - _ey * (_s - math.atan(_s))
+                    _F = mu_fz * math.sin(_cy * math.atan(_arg))
+                    fx_w = _F * _sx / _s
+                    fy_w = -_F * _sy / _s - self.Cg * cam_deg * fz
+                else:
+                    fy_w = -self.Cg * cam_deg * fz
+                if abs(_sx) > 1e-12:
+                    # 由实际滑移反推轮速（供 kappa_qs 输出使用，保持自洽）
+                    _kap = _kp * _sx / _sp
+                    if self.wheel_dof:
+                        r_use_mm2 = (self.v.front.tire_radius if w in ("FR", "FL")
+                                     else self.v.rear.tire_radius) or 325.0
+                        kappa_q = _kap
+                        omega_q = quasi_steady_omega(vx, _kap, r_use_mm2 / 1000.0)
                 _cap = math.sqrt(max(0.0, mu_fz * mu_fz - fx_w * fx_w))
                 fy_w = max(-_cap, min(_cap, fy_w))         # 外倾项可能越界 ⇒ 圆钳位兜底
                 mu_use = min(1.0, math.hypot(fx_w, fy_w) / max(mu_fz, 1.0))

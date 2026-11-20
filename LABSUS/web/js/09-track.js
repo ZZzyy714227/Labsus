@@ -194,13 +194,19 @@ const TPHYS = (function(){
       const share=w==="FR"||w==="FL"?spf/2:(1-spf)/2;
       fx=-Math.sign(vwx)*Math.min(muFz,brk*share*14000);
     }
-    /* ★ 联合滑移（相似法）：纵向需求与侧偏角合成总滑移后查 MF，方向分解。
-       与引擎 `tire_mf.combined_force` 同式（同一 s_peak 解析解、同一 μFz 尺度）。
-       开关关闭时走历史"各自算 + 摩擦圆钳位"，逐位不变。 */
+    /* ★ 联合滑移（相似法）：纵向需求归一化成附着利用率 u=|Fx|/μFz（= 目标总滑移占比），
+       侧向滑移先占额度，剩余给纵向：sx=√(max(0, s_t²−sy²))。
+       与引擎 `transient.py` 的联合滑移分支**同一口径**（同一 s_peak 解析解）。
+       ⚠ 不能把需求直接当力：满制动 ⇒ κ=κ_peak，一有侧偏就总滑移越过峰值 ⇒
+         侧向被压掉、纵向也变小（实测"重刹入弯"打转）。开关关闭时原钳位逐位不变。 */
     if(this.tireCombined){
       const P=this.fy.p, kp=this.kappaPeak, sp=this.fy.sPeak;
-      const kappa=Math.max(-kp,Math.min(kp,fx*kp/Math.max(muFz,1)));
-      const sx=sp*(kappa/kp), sy=P.B*Math.tan(aLat);
+      const sy=P.B*Math.tan(aLat);
+      const u=Math.min(1,Math.abs(fx)/Math.max(muFz,1));
+      const st=sp*u;
+      const sx2=st*st-sy*sy;
+      let sx=sx2>0?Math.sqrt(sx2):0;
+      if(fx<0)sx=-sx;
       const sTot=Math.hypot(sx,sy);
       if(sTot>1e-12){
         const arg=sTot-P.E*(sTot-Math.atan(sTot));
