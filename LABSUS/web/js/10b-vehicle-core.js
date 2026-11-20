@@ -646,6 +646,9 @@ class VehicleDynamics15DOF {
     this.zw = { FL: 0, FR: 0, RL: 0, RR: 0 };
     this.vzw = { FL: 0, FR: 0, RL: 0, RR: 0 };
     this._zRoadPrev = { FL: 0, FR: 0, RL: 0, RR: 0 };
+    /* ★ 2026-11-20 · 四轮接触状态（事件驱动）。落地事件（离地→接地）用它判定，
+       避免"每一步都当新落地"从而反复施加冲量。初始接地（开局按静平衡预压缩）。 */
+    this.contact = { FL: true, FR: true, RL: true, RR: true };
     this.mU_f = (S_config && S_config.front && typeof S_config.front.mU === 'number' && S_config.front.mU > 0)
       ? S_config.front.mU : 12.0;
     this.mU_r = (S_config && S_config.rear && typeof S_config.rear.mU === 'number' && S_config.rear.mU > 0)
@@ -1158,6 +1161,7 @@ class VehicleDynamics15DOF {
         if (isAirborne) numWheelsAirborne++;
 
         let tr_w, dtr_w, Fz_tire_w = 0;
+        let _dzRoadValue = 0;                   // 路面法向速度（供积分后的接触力重算）
         if (this.wheelDof) {
           /* ── S13：真簧下质量路径 ──────────────────────────────────────────
              zw = 轮胎**接地点**高度（状态），z_road = 路面高度。
@@ -1175,6 +1179,7 @@ class VehicleDynamics15DOF {
           }
           const _dzRoad = dt > 0 ? (z_road_w - this._zRoadPrev[w.id]) / dt : 0;
           this._zRoadPrev[w.id] = z_road_w;
+          _dzRoadValue = _dzRoad;
           const pen = z_road_w - this.zw[w.id];
           if (pen > 0) {
             Fz_tire_w = _kT * pen + _cT * (_dzRoad - this.vzw[w.id]);
@@ -1258,6 +1263,9 @@ class VehicleDynamics15DOF {
         
         wheelStates[w.id] = {
           z_road: z_road_w,
+          dzRoad: (this.wheelDof ? _dzRoadValue : 0),
+          /* 4-Post 台架轮（env.rig 给定位移）：接触力链重排/落地冲量对台架不适用 */
+          isRig: (z_rig !== null),
           isKerb: rInfo.isKerb,
           isBump: rInfo.isBump,
           isPothole: rInfo.isPothole,
@@ -1339,6 +1347,76 @@ class VehicleDynamics15DOF {
           if (!isFinite(this.zw[w.id])) this.zw[w.id] = 0.0;
         }
         this._zwInit = true;
+
+        /* ★ 2026-11-20 · 轮胎压缩物理上限（bottoms out）。
+           轮胎不是弹簧：压缩到胎壁高度就到底了，不会无限穿透。旧模型没有上限，
+           落地时穿透量可到 100+ mm（实测 117 mm，超过 R=230 mm 的侧壁高度），
+           接触力随之到 20 kN 级，再经 Fx/Fy 放大成纵向冲量 —— 这是 dt 不收敛的源头。
+           取 penMax = 0.28·Re（FSAE 胎约 64 mm）作为胎壁压死极限：穿透到限值后
+           轮心跟着路面上移、法向相对速度归零（完全非弹性），多余动能交给阻尼器。 */
+        for (const w of wheels) {
+          /* ⚠ 4-Post 台架（env.rig 直接给该轮路面位移）不属于"车辆落地"语义：
+             台架的路面就是给定的信号，这里的落地冲量/穿透上限会改变台架的高频响应
+             （实测让 stability_audit 的 dt=4ms RMS 偏差从 2.75% 恶化到 37.5%，
+             ride_bench 的"降阻尼更颠"也翻向）。故台架工况跳过新增的接触逻辑。 */
+          if (wheelStates[w.id].isRig) continue;
+          const zr = wheelStates[w.id].z_road;
+          /* ⚠ 路面法向速度必须限幅：跳台断崖一个子步内路面掉 1.1 m，
+             `dzRoad` 会算出 ±550 m/s 的非物理值（实测会把轮心速度顶到 40 m/s）。 */
+          const dzr = Math.max(-12, Math.min(12, wheelStates[w.id].dzRoad || 0));
+          const _penMax = 0.28 * w.Re;
+          const pen = zr - this.zw[w.id];
+          /* 落地事件：离地 → 接地的**首次**接触，用一次性非弹性冲量把法向相对
+             速度归零（不反弹）。这一步的冲量按速度定义、与 dt 无关，
+             是"接触冲量不再随离散化跳变"的关键。
+             ⚠ 只对**真冲击**生效（法向接近速度 > 1 m/s）：粗糙路面上轮胎会反复
+               轻微离地/接地，若每次都用非弹性复位，会把轮胎弹跳与阻尼器作用一起
+               抹平 —— 实测表现为 ride_bench 的"降阻尼更颠"和 stability_audit 的
+               dt=4ms RMS 偏差 49.7%（两条既有回归当场抓到）。 */
+          const wasAir = (this.contact && this.contact[w.id] === false);
+          const closingV = dzr - this.vzw[w.id];         // >0 = 轮子正在压向路面
+          if (pen > 0 && wasAir && closingV > 1.0) {
+            this.zw[w.id] = zr;
+            this.vzw[w.id] = dzr;
+          } else if (pen > _penMax) {
+            this.zw[w.id] = zr - _penMax;
+            if (this.vzw[w.id] < dzr) this.vzw[w.id] = dzr;
+          }
+          /* 落地事件可能把 vzw 设成限幅后的路面速度（最大 12 m/s），
+             这里再统一过一次物理上限（8 m/s），保证不越界。 */
+          if (this.vzw[w.id] > 8.0) this.vzw[w.id] = 8.0;
+          else if (this.vzw[w.id] < -8.0) this.vzw[w.id] = -8.0;
+        }
+
+        /* ★ 2026-11-20 · 接触力链重排（预测-校正）：法向力由**积分后**的轮心状态给出。
+           旧链：`Fz` 按轮心积分**之前**的穿透量算 → 直接进入 Fx/Fy（纵向力 = μ·Fz·滑移）
+                → 落地瞬间的假峰值（实测 18~25 kN）被放大成纵向冲量。
+           实测证据：同一 8 连跳，只改外层 dt（内核实为同一 1 ms 子步）末速在
+                24.8 / 24.8 / 11.8 / 15.3 m/s 之间乱跳 —— 冲量随离散化剧烈变化。
+           现在：轮心先积分（预测），再用**积分后**穿透量校正 Fz（校正），下游 Fx/Fy 消费它。
+           这同时把"接触力"变成隐式一致的量：轮子已经就位，力才被算出。 */
+        for (const w of wheels) {
+          if (wheelStates[w.id].isRig) continue;      // 台架：保持历史的"积分前"接触力口径
+          const _kT = (w.axle === 'front') ? this.kT_f : this.kT_r;
+          const _cT = (w.axle === 'front') ? this.cT_f : this.cT_r;
+          const zr = wheelStates[w.id].z_road;
+          const dzr = Math.max(-12, Math.min(12, wheelStates[w.id].dzRoad || 0));
+          const pen = zr - this.zw[w.id];
+          let F = 0;
+          if (pen > 0) {
+            F = _kT * pen + _cT * (dzr - this.vzw[w.id]);
+            if (F < 0) F = 0;                 // 轮胎只压不拉
+          }
+          wheelStates[w.id].Fz_tire = F;
+          FzContact[w.id] = F;
+        }
+        /* 接触状态机更新（滞环 2 mm）：压入 ⇒ 接地；离地 >2 mm 且分离 ⇒ 离地。 */
+        for (const w of wheels) {
+          const pen = wheelStates[w.id].z_road - this.zw[w.id];
+          const relV = this.vzw[w.id] - (wheelStates[w.id].dzRoad || 0);
+          if (pen >= 0) this.contact[w.id] = true;
+          else if (pen < -0.002 && relV > 0.02) this.contact[w.id] = false;
+        }
       }
 
       let SumFx_tire = 0.0, SumFy_tire = 0.0;

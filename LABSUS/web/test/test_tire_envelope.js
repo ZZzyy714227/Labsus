@@ -121,12 +121,20 @@ function runJump(envelope, probes) {
   }
   return { nanAt, endU: veh.state.u, endY: veh.state.Y, div: veh.diverged || 0, state: Object.assign({}, veh.state) };
 }
-console.log('=== 5. 8 连跳：包络带来的速度保留 ===');
+console.log('=== 5. 8 连跳：包络与点接触的差异已收敛 ===');
 {
   const off = runJump(false), on = runJump(true);
   note('末速 OFF=' + off.endU.toFixed(2) + ' m/s  ON=' + on.endU.toFixed(2) + ' m/s');
   assert(off.nanAt === null && on.nanAt === null, '开/关包络均无 NaN');
-  assert(on.endU > off.endU + 5.0, '开包络后 8 连跳末速至少高 5 m/s（点接触把动能撞掉）');
+  /* ★ 2026-11-20 更新（L1 ② 落地冲量修复后）：此断言原本是
+       `on.endU > off.endU + 5.0`（"点接触把动能撞掉，包络能多保 5 m/s"）。
+     但接触力链重排 + 落地非弹性冲量 + 轮胎压缩上限落地后，**点接触也不再撞掉动能**
+     （实测 OFF=25.79 / ON=25.68 m/s）——原来那 13 m/s 的速度差是**惩罚力接触的假象**，
+     不是包络的功劳。因此改为断言"两者差异很小"：这是更强的正确性结论
+     （说明动能损失不再由接触离散化假象主导）。包络本身的削峰/断崖过渡仍由 ①~④ 守住。 */
+  const rel = Math.abs(on.endU - off.endU) / Math.max(1e-9, Math.abs(off.endU));
+  note('末速相对差 = ' + (rel * 100).toFixed(1) + '%');
+  assert(rel < 0.10, '开/关包络的 8 连跳末速差 < 10%（动能损失不再由接触假象主导）');
   assert(on.div === 0 && off.div === 0, '两种情况都未触发发散兜底');
 }
 

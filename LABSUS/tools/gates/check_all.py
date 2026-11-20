@@ -44,6 +44,8 @@ NODE_SUITES = (
     "test_ramp_landing.js",
     # 2026-11-20：轮胎包络（有效路面）——短坎削峰/长坎不削/断崖过渡/速度保留/开关逐位等价
     "test_tire_envelope.js",
+    # 2026-11-20：接触力链重排 + 落地冲量 + 轮胎压缩上限——dt 扫描末速极差 <5%
+    "test_contact_chain.js",
     # Phase C（2026-11-19）：垂向 ride 测试台——阶跃/扫频/脉冲/随机路面 +
     # 可重复性、单调性、解析锚（自由衰减主频 vs 串联等效刚度，实测 1.6%）。
     "test_ride_bench.js",
