@@ -7,8 +7,8 @@
  *   K3（引擎 transient）—— 走摩擦圆钳位；本轮已补 `combined_force`（开关默认关）
  *   K2（TPHYS）     —— 本轮补同一套相似法（开关 `tire.tire_combined`，默认关）
  * 本测试守住 K2 侧的三件事：
- *   ① 开关关闭 ⇒ 与"完全不给该字段"逐位相同（默认隔离，不影响既有圈速/对拍）
- *   ② 开关开启 ⇒ 确实生效（结果与关闭不同）
+ *   ① 默认已翻为**开启** ⇒ "完全不给该字段" 与显式 `true` 逐位相同
+ *   ② 显式 `false` ⇒ 回到历史摩擦圆钳位路径，且与默认不同、可确定性复现
  *   ③ 开启后物理有界：全程有限、muUse ≤ 1、速度不发散
  *
  * 椭圆边界与"制动时 Fy 单调衰减"由引擎侧单测（tests/test_transient.py 的 combined 组）
@@ -66,25 +66,29 @@ function runWith(tirePatch) {
   return TPHYS.run(body, ctx);
 }
 
-/* ── ① 开关关闭 ⇒ 逐位不变 ── */
-console.log('=== ① 开关关闭：与"完全不给该字段"逐位相同 ===');
+/* ── ① 默认 = 开 ⇒ 与显式 true 逐位相同 ── */
+console.log('=== ① 默认已翻为开：与显式 true 逐位相同 ===');
 const noKey = runWith({});
-const offKey = runWith({ tire_combined: false });
+const onKey0 = runWith({ tire_combined: true });
 {
   const a = JSON.stringify(noKey);
-  const b = JSON.stringify(offKey);
-  note('无字段 vs false：' + (a === b ? '逐位相同' : '不同（不应出现）'));
-  assert(a === b, '不传 tire_combined 与传 false 结果逐位相同（默认隔离）');
+  const b = JSON.stringify(onKey0);
+  note('无字段 vs true：' + (a === b ? '逐位相同' : '不同（不应出现）'));
+  assert(a === b, '不传 tire_combined 与显式 true 结果逐位相同（默认已翻为开）');
 }
 
-/* ── ② 开关开启 ⇒ 确实生效 ── */
-console.log('=== ② 开关开启：确实生效（结果不同于关闭）===');
-const onKey = runWith({ tire_combined: true });
+/* ── ② 显式 false ⇒ 历史路径，可复现，且与默认不同 ── */
+console.log('=== ② 显式 false：历史钳位路径可用且可复现 ===');
+const off1 = runWith({ tire_combined: false });
+const off2 = runWith({ tire_combined: false });
+const onKey = noKey;
 {
-  const a = JSON.stringify(noKey);
-  const b = JSON.stringify(onKey);
-  note('false vs true：' + (a === b ? '相同（开关失效！）' : '不同（生效）'));
-  assert(a !== b, '开启联合滑移后结果与关闭不同（开关真实生效）');
+  const a = JSON.stringify(off1);
+  const b = JSON.stringify(off2);
+  note('false 两次：' + (a === b ? '逐位相同' : '不同（不应出现）'));
+  assert(a === b, '显式关闭必须确定性可复现（回退路径）');
+  note('false vs 默认：' + (a === JSON.stringify(onKey) ? '相同（开关失效！）' : '不同（生效）'));
+  assert(a !== JSON.stringify(onKey), '显式关闭与默认必须不同（开关真实生效）');
 }
 
 /* ── ③ 物理有界 ── */

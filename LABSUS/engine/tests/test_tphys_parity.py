@@ -3,7 +3,9 @@
 同一 payload（FSAE 1620/480kg 基线）+ 同一 rc/kw 上下文（ctx 由引擎侧
 axle_rc_sweep 产出）分别喂给：
   - 引擎：run_track_sim(TrackSimRequest)
-  - 内置 JS 物理：dwb-pro-allinone.html 内 TPHYS 闭包（node vm 抽取直调）
+  - 内置 JS 物理：**活模块** js/09-track.js 的 TPHYS 闭包（node vm 抽取直调）
+  2026-11-20：锚从 dwb-pro-allinone.html（冻结快照，不含联合滑移开关）改为活模块；
+  需要测快照时显式传 html_file="dwb-pro-allinone.html"
 断言物理概要指标一致（路径/极速相对差 <=5%，峰值侧向绝对差 <=0.06g），
 这是 README "JS 直译、数值对标" 承诺的第一个可执行 harness。
 若 node 缺失则整组 skip。
@@ -107,7 +109,7 @@ def _autocross():
     return [{"x": float(p[0]), "y": float(p[1]), "target_speed": float(p[2])} for p in pts]
 
 
-def _run_node(body, ctx, case, html_file="dwb-pro-allinone.html"):
+def _run_node(body, ctx, case, html_file="dwb-pro-v4.html"):
     node = shutil.which("node")
     if not node:
         pytest.skip("node 不可用")
@@ -157,7 +159,7 @@ def _ctx(vehicle):
     }
 
 
-def _parity(case, track, html_file="dwb-pro-allinone.html", **over):
+def _parity(case, track, html_file="dwb-pro-v4.html", **over):
     body = _body(track, **over)
     req = TrackSimRequest(**body)
     py = run_track_sim(req)

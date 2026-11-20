@@ -164,8 +164,12 @@ def test_aero_downforce_adds_front_load_and_drag():
     b_fz = float(base["trace"][-1]["fz_FR"])
     a_fz = float(aero["trace"][-1]["fz_FR"])
     assert a_fz > b_fz * 1.05, (b_fz, a_fz)
-    assert aero["summary"]["v_end"] < base["summary"]["v_end"] - 0.2, (
-        aero["summary"]["v_end"], base["summary"]["v_end"])   # 阻力减速（7s 段实测 ~0.35m/s）
+    # 2026-11-20 重标（联合滑移翻默认）：纵向力不再受 0.75μFz 的历史余量限制
+    # （实测驱动能力 +28%），速度控制器把目标速 hold 得更紧，aero 阻力对 v_end 的
+    # **可观测**惩罚从 0.35 m/s 降到 0.05 m/s。物理量（气动阻力做功）本身未变，
+    # 断言方向不变（气动必须让车变慢），阈值按实测 0.05 留 2.5 倍余量。
+    assert aero["summary"]["v_end"] < base["summary"]["v_end"] - 0.02, (
+        aero["summary"]["v_end"], base["summary"]["v_end"])
     assert aero["summary"]["aero_n"] > 250.0
 
 
@@ -423,7 +427,10 @@ def test_kc_spline_flag_on_switches_interpolation_and_is_bounded():
     # 差异受控
     rel_v = abs(v_on - v_off) / max(1.0, abs(v_off))
     rel_ay = abs(ay_on - ay_off) / max(1.0, ay_off)
-    assert rel_v < 0.01 and rel_ay < 0.01, f"差异过大：Δv={rel_v:.4%} Δay={rel_ay:.4%}"
+    # 2026-11-20 重标（联合滑移翻默认）：侧向力在附着极限附近对 Fz 更敏感，
+    # 两种 K&C 插值方式的相对差从 <1% 升到 **Δv=0.16% / Δay=1.12%**（实测）。
+    # 阈值放到 2%：仍能抓住"开关未接线（差异=0）"与"插值明显跑偏"两件事。
+    assert rel_v < 0.02 and rel_ay < 0.02, f"差异过大：Δv={rel_v:.4%} Δay={rel_ay:.4%}"
 
 
 def test_kc_spline_flag_on_without_tables_is_identical_to_off():
@@ -485,14 +492,26 @@ def test_combined_force_small_alpha_matches_lateral_curve():
     assert rel < 0.05, f"退化自检失败：combined={fy_c:.1f} vs 纯侧向={fy_ref:.1f}（相对差 {rel:.1%}）"
 
 
-def test_tire_combined_flag_off_is_bit_identical():
-    """验收 ③：开关默认关 ⇒ 显式关同样结果（证明开关隔离，不影响既有曲线）。"""
-    a = client.post("/api/v3/chassis/simulate_track", json=_wd_body()).json()
-    b = client.post("/api/v3/chassis/simulate_track",
-                    json=_wd_body(tire_combined=False)).json()
-    assert a["status"] == "VALID" and b["status"] == "VALID"
-    assert a["summary"] == b["summary"], "开关关闭时必须逐位不变"
-    assert a["trace"][-1] == b["trace"][-1], "轨迹最后一行也必须逐位一致"
+def test_tire_combined_flag_selection_is_deterministic():
+    """2026-11-20 翻默认后：**默认 = 联合滑移**；显式 false = 历史摩擦圆钳位路径。
+
+    三重断言：
+      ① 默认与显式 true 逐位相同（证明默认确实翻了）
+      ② 显式 false 与默认不同（证明开关真实生效，不是摆设）
+      ③ 显式 false 连跑两次逐位相同（证明历史路径仍是确定性的，可作回退）
+    """
+    dflt = client.post("/api/v3/chassis/simulate_track", json=_wd_body()).json()
+    on = client.post("/api/v3/chassis/simulate_track",
+                     json=_wd_body(tire_combined=True)).json()
+    off1 = client.post("/api/v3/chassis/simulate_track",
+                       json=_wd_body(tire_combined=False)).json()
+    off2 = client.post("/api/v3/chassis/simulate_track",
+                       json=_wd_body(tire_combined=False)).json()
+    assert dflt["status"] == "VALID" and on["status"] == "VALID" and off1["status"] == "VALID"
+    assert dflt["summary"] == on["summary"], "默认应等价于显式开启联合滑移"
+    assert dflt["trace"][-1] == on["trace"][-1], "轨迹最后一行也必须逐位一致"
+    assert off1["summary"] == off2["summary"], "显式关闭必须确定性可复现（可作回退路径）"
+    assert off1["summary"] != dflt["summary"], "开关必须真实生效（关闭 ≠ 默认）"
 
 
 def test_tire_combined_flag_on_runs_and_stays_bounded():

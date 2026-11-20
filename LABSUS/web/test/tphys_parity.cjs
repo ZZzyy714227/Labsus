@@ -10,7 +10,11 @@ const vm = require('vm');
 const { execFileSync } = require('child_process');
 
 // G10（2026-08-31）：自 web/ 迁入 web/test/，被测 HTML 改指上级目录
-const htmlPath = process.env.TPHYS_HTML || path.join(__dirname, '..', 'dwb-pro-allinone.html');
+// 2026-11-20：默认改用**活模块**（薄壳 + js/09-track.js）。理由：TPHYS 已迁入
+// js/09-track.js，而 allinone 是冻结快照（不含后加能力，如联合滑移开关）——
+// 若继续以冻结快照为锚，对拍测的就不是当前实现（实测：引擎翻默认后 PY 开/JS 快照关
+// 会产生 10.28% 的**假缺口**）。需要测快照时显式设 TPHYS_HTML=dwb-pro-allinone.html。
+const htmlPath = process.env.TPHYS_HTML || path.join(__dirname, '..', 'dwb-pro-v4.html');
 const pyBin = process.env.LABSUS_PY || 'python';
 const inPath = process.argv[2] || path.join(__dirname, 'parity_input.example.json');
 const TOL = 0.05;   // 第十一讲钦定：TPHYS Parity 相对差 < 5%

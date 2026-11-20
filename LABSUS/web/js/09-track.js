@@ -111,7 +111,7 @@ const TPHYS = (function(){
     this.Ls=(t.Ls!==undefined?t.Ls:0.35);
     this.fy=mfSetup(t);
     /* ★ 联合滑移开关（默认关 ⇒ 历史钳位路径逐位不变）与峰值滑移率 */
-    this.tireCombined=!!(t.tire_combined===true||body.tire_combined===true);
+    this.tireCombined=(t.tire_combined!==false&&body.tire_combined!==false);  // 2026-11-20 默认开
     this.kappaPeak=(typeof t.kappa_peak==='number'&&t.kappa_peak>0)?t.kappa_peak:0.12;
     this.L=v.wheelbase_mm/1000;
     const fms=v.front.spring_mass_kg, rms=v.rear.spring_mass_kg;
