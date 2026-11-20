@@ -1,4 +1,4 @@
-﻿"""一条命令跑完全部门禁（T4，2026-10-20）
+"""一条命令跑完全部门禁（T4，2026-10-20）
 
 把散落在 CLAUDE.md / DEVLOG / CI 里的验收判据收敛成**可执行检查**，
 逐条输出 PASS/FAIL，任一失败则退出码非零。
@@ -115,6 +115,9 @@ def gates(quick: bool = False, node_only: bool = False) -> list[tuple[str, list[
 
     g = [
         ("ruff（引擎静态检查）", [PY, "-m", "ruff", "check", "engine"]),
+        # 后端模块角色审计（2026-11-20）：每个模块/端点/生产零引用函数都必须在
+        # tools/audit/module_roles.json 登记，否则变红。防"写了没接线"与真死代码长期潜伏。
+        ("后端模块角色审计", [PY, "tools/audit/backend_audit.py", "--check"]),
         ("溯源注册表覆盖", [PY, "-c", PROVENANCE_CMD]),
         ("文档一致性（根↔LABSUS）", [PY, "scripts/sync_root_docs.py", "--check"]),
     ]

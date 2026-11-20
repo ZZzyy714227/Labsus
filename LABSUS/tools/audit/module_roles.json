@@ -1,0 +1,63 @@
+{
+  "_comment": "后端模块角色登记表（2026-11-20）。由 tools/audit/backend_audit.py --check 强制：每个模块、每个端点、每个'生产零引用但保留'的函数都必须在这里登记，否则门禁变红。目的：防止长线开发中'写了但没接线'的东西被当成死代码误删，也防止真死代码长期潜伏。",
+  "_roles": {
+    "runtime": "生产路径会调用（无需登记，自动判定）",
+    "entrypoint": "可执行入口（server.py / scripts/*），由框架或 CLI 调用",
+    "design_reference": "运行时消费者在别处（前端 JS 或 hardcode 常数），本模块是可核对的真源",
+    "research_tool": "产出可核对的物理结论，结论由测试锁定；无产品面",
+    "gate_data": "门禁用的数据/规则表（不被运行时调用，但 CI 依赖）",
+    "frozen_archive": "V1 冻结线，生产禁止 import（有 AST 守卫）",
+    "test_fixture": "只服务测试的夹具"
+  },
+  "modules": {
+    "scripts.kandc_run": {
+      "role": "entrypoint",
+      "note": "K&C CLI 回归入口（scripts/kandc_run.py），由门禁/人工命令行调用"
+    },
+    "src.components.damper_table": {
+      "role": "design_reference",
+      "note": "减振器四象限表的 Python 参考实现。运行时消费者是前端 JS（17-damper4q.js 由 04-dynamics.js 调用，两薄壳均加载）；本模块只被 test_damper_table 引用。数据源 engine/data/dampers/*.csv"
+    },
+    "src.components.suspension_audit": {
+      "role": "research_tool",
+      "note": "四模式模态交叉审计（T5-b）。结论（ARB 只贡献 roll 模式、roll-warp 耦合）由 test_suspension_audit 锁定，无产品面。接线候选：四模式调校面板"
+    },
+    "src.components.suspension_modes": {
+      "role": "research_tool",
+      "note": "四模式模态基（T 矩阵）。生产消费者仅为 suspension_audit；本身无产品面"
+    },
+    "src.tire_data": {
+      "role": "design_reference",
+      "note": "TTC 台架拟合 → LABSUS 轮胎口径的推导真源。产物 kappa_peak=0.029 已 hardcode 进 src/api/v3models.py:441，溯源链靠本模块可复现"
+    },
+    "src.provenance": {
+      "role": "gate_data",
+      "note": "engine/data/** 数据资产登记表（REGISTRY）。由 test_provenance.py 强制：未登记的数据文件会让 CI 变红"
+    },
+    "src.legacy.kinematics": {
+      "role": "frozen_archive",
+      "note": "V1 冻结线（X前/Y右/Z上）。生产禁止 import，有 AST 守卫；仅供对照与教学"
+    },
+    "src.legacy.pose": {
+      "role": "frozen_archive",
+      "note": "V1 冻结线姿态解算，同上"
+    }
+  },
+  "__endpoints__": {
+    "/api/v3/version": "运维约定端点（版本号/健康巡检），不属于前端功能面",
+    "/api/v3/solve/pose": "V1 冻结线契约端点。test_api_contract.py 显式锁定『前端未调用但模型仍须与返回一致』，防止契约腐化"
+  },
+  "__exported_ok__": {
+    "_comment": "生产零引用但**故意保留**的函数/类（独立参考实现、交叉校验、设计期校核）。注释必须写清为什么不能接进生产路径、或接线前置条件。",
+    "src.metrics.kandc": {
+      "mr_matrix": "F-12「差分内核单一实现」门禁的独立参考实现：test_w4_consistency 用它逐位对齐 legacy kinetics.motion_ratio。**不要再接进生产路径**（会多出一条 MR 口径）——原 docstring 已如此声明"
+    },
+    "src.api.mass_properties": {
+      "check_mass_consistency": "清单推导值 vs 声明标量的校核器。接线候选：并入 chassis/solve 的 warnings 字段（前端已能显示）；**前置条件**：先确认 P16 的静态分配 1.4% 差异是否落在缺省容差内，否则每次请求都会刷警告"
+    },
+    "src.solver.wheel_dof": {
+      "wheel_inertia": "簧下转动惯量解析式，供分析与校验用；生产用 tire R + mU 的内联式，故意不走这里以免口径分叉",
+      "steady_slip_ratio": "准稳态滑移率反解，供分析/测试用"
+    }
+  }
+}
