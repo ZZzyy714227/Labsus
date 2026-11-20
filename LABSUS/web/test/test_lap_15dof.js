@@ -1,4 +1,4 @@
-/* LABSUS 15-DOF 全闭环圈速回归测试（G24，2026-09-02）。
+﻿/* LABSUS 15-DOF 全闭环圈速回归测试（G24，2026-09-02）。
  *
  * ── 为什么要加这道防线 ──────────────────────────────────────────
  * test_racingline.js 的闭环是【运动学单车模型】：它把速度直接钳到 v_max 包络、
@@ -230,6 +230,15 @@ function runLaps(ctx, wp, sim, nLaps, opts) {
     const cte = (s.X - p.x) * p.nx + (s.Y - p.y) * p.ny;
     if (!isFinite(lat) || Math.sqrt(md) > 80) { diverged = true; break; }
     maxLat = Math.max(maxLat, Math.abs(lat)); sumLat += Math.abs(lat); nLat++;
+    /* LAP_TRACE=1：定位第一次失控（能力模式标定用）。
+       打印时间/圈号/出界量/速度/侧滑/转角，便于复现与定点。 */
+    if (process.env.LAP_TRACE === '1' && !runLaps._firstOff && Math.abs(cte) > EDGE) {
+      runLaps._firstOff = true;
+      const _slip = Math.abs(Math.atan2(s.v, Math.max(1, s.u)) * 180 / Math.PI);
+      console.log(`  [TRACE] 首次出界 t=${t.toFixed(1)}s lap=${lapNo + 1} cte=${cte.toFixed(2)}m ` +
+        `u=${s.u.toFixed(1)} β=${_slip.toFixed(1)}° ψ̇=${(s.r || 0).toFixed(3)} corner=${p.cornerId} ` +
+        `v_max=${p.v_max.toFixed(1)} turn=${p.turn || '?'}`);
+    }
     if (Math.abs(cte) > EDGE) {
       overEdge++;
       // ★ 保真：真产品里 circuitStageLoop → trackLimitsAndLaps 出界时会调

@@ -1,4 +1,4 @@
-/* 21-car-capability.js —— 车能力表（CAR_CAPABILITY，2026-11-20）
+﻿/* 21-car-capability.js —— 车能力表（CAR_CAPABILITY，2026-11-20）
  *
  * 存在理由（P29 的病根）
  * ─────────────────────────────────────────────────────────────────────
@@ -122,19 +122,33 @@ const CAR_CAPABILITY = (function () {
   }
 
   /** 直线制动：全力踩刹车，取稳定窗内的平均减速度 */
+  /** 直线制动：多点实测（2026-11-20 改）
+   *
+   * 早期版本只测 22/30 m/s 两点的最大值，然后 `brake(v) = brk0 · (1+F_down/W)`
+   * 用**解析气动增益**外推高速——实测该外推高估 16%（gt3 @70 m/s：预测 15.6，
+   * 实车 13.4 m/s²）。后果：剖面以为高速刹得住，实跑刹不住 ⇒ 长直末端冲出赛道
+   * （实测第 2 圈 T1 处侧偏 78.5°）。改为与加速同理的**多点实测分段线性插值**。 */
   function measureBrake(Ctor, S, dt) {
-    let best = 0;
-    for (const u0 of [22, 30]) {
+    const at = (u0) => {
       const car = new Ctor(S, SIMref(), u0);
-      const nSettle = Math.round(0.6 / dt);
+      const nSettle = Math.round(0.4 / dt);
       for (let i = 0; i < nSettle; i++) car.step(CTRL_ZERO, ENV_FLAT, dt);
       const n = Math.round(1.2 / dt);
       const uA = car.state.u;
       for (let i = 0; i < n; i++) car.step({ steer: 0, throttle: 0, brake: 1, drs: false }, ENV_FLAT, dt);
       const decel = (uA - car.state.u) / 1.2;
-      if (isFinite(decel) && decel > best) best = decel;
+      return (isFinite(decel) && decel > 0.3) ? decel : NaN;
+    };
+    const pts = [];
+    for (const u0 of [25, 45, 65, 85]) {
+      const a = at(u0);
+      if (isFinite(a)) pts.push({ v: u0, a: a });
     }
-    return best;
+    if (!pts.length) return { best: 6.0, pts: [{ v: 25, a: 6.0 }] };
+    pts.sort((p, q) => p.v - q.v);
+    let best = 0;
+    for (const p of pts) best = Math.max(best, p.a);
+    return { best: best, pts: pts };
   }
 
   /** 直线加速：多点实测（2026-11-20 改）
@@ -232,7 +246,7 @@ const CAR_CAPABILITY = (function () {
     _cache = {
       source: 'car',
       ay0: lat.ay0, ayAt: lat.at,
-      brk0: brk, acc0: acc.acc0, accHi: acc.accHi, vHi: acc.vHi, accPts: acc.pts,
+      brk0: brk.best, brkPts: brk.pts, acc0: acc.acc0, accHi: acc.accHi, vHi: acc.vHi, accPts: acc.pts,
       m: m, W: W,
       measuredAt: { dt: dt }
     };
@@ -256,7 +270,8 @@ const CAR_CAPABILITY = (function () {
       /** 横向加速度上限（m/s²）——按用户决策用峰值 ay 口径 */
       lateral: (v) => cap.ay0 * G * gain(v),
       /** 制动减速度上限（m/s²） */
-      brake: (v) => cap.brk0 * gain(v),
+      /* 制动：四点实测分段线性插值（不再用解析气动增益——实测高估 16%） */
+      brake: (v) => accelAt(cap.brkPts, Math.max(1, v || 1)),
       /** 加速上限（m/s²）：四点实测分段线性插值（附气动增益） */
       accel: (v) => accelAt(cap.accPts, Math.max(1, v || 1)) * gain(v)
     };

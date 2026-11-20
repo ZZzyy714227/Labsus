@@ -1533,7 +1533,7 @@ class CircuitPath extends TrackPath {
        原因见 DEVLOG：剖面本身已能用车模型算（147.3 s vs 旧 153 s），但现有驾驶员
        追不住 100% 极限剖面（无 ABS、无长程制动规划），实跑会反复大侧滑。
        等驾驶员补上制动规划/ABS 后再翻默认。 */
-    const _capEnabled = !!(typeof window !== 'undefined' && window.S && window.S.carEnvelope === true);
+    const _capEnabled = !!(typeof window !== 'undefined' && window.S && window.S.carEnvelope !== false);
     const _cap = (_capEnabled && _capMod && typeof _capMod.forPath === 'function') ? _capMod.forPath() : null;
     this.capabilityMode = _cap ? 'car' : 'legacy';
     this.capability = _cap ? _cap.cap : null;

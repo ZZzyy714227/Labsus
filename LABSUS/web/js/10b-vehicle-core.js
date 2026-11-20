@@ -197,7 +197,7 @@ class UniversalAutoPilot {
        （理论最快圈），但驾驶员按 95% 跟踪——真实车手也不会每点压着极限开，
        且控制器有 140°/s 转向速率与 45 ms 油门滤波，压极限必然瞬态超调。
        该常数是**标定值**，不随圈数变化 ⇒ 保持确定性。 */
-    const capMargin = (typeof this.capMargin === 'number' && isFinite(this.capMargin)) ? this.capMargin : 0.90;
+    const capMargin = (typeof this.capMargin === 'number' && isFinite(this.capMargin)) ? this.capMargin : 0.85;
     const cid = (typeof target.cornerId === "number") ? target.cornerId : -1;
     const margin = _capMode ? capMargin
       : ((cid >= 0 && this.cornerMargins[cid] !== undefined) ? this.cornerMargins[cid] : 1.0);
