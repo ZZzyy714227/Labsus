@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 /* 液态玻璃双主题：自动跟随系统偏好，手动切换后持久化 */
 function applyTheme(t){
   document.documentElement.setAttribute("data-theme",t);
@@ -1520,16 +1520,44 @@ class CircuitPath extends TrackPath {
     //      → 自然得到更高弯速，这就是「赛车线圈速奖励」的物理来源，无需再拍一个
     //      经验百分比（原 5b 的 +4% 已删）；而换线过渡区 refCurvature 偏大 → 自动压速，
     //      也是正确的（横向移动本身要吃掉一部分抓地力预算）。
+    /* ── 车能力表（2026-11-20，P29 病根修复）──────────────────────────────
+       原实现用**三个硬编码常数**（1.35·9.81·0.85 横向、5.5 制动、5.8 加速），
+       与 15-DOF 车模型无关 ⇒ 弯里给太快、直道刹车太早，圈速由常数决定而不是
+       由悬架决定（P29「几何差异被逐圈学习压平」的根因）。
+       `CAR_CAPABILITY` 用 15-DOF 实测三项能力并接上气动 v² 项；拿不到就回退
+       旧常数 ⇒ **逐位不变**。 */
+    const _capMod = (typeof window !== 'undefined' && window.CAR_CAPABILITY)
+      ? window.CAR_CAPABILITY
+      : ((typeof CAR_CAPABILITY !== 'undefined') ? CAR_CAPABILITY : null);
+    /* ⚠ 2026-11-20：**opt-in**（`S.carEnvelope === true`）。默认关闭 ⇒ 逐位不变。
+       原因见 DEVLOG：剖面本身已能用车模型算（147.3 s vs 旧 153 s），但现有驾驶员
+       追不住 100% 极限剖面（无 ABS、无长程制动规划），实跑会反复大侧滑。
+       等驾驶员补上制动规划/ABS 后再翻默认。 */
+    const _capEnabled = !!(typeof window !== 'undefined' && window.S && window.S.carEnvelope === true);
+    const _cap = (_capEnabled && _capMod && typeof _capMod.forPath === 'function') ? _capMod.forPath() : null;
+    this.capabilityMode = _cap ? 'car' : 'legacy';
+    this.capability = _cap ? _cap.cap : null;
+    this.capabilityFn = _cap || null;   // 供测试/诊断：v 相关的 lateral/brake/accel
+
     const vehType = (typeof window !== "undefined" && window.S && window.S.vehicleType) ? window.S.vehicleType : "formula";
     const v_top_kmh = (vehType === "formula") ? 335.0 : (vehType === "gt3" || vehType === "sport") ? 295.0 : (vehType === "kart") ? 140.0 : 245.0;
     const v_top_veh = v_top_kmh * (1000.0 / 3600.0);
     const aggrScale = Math.min(1.35, Math.max(0.65, this.aggressiveness));
     const a_lat_max = Math.max(4.5, this.mu * 9.81 * 0.85 * aggrScale);
-    
+
     for(let i = 0; i < P; i++){
       const pt = this.pts[i];
       const kLine = (pt.refCurvature !== undefined) ? pt.refCurvature : pt.curvature;
-      const curv_v = Math.sqrt(a_lat_max / (Math.abs(kLine) + 1e-5));
+      let curv_v;
+      if (_cap) {
+        /* 迭代解 v = sqrt(a_lat(v)/|κ|)：a_lat 随 v² 增长（气动），两次迭代足够 */
+        const ak = Math.abs(kLine) + 1e-5;
+        let v = Math.sqrt(_cap.lateral(20) / ak);
+        v = Math.sqrt(_cap.lateral(v) / ak);
+        curv_v = v;
+      } else {
+        curv_v = Math.sqrt(a_lat_max / (Math.abs(kLine) + 1e-5));
+      }
       pt.v_max = Math.min(v_top_veh, Math.min(pt.v_max, curv_v));
     }
     
@@ -1543,7 +1571,9 @@ class CircuitPath extends TrackPath {
       for(let i = P - 1; i >= 0; i--){
         const nextIdx = (i + 1) % P;
         const ds = Math.hypot(this.pts[nextIdx].x - this.pts[i].x, this.pts[nextIdx].y - this.pts[i].y);
-        const v_limit = Math.sqrt(this.pts[nextIdx].v_max**2 + 2 * a_brake * ds);
+        /* 车能力表：制动减速度随速度变（气动下压力）；无能力表时用旧常数 */
+        const aB = _cap ? _cap.brake(this.pts[nextIdx].v_max) : a_brake;
+        const v_limit = Math.sqrt(this.pts[nextIdx].v_max**2 + 2 * aB * ds);
         if(v_limit < this.pts[i].v_max){
           maxDiff = Math.max(maxDiff, this.pts[i].v_max - v_limit);
           this.pts[i].v_max = v_limit;
@@ -1557,7 +1587,8 @@ class CircuitPath extends TrackPath {
       for(let i = 0; i < P; i++){
         const prevIdx = (i - 1 + P) % P;
         const ds = Math.hypot(this.pts[i].x - this.pts[prevIdx].x, this.pts[i].y - this.pts[prevIdx].y);
-        const v_limit = Math.sqrt(this.pts[prevIdx].v_max**2 + 2 * a_accel * ds);
+        const aA = _cap ? _cap.accel(this.pts[prevIdx].v_max) : a_accel;
+        const v_limit = Math.sqrt(this.pts[prevIdx].v_max**2 + 2 * aA * ds);
         if(v_limit < this.pts[i].v_max){
           maxDiff = Math.max(maxDiff, this.pts[i].v_max - v_limit);
           this.pts[i].v_max = v_limit;

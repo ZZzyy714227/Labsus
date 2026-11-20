@@ -146,6 +146,19 @@ function loadReal(webDir) {
   if (sS < 0 || sE < 0 || sE <= sS) throw new Error('无法定位 sampleSweep');
   vm.runInContext(mech.slice(sS, sE), ctx, { filename: '03-mechanism.js#sampleSweep' });
 
+  /* 2026-11-20：车能力表（速度包络用车模型算，取代硬编码常数）。
+     `21-car-capability` 依赖 `LAT_BENCH.steadyCircle`，故先加载 20。
+     ⚠ 加载顺序也决定行为：不加载 21 ⇒ `CircuitPath.capabilityMode='legacy'`
+       （旧常数，逐位不变）；加载后 ⇒ 'car'（确定性最快圈）。 */
+  try {
+    vm.runInContext(fs.readFileSync(path.join(webDir, 'js', '20-lat-bench.js'), 'utf8'),
+      ctx, { filename: '20-lat-bench.js' });
+    vm.runInContext(fs.readFileSync(path.join(webDir, 'js', '21-car-capability.js'), 'utf8'),
+      ctx, { filename: '21-car-capability.js' });
+  } catch (e) {
+    throw new Error('加载车能力表模块失败：' + (e && e.message));
+  }
+
   const wpSrc = st.slice(st.indexOf('function buildShanghaiCircuit'),
     st.indexOf('return new CircuitPath(wp, mu, aggressiveness);'))
     .replace('function buildShanghaiCircuit(mu = 1.35, aggressiveness = 1.0) {', '');
@@ -156,9 +169,17 @@ function loadReal(webDir) {
 /* ── 真 15-DOF 全闭环 ─────────────────────────────────────────── */
 function runLaps(ctx, wp, sim, nLaps, opts) {
   const useMPC = opts && opts.pilotType === 'mpc';
+  /* 2026-11-20：车能力表 `CAR_CAPABILITY` 需要读整车配置（S）才能实测能力。
+     浏览器里 `window.S` 就是真配置；本沙箱原先只放了 `{vehicleType:'gt3'}` 桩，
+     导致 `forPath()` 返回 null ⇒ 退回旧常数。这里先把真配置挂到 window.S 再建
+     CircuitPath（10-eval 只用它的 vehicleType，行为不变）。 */
+  const S = makeS();
+  /* 同时挂到上下文全局（`LAT_BENCH.cloneS()` 读的是裸 `S`）与 window.S
+     （`CAR_CAPABILITY` 与 10-eval 读 window.S）。 */
+  ctx.S = S;
+  ctx.window.S = S;
   const P = new ctx.window.CircuitPath(wp, 1.35, 1.0);
   const pts = P.pts, N = pts.length;
-  const S = makeS();
   const eng = new ctx.window.VehicleDynamics15DOF(S, sim, 5.0);
   const p0 = pts[0];
   Object.assign(eng.state, {

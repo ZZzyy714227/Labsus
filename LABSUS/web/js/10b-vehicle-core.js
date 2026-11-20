@@ -189,8 +189,18 @@ class UniversalAutoPilot {
     
     // Longitudinal Speed Control with Smooth Deadband & Progressive Braking
     // G21：逐圈刹车学习——弯内目标速 × 余量系数（首圈 0.85，逐圈→ 1.0 = 刹车更晚）
+    /* 2026-11-20：**车能力表模式下车速已由物理算出**（CircuitPath.capabilityMode
+       === 'car'），逐圈学习退化为噪声源（它会把确定性剖面再压低/抬高），
+       故 margin 固定 1.0，驾驶员降级为跟踪器。旧路径（'legacy'）行为不变。 */
+    const _capMode = !!(this.path && this.path.capabilityMode === 'car');
+    /* 车能力表模式下用**单一全局跟踪裕度**（不是逐弯学习）：剖面按峰值能力算
+       （理论最快圈），但驾驶员按 95% 跟踪——真实车手也不会每点压着极限开，
+       且控制器有 140°/s 转向速率与 45 ms 油门滤波，压极限必然瞬态超调。
+       该常数是**标定值**，不随圈数变化 ⇒ 保持确定性。 */
+    const capMargin = (typeof this.capMargin === 'number' && isFinite(this.capMargin)) ? this.capMargin : 0.95;
     const cid = (typeof target.cornerId === "number") ? target.cornerId : -1;
-    const margin = (cid >= 0 && this.cornerMargins[cid] !== undefined) ? this.cornerMargins[cid] : 1.0;
+    const margin = _capMode ? capMargin
+      : ((cid >= 0 && this.cornerMargins[cid] !== undefined) ? this.cornerMargins[cid] : 1.0);
     let e_v = target.targetSpeed * margin - u;
     this.pid_speed.integral += e_v * dt;
     this.pid_speed.integral = Math.max(-6, Math.min(6, this.pid_speed.integral));
@@ -223,6 +233,36 @@ class UniversalAutoPilot {
       // Coasting Zone (-0.75 <= accel_cmd <= 0.08): Lift and Coast naturally, NO mechanical braking
       target_throttle = 0;
       target_brake = 0;
+    }
+
+    /* 纵向**前馈**（车能力表模式专用，2026-11-20）。
+       动机①：剖面改由车模型生成后刹车点大幅提前，纯 PID（对速度误差反应）追不上。
+       动机②：**必须按制动距离前视**——在 80 m/s 时刹到 25 m/s 需要 250 m 以上，
+       而默认前视只有 12~20 m，等看到弯再刹车必然冲出去（实测横向偏差 79.97 m）。
+       实现：先算当前速度需要的制动距离，再朝那个距离取前视点的目标速度：
+           d_brake = (u² − v_min²) / (2·a_brake(u))
+           v_far   = getLookahead(..., d_brake).targetSpeed
+           a_req   = (u² − v_far²) / (2·d_brake)
+       若 a_req > 0 则按 a_req/a_brake 请求制动力，与 PID 输出取大。 */
+    if (_capMode) {
+      const _capObj = (this.path && this.path.capability) ? this.path.capability : null;
+      const _aBrakeMax = _capObj && _capObj.brake ? _capObj.brake(u) : 11.0;
+      const dBrake = Math.max(20.0, (u * u - 5.0 * 5.0) / (2.0 * Math.max(2.0, _aBrakeMax)));
+      let _vFar = target.targetSpeed * capMargin;
+      if (typeof this.path.getLookahead === 'function') {
+        const _far = this.path.getLookahead(fx, fy, u, dBrake);
+        if (_far && typeof _far.targetSpeed === 'number' && isFinite(_far.targetSpeed)) {
+          _vFar = Math.min(_vFar, _far.targetSpeed * capMargin);
+        }
+      }
+      const _aReq = (u * u - _vFar * _vFar) / (2.0 * Math.max(5.0, dBrake));
+      if (_aReq > 0.2) {
+        /* 前馈制动同样要过摩擦圆限制器（long_avail）——否则弯中仍按 100% 制动，
+           无 ABS 的前端必然抱死、失去转向（实测侧偏 83.8°）。 */
+        const _ffBrake = Math.min(1.0, _aReq / Math.max(2.0, _aBrakeMax)) * long_avail;
+        target_brake = Math.max(target_brake, _ffBrake);
+        target_throttle = 0;
+      }
     }
 
     /* 侧滑抑制差动（同属驾驶员模型升级）：β 过大时松制动 + 断油。
