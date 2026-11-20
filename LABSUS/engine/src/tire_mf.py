@@ -175,13 +175,41 @@ class MagicFormulaSub:
         """
         return self.fy(alpha_deg, fz) * (trail_mm / 1000.0)
 
+def solve_s_peak(cy: float, ey: float) -> float:
+    """魔术公式峰值处的**总滑移量** s_peak（与前端 K1 同解）。
+
+    峰值条件：`sin(Cy·atan(arg)) = 1` ⇒ `arg = tan(π/(2·Cy))`，而
+    `arg = s − Ey·(s − atan s)` 对 s 单调递增 ⇒ 二分求解。
+    `Cy < 1` 时无内部峰值（力渐近上升），退到 3.0。
+    """
+    if cy < 1.0:
+        return 3.0
+    arg_t = math.tan(math.pi / (2.0 * cy))
+
+    def f(s: float) -> float:
+        return s - ey * (s - math.atan(s)) - arg_t
+
+    lo, hi = 1e-6, 50.0
+    if f(lo) > 0:
+        return lo
+    if f(hi) < 0:
+        return hi
+    for _ in range(60):
+        mid = 0.5 * (lo + hi)
+        if f(mid) > 0:
+            hi = mid
+        else:
+            lo = mid
+    return 0.5 * (lo + hi)
+
+
 def combined_force(
     *,
     alpha_rad: float,
     fx_demand: float,
     mu_fz: float,
     p: dict[str, float],
-    s_peak: float = 1.0,
+    s_peak: float | None = None,
     kappa_peak: float | None = None,
 ) -> tuple[float, float]:
     """相似法联合滑移（combined slip）—— 与前端 K1 `magicFormula` 同式。
@@ -190,8 +218,9 @@ def combined_force(
         曲线：      F(s) = μFz·sin(Cy·atan(s − Ey·(s − atan s)))
         分解：      Fx = F·s_x/s ，Fy = −F·s_y/s
 
-    语义：纵向需求先反解成滑移率（与 `quasi_steady_slip` 同口径），再与侧偏角
-    合成一个**总滑移**，由该总滑移查魔术公式，最后按方向分解。
+    ⚠ `s_peak` 缺省由 `solve_s_peak(Cy, Ey)` 解析求出（**不可硬编码 1.0**：
+      默认胎 By=20/Cy=1.2/Ey=-0.5 时 s_peak≈2.90，用 1.0 会让"κ=κ_peak 处恰好
+      达到峰值"这一标定关系失效 —— 实测把驱动能力算小约 20%）。
 
     为什么优于"各自算 Fy 再用摩擦圆钳位"：
       · 钳位在 |Fx| 接近 μFz 时给出**硬拐点**（Fy 突然被截断），而真实轮胎是
@@ -208,9 +237,10 @@ def combined_force(
     cy = float(p.get("Cy", 1.2))
     ey = float(p.get("Ey", 0.0))
     kp = float(kappa_peak) if kappa_peak and kappa_peak > 0 else 0.12
+    sp = float(s_peak) if s_peak and s_peak > 0 else solve_s_peak(cy, ey)
     # 纵向需求 → 滑移率（quasi_steady_slip 同式：Cκ = μFz/κ_peak）
     kappa = max(-kp, min(kp, fx_demand * kp / mu_fz))
-    sx = s_peak * (kappa / kp)
+    sx = sp * (kappa / kp)
     sy = by * math.tan(alpha_rad)
     s = math.hypot(sx, sy)
     if s < 1e-12:

@@ -504,3 +504,21 @@ def test_tire_combined_flag_on_runs_and_stays_bounded():
             mu = row.get(f"mu_use_{w}")
             if mu is not None:
                 assert 0.0 <= mu <= 1.000001, f"mu_use_{w}={mu} 越界"
+
+
+def test_combined_force_peak_alignment():
+    """标定关系：纯纵向且 κ=κ_peak 时，合力恰为 μFz（峰值对齐，与 K1 同解）。
+
+    这条断言守住 `s_peak` 的**解析求解**——若有人把 s_peak 硬编码成 1.0，
+    峰值会落在 κ≈1.39κ_peak 且驱动力被算小约 20%（实测直道末速 25.74 vs 30.08）。
+    """
+    from src.tire_mf import combined_force, solve_s_peak
+
+    p = {"By": 20.0, "Cy": 1.2, "Ey": -0.5}
+    kp = 0.12
+    sp = solve_s_peak(1.2, -0.5)
+    assert abs(sp - 2.901) < 0.01, f"s_peak 解析解应为 ~2.901（实测 {sp:.4f}）"
+    fx_c, fy_c = combined_force(alpha_rad=0.0, fx_demand=1e9, mu_fz=1000.0,
+                                p=p, kappa_peak=kp)
+    assert abs(abs(fx_c) - 1000.0) < 1e-6, f"κ=κ_peak 时 |Fx| 应恰为 μFz（实测 {abs(fx_c):.6f}）"
+    assert abs(fy_c) < 1e-9, "纯纵向时侧向力应为 0"

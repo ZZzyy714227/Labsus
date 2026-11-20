@@ -378,7 +378,7 @@ class VehiclePlanar:
                 # 联合滑移（相似法，2026-11-20）：纵向需求与侧偏角合成总滑移后查 MF
                 _fx_c, _fy_c = combined_force(
                     alpha_rad=a_lat, fx_demand=fx_w, mu_fz=mu_fz,
-                    p=self.tires[w].p, s_peak=1.0, kappa_peak=self.kappa_peak)
+                    p=self.tires[w].p, kappa_peak=self.kappa_peak)
                 fx_w = _fx_c
                 fy_w = _fy_c - self.Cg * cam_deg * fz      # 外倾推力（线性）叠加一次
                 _cap = math.sqrt(max(0.0, mu_fz * mu_fz - fx_w * fx_w))
