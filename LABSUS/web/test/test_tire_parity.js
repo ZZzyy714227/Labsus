@@ -101,6 +101,42 @@ console.log('=== 4. 载荷敏感性仍在（不是把 μ 拉平）===');
   assert(f2 / f1 > 1.2, '载荷敏感性未过度（比值仍随载荷增长）');
 }
 
+/* N2（2026-11-20）：**口径重构后不得双重计入标定**。
+   事故：初版把 muTire 乘在 gripScale 之上，而 gripScale 本身就是
+   `(Fy0/FzNom)/(缺省胎比)` ⇒ 标定 Fy0×1.25 时峰值变 1.25×1.875/1.35 ≈ 2.34。
+   现在两口径互斥，标定应严格线性。
+   静态轮载 Fz = mTotal·g/4（lsF≈1），峰值 Fy/Fz 可读绝对口径。 */
+console.log('=== 5. N2：标定不被重复计入（口径互斥）===');
+{
+  const FZ = 576.3375;                       // formula 静轮载 mTotal·g/4
+  /* 必须**新建车**：轮胎参数按 (S, SIM) 缓存在实例上，改 SIM 后复用旧实例读不到新标定。 */
+  const Ctor = ctx.window.VehicleDynamics15DOF;
+  const peakAt = (scaleFy0, absolute) => {
+    const sim = { tireCalib: { Fy0: 5250 * scaleFy0, FzNom: 3500 } };
+    S.tireMuFromParams = !!absolute;
+    const c = new Ctor(S, sim, 14);
+    let best = 0;
+    for (let deg = 2; deg <= 18; deg += 0.25) {
+      const r = Math.abs(c.magicFormula(FZ, deg * Math.PI / 180, 0, 1.35, 1).Fy) / FZ;
+      if (r > best) best = r;
+    }
+    return best;
+  };
+  const abs100 = peakAt(1.00, true), abs125 = peakAt(1.25, true);
+  const rel100 = peakAt(1.00, false), rel125 = peakAt(1.25, false);
+  S.tireMuFromParams = false;
+  note(`绝对口径 μ=1.35：×1.00 ${abs100.toFixed(4)} → ×1.25 ${abs125.toFixed(4)}（比 ${(abs125 / abs100).toFixed(4)}）`);
+  note(`相对口径 μ=1.35：×1.00 ${rel100.toFixed(4)} → ×1.25 ${rel125.toFixed(4)}（比 ${(rel125 / rel100).toFixed(4)}）`);
+  assert(Math.abs(abs100 - 1.5) < 0.02,
+    `绝对口径峰值 = Fy0/FzNom = ${abs100.toFixed(3)} ≈ 1.5（与 K3 同源）`);
+  assert(Math.abs(abs125 / abs100 - 1.25) < 0.01,
+    `标定 Fy0×1.25 严格线性（比 ${(abs125 / abs100).toFixed(4)}，旧实现是 1.25×1.111=1.39）`);
+  assert(Math.abs(rel125 / rel100 - 1.25) < 0.01,
+    `相对口径同样严格线性（比 ${(rel125 / rel100).toFixed(4)}）`);
+  assert(Math.abs(rel100 - 1.35) < 0.02,
+    `相对口径峰值 = μ_surface = ${rel100.toFixed(3)}（旧语义保留，逐位不变）`);
+}
+
 console.log(`\n========================================`);
 console.log(`All ${passed}/${total} tire-parity checks passed!`);
 console.log(`========================================`);

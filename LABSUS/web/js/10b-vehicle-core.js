@@ -1,4 +1,4 @@
-﻿/* ═══════════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════════════
    10b-vehicle-core.js —— 15-DOF 车辆物理与自动驾驶内核（P2 拆分，2026-10-31）
 
    从 11-stages.js 抽出（原 L95–L1440）。这里只有**数值层**：
@@ -812,18 +812,25 @@ class VehicleDynamics15DOF {
     const ref = (typeof tp.FzRef === 'number' && tp.FzRef > 0) ? tp.FzRef : tp.FzNom;
     const r = Fz / ref;
     const lsF = Math.max(0.1, 1.0 - tp.LS * (r - 1.0));
-    /* 线 B · B4（2026-11-19）：**四内核轮胎口径同源**。
+    /* 线 B · B4（2026-11-19）＋ N2（2026-11-20）：**四内核轮胎口径同源**。
        实测 K1 与 K3（engine/tire_mf.py）在完全相同参数下 Fy 比值恒为 **10/9**
        （精确，与 Fz/α 无关）——根因是 D 的量级基准不同：
          K1: D = μ_surface(1.35) · Fz
          K3: D = Fy0/FzNom(=5250/3500=1.5) · Fz      ← 轮胎标定值
        K2（09-track TPHYS）也用 Fy0/FzNom ⇒ **K1 是唯一异类**。
-       `S.tireMuFromParams === true` 时把路面 μ 当作"相对干沥青的倍率"（1.35 为基准），
-       底层改用轮胎标定 μ ⇒ 与 K3/K2 逐点一致（×1.111）。默认关闭 ⇒ 逐位不变。 */
+
+       ⚠ N2 修正（2026-11-20）：初版把 `muTire` 乘在原有 `gripScale` 之上，
+       造成**标定被算两遍**——`gripScale` 的定义本身就是
+       `(Fy0/FzNom)/(缺省胎 Fy0/FzNom)`，即"轮胎相对引擎缺省胎的 μ 比"。
+       于是标定 Fy0 ×1.25 时峰值变成 1.25 × 1.875/1.35 ≈ 2.34（正确应 1.875）。
+       现在两口径**互斥**：
+         关：D = μ_surface · gripScale · Fz          （旧相对口径，逐位不变）
+         开：D = (μ_surface/1.35) · (Fy0/FzNom) · Fz （绝对口径：路面 μ 退化为倍率，
+             1.35 = 干沥青基准；峰值在 μ=1.35 时恰为 Fy0/FzNom，与 K3 逐点一致） */
     const _muTire = (tp.Fy0 > 0 && tp.FzNom > 0) ? tp.Fy0 / tp.FzNom : 1.35;
-    const muBase = (this.S && this.S.tireMuFromParams === true)
-      ? (mu_peak / 1.35) * _muTire : mu_peak;
-    const D = muBase * tp.gripScale * Fz * lsF;
+    const _useTireMu = !!(this.S && this.S.tireMuFromParams === true);
+    const muBase = _useTireMu ? (mu_peak / 1.35) * _muTire : mu_peak;
+    const D = muBase * (_useTireMu ? 1.0 : tp.gripScale) * Fz * lsF;
 
     /* M5（2026-09-20）：axleScale = 按胎宽配平的轴刚度系数 k = W_axle / mean(W_f, W_r)。
        只放大**刚度因子**（侧向归一化滑移 sy 的 By），不动峰值 D —— 胎宽对接触斑
@@ -928,7 +935,12 @@ class VehicleDynamics15DOF {
        BRAKE_CAP=1.05 留 5% 余量：重刹可以抱死（真实，无 ABS），但不是必然；
        且砾石上自动降到 813 N·m，与降低的拓地力匹配（直接影响 G21 出界后的物理表现）。 */
     const BRAKE_CAP = 1.05;
-    const brakeMu = mu_eff * tpStep.gripScale * BRAKE_CAP;
+    /* N2（2026-11-20）：与 magicFormula 的 D 口径保持一致——开 tireMuFromParams 时
+       制动上限也改用绝对口径 `(μ_eff/1.35)·(Fy0/FzNom)`，否则同一次标定在驱动/制动
+       两条链上被计成两个不同的量。 */
+    const _tireMuAbs = (tpStep.Fy0 > 0 && tpStep.FzNom > 0) ? tpStep.Fy0 / tpStep.FzNom : 1.35;
+    const _useTireMuB = !!(this.S && this.S.tireMuFromParams === true);
+    const brakeMu = (_useTireMuB ? (mu_eff / 1.35) * _tireMuAbs : mu_eff * tpStep.gripScale) * BRAKE_CAP;
     const maxBrakeTorqueF = brakeMu * this.Fz0_F * this.ReF;
     const maxBrakeTorqueR = brakeMu * this.Fz0_R * this.ReR;
     const drivePowerFactor = Math.min(1.0, (this.m / 1250) * 1.2);
