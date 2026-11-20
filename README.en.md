@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.11+](https://img.shields.io/badge/Python-3.11%2B-brightgreen.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-v3%20REST%20API-009688.svg)](https://fastapi.tiangolo.com/)
-[![Tests: 100% Passed](https://img.shields.io/badge/pytest-337%20passed-success.svg)]()
+[![Tests: 100% Passed](https://img.shields.io/badge/pytest-345%20passed-success.svg)]()
 [![Platform: Web & Desktop](https://img.shields.io/badge/Platform-Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-orange.svg)]()
 
 > A modern full-chassis suspension engineering workbench tailored for **Formula Student (FSAE), FIA GT3 racing, and Baja off-road vehicles**.
@@ -150,7 +150,7 @@ python tools/gates/check_all.py           # 29 checks: ruff / pytest / 24 node s
 python tools/gates/check_all.py --quick   # 3 sub-second checks (ruff / provenance / docs)
 
 # ── Python engine: physics assertions / gates / API-contract guard / TPHYS parity / stress ──
-pytest engine/tests -q                 # 337 passed / 1 skipped (skip = OptimumK rows not entered, explicit)
+pytest engine/tests -q                 # 345 passed / 1 skipped (skip = OptimumK rows not entered, explicit)
                                        #   · test_api_contract            frontend/backend key-set contract
                                        #   · test_static_split_invariant  static load-split invariant
                                        #   · test_tire_width_balance      tire width -> cornering stiffness
@@ -161,12 +161,12 @@ python scripts/sync_root_docs.py --check   # root <-> LABSUS README/LICENSE byte
 
 # ── Frontend defense lines (per suite) ──────────────────────────────────
 node web/test/test_dom.js              # 356 assertions: shell structure / dual-entry parity / bug regressions
-node web/test/stage_boot_check.js      # 47 assertions: module order / TDZ / 3 stages x 20 frames
+node web/test/stage_boot_check.js      # 50 assertions: module order / TDZ / 3 stages x 20 frames
 node web/test/test_lap_15dof.js        # 23 assertions: 2 laps of 5.45 km + 6 powertrain parity checks
 node web/test/test_15dof_steady.js     # 18 assertions: analytic steady-state anchors + kT source wiring
 node web/test/test_powertrain.js       # 625 assertions (7 powertrain architectures)
 node web/test/test_tire_lab.js         # 70 · test_tire_wiring.js 36 · proving_ground_test.js 36
-node web/test/test_racingline.js       # 30 · test_engine_sound.js 26 · test_kc_wiring.js 25
+node web/test/test_racingline.js       # 30 · test_kc_wiring.js 25
 node web/test/undulating_road_test.js  # 21 · test_mpc.js 19 · test_p2b_damper.js 28 (incl. 4Q damper table)
 node web/test/test_p2a_aero.js         # 14 · test_circuit_ui.js 100% (64 ids + 22 classes)
 node web/test/test_ride_bench.js       # 17: step/sweep/impulse/random + repeatability + analytic anchor
@@ -235,7 +235,7 @@ LABSUS/                           # Engineering Root Directory
 │   ├── server.py                 # FastAPI server entry (:8001)
 │   ├── src/                      # Solvers (K&C / Bushing / Pacejka / Tire Fit / Transient)
 │   ├── data/                     # External data assets (sha256-locked, see src/provenance.py)
-│   └── tests/                    # pytest unit test suite (337 passed / 1 explicit skip)
+│   └── tests/                    # pytest unit test suite (345 passed / 1 skipped)
 ├── tools/gates/                  # One-command gate runner (single source of truth for CI)
 ├── scripts/                      # Utility and automation scripts
 ├── requirements.txt              # Python runtime dependencies (exact verified pins)
