@@ -108,15 +108,30 @@
 /* G32：车型平台 cell 改行内布局——原 column 布局把 select+轮胎/动力按钮堆叠在
    52px 高内，按钮溢出与下拉重叠（用户截图实证）。行内排列 + select 限宽。
    （原拆两条规则，2026-11-16 E10 合并为一条） */
-/* 性能档位（2026-11-20）：顶栏紧凑双下拉。长名（"T5 顶级光头胎"）只进 title，
-   选项只显示 "T5"/"P5" —— 否则长选项会把顶栏撑乱、与"车型平台"叠在一起。 */
-#tb .cell#perfTierCell{flex:0 0 auto;min-width:0;gap:4px;padding:0 8px;white-space:nowrap}
-#tb .perf-sel{-webkit-appearance:none;appearance:none;background:transparent;
-  border:1px solid var(--glass-bd);border-radius:var(--r-sm);color:var(--pri);
-  font:600 10px var(--font-mono);letter-spacing:.04em;line-height:18px;
-  padding:0 2px;width:46px;text-align:center;text-align-last:center;cursor:pointer}
-#tb .perf-sel:hover{border-color:var(--pri-bd);background:var(--glass-hov)}
-#tb .perf-sel:focus{outline:none;border-color:var(--pri-bd)}
+/* 性能档位（2026-11-20）：顶栏只放一个紧凑按钮，设置放浮层 —— 顶栏不再被下拉撑乱。 */
+/* 顶栏拥挤度治理（2026-11-20）：窄屏先牺牲装饰性副标题，保证功能项不被挤压/重叠。
+   1600px 时实测内容宽 1656px 溢出 74px；隐藏 415px 的 `.tt` 后 1241px，余量充足。 */
+@media (max-width: 1750px){ #tb .tt{display:none} }
+@media (max-width: 1320px){ #tb .v4-axis{min-width:0} #tb .v4-axis button{padding:3px 6px} }
+@media (max-width: 1180px){ #tb .perf-tier-btn #perfTierLabel{display:none} }
+#tb .perf-tier-btn{flex:0 0 auto;white-space:nowrap;font:600 10px var(--font-mono);letter-spacing:.03em}
+#perfTierBtn.on{border-color:var(--pri-bd);background:var(--pri-fill)}
+#perfTierPop{position:fixed;z-index:99999;display:none;min-width:250px;padding:10px 12px;
+  background:#0E1520;border:1px solid var(--pri-bd);border-radius:var(--r-lg);
+  box-shadow:0 8px 28px rgba(0,0,0,.45);color:var(--ink-2);
+  font:500 11px var(--font-ui)}
+#perfTierPop.show{display:block}
+#perfTierPop .pt-hd{font:600 10px var(--font-ui);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-3);margin-bottom:8px}
+#perfTierPop .pt-row{display:flex;align-items:center;gap:8px;margin:6px 0}
+#perfTierPop .pt-row>span{width:34px;flex:0 0 auto;color:var(--ink-3)}
+#perfTierPop select{flex:1 1 auto;min-width:0;background:#141C26;color:var(--ink-1);
+  border:1px solid var(--glass-bd);border-radius:var(--r-sm);padding:3px 6px;
+  font:500 11px var(--font-ui);cursor:pointer}
+#perfTierPop select:focus{outline:none;border-color:var(--pri-bd)}
+#perfTierPop .pt-hint{margin-top:8px;color:var(--pri);font:600 10px var(--font-mono)}
+#perfTierPop .pt-foot{margin-top:8px;padding-top:8px;border-top:1px solid var(--glass-bd);
+  color:var(--ink-3);font-size:10px;line-height:1.5}
 #tb .cell.slim{min-width:0;padding:0 9px;flex-direction:row;align-items:center;gap:6px;flex-wrap:nowrap}
 #tb .cell.slim i{flex:0 0 auto;margin-right:2px}
 #tb .cell.slim select{flex:1 1 auto;min-width:104px;max-width:220px;text-overflow:ellipsis}

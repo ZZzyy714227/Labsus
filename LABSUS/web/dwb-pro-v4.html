@@ -30,13 +30,11 @@
     </div>
 
 
-    <!-- 性能档位（2026-11-20）：轮胎 5 档 × 动力 5 档，两维自由组合；默认 T5×P5。
-         紧凑显示：选项只放 "T5"/"P5" 短标签，全名与 μ/kW 进 title（顶栏不再被长名撑乱）。 -->
-    <div class="cell slim" id="perfTierCell" title="性能档位：轮胎 × 动力，各 5 档可任意组合">
-      <i>档位</i>
-      <select id="perfTireSelect" class="perf-sel" title="轮胎档"></select>
-      <select id="perfPowerSelect" class="perf-sel" title="动力档"></select>
-    </div>
+    <!-- 性能档位（2026-11-20）：顶栏只放**一个**紧凑按钮，点开才是浮层。
+         之前直接把两个 <select> 塞进顶栏 ⇒ 连"车型平台"都被挤成 "Formula S..."。 -->
+    <button id="perfTierBtn" class="v4-mini perf-tier-btn" title="性能档位：轮胎 × 动力（点击设置）">
+      <span id="perfTierLabel">档位 —</span>
+    </button>
 
     <!-- 前轴 / 后轴 -->
     <div class="v4-seg v4-axis" title="切换调校轴（写入 S.axis）">

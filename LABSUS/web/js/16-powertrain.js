@@ -2022,24 +2022,39 @@ if (typeof window !== 'undefined') {
 (function initPerfTiers() {
   try {
     if (typeof document === 'undefined' || !document.getElementById) return;
+    var btn = document.getElementById('perfTierBtn');
+    if (!btn) return;                              // 无头环境：保持历史缺省
+    if (typeof PERF === 'undefined' || !PERF) return;
+
+    /* 浮层（点按钮才出现）：两个下拉 + 覆盖规则说明。顶栏只占一个按钮宽度。 */
+    var pop = document.getElementById('perfTierPop');
+    if (!pop) {
+      pop = document.createElement('div');
+      pop.id = 'perfTierPop';
+      pop.innerHTML =
+        '<div class="pt-hd">性能档位 · DEFAULT TIER</div>' +
+        '<label class="pt-row"><span>轮胎</span><select id="perfTireSelect"></select></label>' +
+        '<label class="pt-row"><span>动力</span><select id="perfPowerSelect"></select></label>' +
+        '<div id="perfTierHint" class="pt-hint"></div>' +
+        '<div class="pt-foot">档位是基准：轮胎/动力工坊改过参数后自动显示「自定义」，' +
+        '再选档位会以档位基准覆盖。</div>';
+      document.body.appendChild(pop);
+    }
     var ts = document.getElementById('perfTireSelect');
     var ps = document.getElementById('perfPowerSelect');
-    if (!ts || !ps) return;                       // 无头环境：保持历史缺省
-    if (typeof PERF === 'undefined' || !PERF) return;
+    if (!ts || !ps) return;
 
     PERF.apply();                                  // 默认 tire 5 + power 5
 
-    /* 顶栏空间紧：选项只放短标签（"T5"/"P5"），全名+参数放 option.title 与
-       select.title —— 之前直接塞 "T5 顶级光头胎" 会把整个顶栏撑乱、与车型平台重叠。
-       工坊改过参数时追加/选中「自定义」，让下拉不谎报档位（2026-11-20 融合）。 */
+    /* 选项只放短标签（T1…T5 / P1…P5）；全名与 μ/kW 进 title，避免长文本撑宽。 */
     function fill(sel, list, cur, prefix) {
       var html = list.map(function (x) {
         var full = (prefix || '') + x.id + ' · ' + x.name;
         return '<option value="' + x.id + '"' + (x.id === cur ? ' selected' : '') +
-               ' title="' + full + '">' + (prefix || '') + x.id + '</option>';
+               ' title="' + full + '">' + (prefix || '') + x.id + ' · ' + x.name + '</option>';
       }).join('');
       if (cur === 'custom') {
-        html += '<option value="0" selected title="由工坊手动设置（再选档位会以档位基准覆盖）">自定义</option>';
+        html += '<option value="0" selected title="由工坊手动设置（再选档位会以档位基准覆盖）">自定义（工坊）</option>';
       }
       sel.innerHTML = html;
     }
@@ -2047,19 +2062,39 @@ if (typeof window !== 'undefined') {
       fill(ts, PERF.TIRE_TIERS, PERF.PERF_TIERS.tire, 'T');
       fill(ps, PERF.POWER_TIERS, PERF.PERF_TIERS.power, 'P');
       var d = PERF.describe();
-      ts.title = '轮胎档：' + (d.tireCustom ? '自定义（轮胎工坊已接管，选 T1–T5 会以档位覆盖）'
-                                            : (d.tire ? d.tire.name + '（μ ' + d.tire.mu + '）' : ''));
-      ps.title = '动力档：' + (d.powerCustom ? '自定义（动力工坊已接管，选 P1–P5 会以档位覆盖）'
-                                            : (d.power ? d.power.name + '（' + d.power.kw + ' kW）' : ''));
+      var lab = document.getElementById('perfTierLabel');
+      var ts2 = d.tireCustom ? '自定义' : ('T' + PERF.PERF_TIERS.tire);
+      var ps2 = d.powerCustom ? '自定义' : ('P' + PERF.PERF_TIERS.power);
+      if (lab) lab.textContent = '档位 ' + ts2 + '·' + ps2;
+      btn.title = '性能档位：' + d.text + '（点击设置）';
+      ts.title = d.tireCustom ? '轮胎：自定义（轮胎工坊已接管）'
+                              : ('轮胎：' + (d.tire ? d.tire.name + '（μ ' + d.tire.mu + '）' : ''));
+      ps.title = d.powerCustom ? '动力：自定义（动力工坊已接管）'
+                               : ('动力：' + (d.power ? d.power.name + '（' + d.power.kw + ' kW）' : ''));
       var hint = document.getElementById('perfTierHint');
       if (hint) hint.textContent = d.text;
     }
-    /* 注册给 PERF：工坊反向同步时刷新下拉 */
     PERF._uiSync = sync;
+
+    function place() {
+      var r = btn.getBoundingClientRect();
+      pop.style.left = Math.max(8, Math.min(r.left, (window.innerWidth || 1200) - 270)) + 'px';
+      pop.style.top = (r.bottom + 6) + 'px';
+    }
+    function openPop() { place(); pop.classList.add('show'); btn.classList.add('on'); }
+    function closePop() { pop.classList.remove('show'); btn.classList.remove('on'); }
+    btn.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      if (pop.classList.contains('show')) closePop(); else openPop();
+    });
+    pop.addEventListener('click', function (ev) { ev.stopPropagation(); });
+    if (typeof document.addEventListener === 'function') {
+      document.addEventListener('click', closePop);
+      document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') closePop(); });
+    }
     function onChange() {
-      var t = ts.value === '0' ? 'custom' : +ts.value;
-      var pw = ps.value === '0' ? 'custom' : +ps.value;
-      PERF.apply({ tire: t, power: pw });
+      PERF.apply({ tire: ts.value === '0' ? 'custom' : +ts.value,
+                   power: ps.value === '0' ? 'custom' : +ps.value });
       sync();
     }
     ts.addEventListener('change', onChange);
