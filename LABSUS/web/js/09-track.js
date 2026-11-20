@@ -16,6 +16,21 @@ const TPHYS = (function(){
     if(!l||!l.travel||!l[key])return fb;
     return interp(l.travel,l[key],travel,fb);
   }
+  /* ★ 2026-11-20 · 联合滑移（相似法）—— 与引擎 `tire_mf.combined_force`、
+     前端 K1 `magicFormula` 同式。开关 `tire.tire_combined`（**默认关** ⇒ 历史
+     "各算各的 + 摩擦圆钳位" 逐位不变）。
+     峰值滑移量 s_peak 解析求解（与 K1 `resolveTireParams` 同一二分）：
+     峰值条件 sin(C·atan(arg))=1 ⇒ arg = tan(π/(2C))，arg = s − E(s − atan s)。 */
+  function solveSPeak(C,E){
+    if(!(C>=1))return 3.0;
+    const argT=Math.tan(Math.PI/(2*C));
+    const f=s=>s-E*(s-Math.atan(s))-argT;
+    let lo=1e-6,hi=50;
+    if(f(lo)>0)return lo;
+    if(f(hi)<0)return hi;
+    for(let i=0;i<60;i++){const mid=0.5*(lo+hi); if(f(mid)>0)hi=mid; else lo=mid;}
+    return 0.5*(lo+hi);
+  }
   function mfSetup(p){
     const B=(p.By!==undefined?p.By:20), C=(p.Cy!==undefined?p.Cy:1.2),
           E=(p.Ey!==undefined?p.Ey:-0.5), D0=p.Fy0||5250,
@@ -24,13 +39,17 @@ const TPHYS = (function(){
              缺省退化为 FzN ⇒ 旧口径逐位不变；赛道仿真由 payload 传真实静轮载。 */
           FzR=(typeof p.FzRef==='number'&&p.FzRef>0)?p.FzRef:FzN,
           Sh=p.Sh||0, Sv=p.Sv||0;
-    return function fy(aRad,fz){
+    const fy=function(aRad,fz){
       if(fz<=0)return 0;
       const d=D0*(fz/FzN)*(1-LS*(fz/FzR-1));
       const x=B*aRad+Sh;
       const arg=x-E*(x-Math.atan(x));
       return d*Math.sin(C*Math.atan(arg))+Sv;
     };
+    /* 联合滑移需要的参数暴露（只读；不改动 fy 本身的行为） */
+    fy.p={B:B,C:C,E:E,D0:D0,LS:LS,FzN:FzN,FzR:FzR,Sh:Sh,Sv:Sv};
+    fy.sPeak=solveSPeak(C,E);
+    return fy;
   }
   // --- quasi_loads as JS (port of chassis.quasiLoads; rc/kw LUT supplied) ---
   function kwAt(xs,ys,x,k0){
@@ -91,6 +110,9 @@ const TPHYS = (function(){
     this.Cg=(t.Cg!==undefined?t.Cg:6.0);
     this.Ls=(t.Ls!==undefined?t.Ls:0.35);
     this.fy=mfSetup(t);
+    /* ★ 联合滑移开关（默认关 ⇒ 历史钳位路径逐位不变）与峰值滑移率 */
+    this.tireCombined=!!(t.tire_combined===true||body.tire_combined===true);
+    this.kappaPeak=(typeof t.kappa_peak==='number'&&t.kappa_peak>0)?t.kappa_peak:0.12;
     this.L=v.wheelbase_mm/1000;
     const fms=v.front.spring_mass_kg, rms=v.rear.spring_mass_kg;
     this.b=this.L*(rms/(fms+rms)); this.a=this.L-this.b;
@@ -171,6 +193,23 @@ const TPHYS = (function(){
       const spf=("brake_split_f" in this.pt)?this.pt.brake_split_f:0.6;
       const share=w==="FR"||w==="FL"?spf/2:(1-spf)/2;
       fx=-Math.sign(vwx)*Math.min(muFz,brk*share*14000);
+    }
+    /* ★ 联合滑移（相似法）：纵向需求与侧偏角合成总滑移后查 MF，方向分解。
+       与引擎 `tire_mf.combined_force` 同式（同一 s_peak 解析解、同一 μFz 尺度）。
+       开关关闭时走历史"各自算 + 摩擦圆钳位"，逐位不变。 */
+    if(this.tireCombined){
+      const P=this.fy.p, kp=this.kappaPeak, sp=this.fy.sPeak;
+      const kappa=Math.max(-kp,Math.min(kp,fx*kp/Math.max(muFz,1)));
+      const sx=sp*(kappa/kp), sy=P.B*Math.tan(aLat);
+      const sTot=Math.hypot(sx,sy);
+      if(sTot>1e-12){
+        const arg=sTot-P.E*(sTot-Math.atan(sTot));
+        const F=muFz*Math.sin(P.C*Math.atan(arg));
+        fx=F*sx/sTot;
+        fy=-F*sy/sTot-this.Cg*camRad*fz;      // 外倾推力（线性）叠加一次
+        const cap=Math.sqrt(Math.max(0,muFz*muFz-fx*fx));
+        fy=Math.max(-cap,Math.min(cap,fy));   // 外倾项可能越界 ⇒ 圆钳位兜底
+      }
     }
     const latAvail=Math.sqrt(Math.max(0,muFz*muFz-fx*fx));
     fy=Math.max(-latAvail,Math.min(latAvail,fy));
