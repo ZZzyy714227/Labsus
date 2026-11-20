@@ -64,11 +64,17 @@ const CAR_CAPABILITY = (function () {
       a && a.arb && a.arb.d, a && a.arb && a.arb.t,
     ].join(',');
     const q = (S && S.qs) || {};
+    /* 2026-11-20（N1）：质量必须用**真实字段** `mTotal`（预设里没有 `S.m`）。
+       旧式写 `S && S.m` ⇒ 指纹里恒为 "undefined"，用户只改总质量时缓存不失效，
+       能力表会沿用旧测值。同理去掉不存在的 `S.tire` / `S.powertrain` 探测。 */
+    const _tR = (a) => (a && a.tire && a.tire.R) || 0;
     return [
-      (S && S.vehicleType) || '?', S && S.m, S && S.wb, S && S.hcg,
+      (S && S.vehicleType) || '?',
+      (S && S.mTotal) || 0, (S && S.mSprung) || 0,
+      S && S.wb, S && S.hcg, S && S.hs,
       ax(S && S.front), ax(S && S.rear),
-      q.aeroF, q.speed, (S && S.tire && S.tire.R),
-      (S && S.powertrain && S.powertrain.power_kW) || (S && S.power) || 0,
+      q.aeroF, q.speed,
+      Math.max(_tR(S && S.front), _tR(S && S.rear)),
     ].join('|');
   }
 
@@ -239,8 +245,7 @@ const CAR_CAPABILITY = (function () {
        于是气动增益 `1 + F_down/W` 对 gt3 被放大 5 倍（W 本该 12.3 kN 却按 2.3 kN 算），
        实测 gt3 加速极限在 50 m/s 处谎报 4.39 m/s²（真值 ~2.2）。 */
     const m = Math.max(150,
-      (typeof S.mTotal === 'number' && S.mTotal > 0) ? S.mTotal
-        : ((typeof S.m === 'number' && S.m > 0) ? S.m : 1000));
+      (typeof S.mTotal === 'number' && S.mTotal > 0) ? S.mTotal : 1000);
     const W = m * G;
 
     _cache = {

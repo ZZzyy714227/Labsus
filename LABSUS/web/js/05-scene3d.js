@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 function EC(key, fallback){
   if(!S.show.entityColor) return fallback;
   return (typeof ENTITY_COLORS !== 'undefined' && ENTITY_COLORS[key]) || fallback;
@@ -1045,7 +1045,16 @@ function fitView(v){
      尺寸标注线——它们会画到硬点云之外约一个轮胎半径。旧实现只按硬点云取景，
      于是"贴合"时车实际被裁掉一圈（实测 1:2.0 时前后轮与尾翼全部出画）。
      这里在包围盒两侧各加一个轮胎半径的余量；同时对整体留 82% 的目标占比。 */
-  const pad = (typeof S!=="undefined" && S.tire && S.tire.R) ? S.tire.R*1.05 : 260;
+  /* 2026-11-20（N1）：旧式读 `S.tire.R`，但预设只有 `S.front.tire` / `S.rear.tire`
+     —— `S.tire` 恒 undefined，于是**永远回落 260 mm**。gt3 胎半径 300（留白应 315）
+     被少留 17% ⇒ 贴边时轮胎被裁。取前后轴轮胎半径的较大值。 */
+  const _tireR = (() => {
+    if (typeof S === 'undefined' || !S) return 0;
+    const fr = (S.front && S.front.tire && S.front.tire.R) || 0;
+    const rr = (S.rear && S.rear.tire && S.rear.tire.R) || 0;
+    return Math.max(fr, rr);   // 预设只有分轴 tire，`S.tire` 从不存在
+  })();
+  const pad = _tireR > 0 ? _tireR * 1.05 : 260;
   const FILL = 0.82;
   if(v.type==="o"){
     let a0=1e9,a1=-1e9,b0=1e9,b1=-1e9;

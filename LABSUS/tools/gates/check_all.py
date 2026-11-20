@@ -1,4 +1,4 @@
-"""一条命令跑完全部门禁（T4，2026-10-20）
+﻿"""一条命令跑完全部门禁（T4，2026-10-20）
 
 把散落在 CLAUDE.md / DEVLOG / CI 里的验收判据收敛成**可执行检查**，
 逐条输出 PASS/FAIL，任一失败则退出码非零。
@@ -54,6 +54,9 @@ NODE_SUITES = (
     "test_compliance_steer.js",
     # 线 B · B4（2026-11-19）：四内核轮胎口径对拍（K1 vs K3 逐点；缺口 10/9 已量化）
     "test_tire_parity.js",
+    # N1（2026-11-20）：配置字段契约——代码读的 S.* 字段必须真实存在。
+    # 事故前科：CAR_CAPABILITY 读不存在的 S.m ⇒ 恒用 235kg；05-scene3d 读 S.tire ⇒ 恒用 260mm。
+    "test_config_contract.js",
     # P29（2026-11-20）：车能力表——速度包络改由 15-DOF 实测（opt-in，默认逐位不变）。
     # 锁定能力实测合理性 / 气动 v² 项 / 剖面不变量 / 确定性 / opt-in 边界 / 几何敏感性。
     "test_car_capability.js",
