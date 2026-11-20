@@ -301,6 +301,15 @@ Python 侧由 `tests/test_differential.py::test_distribute_axle_matches_cross_la
 
 **跨内核状态**：K2（`09-track.js` TPHYS）与 K3（`engine/tire_mf.py`）一直用 `Fy0/FzNom`；
 K1 在开关关闭时是唯一异类（已知，B4 登记）。开关打开后四内核同源。
+## 模态审计仅引擎侧（2026-11-20）
+
+`warp_rate_n_m` / `mode_coupling_ratio` 由 Python 引擎（`suspension_audit` → `chassis.py`）
+计算并随 `/api/v3/chassis/solve` 返回。**前端本地路径（`03-mechanism.js` 的 solveQuasiStatic）
+没有对应实现**，故引擎离线时 KPI 面板该行显示占位符。
+
+口径依据：这两个量由已被对拍锁定的量（`kwf/kwr`、`kphi_arb`、`tf/tr`）纯代数导出，
+不含新建模假设；前端若要补，应镜像 `suspension_modes.TRANSFORM` 与
+`arb_corner_stiffness` 的同一公式（`a = k_arb/(4·t_half²)`），不得另立口径。
 ## 历史退化路径（M19 / T4 登记，2026-09-20）
 
 以下路径**保留但不代表物理**，仅用于"没有更完整模型时"的兜底。**不要把它们当作差速器/轮胎模型的实现**，

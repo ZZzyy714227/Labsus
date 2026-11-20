@@ -19,12 +19,12 @@
       "note": "减振器四象限表的 Python 参考实现。运行时消费者是前端 JS（17-damper4q.js 由 04-dynamics.js 调用，两薄壳均加载）；本模块只被 test_damper_table 引用。数据源 engine/data/dampers/*.csv"
     },
     "src.components.suspension_audit": {
-      "role": "research_tool",
-      "note": "四模式模态交叉审计（T5-b）。结论（ARB 只贡献 roll 模式、roll-warp 耦合）由 test_suspension_audit 锁定，无产品面。接线候选：四模式调校面板"
+      "role": "runtime",
+      "note": "2026-11-20 **已接线**：chassis.py 在 loads 里输出 warp_rate_n_m（warp 模态刚度）与 mode_coupling_ratio（roll↔warp 耦合比），前端 KPI 面板显示。此前只被测试引用（research_tool），属'设计无使用'。回归：tests/test_chassis_modal_wiring.py"
     },
     "src.components.suspension_modes": {
-      "role": "research_tool",
-      "note": "四模式模态基（T 矩阵）。生产消费者仅为 suspension_audit；本身无产品面"
+      "role": "runtime",
+      "note": "四模式模态基（T 矩阵），经 suspension_audit 进入 chassis.py 的 loads 计算"
     },
     "src.tire_data": {
       "role": "design_reference",
@@ -58,6 +58,16 @@
     "src.solver.wheel_dof": {
       "wheel_inertia": "簧下转动惯量解析式，供分析与校验用；生产用 tire R + mU 的内联式，故意不走这里以免口径分叉",
       "steady_slip_ratio": "准稳态滑移率反解，供分析/测试用"
+    },
+    "src.components.suspension_audit": {
+      "roll_warp_ratio_is_constrained": "解析判据函数（ARB 是否约束 roll-warp 耦合），由 test_suspension_audit 断言；chassis.py 只消费 modal_audit 的输出"
+    },
+    "src.components.suspension_modes": {
+      "to_modes": "逐角→模态基变换，供分析与测试；chassis.py 经 modal_audit 间接使用",
+      "from_modes": "模态→逐角反变换，供分析与测试",
+      "corner_forces": "模态力→逐角力，供分析",
+      "modal_energy": "模态弹能，供分析",
+      "roll_stiffness_nm_per_rad": "由模态刚度反推侧倾刚度，供交叉核对"
     }
   }
 }

@@ -30,6 +30,7 @@ from src.api.v3models import (
     VehicleSpec,
 )
 from src.api.v3service import _new_mech, mirror_left, pose_metrics
+from src.components.suspension_audit import modal_audit, per_corner_stiffness_matrix
 from src.metrics.kandc import _slope  # F-13：单一差分内核（全局共用）
 from src.solver.mechanism.solver import solve_pose
 from src.tire_mf import cornering_stiffness  # M5：Cα 唯一实现（避免第三份拷贝）
@@ -433,6 +434,25 @@ def quasi_loads(vehicle: VehicleSpec, q: QuasiInputs,
     f_jack = f_jack_f + f_jack_r
     jack_heave_mm = f_jack / ((kw_f0 + kw_r0) / 1000.0)   # 簧载 heave（mm）
 
+    # ── 模态审计（2026-11-20 接线：此前 `suspension_audit` 只被测试引用）──
+    # 把「逐角弹簧 + ARB」的 4×4 刚度矩阵变换到 heave/roll/pitch/warp 模态基。
+    # 对用户真正有用的两个量：
+    #   · warp 模态刚度 —— 单轮受扰（过路肩/减速带）时车身的实际抵抗，ARB 对它无贡献
+    #   · roll↔warp 耦合比 —— ARB 只进 roll，但会把 roll 与 warp 耦合起来，这是
+    #     "加大前 ARB 为什么也让单轮工况变硬"的定量解释
+    # 单位换算：audit 的 k_arb 定义是 a = k_arb/(4·t_half²)，而本文件的 kphi_arb 是
+    # **侧倾刚度** = 2·a·t_half² ⇒ k_arb = 2·kphi_arb。半轮距 = 全轮距/2。
+    _K4 = per_corner_stiffness_matrix(
+        [kwf, kwf, kwr, kwr],
+        arb_front_nm_rad=2.0 * kphi_arb_f,
+        arb_rear_nm_rad=2.0 * kphi_arb_r,
+        half_track_front_m=tf / 2.0,
+        half_track_rear_m=tr / 2.0,
+    )
+    _ma = modal_audit(_K4)
+    warp_rate = float(_ma["modal_rates"]["warp"])
+    coupling_ratio = float(_ma["coupling_ratio"])
+
     return ChassisLoads(
         roll_deg=roll_deg, roll_grad_deg_per_g=roll_grad,
         kphi_f=kphi_f * D2R, kphi_r=kphi_r * D2R, kphi_tot=kphi_tot * D2R,
@@ -444,6 +464,8 @@ def quasi_loads(vehicle: VehicleSpec, q: QuasiInputs,
         us_grad_deg_per_g=round(us_grad, 4),
         alpha_f_deg=round(alpha_f, 4), alpha_r_deg=round(alpha_r, 4),
         jacking_f_n=round(f_jack, 1), jacking_heave_mm=round(jack_heave_mm, 4),
+        warp_rate_n_m=round(warp_rate, 1),
+        mode_coupling_ratio=round(coupling_ratio, 6),
     )
 
 

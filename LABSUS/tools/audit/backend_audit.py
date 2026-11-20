@@ -66,7 +66,7 @@ def collect_py_files(root: Path, *, include_tests: bool) -> list[Path]:
 def imported_modules(path: Path) -> set[str]:
     """本文件 import 了哪些 `src.*` 模块（按模块名归一）。"""
     try:
-        tree = ast.parse(path.read_text(encoding="utf-8"))
+        tree = ast.parse(path.read_text(encoding="utf-8-sig"))
     except SyntaxError:
         return set()
     found: set[str] = set()
@@ -85,7 +85,7 @@ def imported_modules(path: Path) -> set[str]:
 
 def top_level_defs(path: Path) -> list[str]:
     try:
-        tree = ast.parse(path.read_text(encoding="utf-8"))
+        tree = ast.parse(path.read_text(encoding="utf-8-sig"))
     except SyntaxError:
         return []
     return [n.name for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
@@ -139,7 +139,7 @@ def main(argv: list[str]) -> int:
 
     doc = {}
     if ROLES_FILE.exists():
-        doc = json.loads(ROLES_FILE.read_text(encoding="utf-8"))
+        doc = json.loads(ROLES_FILE.read_text(encoding="utf-8-sig"))   # 容忍 BOM（Windows 编辑器常见）
     roles = doc.get("modules", {})
     ep_roles = doc.get("__endpoints__", {})
     exported_ok = doc.get("__exported_ok__", {})
@@ -170,7 +170,7 @@ def main(argv: list[str]) -> int:
         })
 
     # ── 模块内"定义了但外部没人引用"的顶层函数/类 ──────────────
-    prod_src = {p: p.read_text(encoding="utf-8", errors="ignore") for p in prod_files}
+    prod_src = {p: p.read_text(encoding="utf-8-sig", errors="ignore") for p in prod_files}
     unused_defs = []
     for path in prod_files:
         text = prod_src[path]
@@ -194,6 +194,31 @@ def main(argv: list[str]) -> int:
             if path.name == "server.py":       # 路由处理器由框架调用
                 continue
             unused_defs.append({"module": mod, "name": name})
+
+    # ── 请求模型里"声明了但引擎从不读取"的字段 ──────────────────
+    # 这类字段最危险：前端传了、Pydantic 收下、然后被静默忽略（和前端 S.m 事故同源）。
+    # 只查 *Request / *Inputs 结尾的输入模型；响应模型由构造方填，不适用同一判据。
+    field_hits = []
+    for path in prod_files:
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8-sig"))
+        except SyntaxError:
+            continue
+        for node in tree.body:
+            if not isinstance(node, ast.ClassDef):
+                continue
+            if not (node.name.endswith("Request") or node.name.endswith("Inputs")):
+                continue
+            for stmt in node.body:
+                if not isinstance(stmt, ast.AnnAssign) or not isinstance(stmt.target, ast.Name):
+                    continue
+                fname = stmt.target.id
+                others = "\n".join(v for k, v in prod_src.items() if k != path)
+                if re.search(r"\." + re.escape(fname) + r"\b", others) or \
+                   re.search(r"""\[['"]""" + re.escape(fname), others):
+                    continue
+                field_hits.append({"model": node.name, "field": fname,
+                                   "module": module_name(path, ENGINE)})
 
     eps = endpoints()
     calls = frontend_api_calls()
@@ -240,6 +265,10 @@ def main(argv: list[str]) -> int:
             print("确属独立参考实现/设计期校核的，在 module_roles.json 的 __exported_ok__ 里登记）：")
             for u in unused_defs:
                 print(f"  - {u['module']}.{u['name']}")
+        if field_hits:
+            print(f"\n请求模型里声明但引擎从不读取的字段（{len(field_hits)} 个）：")
+            for f in field_hits:
+                print("  - " + f["module"] + "." + f["model"] + "." + f["field"])
         if problems:
             print(f"\n发现 {len(problems)} 个待处理项：")
             for p in problems:

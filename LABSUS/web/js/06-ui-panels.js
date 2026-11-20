@@ -1071,6 +1071,10 @@ function chassisRender(){
       ["前轴载荷转移","UNS "+fmt(L.dFz_u_f,0)+" + GEO "+fmt(L.dFz_geo_f,0)+" + ELA "+fmt(L.dFz_elas_f,0)+" = "+fmt(L.dFz_f_tot,0)+" N",C.tie],
       ["四轮接地载荷","FL "+fmt(fz.FL,0)+" · FR "+fmt(fz.FR,0)+" · RL "+fmt(fz.RL,0)+" · RR "+fmt(fz.RR,0)+" N",C.kp],
       ["TLLTD 前轴占比",""+fmt(L.tlltd_pct,1)+"%",(L.tlltd_pct>54)?C.nodeFix:((L.tlltd_pct<47)?C.ela:C.pathC)],
+      /* 模态审计（2026-11-20 接线）：引擎侧把逐角刚度+ARB 变到 heave/roll/pitch/warp 基。
+         warp = 单轮受扰时的抵抗（ARB 无贡献）；耦合比量化"加 ARB 让单轮工况变硬"。
+         仅引擎在线时提供（前端本地路径无此分析），缺值时显示占位。 */
+      ["模态审计","warp "+fmt(L.warp_rate_n_m,0)+" N/m · roll↔warp 耦合 "+fmt(L.mode_coupling_ratio,3),C.knu],
     ];
     rows.forEach(([lb,val,col])=>{
       const r2=E("div","ro");r2.appendChild(E("span",null,lb));

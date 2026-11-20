@@ -357,6 +357,11 @@ class ChassisLoads(BaseModel):
     # Jacking 效应：侧向力经 RC 传递的垂向分量（正 = 抬升簧载）
     jacking_f_n: float = 0.0
     jacking_heave_mm: float = 0.0
+    # 模态审计（2026-11-20 接线 src/components/suspension_audit.py）：
+    # warp 模态刚度 = 单轮受扰时车身抵抗（ARB 无贡献）；耦合比 = 非对角/对角最大值，
+    # 量化"加 ARB 让单轮工况变硬"的程度。无因次，便于跨布置比较。
+    warp_rate_n_m: float = 0.0
+    mode_coupling_ratio: float = 0.0
 
 
 class ChassisPoseResponse(BaseModel):
