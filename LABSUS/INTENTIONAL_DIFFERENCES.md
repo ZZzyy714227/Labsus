@@ -103,6 +103,32 @@
 界面下拉（`perfTireSelect` / `perfPowerSelect`）、K1 15-DOF、K2 TPHYS、K3 引擎请求
 都从这里取值。**禁止**在别处另写一套档位数字（会出现"界面显示一档、物理跑另一档"）。
 
+### 与两个既有设计系统的融合（2026-11-20 补，**重要**）
+
+档位系统**不另立一套物理状态**。权威状态仍是：
+- 轮胎：`TIRE_LAB.active`（轮胎工坊，写 `S[axle].tire`/`kT`/`SIM.userTire`）
+- 动力：`POWERTRAIN.spec`（动力工坊，含预设/自定义/草稿）
+
+档位只是"**基准选择器**"，双向同步：
+
+| 方向 | 行为 |
+|---|---|
+| 选档位 → 工坊 | 轮胎走 `TIRE_LAB.applyToState()`（正统入口，`active.name` 带 `档位T5·…` 标记）；动力走 `POWERTRAIN.setSpec()`（在**工坊当前基准**上乘倍率，不是永远乘 defaultSpec）|
+| 工坊改参数 → 档位 | 档位标记为 `'custom'`，界面下拉显示「自定义」，不再谎报档位 |
+| 再选档位 | 以档位为基准覆盖（用户意图明确），工坊参数回到档位值 |
+| 恢复内置 | 轮胎回 **T3**（内置胎=引擎缺省 μ1.50）；动力回 **P3**（legacy-equivalent，×1.00）|
+
+实现要点（都在代码注释里）：
+- `PERF._applying` 守卫：我们自己 seed 时工坊 hook 不判自定义
+- `POWERTRAIN.setSpec` 与 `TIRE_LAB.applyToState` 末尾各有一个**反向通知 hook**
+  （`typeof PERF` 保护；14 早于 16 加载时的 TDZ 也安全）
+- 动力"自定义"判定用**上次写入指纹**优先：工坊原样 apply 不算改；
+  在工坊里微调扭矩曲线（即使残留 perfTier 标记）仍会正确判为自定义
+- `TIRE_LAB.applyToState` 的 name 优先级修正为 `传入 name > 旧 active.name`
+  （旧逻辑会把档位标记抹掉 ⇒ 误判自定义）
+- 轮胎档"自定义"时，`PERF.activeTireParams()` 直接取 `SIM.userTire`，
+  保证 K2/K3 载荷跟工坊实际值同源
+
 ### 两个维度的接线
 
 | 维度 | 写入点 | 说明 |

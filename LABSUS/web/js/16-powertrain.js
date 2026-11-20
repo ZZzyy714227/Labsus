@@ -84,6 +84,13 @@ const POWERTRAIN = {
     if (!v.ok) return v;
     this.spec = JSON.parse(JSON.stringify(sp));
     this.resetState();
+    /* 2026-11-20（性能档位融合）：工坊/预设改规格时通知档位层。
+       我们自己写档位规格时 `PERF._applying === true`，不会误判成用户自定义；
+       外部调用（工坊选预设/应用草稿）则把档位标记为「自定义」。 */
+    try {
+      if (typeof PERF !== 'undefined' && PERF && PERF._applying !== true &&
+          typeof PERF.onPowerChanged === 'function') PERF.onPowerChanged(this.spec);
+    } catch (e) { /* PERF 尚未定义（本文件头部 setSpec(defaultSpec) 初始化）：忽略 */ }
     return v;
   },
   resetState() {
@@ -1789,67 +1796,204 @@ const PERF_TIERS = { tire: 5, power: 5 };
 const PERF = {
   TIRE_TIERS, POWER_TIERS, PERF_TIERS,
 
+  /* ── 与两个既有设计系统的融合状态（2026-11-20 补）────────────────────────
+     本模块**不另立一套物理状态**：轮胎的权威状态在 `TIRE_LAB.active`（写
+     `S[axle].tire`/`kT`/`SIM.userTire`），动力的权威状态在 `POWERTRAIN.spec`。
+     档位只是"基准选择器"（seed）：
+       · 选档位  → 把该档参数**灌进工坊**（工坊打开时看到的就是档位值）
+       · 改工坊  → 档位标记为 `'custom'`（界面显示"自定义"），不再谎报档位
+       · 再选档  → 以档位为基准重新覆盖（用户意图明确，不是静默覆盖）
+     关系登记见 INTENTIONAL_DIFFERENCES.md「性能档位 × 两个设计系统」。 */
+  _applying: false,       // 防止"我们自己写状态"被工坊 hook 误判成用户自定义
+  _powerBase: null,       // 动力基准规格（工坊选的预设/自定义），档位在它之上乘倍率
+
+  _clampTier(v, list) {
+    const n = Number(v);
+    return list.some(x => x.id === n) ? n : null;
+  },
+
   tireParams(id) {
-    const t = TIRE_TIERS.find(x => x.id === Number(id)) || TIRE_TIERS[2];
+    const n = this._clampTier(id, TIRE_TIERS) || TIRE_TIERS[2].id;
+    const t = TIRE_TIERS.find(x => x.id === n);
     return { Fy0: t.Fy0, By: t.By, Cy: t.Cy, Ey: t.Ey, FzNom: t.FzNom, LS: t.LS, Cg: t.Cg, Ls: t.Ls, tier: t.id, tierName: t.name };
+  },
+  /** 当前**实际生效**的轮胎参数：档位模式下取档位表；自定义模式下取工坊写入的 userTire。 */
+  activeTireParams() {
+    if (PERF_TIERS.tire !== 'custom') return this.tireParams(PERF_TIERS.tire);
+    const ut = (typeof SIM !== 'undefined' && SIM && SIM.userTire) ? SIM.userTire : null;
+    if (!ut) return this.tireParams(3);
+    return {
+      Fy0: ut.Fy0, By: ut.By, Cy: ut.Cy, Ey: ut.Ey, FzNom: ut.FzNom,
+      LS: ut.LS, Cg: ut.Cg, Ls: ut.Ls, tier: 'custom', tierName: '自定义（轮胎工坊）'
+    };
   },
   powerTier(id) {
     return POWER_TIERS.find(x => x.id === Number(id)) || POWER_TIERS[2];
   },
-  /** 生成该档位的动力规格：深拷贝基准规格后缩放扭矩曲线（不改其它字段） */
-  powerSpec(id) {
+  /** 生成该档位的动力规格：深拷贝**基准**规格后缩放扭矩/电机（不改其它字段）。
+     基准 = 工坊当前选中的预设或自定义（`_powerBase`），缺省才回落 defaultSpec。 */
+  powerSpec(id, base) {
     const tier = this.powerTier(id);
-    const sp = JSON.parse(JSON.stringify(POWERTRAIN.defaultSpec()));
+    const b = base || this._powerBase || POWERTRAIN.defaultSpec();
+    const sp = JSON.parse(JSON.stringify(b));
+    delete sp.perfTier; delete sp.perfTierName;
     if (sp.ice && Array.isArray(sp.ice.map)) {
       sp.ice.map = sp.ice.map.map(([rpm, tq]) => [rpm, tq * tier.tqScale]);
+    }
+    /* EV/powersplit 预设也要能被档位放大：电机峰值扭矩/功率同比缩放 */
+    ["motorF", "motorR"].forEach(k => {
+      if (sp[k] && typeof sp[k] === "object") {
+        if (typeof sp[k].peakTorqueNm === "number") sp[k].peakTorqueNm *= tier.tqScale;
+        if (typeof sp[k].peakPowerKw === "number") sp[k].peakPowerKw *= tier.tqScale;
+      }
+    });
+    if (sp.battery && typeof sp.battery.maxDischargeKw === "number") {
+      sp.battery.maxDischargeKw *= Math.max(1, tier.tqScale);
     }
     sp.perfTier = tier.id;
     sp.perfTierName = tier.name;
     return sp;
   },
-  /** 应用档位（夹具：轮胎→SIM.userTire；动力→POWERTRAIN.setSpec） */
+  /** 用档位参数去 seed 轮胎工坊（走它的正统 `applyToState`，不是旁路写 SIM） */
+  _seedTireLab(tp) {
+    if (typeof TIRE_LAB === 'undefined' || !TIRE_LAB || typeof TIRE_LAB.applyToState !== 'function') {
+      /* 无工坊（无头沙箱/旧快照）：退回最小写入，保持 `resolveTireParams` 第②层可用 */
+      if (typeof SIM !== 'undefined' && SIM) {
+        SIM.userTire = tp;
+        SIM.tireCalibEy = tp.Ey;
+      }
+      return false;
+    }
+    const cfg = { front: null, rear: null, mf: {
+      Fy0: tp.Fy0, FzNom: tp.FzNom, By: tp.By, Cy: tp.Cy, Ey: tp.Ey, LS: tp.LS, Cg: tp.Cg
+    }, name: this._tierTireName(tp) };
+    let p0 = 180;
+    try { p0 = TIRE_LAB.pressureBase(S.vehicleType); } catch (e) { p0 = 180; }
+    ["front", "rear"].forEach(ax => {
+      const cur = (typeof S !== 'undefined' && S && S[ax] && S[ax].tire) ? S[ax].tire : {};
+      cfg[ax] = {
+        R: cur.R || 230, W: cur.W || 175, rim: cur.rim || 127,
+        rimW: cur.rimW || cur.W || 175, et: cur.et || 0, p: p0
+      };
+    });
+    TIRE_LAB.applyToState(cfg);
+    return true;
+  },
+  _tierTireName(tp) { return '档位T' + tp.tier + '·' + (tp.tierName || ''); },
+
+  /** 应用档位（唯一入口；界面下拉与启动都走这里） */
   apply(patch) {
-    if (patch) {
-      if (patch.tire !== undefined) PERF_TIERS.tire = Number(patch.tire);
-      if (patch.power !== undefined) PERF_TIERS.power = Number(patch.power);
-    }
-    const tp = this.tireParams(PERF_TIERS.tire);
-    if (typeof SIM !== 'undefined' && SIM) {
-      SIM.userTire = tp;                       // resolveTireParams 第②层
-      SIM.tireCalibEy = tp.Ey;                 // Ey 与引擎 payload 同口径
-    }
-    const sp = this.powerSpec(PERF_TIERS.power);
-    POWERTRAIN.setSpec(sp);
-    if (typeof S !== 'undefined' && S) {
-      S.perfTiers = { tire: PERF_TIERS.tire, power: PERF_TIERS.power };
-    }
-    /* 换档 ⇒ 车能力表必须重测（横向/制动/加速能力都随胎与动力变）。
-       指纹已含胎种与峰值扭矩，这里再加一道显式失效，杜绝任何遗漏路径让
-       "界面换了档、判定还是旧值"。 */
+    const prev = this._applying;
+    this._applying = true;
     try {
-      if (typeof CAR_CAPABILITY !== 'undefined' && CAR_CAPABILITY &&
-          typeof CAR_CAPABILITY.invalidate === 'function') CAR_CAPABILITY.invalidate();
-    } catch (e) { /* 旧沙箱无能力表：忽略 */ }
+      if (patch) {
+        if (patch.tire !== undefined) {
+          const n = this._clampTier(patch.tire, TIRE_TIERS);
+          PERF_TIERS.tire = (n === null) ? 'custom' : n;
+        }
+        if (patch.power !== undefined) {
+          const n = this._clampTier(patch.power, POWER_TIERS);
+          PERF_TIERS.power = (n === null) ? 'custom' : n;
+        }
+      }
+      /* 轮胎：档位模式才 seed；自定义模式下保持工坊当前值（不再覆盖用户编辑） */
+      if (PERF_TIERS.tire !== 'custom') this._seedTireLab(this.tireParams(PERF_TIERS.tire));
+      /* 动力：档位模式才写 spec；自定义模式保持工坊当前规格 */
+      if (PERF_TIERS.power !== 'custom') {
+        POWERTRAIN.setSpec(this.powerSpec(PERF_TIERS.power));
+        /* 记录"这是我们自己写的"指纹：工坊若只是原样 apply（未改数值），不该被判自定义 */
+        try { this._lastSpecJSON = JSON.stringify(POWERTRAIN.spec); } catch (e) {}
+      } else if (!this._powerBase && POWERTRAIN.spec) {
+        this._powerBase = JSON.parse(JSON.stringify(POWERTRAIN.spec));
+      }
+      if (typeof S !== 'undefined' && S) {
+        S.perfTiers = { tire: PERF_TIERS.tire, power: PERF_TIERS.power };
+      }
+      /* 换档 ⇒ 车能力表必须重测（横向/制动/加速能力都随胎与动力变）。 */
+      try {
+        if (typeof CAR_CAPABILITY !== 'undefined' && CAR_CAPABILITY &&
+            typeof CAR_CAPABILITY.invalidate === 'function') CAR_CAPABILITY.invalidate();
+      } catch (e) { /* 旧沙箱无能力表：忽略 */ }
+    } finally {
+      this._applying = prev;
+    }
+    this.refreshUI();
     return this.describe();
   },
+
+  /* ── 工坊 → 档位 的反向同步（由 TIRE_LAB.applyToState / POWERTRAIN.setSpec 调用）── */
+  onTireChanged(name) {
+    if (this._applying) return;
+    /* 我们自己 seed 的名字不算用户自定义 */
+    if (typeof name === 'string' && name.indexOf('档位T') === 0) return;
+    /* 「恢复内置」= 引擎缺省胎 = T3（μ1.50），不是"自定义" */
+    if (name === '内置') { PERF_TIERS.tire = 3; this.refreshUI(); return; }
+    PERF_TIERS.tire = 'custom';
+    if (typeof S !== 'undefined' && S) S.perfTiers = { tire: PERF_TIERS.tire, power: PERF_TIERS.power };
+    this.refreshUI();
+  },
+  onPowerChanged(spec) {
+    if (this._applying) return;
+    /* ① 与我们上次写入的规格逐字节相同 ⇒ 是我们自己的，不算用户自定义 */
+    try { if (this._lastSpecJSON && JSON.stringify(spec) === this._lastSpecJSON) return; } catch (e) {}
+    /* ② 带 perfTier 标记但数值被改过 ⇒ 仍是用户编辑（不能只看标记，否则
+          "在工坊里微调扭矩曲线后档位还谎报档位"）。 */
+    if (spec && spec.perfTier !== undefined) {
+      PERF_TIERS.power = 'custom';
+      this._powerBase = JSON.parse(JSON.stringify(spec));
+      delete this._powerBase.perfTier; delete this._powerBase.perfTierName;
+      if (typeof S !== 'undefined' && S) S.perfTiers = { tire: PERF_TIERS.tire, power: PERF_TIERS.power };
+      this.refreshUI();
+      return;
+    }
+    /* 「恢复内置」= legacy-equivalent = P3（tqScale 1.00），不是"自定义" */
+    let isDefault = false;
+    try { isDefault = (JSON.stringify(spec) === JSON.stringify(POWERTRAIN.defaultSpec())); } catch (e) {}
+    if (isDefault) { PERF_TIERS.power = 3; this.refreshUI(); return; }
+    PERF_TIERS.power = 'custom';
+    if (spec) {
+      this._powerBase = JSON.parse(JSON.stringify(spec));   // 工坊选中/编辑的规格成为新基准
+      delete this._powerBase.perfTier;
+    }
+    if (typeof S !== 'undefined' && S) S.perfTiers = { tire: PERF_TIERS.tire, power: PERF_TIERS.power };
+    this.refreshUI();
+  },
+  /** 让界面下拉反映当前状态（initPerfTiers 会注册具体实现） */
+  _uiSync: null,
+  refreshUI() { try { if (typeof this._uiSync === 'function') this._uiSync(); } catch (e) {} },
+
   /** 引擎侧（K3）载荷：T_max / P_kw 按档位等效值 */
   powerPayload() {
-    const tier = this.powerTier(PERF_TIERS.power);
+    const custom = (PERF_TIERS.power === 'custom');
+    const tier = custom ? null : this.powerTier(PERF_TIERS.power);
     /* ⚠ K3 的 `PowertrainParams` 要**真实量级**（T_max N·m / P_kw kW）；
        而 K1 用的基准 spec 是 LEGACY-EQUIVALENT 占位（恒定 1200 扭矩等效），
        由它反推 kW 会得到 2000+ kW 的荒谬值（实测 2035.8 kW）。故这里直接用档位表
-       的物理等效值，不从前端 spec 反算。 */
+       的物理等效值，不从前端 spec 反算。自定义动力按基准规格峰值扭矩估算。 */
+    let tmax, kw;
+    if (tier) { tmax = tier.tmax; kw = tier.kw; }
+    else {
+      const sp = POWERTRAIN.spec || this._powerBase || POWERTRAIN.defaultSpec();
+      const map = (sp.ice && Array.isArray(sp.ice.map)) ? sp.ice.map : [];
+      tmax = map.length ? map.reduce((m, r) => Math.max(m, Number(r[1]) || 0), 0) : 0;
+      kw = map.length ? map.reduce((mx, r) => Math.max(mx, (Number(r[1]) * Number(r[0]) * 2 * Math.PI / 60) / 1000), 0) : 0;
+      if (sp.motorR && sp.motorR.peakPowerKw) kw += sp.motorR.peakPowerKw;
+    }
     return {
-      T_max: tier.tmax,
-      P_kw: tier.kw,
+      T_max: +(+tmax).toFixed(1),
+      P_kw: +(+kw).toFixed(1),
       drive_split_f: 0,
-      tire: this.tireParams(PERF_TIERS.tire)
+      tire: this.activeTireParams()
     };
   },
   describe() {
-    const t = TIRE_TIERS.find(x => x.id === Number(PERF_TIERS.tire));
-    const p = this.powerTier(PERF_TIERS.power);
-    return { tire: t, power: p, text: `${t ? t.name : '?'} × ${p ? p.name : '?'}` };
+    const tc = (PERF_TIERS.tire === 'custom');
+    const pc = (PERF_TIERS.power === 'custom');
+    const t = tc ? null : TIRE_TIERS.find(x => x.id === Number(PERF_TIERS.tire));
+    const p = pc ? null : POWER_TIERS.find(x => x.id === Number(PERF_TIERS.power));
+    const tn = tc ? '自定义（轮胎工坊）' : (t ? t.name : '?');
+    const pn = pc ? '自定义（动力工坊）' : (p ? p.name : '?');
+    return { tire: t, power: p, tireCustom: tc, powerCustom: pc, text: tn + ' × ' + pn };
   }
 };
 
@@ -1886,23 +2030,36 @@ if (typeof window !== 'undefined') {
     PERF.apply();                                  // 默认 tire 5 + power 5
 
     /* 顶栏空间紧：选项只放短标签（"T5"/"P5"），全名+参数放 option.title 与
-       select.title —— 之前直接塞 "T5 顶级光头胎" 会把整个顶栏撑乱、与车型平台重叠。 */
+       select.title —— 之前直接塞 "T5 顶级光头胎" 会把整个顶栏撑乱、与车型平台重叠。
+       工坊改过参数时追加/选中「自定义」，让下拉不谎报档位（2026-11-20 融合）。 */
     function fill(sel, list, cur, prefix) {
-      sel.innerHTML = list.map(function (x) {
+      var html = list.map(function (x) {
         var full = (prefix || '') + x.id + ' · ' + x.name;
         return '<option value="' + x.id + '"' + (x.id === cur ? ' selected' : '') +
                ' title="' + full + '">' + (prefix || '') + x.id + '</option>';
       }).join('');
+      if (cur === 'custom') {
+        html += '<option value="0" selected title="由工坊手动设置（再选档位会以档位基准覆盖）">自定义</option>';
+      }
+      sel.innerHTML = html;
     }
     function sync() {
       fill(ts, PERF.TIRE_TIERS, PERF.PERF_TIERS.tire, 'T');
       fill(ps, PERF.POWER_TIERS, PERF.PERF_TIERS.power, 'P');
       var d = PERF.describe();
-      ts.title = '轮胎档：' + (d.tire ? d.tire.name + '（μ ' + d.tire.mu + '）' : '');
-      ps.title = '动力档：' + (d.power ? d.power.name + '（' + d.power.kw + ' kW）' : '');
+      ts.title = '轮胎档：' + (d.tireCustom ? '自定义（轮胎工坊已接管，选 T1–T5 会以档位覆盖）'
+                                            : (d.tire ? d.tire.name + '（μ ' + d.tire.mu + '）' : ''));
+      ps.title = '动力档：' + (d.powerCustom ? '自定义（动力工坊已接管，选 P1–P5 会以档位覆盖）'
+                                            : (d.power ? d.power.name + '（' + d.power.kw + ' kW）' : ''));
+      var hint = document.getElementById('perfTierHint');
+      if (hint) hint.textContent = d.text;
     }
+    /* 注册给 PERF：工坊反向同步时刷新下拉 */
+    PERF._uiSync = sync;
     function onChange() {
-      PERF.apply({ tire: +ts.value, power: +ps.value });
+      var t = ts.value === '0' ? 'custom' : +ts.value;
+      var pw = ps.value === '0' ? 'custom' : +ps.value;
+      PERF.apply({ tire: t, power: pw });
       sync();
     }
     ts.addEventListener('change', onChange);

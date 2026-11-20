@@ -90,9 +90,19 @@ const TIRE_LAB = {
     });
     // MF 单组共用；LS 按前轴胎压修正
     SIM.userTire = Object.assign(deepClone(a.mf), { p: a.front.p, LS: a.mf.LS * this.lSFactor(a.front.p, p0) });
-    const nm = (this.active && this.active.name) || null;
+    /* 2026-11-20：优先用**传入**的 name（性能档位 seed 会带「档位T5·…」标记，
+       若沿用旧 active.name 会把这标记抹掉 ⇒ 档位层误判成用户自定义）。 */
+    const nm = (a && a.name) || (this.active && this.active.name) || null;
     this.active = deepClone(a); this.active.name = nm;
     this.persistActive();
+    /* 2026-11-20（性能档位融合）：工坊应用了轮胎 ⇒ 通知档位层。
+       档位自己 seed 时 `PERF._applying === true`，且名字带「档位T」前缀，
+       两条都不算用户自定义。 */
+    try {
+      if (typeof PERF !== 'undefined' && PERF && typeof PERF.onTireChanged === 'function') {
+        PERF.onTireChanged(nm);
+      }
+    } catch (e) { /* PERF 未定义（14 先于 16 加载）：忽略 */ }
     if (typeof rebuild === "function") { try { rebuild(); } catch (e) {} }
     /* M-1：舞台重建统一走本路径——SLOPE 引擎构造期固化 ReF，
        activateCustom/restoreBuiltin/applyFromForm 全部经由 applyToState 收敛 */
@@ -127,6 +137,12 @@ const TIRE_LAB = {
   restoreBuiltin() {
     this.active = null; this.persistActive();
     SIM.userTire = null;
+    /* 2026-11-20（性能档位融合）：恢复内置 ⇒ 档位层回到 T3（内置胎就是引擎缺省 μ1.50） */
+    try {
+      if (typeof PERF !== 'undefined' && PERF && typeof PERF.onTireChanged === 'function') {
+        PERF.onTireChanged('内置');
+      }
+    } catch (e) {}
     if (typeof loadVehiclePreset === "function") {
       loadVehiclePreset(S.vehicleType);
       /* 预设重载 deepClone 轴对象后 _kTBase 失效——恢复内置后状态即预设，
