@@ -30,11 +30,12 @@
     </div>
 
 
-    <!-- 性能档位（2026-11-20）：轮胎 5 档 × 动力 5 档，两个维度自由组合；默认 T5×P5 -->
-    <div class="cell slim" title="性能档位：轮胎与动力各 5 档，可任意组合。默认 = T5 顶级光头胎 + P5 冗余动力">
-      <i>性能档位</i>
-      <select id="perfTireSelect" style="background:transparent;border:none;color:var(--pri);font:600 11px var(--font)"></select>
-      <select id="perfPowerSelect" style="background:transparent;border:none;color:var(--pri);font:600 11px var(--font)"></select>
+    <!-- 性能档位（2026-11-20）：轮胎 5 档 × 动力 5 档，两维自由组合；默认 T5×P5。
+         紧凑显示：选项只放 "T5"/"P5" 短标签，全名与 μ/kW 进 title（顶栏不再被长名撑乱）。 -->
+    <div class="cell slim" id="perfTierCell" title="性能档位：轮胎 × 动力，各 5 档可任意组合">
+      <i>档位</i>
+      <select id="perfTireSelect" class="perf-sel" title="轮胎档"></select>
+      <select id="perfPowerSelect" class="perf-sel" title="动力档"></select>
     </div>
 
     <!-- 前轴 / 后轴 -->
@@ -1054,7 +1055,6 @@
 <script src="js/10b-vehicle-core.js"></script>
 <script src="js/11-stages.js"></script>
 <script src="js/12-v4-arrange.js"></script>
-<script src="js/13-engine-sound.js"></script>
 <script src="js/15-mpc.js"></script>
 <script src="js/16-powertrain.js"></script>
   <script src="js/17-damper4q.js"></script>

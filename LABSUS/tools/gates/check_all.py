@@ -38,7 +38,7 @@ NODE_SUITES = (
     "proving_ground_test.js", "undulating_road_test.js", "test_p2a_aero.js",
     "test_p2b_damper.js", "test_circuit_ui.js", "test_racingline.js",
     "test_tire_wiring.js", "test_kc_wiring.js", "test_mpc.js", "test_powertrain.js",
-    "test_tire_lab.js", "test_engine_sound.js",
+    "test_tire_lab.js",
     # 2026-11-20：飞坡落地数值稳定性——压缩行程硬限位 / 缓冲块力上限 / 发散兜底。
     # 修的 bug：直线上飞坡落地后被弹飞并卡死（NaN 沿帧传播）。
     "test_ramp_landing.js",

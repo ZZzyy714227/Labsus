@@ -190,9 +190,10 @@ const POWERTRAIN = {
   },
   /* M-1(G31-P6-fix)：封装 rpm 源判据——architecture==="ev"（直驱，无曲轴/iceOmega
      不可用，rpm 源必须落到驱动轮速）或 hasRealDrivetrain()（存在真实齿轮比，
-     iceOmega 可信）二者任一为真时，state.iceOmega/驱动轮速才作为 HUD/声浪 rpm 源。
-     13-engine-sound.js（声浪）与 11-stages.js（HUD renderCircuitTelemetry）共用此判据，
-     避免两处各写一份、语义漂移。legacy 恒等箱 + 非 EV → false（回退轮速×齿比估算，保对拍锚）。 */
+     iceOmega 可信）二者任一为真时，state.iceOmega/驱动轮速才作为 HUD rpm 源。
+     `11-stages.js`（HUD renderCircuitTelemetry）使用此判据。
+     （2026-11-20：赛道模式的声浪功能已整体移除，`13-engine-sound.js` 不再存在。）
+     legacy 恒等箱 + 非 EV → false（回退轮速×齿比估算，保对拍锚）。 */
   hasLiveRpmSource() {
     return !!(this.spec && this.state &&
       (this.spec.architecture === "ev" || this.hasRealDrivetrain()));
@@ -1884,16 +1885,18 @@ if (typeof window !== 'undefined') {
 
     PERF.apply();                                  // 默认 tire 5 + power 5
 
-    function fill(sel, list, cur) {
+    /* 顶栏空间紧：选项只放短标签（"T5"/"P5"），全名+参数放 option.title 与
+       select.title —— 之前直接塞 "T5 顶级光头胎" 会把整个顶栏撑乱、与车型平台重叠。 */
+    function fill(sel, list, cur, prefix) {
       sel.innerHTML = list.map(function (x) {
-        var star = (x.id === 5) ? '★ ' : '';
-        return '<option value="' + x.id + '"' + (x.id === cur ? ' selected' : '') + '>' +
-               star + x.name + '</option>';
+        var full = (prefix || '') + x.id + ' · ' + x.name;
+        return '<option value="' + x.id + '"' + (x.id === cur ? ' selected' : '') +
+               ' title="' + full + '">' + (prefix || '') + x.id + '</option>';
       }).join('');
     }
     function sync() {
-      fill(ts, PERF.TIRE_TIERS, PERF.PERF_TIERS.tire);
-      fill(ps, PERF.POWER_TIERS, PERF.PERF_TIERS.power);
+      fill(ts, PERF.TIRE_TIERS, PERF.PERF_TIERS.tire, 'T');
+      fill(ps, PERF.POWER_TIERS, PERF.PERF_TIERS.power, 'P');
       var d = PERF.describe();
       ts.title = '轮胎档：' + (d.tire ? d.tire.name + '（μ ' + d.tire.mu + '）' : '');
       ps.title = '动力档：' + (d.power ? d.power.name + '（' + d.power.kw + ' kW）' : '');

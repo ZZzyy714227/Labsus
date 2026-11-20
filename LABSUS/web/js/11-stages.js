@@ -2909,7 +2909,7 @@ function renderCircuitTelemetry(st, tel, ctrl) {
 
     // M-1(G31-P6-fix)：rpm 判据改架构感知——POWERTRAIN.hasLiveRpmSource()
     //   （spec && state && (architecture==="ev" || hasRealDrivetrain())）为真时才信任动力链 rpm 源，
-    //   与 13-engine-sound.js 声浪共用同一判据（避免两处各写一份、语义漂移）。
+    //   （2026-11-20 起赛道模式的声浪功能已整体移除，此判据只服务 HUD/遥测。）
     //   EV：用驱动轮 ω×30/π（不查 motorR 是否存在；ev+fwd 用前轮均值，否则后轮均值）；
     //   非 EV + 真实传动比：用 iceRpm；legacy 恒等箱 + 非 EV：hasLiveRpmSource()=false
     //   → 回退旧轮速×齿比估算（对拍锚）。
@@ -3287,12 +3287,6 @@ function openCircuitStage() {
   const sceneryBtn = document.getElementById("circuitSceneryToggle");
   if(sceneryBtn) sceneryBtn.classList.toggle("on", CIRCUIT_STAGE.showScenery !== false);
 
-  // Sync engine sound button
-  const sndBtn = document.getElementById("engineSoundTg");
-  if (sndBtn && typeof EngineSound !== "undefined") {
-    sndBtn.textContent = EngineSound.muted ? "🔊 声浪 OFF" : "🔊 声浪 ON";
-    sndBtn.classList.toggle("muted", EngineSound.muted);
-  }
 
   // Sync vehicle buttons
   document.querySelectorAll(".c-veh-btn").forEach(b => {

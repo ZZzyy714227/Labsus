@@ -108,6 +108,15 @@
 /* G32：车型平台 cell 改行内布局——原 column 布局把 select+轮胎/动力按钮堆叠在
    52px 高内，按钮溢出与下拉重叠（用户截图实证）。行内排列 + select 限宽。
    （原拆两条规则，2026-11-16 E10 合并为一条） */
+/* 性能档位（2026-11-20）：顶栏紧凑双下拉。长名（"T5 顶级光头胎"）只进 title，
+   选项只显示 "T5"/"P5" —— 否则长选项会把顶栏撑乱、与"车型平台"叠在一起。 */
+#tb .cell#perfTierCell{flex:0 0 auto;min-width:0;gap:4px;padding:0 8px;white-space:nowrap}
+#tb .perf-sel{-webkit-appearance:none;appearance:none;background:transparent;
+  border:1px solid var(--glass-bd);border-radius:var(--r-sm);color:var(--pri);
+  font:600 10px var(--font-mono);letter-spacing:.04em;line-height:18px;
+  padding:0 2px;width:46px;text-align:center;text-align-last:center;cursor:pointer}
+#tb .perf-sel:hover{border-color:var(--pri-bd);background:var(--glass-hov)}
+#tb .perf-sel:focus{outline:none;border-color:var(--pri-bd)}
 #tb .cell.slim{min-width:0;padding:0 9px;flex-direction:row;align-items:center;gap:6px;flex-wrap:nowrap}
 #tb .cell.slim i{flex:0 0 auto;margin-right:2px}
 #tb .cell.slim select{flex:1 1 auto;min-width:104px;max-width:220px;text-overflow:ellipsis}
