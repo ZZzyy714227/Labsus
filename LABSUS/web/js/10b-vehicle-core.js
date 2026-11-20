@@ -636,6 +636,13 @@ class VehicleDynamics15DOF {
        ⚠ 参数：mU（非簧载质量/角，kg）、kT（轮胎垂向刚度 N/mm）、
          cT（轮胎垂向阻尼，由阻尼比 ζ 推导，缺省 0.06）。 */
     this.wheelDof = !(S_config && S_config.wheelDof === false);
+    /* ★ 2026-11-20 · 轮胎包络开关（见 _envelopeRoadZ）。默认开启；
+       `S.tireEnvelope === false` 回到逐点接触（历史行为，逐位可比）。
+       `S.envelopeProbes` 给探针数：**缺省 5**。⚠ 不能用 3 —— Hann 窗在 ±1 处
+       权重为 0，三点退化成"只看中心点"，包络等于没开（本轮实踩，ON 与 OFF 逐位相同）。 */
+    this.tireEnvelope = !(S_config && S_config.tireEnvelope === false);
+    this.envelopeProbes = (S_config && typeof S_config.envelopeProbes === 'number' && S_config.envelopeProbes >= 1)
+      ? Math.min(9, Math.round(S_config.envelopeProbes)) : 5;
     this.zw = { FL: 0, FR: 0, RL: 0, RR: 0 };
     this.vzw = { FL: 0, FR: 0, RL: 0, RR: 0 };
     this._zRoadPrev = { FL: 0, FR: 0, RL: 0, RR: 0 };
@@ -889,6 +896,47 @@ class VehicleDynamics15DOF {
                    : { left: sgn * d_in, right: sgn * d_out };
   }
 
+  /* ═══════════════════════════════════════════════════════════════════════
+     ★ 2026-11-20 · 轮胎包络（有效路面 / tire enveloping）
+
+     问题：旧实现把轮胎当成"一个点"去读路面高程。真实轮胎是半径 R 的弹性环，
+     会把短于接地长度的障碍"跨过去"——1.1 m 跳台的断崖、60 mm 减速坎在点接触
+     模型下都是"瞬间阶跃"，于是撞击力、弹跳、数值发散全从这里来。
+
+     模型（加权平均核 = 胎体柔度对接触斑的平滑）：
+       轮胎不是刚体环——胎面/带束层把接地压力**分布**在接地长度上，
+       所以有效路面是路面高程在包络窗内的加权平均：
+         z_eff(s) = Σ wᵢ·z_road(s+uᵢ) / Σ wᵢ ， wᵢ = ½(1+cos(π·uᵢ/L))
+       ⚠ 反例（本轮实踩）：先用过"刚性环取 max" `z_eff = max_u [z(s+u) − u²/2R]`，
+         实测**削峰 0%** —— 探针落在坎顶时惩罚为 0，而刚性轮本来就会爬上坎顶。
+         削峰必须来自胎体柔度（平均），不是几何抬高。
+
+     包络半长 L 由**静态接地长度**推出（不是拍脑袋常数）：
+       静态穿透 pen0 = Fz0 / kT，接地半长 a0 = √(2·R·pen0)，取 L = 1.5·a0，
+       并夹在 [20, 90] mm（覆盖 FSAE 到 GT3 的胎宽/载荷范围）。
+       对远长于 L 的障碍（1.1 m 跳台主体）几乎不削峰（正确），但会把
+       "断崖"变成有限斜率的过渡 —— 这正是落地点从"硬切"变"滚下来"的来源。
+
+     开关：`S.tireEnvelope === false` 关闭（回到逐点接触 = 历史行为，逐位可比）。
+     ═══════════════════════════════════════════════════════════════════════ */
+  _envelopeRoadZ(pathObj, x, y, dirX, dirY, Re, Fz0, kT, nProbe) {
+    const pen0 = Math.max(1e-4, Fz0 / Math.max(1, kT));
+    const a0 = Math.sqrt(2 * Re * pen0);
+    const L = Math.min(0.090, Math.max(0.020, 1.5 * a0));
+    const n = nProbe || 5;
+    let sum = 0, wsum = 0;
+    for (let i = 0; i < n; i++) {
+      const t = (n === 1) ? 0 : (2 * i / (n - 1) - 1);   // −1 … +1
+      const u = t * L;
+      const wt = 0.5 * (1 + Math.cos(Math.PI * t));       // Hann 窗
+      const q = pathObj.getRoadElevation(x + dirX * u, y + dirY * u);
+      const z = (q && isFinite(q.z_road)) ? q.z_road : 0;
+      sum += wt * z;
+      wsum += wt;
+    }
+    return wsum > 0 ? sum / wsum : 0;
+  }
+
   step(ctrl, env, dt_sec) {
     /* P0（M20）· 性能埋点：只做整数自增，不调 performance.now()，开销可忽略。
        审计 R-1017 实测：物理 0.023 ms/子步（17 子步 ≈ 0.39 ms/帧），
@@ -1083,8 +1131,18 @@ class VehicleDynamics15DOF {
            可以各轮独立给相位（真 4-Post），这是 2D path 表达不了的。
            未给 ⇒ 完全走旧路径，逐位不变。 */
         const z_rig = (env && env.rig && typeof env.rig[w.id] === 'number') ? env.rig[w.id] : null;
+        /* ★ 2026-11-20 · 轮胎包络：把"点接触"换成"刚性环包络"的有效路面。
+           只作用于 path 高程（跳台/路肩/减速坎/坑洞），不作用于 ISO 随机路面
+           与 bumpNoise（那两者本来就是按弧长/噪声给的，包络留待后续统一）。
+           台架（env.rig）优先，包络不参与。 */
+        let z_path = (rInfo.z_road || 0);
+        if (z_rig === null && this.tireEnvelope && pathObj) {
+          z_path = this._envelopeRoadZ(
+            pathObj, X_w, Y_w, -sPsi, cPsi, w.Re, w.Fz0,
+            (w.axle === 'front' ? this.kT_f : this.kT_r), this.envelopeProbes);
+        }
         const z_road_w = (z_rig !== null) ? z_rig
-          : ((rInfo.z_road || 0) + z_iso + (env.bumpNoise || 0));
+          : (z_path + z_iso + (env.bumpNoise || 0));
         const mu_w = (rInfo.mu !== undefined ? rInfo.mu : mu_eff);
         
         // Chassis corner vertical displacement & velocity (+X right, +Y forward)
