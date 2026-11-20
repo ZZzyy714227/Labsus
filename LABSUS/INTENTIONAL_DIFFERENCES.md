@@ -109,6 +109,7 @@
 |---|---|---|
 | 轮胎档 | `SIM.userTire` + `SIM.tireCalibEy` | `10b-vehicle-core.js::resolveTireParams` 的第②优先级层（实测标定 > 用户档 > 缺省）|
 | 动力档 | `POWERTRAIN.setSpec()` | K1 的扭矩曲线整体按 `tqScale` 缩放；K3 用档位表的 `T_max`/`P_kw` |
+| K2/K3 请求载荷 | `09-track.js` 两处 body 构造 | 档位**优先于滑杆**：选了档位就以档位表覆盖 `body.tire`/`body.powertrain`（滑杆保留为自定义入口）|
 
 ### ⚠ 动力档为什么有两套口径
 

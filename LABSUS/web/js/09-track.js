@@ -478,6 +478,22 @@ function trackPayload(){
       /* M8：同 792 行处——LS 参考载荷与前端瞬态层同源，防两内核口径分叉 */
       FzRef:Math.max(1,(typeof S!=="undefined"&&S.mTotal?S.mTotal:1000)*9.81/4),
       LS:0.10, By:20, Cy:1.2, Ey:-0.5}};
+
+  /* ★ 2026-11-20 · 性能档位下发（K2 TPHYS / K3 引擎同源）
+     档位**优先于滑杆**：滑杆保留为"自定义/微调"入口，但一旦选了档位，就以档位表为准。
+     否则会出现"界面选了 T5 顶级胎，赛道页仍按滑杆缺省 5250 跑"的静默分叉。 */
+  try {
+    if (typeof PERF !== 'undefined' && PERF && typeof PERF.tireParams === 'function') {
+      var _tp = PERF.tireParams(PERF.PERF_TIERS.tire);
+      Object.assign(body.tire, {
+        Fy0: _tp.Fy0, FzNom: _tp.FzNom, By: _tp.By, Cy: _tp.Cy, Ey: _tp.Ey,
+        LS: _tp.LS, Cg: _tp.Cg, Ls: _tp.Ls
+      });
+      var _pl = PERF.powerPayload();
+      body.powertrain.T_max = _pl.T_max;
+      body.powertrain.P_kw = _pl.P_kw;
+    }
+  } catch (e) { console.warn('perf tier payload merge failed:', e); }
   /* G31-P10-4：动力工坊定制规格下发——仅当生效 spec 与 legacy-equivalent
      物理不等价时才叠加嵌套字段（PowertrainSpec 继承 PowertrainParams，
      标量键共存；缺省不发 → payload 与旧行为逐字节一致，对拍锚不变）。
@@ -839,6 +855,20 @@ function trackStageRun(){
          不发则引擎沿用 FzNom ⇒ 两端 LS 口径分叉（JS 用静载、PY 用 FzNom）。 */
       FzRef:Math.max(1,(S.mTotal||1000)*9.81/4),
       Cg:parseFloat(document.getElementById("ssCg").value)||6.0}};
+
+  /* ★ 2026-11-20 · 性能档位下发（同上）：档位优先于滑杆，保证赛道页与其它舞台同源。 */
+  try {
+    if (typeof PERF !== 'undefined' && PERF && typeof PERF.tireParams === 'function') {
+      var _tp2 = PERF.tireParams(PERF.PERF_TIERS.tire);
+      Object.assign(body.tire, {
+        Fy0: _tp2.Fy0, FzNom: _tp2.FzNom, By: _tp2.By, Cy: _tp2.Cy, Ey: _tp2.Ey,
+        LS: _tp2.LS, Cg: _tp2.Cg, Ls: _tp2.Ls
+      });
+      var _pl2 = PERF.powerPayload();
+      body.powertrain.T_max = _pl2.T_max;
+      body.powertrain.P_kw = _pl2.P_kw;
+    }
+  } catch (e) { console.warn('perf tier payload merge failed (2):', e); }
   /* G31-P10-4：动力工坊定制规格下发——仅当生效 spec 与 legacy-equivalent
      物理不等价时才叠加嵌套字段（PowertrainSpec 继承 PowertrainParams，
      标量键共存；缺省不发 → payload 与旧行为逐字节一致，对拍锚不变）。
