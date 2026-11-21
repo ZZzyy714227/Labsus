@@ -183,6 +183,7 @@
    画到相邻元素上（1366 实测 6 对叠压）。逐级收缩：藏标签→藏副标题→限宽。 */
 @media (max-width:1560px){
   #tb .cell.slim i{display:none}
+  #tb .v4-ctx .ro-kernel,#tb .v4-ctx .ro-fps{display:none}
   /* G32 终验二：1500 档 cell 被 flex 压到 221.6px < 内容 233.7px 仍溢出——
      内容下限压到 ≈212px（gap 4 + 按钮 padding 6 + select min 76），留 9px 冗余 */
   #tb .cell.slim{justify-content:flex-start;gap:4px;padding:0 6px}
@@ -257,11 +258,16 @@
 #tb .sp{flex:0 0 0}
 #engPillV4{margin-left:auto}
 
-/* 模式上下文提示（2026-11-21 五轮）：flex:1 吃掉顶栏中部富余空间（"莫名其妙空了一截"的
-   所有者），文字居中、随模式切换（v4SyncCtx）；与右簇 auto 边距共存——ctx 可见时
-   auto 归零，ctx 隐藏（≤1400）时 auto 接管。 */
-.v4-ctx{flex:1 1 auto;min-width:0;overflow:hidden;text-align:center;
-  font:500 10.5px var(--font-ui);color:var(--ink-3);white-space:nowrap;text-overflow:ellipsis;padding:0 12px}
+/* 模式上下文 + 状态只读件（2026-11-21 七轮，川陀提议"隐藏的信息填满空白"）：
+   顶栏中部 = 模式提示 + Baseline/求解内核/fps；flex:1 吃掉富余空间；
+   display:flex 垂直居中（此前纯文本顶对齐，川陀要求"字体高度居中"）。 */
+.v4-ctx{flex:1 1 auto;min-width:0;overflow:hidden;display:flex;align-items:center;justify-content:center;
+  gap:16px;padding:0 12px;font:500 10.5px var(--font-ui);color:var(--ink-3)}
+.v4-ctx .v4-ctx-mode{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v4-ctx .v4-ro{display:flex;align-items:baseline;gap:5px;white-space:nowrap}
+.v4-ctx .v4-ro i{font-style:normal;font-size:10px;color:var(--ink-3)}
+.v4-ctx .v4-ro b{font:500 10.5px var(--font-mono);color:var(--ink-2);font-variant-numeric:tabular-nums}
+.v4-ctx .v4-ro b.a{color:var(--cream)}
 
 /* 只读状态降级：不画边框、不占按钮语义，只留色点 + 小字
    （cursor:default 原在文件前部单列一条，2026-11-16 E10 并入本条） */

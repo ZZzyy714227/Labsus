@@ -55,7 +55,12 @@
 
     <!-- 模式上下文提示（2026-11-21 五轮）：占据顶栏中部富余空间，随模式切换变化；
          窄屏（≤1400）隐藏，空间归还给右簇 auto 边距 -->
-    <div class="v4-ctx" id="v4Ctx"><span id="v4CtxTxt">几何 · 硬点拖拽与定位角联动</span></div>
+    <div class="v4-ctx" id="v4Ctx">
+      <span class="v4-ctx-mode" id="v4CtxTxt">几何 · 硬点拖拽与定位角联动</span>
+      <span class="v4-ro ro-base"><i>Baseline</i><b id="tbBase">未锁定</b></span>
+      <span class="v4-ro ro-kernel"><i>求解内核</i><b id="tbSolver">闭式几何 + 静力平衡</b></span>
+      <span class="v4-ro ro-fps"><i>fps</i><b id="tbFps">--</b></span>
+    </div>
 
     <!-- 状态胶囊 -->
     <button class="v4-pill warn" id="engPillV4" title="点击 连接 / 断开 引擎">
@@ -122,12 +127,9 @@
 <!-- 主题选择浮层（12 号脚本填充内容） -->
 <div id="v4ThemePop" style="display:none"></div>
 
-<!-- 更多浮层（2026-11-21 UI 翻新）：低频状态/工具/外观收纳；id 全保留，JS 写入无感 -->
+<!-- 更多浮层（2026-11-21 UI 翻新）：低频工具/外观收纳。
+     状态只读件（Baseline/内核/fps）已于七轮回填顶栏中部 #v4Ctx（川陀提议）。 -->
 <div id="v4MorePop">
-  <div class="mp-h">状态 STATUS</div>
-  <div class="mp-row"><span>Baseline 快照</span><span id="tbBase" class="mp-val">未锁定</span></div>
-  <div class="mp-row"><span>求解内核</span><span id="tbSolver" class="mp-val">闭式几何 + 静力平衡</span></div>
-  <div class="mp-row"><span>fps</span><span id="tbFps" class="mp-val">--</span></div>
   <div class="mp-h">工具 TOOLS</div>
   <button id="evalModalBtn" class="mp-btn" title="查看全维度悬架工程评价与AI调校建议">📊 评价报告</button>
   <div class="mp-h">外观 APPEARANCE</div>

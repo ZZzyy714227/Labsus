@@ -581,8 +581,10 @@ require('./test_tire_wiring')(webDir, ok, failures.push.bind(failures), { log(){
   ['tbBase','tbSolver','tbFps','evalModalBtn','v4ThemeBtn','themeTg','pureSuspTg','v4MoreBtn','v4MorePop']
     .forEach(id => ok((v4.match(new RegExp('id="'+id+'"'))||[]).length === 1, `顶栏重排: #${id} 存在且唯一`));
   const tbBlock = (v4.match(/<div id="tb">[\s\S]*?<\/div>\s*<!--[\s═]*主区/) || [''])[0];
-  ok(tbBlock !== '' && !/id="tbBase"|id="tbSolver"|id="tbFps"|id="evalModalBtn"|id="v4ThemeBtn"|id="themeTg"/.test(tbBlock),
-    '顶栏重排: Baseline/内核/fps/评价/主题/明暗 已移出 #tb');
+  ok(tbBlock !== '' && /id="tbBase"/.test(tbBlock) && /id="tbSolver"/.test(tbBlock) && /id="tbFps"/.test(tbBlock),
+    '顶栏七轮: Baseline/内核/fps 回填顶栏中部 v4Ctx');
+  ok(tbBlock !== '' && !/id="evalModalBtn"|id="v4ThemeBtn"|id="themeTg"/.test(tbBlock),
+    '顶栏重排: 评价/主题/明暗仍在更多浮层');
   ok(/class="v4-vpbar"[\s\S]{0,900}id="pureSuspTg"/.test(v4),
     '顶栏重排: 透视按钮位于视口工具条');
   ok((v4.match(/id="v4Ctx"/g) || []).length === 1, '顶栏五轮: 模式上下文提示条存在且唯一');
