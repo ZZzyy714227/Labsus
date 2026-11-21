@@ -20,13 +20,13 @@
     <!-- 车型平台 -->
     <div class="cell slim"><i>车型平台</i>
       <select id="topVehSelect" onchange="loadVehiclePreset(this.value)">
-        <option value="formula">🏎️ Formula SAE (方程式)</option>
-        <option value="gt3">🏁 FIA GT3 (赛车模式)</option>
-        <option value="gt3_sport">🚗 FIA GT3 (日常模式)</option>
-        <option value="baja">🏜️ SAE Baja (越野赛车)</option>
+        <option value="formula">Formula SAE</option>
+        <option value="gt3">FIA GT3 · 赛道</option>
+        <option value="gt3_sport">FIA GT3 · 日常</option>
+        <option value="baja">SAE Baja · 越野</option>
       </select>
-      <button id="tireLabBtn" class="v4-mini" onclick="if(typeof TIRE_LAB!=='undefined')TIRE_LAB.open()" title="自定义轮胎/轮毂尺寸与参数">🛞 轮胎</button>
-      <button id="ptLabBtn" class="v4-mini" onclick="if(typeof POWERTRAIN!=='undefined')POWERTRAIN.open()" title="自定义动力总成（架构/ICE/电机/变速箱）">🔧 动力</button>
+      <button id="tireLabBtn" class="v4-mini" onclick="if(typeof TIRE_LAB!=='undefined')TIRE_LAB.open()" title="自定义轮胎/轮毂尺寸与参数">轮胎</button>
+      <button id="ptLabBtn" class="v4-mini" onclick="if(typeof POWERTRAIN!=='undefined')POWERTRAIN.open()" title="自定义动力总成（架构/ICE/电机/变速箱）">动力</button>
     </div>
 
 

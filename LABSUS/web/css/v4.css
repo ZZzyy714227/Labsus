@@ -162,7 +162,11 @@
 #v4MorePop .mp-appear{display:flex;align-items:center;justify-content:space-between;gap:8px}
 #v4MorePop .mp-appear #v4ThemeBtn{width:auto;padding:6px 10px}
 /* topVehSelect 内联样式转 CSS（2026-11-21：内联样式清零） */
-#tb .cell.slim select{background:transparent;border:none;color:var(--pri);
+/* 2026-11-21 二次修复（川陀截图"顶部太丑"）：全局 `button{flex:1}`（fullchassis.css，
+   为 .btnrow 平分设计）传染到顶栏 ⇒ ▶运行与"引擎"胶囊被 flex 拉成巨条。
+   顶栏按钮一律内容宽，剩余空间交给 #v4RunBtn 的 margin-left:auto（导航左/动作右）。 */
+#tb button{flex:0 0 auto}
+#tb .cell.slim select{background:transparent;border:none;color:var(--ink-1);
   font:600 11.5px var(--font-ui);cursor:pointer;outline:none}
 /* 模式徽标（2026-11-21）：右坞站结论卡头部显示当前工作模式 */
 .v4-modechip{margin-left:6px;padding:1px 8px;border:1px solid var(--pri-bd);border-radius:var(--r-pill);
