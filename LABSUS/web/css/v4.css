@@ -17,25 +17,16 @@
 
 /* 左坞站：Tab 条 + 面板区（.sec 由 JS 生成，样式继承旧体系） */
 #lp{display:flex;flex-direction:column;overflow:hidden}
-.v4-sum{margin-left:auto;margin-right:6px;font:500 9px var(--font-mono);color:var(--ink-3);
+.v4-sum{margin-left:auto;margin-right:6px;font:500 8.5px var(--font-mono);color:var(--ink-3);
   background:var(--well);border:1px solid var(--hairline);border-radius:var(--r-sm);padding:1px 5px;white-space:nowrap}
 .v4-ltabs{display:flex;gap:3px;padding:8px 8px 6px;flex:0 0 auto;border-bottom:1px solid var(--glass-bd)}
 .v4-ltab{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;
   padding:6px 2px;border-radius:var(--r-md);border:1px solid transparent;
-  background:transparent;color:var(--ink-3);font:500 11.5px var(--font-ui);cursor:pointer;transition:.15s}
+  background:transparent;color:var(--ink-3);font:500 10.5px var(--font-ui);cursor:pointer;transition:.15s}
 .v4-ltab:hover{color:var(--ink-2);background:var(--glass-hov)}
 .v4-ltab.on{color:var(--ink-1);background:var(--pri-fill);border-color:var(--pri-bd)}
 .v4-pane{display:none;flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding:8px;min-height:0}
 .v4-pane.on{display:block}
-/* 参数搜索（2026-11-21）：Tab 栏下方，当前 Tab 内过滤 .sec */
-.v4-lsearchrow{padding:6px 8px 4px;flex:0 0 auto;border-bottom:1px solid var(--hairline)}
-.v4-lsearch{width:100%;height:26px;padding:0 9px;background:var(--well);
-  border:1px solid var(--glass-bd);border-radius:var(--r-md);color:var(--ink-1);
-  font:500 11px var(--font-ui);outline:none;transition:border-color .15s,box-shadow .15s}
-.v4-lsearch:focus{border-color:var(--pri-bd);box-shadow:var(--ring)}
-.v4-lsearch::placeholder{color:var(--ink-3)}
-.v4-nohit{padding:14px 10px;color:var(--ink-3);font:500 10.5px var(--font-ui);text-align:center;display:none}
-.sec.v4-hit .sh::before{opacity:1}
 
 /* 中央舞台 */
 #v4stage{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;min-height:0;
@@ -45,12 +36,12 @@
   border-bottom:1px solid var(--glass-bd);background:var(--sh-bg)}
 .v4-vpbar .v4-sp{flex:1}
 .v4-seg{display:flex;gap:2px;background:var(--well);border:1px solid var(--glass-bd);border-radius:var(--r-md);padding:2px}
-.v4-seg button{border:none;background:transparent;color:var(--ink-3);font:500 10.5px var(--font-ui);
+.v4-seg button{border:none;background:transparent;color:var(--ink-3);font:500 10px var(--font-ui);
   padding:3px 8px;border-radius:var(--r-sm);cursor:pointer;transition:.15s;white-space:nowrap}
 .v4-seg button:hover{color:var(--ink-2)}
 .v4-seg button.on{background:var(--pri-fill);color:var(--ink-1)}
 .v4-mini{display:flex;align-items:center;gap:5px;border:1px solid var(--glass-bd);background:transparent;
-  color:var(--ink-2);font:500 10.5px var(--font-ui);padding:3px 8px;border-radius:var(--r-md);cursor:pointer;transition:.15s}
+  color:var(--ink-2);font:500 10px var(--font-ui);padding:3px 8px;border-radius:var(--r-md);cursor:pointer;transition:.15s}
 .v4-mini:hover{background:var(--glass-hov);color:var(--ink-1)}
 .v4-mini.on{background:var(--pri-fill);border-color:var(--pri-bd);color:var(--ink-1)}
 /* 覆盖 fullchassis.css:266 #vp（2x2 grid 基）：v4 舞台列内补 flex 尺寸与内边距；
@@ -69,21 +60,21 @@
 #v4scroll{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;min-height:0;display:flex;flex-direction:column;gap:8px;padding:0}
 .v4-hero{flex:0 0 auto;background:var(--glass);border:1px solid var(--glass-bd);border-radius:var(--r-xl);padding:10px}
 .v4-hero-hd{display:flex;align-items:baseline;gap:7px;margin-bottom:8px}
-.v4-hero-hd b{font:600 12.5px var(--font-ui);color:var(--ink-1)}
-.v4-hero-hd i{font:500 9px var(--font-ui);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);font-style:normal}
-.v4-hero-hd .v4-live{margin-left:auto;font:500 9px var(--font-mono);color:var(--ink-3)}
+.v4-hero-hd b{font:600 11.5px var(--font-ui);color:var(--ink-1)}
+.v4-hero-hd i{font:500 8px var(--font-ui);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);font-style:normal}
+.v4-hero-hd .v4-live{margin-left:auto;font:500 8px var(--font-mono);color:var(--ink-3)}
 .v4-hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .v4-hc{background:var(--well);border:1px solid var(--hairline);border-radius:var(--r-lg);padding:8px 9px}
-.v4-hc .en{font:500 9.5px var(--font-ui);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
-.v4-hc .v{font:600 var(--fs-hero)/1.2 var(--font-mono);letter-spacing:-.02em;color:var(--ink-1);margin-top:2px;font-variant-numeric:tabular-nums}
-.v4-hc .hint{font:400 10.5px var(--font-ui);color:var(--ink-3);margin-top:2px}
+.v4-hc .en{font:500 8px var(--font-ui);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.v4-hc .v{font:600 16px/1.25 var(--font-mono);letter-spacing:-.02em;color:var(--ink-1);margin-top:2px;font-variant-numeric:tabular-nums}
+.v4-hc .hint{font:400 8.5px var(--font-ui);color:var(--ink-3);margin-top:2px}
 .v4-hc.ok .v{color:var(--ok)} .v4-hc.ok .hint{color:var(--ok)}
 .v4-hc.warn .v{color:var(--warn)} .v4-hc.warn .hint{color:var(--warn)}
 .v4-hc.bad .v{color:var(--err)} .v4-hc.bad .hint{color:var(--err)}
 .v4-bar{height:4px;border-radius:var(--r-pill);background:var(--track);overflow:hidden;margin-top:6px}
 .v4-bar i{display:block;height:100%;border-radius:var(--r-pill);background:var(--pri);transition:width .3s}
 .v4-diag{flex:0 0 auto;background:var(--glass);border:1px solid var(--pri-bd);border-radius:var(--r-xl);padding:10px}
-.v4-diag p{font:400 10.5px/1.6 var(--font-ui);color:var(--ink-2);margin-top:6px}
+.v4-diag p{font:400 10px/1.6 var(--font-ui);color:var(--ink-2);margin-top:6px}
 
 /* ---------- 顶栏（v4 版：决策与执行） ---------- */
 #tb{height:52px}
@@ -94,9 +85,9 @@
 #tb .tt span{white-space:nowrap}
 #tb .tt span:last-child{margin-top:0}
 #tb .tt span:last-child::before{content:"·";margin:0 7px;color:var(--ink-3)}
-#tb .v4-run{display:flex;align-items:center;gap:6px;margin:0 6px;padding:0 20px;height:34px;
+#tb .v4-run{display:flex;align-items:center;gap:6px;margin:0 6px;padding:0 16px;height:30px;
   border:none;border-radius:var(--r-md);cursor:pointer;color:#fff;
-  font:600 12.5px var(--font-ui);letter-spacing:.04em;
+  font:600 11px var(--font-ui);letter-spacing:.04em;
   background:linear-gradient(135deg,var(--acc-in),var(--err));
   box-shadow:0 3px 12px var(--err-fill);transition:filter .15s,transform .1s}
 #tb .v4-run:hover{filter:brightness(1.12)}
@@ -104,7 +95,7 @@
 #tb .v4-run:disabled{filter:grayscale(.4) brightness(.8);cursor:wait}
 .v4-pill{display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;margin:0 2px;
   border:1px solid var(--glass-bd);border-radius:var(--r-pill);background:transparent;
-  font:500 10.5px var(--font-mono);color:var(--ink-2);cursor:pointer;transition:.15s;white-space:nowrap}
+  font:500 9.5px var(--font-mono);color:var(--ink-2);cursor:pointer;transition:.15s;white-space:nowrap}
 .v4-pill:hover{background:var(--glass-hov)}
 .v4-pill .dot{width:7px;height:7px;border-radius:var(--r-pill);background:currentColor;flex:0 0 7px}
 .v4-pill.ok{color:var(--ok);border-color:var(--ok)}
@@ -124,10 +115,9 @@
 @media (max-width: 1320px){ #tb .v4-axis{min-width:0} #tb .v4-axis button{padding:3px 6px} }
 @media (max-width: 1180px){ #tb .perf-tier-btn #perfTierLabel{display:none} }
 #tb .perf-tier-btn{flex:0 0 auto;white-space:nowrap;font:600 10px var(--font-mono);letter-spacing:.03em}
-/* 档位按钮的常驻 .on 高亮退役（2026-11-21 三轮打磨）：它是"基准入口"不是开关，
-   档位值已写在按钮文字里，永久高亮看起来像卡在按下态。 */
+#perfTierBtn.on{border-color:var(--pri-bd);background:var(--pri-fill)}
 #perfTierPop{position:fixed;z-index:99999;display:none;min-width:250px;padding:10px 12px;
-  background:var(--bg-base);border:1px solid var(--pri-bd);border-radius:var(--r-lg);
+  background:#0E1520;border:1px solid var(--pri-bd);border-radius:var(--r-lg);
   box-shadow:0 8px 28px rgba(0,0,0,.45);color:var(--ink-2);
   font:500 11px var(--font-ui)}
 #perfTierPop.show{display:block}
@@ -142,39 +132,6 @@
 #perfTierPop .pt-hint{margin-top:8px;color:var(--pri);font:600 10px var(--font-mono)}
 #perfTierPop .pt-foot{margin-top:8px;padding-top:8px;border-top:1px solid var(--glass-bd);
   color:var(--ink-3);font-size:10px;line-height:1.5}
-/* 更多浮层（2026-11-21）：低频件收纳；开合复用 perfTierPop 模式（按钮/点外部/Esc）。
-   背景用 --bg-base 令牌（同族 perfTierPop 的硬编码 #0E1520 一并令牌化）。 */
-#v4MoreBtn{flex:0 0 auto;width:30px;justify-content:center;font:600 12px var(--font-ui)}
-#v4MorePop{position:fixed;z-index:100000;display:none;min-width:252px;padding:10px 12px;
-  background:var(--bg-base);border:1px solid var(--pri-bd);border-radius:var(--r-lg);
-  box-shadow:0 8px 28px rgba(0,0,0,.45);color:var(--ink-2);font:500 11px var(--font-ui)}
-#v4MorePop.show{display:block}
-#v4MorePop .mp-h{font:600 9.5px var(--font-ui);letter-spacing:.14em;text-transform:uppercase;
-  color:var(--ink-3);margin:10px 0 6px}
-#v4MorePop .mp-h:first-child{margin-top:0}
-#v4MorePop .mp-row{display:flex;align-items:center;justify-content:space-between;gap:10px;
-  padding:4px 0;border-bottom:1px solid var(--hairline)}
-#v4MorePop .mp-row span:first-child{color:var(--ink-3)}
-#v4MorePop .mp-val{font:500 10.5px var(--font-mono);color:var(--ink-1);text-align:right;font-variant-numeric:tabular-nums}
-#v4MorePop .mp-btn{display:flex;align-items:center;gap:6px;width:100%;padding:7px 9px;margin:4px 0;
-  border:1px solid var(--glass-bd);border-radius:var(--r-md);background:transparent;
-  color:var(--ink-2);font:500 10.5px var(--font-ui);cursor:pointer;transition:.15s;text-transform:none}
-#v4MorePop .mp-btn:hover{background:var(--glass-hov);color:var(--ink-1)}
-#v4MorePop .mp-appear{display:flex;align-items:center;justify-content:space-between;gap:8px}
-#v4MorePop .mp-appear #v4ThemeBtn{width:auto;padding:6px 10px}
-/* topVehSelect 内联样式转 CSS（2026-11-21：内联样式清零） */
-/* 2026-11-21 二次修复（川陀截图"顶部太丑"）：全局 `button{flex:1}`（fullchassis.css，
-   为 .btnrow 平分设计）传染到顶栏 ⇒ ▶运行与"引擎"胶囊被 flex 拉成巨条。
-   顶栏按钮一律内容宽，剩余空间交给 #v4RunBtn 的 margin-left:auto（导航左/动作右）。 */
-#tb button{flex:0 0 auto}
-/* 顶栏入口统一幽灵形态（2026-11-21 三轮打磨）：轮胎/动力/档位/更多是"入口"不是开关，
-   去常驻边框（hover 才浮起），与轴/模式两个分段控件的框线区分层级。 */
-#tb .v4-mini{border-color:transparent}
-#tb .cell.slim select{background:transparent;border:none;color:var(--ink-1);
-  font:600 11.5px var(--font-ui);cursor:pointer;outline:none}
-/* 模式徽标（2026-11-21）：右坞站结论卡头部显示当前工作模式 */
-.v4-modechip{margin-left:6px;padding:1px 8px;border:1px solid var(--pri-bd);border-radius:var(--r-pill);
-  font:600 9.5px var(--font-ui);color:var(--pri);background:var(--pri-fill)}
 #tb .cell.slim{min-width:0;padding:0 9px;flex-direction:row;align-items:center;gap:6px;flex-wrap:nowrap}
 #tb .cell.slim i{flex:0 0 auto;margin-right:2px}
 #tb .cell.slim select{flex:1 1 auto;min-width:104px;max-width:220px;text-overflow:ellipsis}
@@ -183,7 +140,6 @@
    画到相邻元素上（1366 实测 6 对叠压）。逐级收缩：藏标签→藏副标题→限宽。 */
 @media (max-width:1560px){
   #tb .cell.slim i{display:none}
-  #tb .v4-ctx .ro-kernel,#tb .v4-ctx .ro-fps{display:none}
   /* G32 终验二：1500 档 cell 被 flex 压到 221.6px < 内容 233.7px 仍溢出——
      内容下限压到 ≈212px（gap 4 + 按钮 padding 6 + select min 76），留 9px 冗余 */
   #tb .cell.slim{justify-content:flex-start;gap:4px;padding:0 6px}
@@ -203,14 +159,13 @@
   #tb .cell.slim{gap:4px;padding:0 6px}
   #tb .v4-seg.v4-axis button{padding:3px 5px}
   #tb .v4-pill{padding:0 6px}
-  #tb .v4-ctx{display:none}
 }
 
 /* ---------- 主题选择器浮层 ---------- */
 #v4ThemeBtn{display:flex;align-items:center;justify-content:center;width:30px;height:30px;margin:0 2px;
   border:1px solid var(--glass-bd);border-radius:var(--r-md);background:transparent;color:var(--ink-2);cursor:pointer;transition:.15s}
 #v4ThemeBtn:hover{background:var(--glass-hov);color:var(--ink-1)}
-#v4ThemePop{position:fixed;z-index:100001;width:300px;max-height:80vh;overflow-y:auto;
+#v4ThemePop{position:fixed;z-index:400;width:300px;max-height:80vh;overflow-y:auto;
   background:var(--glass);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
   border:1px solid var(--glass-bd-2);border-radius:var(--r-xl);box-shadow:var(--shadow);padding:12px}
 #v4ThemePop .tp-h{font:600 11px var(--font-ui);color:var(--ink-1);margin-bottom:8px}
@@ -248,34 +203,21 @@
 
 /* 副标题基规则已移至顶栏节首（media 之前，见该处级联顺序注释） */
 
-/* 左簇贴左、右簇贴右：#tb .sp 置零（大占位退役）。
-   2026-11-21 四轮定稿：▶运行紧贴模式分段（执行亲和——选完模式立刻执行），
-   右簇（引擎/状态/调校对象/更多）贴右由 #engPillV4{margin-left:auto} 承担。
-   ⚠ 历史教训 ×2：margin-left:auto 必须≈与压制规则同级特异度——
-   · v1：#v4RunBtn (1,0,0) 被 #tb .v4-run{margin:0 6px} (1,1,0) 压制，从未生效；
-   · v2：auto 放 .v4-run 上会把运行推去右缘（川陀裁定"运行位置不对"）。
-   #engPillV4 (1,0,0) > .v4-pill (0,1,0)，无压制风险。 */
+/* 左簇贴左、右簇贴右：撤掉旧的大占位，改由主按钮吃掉剩余空间 */
 #tb .sp{flex:0 0 0}
-#engPillV4{margin-left:auto}
-
-/* 模式上下文 + 状态只读件（2026-11-21 七轮，川陀提议"隐藏的信息填满空白"）：
-   顶栏中部 = 模式提示 + Baseline/求解内核/fps；flex:1 吃掉富余空间；
-   display:flex 垂直居中（此前纯文本顶对齐，川陀要求"字体高度居中"）。 */
-.v4-ctx{flex:1 1 auto;min-width:0;overflow:hidden;display:flex;align-items:center;justify-content:center;
-  gap:16px;padding:0 12px;font:500 10.5px var(--font-ui);color:var(--ink-3)}
-.v4-ctx .v4-ctx-mode{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.v4-ctx .v4-ro{display:flex;align-items:baseline;gap:5px;white-space:nowrap}
-.v4-ctx .v4-ro i{font-style:normal;font-size:10px;color:var(--ink-3)}
-.v4-ctx .v4-ro b{font:500 10.5px var(--font-mono);color:var(--ink-2);font-variant-numeric:tabular-nums}
-.v4-ctx .v4-ro b.a{color:var(--cream)}
+#v4RunBtn{margin-left:auto}
 
 /* 只读状态降级：不画边框、不占按钮语义，只留色点 + 小字
    （cursor:default 原在文件前部单列一条，2026-11-16 E10 并入本条） */
 .v4-pill.ro{cursor:default;border-color:transparent;background:transparent;color:var(--ink-3);
-  font-size:10.5px;padding:0 6px;gap:5px}
+  font-size:9px;padding:0 6px;gap:5px}
 .v4-pill.ro:hover{background:transparent;color:var(--ink-2)}
 /* 状态簇起始处的竖分隔（借首个状态胶囊的伪元素，不新增 DOM） */
 #tb .v4-pill.ro.ok::before{content:"";width:1px;height:16px;background:var(--glass-bd);margin-right:5px}
+
+/* 工具区（评价报告 / 透视 / 主题 / fps）与状态簇拉开呼吸 */
+#evalModalBtn{margin-left:12px}
+#tb .cell.slim:last-child{min-width:40px;padding:0 10px}
 
 /* 导航簇与右侧动作簇之间的留白 */
 #tb > #v4ModeSeg{margin-right:14px}

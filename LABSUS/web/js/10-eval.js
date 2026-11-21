@@ -545,12 +545,6 @@ ${baseHtml}
 }
 window.exportDesignReport = exportDesignReport;
 
-/* 弹窗取色（2026-11-21 UI 翻新）：跟随主题令牌；主题变量挂在 documentElement 上（v4Apply） */
-function evalCssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
-function evalRgbaOf(hex,a){
-  const m=/^#?([0-9a-f]{6})$/i.exec(hex||"");if(!m)return hex;
-  const v=parseInt(m[1],16);return "rgba("+((v>>16)&255)+","+((v>>8)&255)+","+(v&255)+","+a+")";}
-
 function drawRadarChart(scores){
   const cv = document.getElementById("evalRadarCanvas");
   if(!cv) return;
@@ -563,7 +557,7 @@ function drawRadarChart(scores){
   const total = keys.length;
   const angleStep = (Math.PI * 2) / total;
 
-  ctx.strokeStyle = evalCssVar("--glass-bd-2")||"rgba(255,255,255,0.1)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
   ctx.lineWidth = 1;
   for(let layer = 1; layer <= 4; layer++){
     ctx.beginPath();
@@ -586,7 +580,7 @@ function drawRadarChart(scores){
 
     const labelX = cx + (R + 22) * Math.cos(ang);
     const labelY = cy + (R + 22) * Math.sin(ang);
-    ctx.fillStyle = evalCssVar("--ink-3")||"#8b949e";
+    ctx.fillStyle = "#8b949e";
     ctx.font = "10.5px ui-monospace, sans-serif";
     ctx.textAlign = Math.abs(Math.cos(ang)) < 0.2 ? "center" : (Math.cos(ang) > 0 ? "left" : "right");
     ctx.textBaseline = "middle";
@@ -602,9 +596,9 @@ function drawRadarChart(scores){
     if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   }
   ctx.closePath();
-  ctx.fillStyle = evalRgbaOf(evalCssVar("--pri"),0.25)||"rgba(88,166,255,0.25)";
+  ctx.fillStyle = "rgba(88, 166, 255, 0.25)";
   ctx.fill();
-  ctx.strokeStyle = evalCssVar("--pri")||"#58a6ff";
+  ctx.strokeStyle = "#58a6ff";
   ctx.lineWidth = 2.2;
   ctx.stroke();
 
@@ -615,9 +609,9 @@ function drawRadarChart(scores){
     const x = cx + r * Math.cos(ang), y = cy + r * Math.sin(ang);
     ctx.beginPath();
     ctx.arc(x, y, 4, 0, Math.PI * 2);
-    ctx.fillStyle = evalCssVar("--pri")||"#58a6ff";
+    ctx.fillStyle = "#58a6ff";
     ctx.fill();
-    ctx.strokeStyle = evalCssVar("--ink-1")||"#fff";
+    ctx.strokeStyle = "#fff";
     ctx.lineWidth = 1.5;
     ctx.stroke();
   }

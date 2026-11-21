@@ -19,14 +19,14 @@
 
     <!-- 车型平台 -->
     <div class="cell slim"><i>车型平台</i>
-      <select id="topVehSelect" onchange="loadVehiclePreset(this.value)">
-        <option value="formula">Formula SAE</option>
-        <option value="gt3">FIA GT3 · 赛道</option>
-        <option value="gt3_sport">FIA GT3 · 日常</option>
-        <option value="baja">SAE Baja · 越野</option>
+      <select id="topVehSelect" style="background:transparent;border:none;color:var(--pri);font:600 11px var(--font-ui);cursor:pointer;outline:none;" onchange="loadVehiclePreset(this.value)">
+        <option value="formula">🏎️ Formula SAE (方程式)</option>
+        <option value="gt3">🏁 FIA GT3 (赛车模式)</option>
+        <option value="gt3_sport">🚗 FIA GT3 (日常模式)</option>
+        <option value="baja">🏜️ SAE Baja (越野赛车)</option>
       </select>
-      <button id="tireLabBtn" class="v4-mini" onclick="if(typeof TIRE_LAB!=='undefined')TIRE_LAB.open()" title="自定义轮胎/轮毂尺寸与参数">轮胎</button>
-      <button id="ptLabBtn" class="v4-mini" onclick="if(typeof POWERTRAIN!=='undefined')POWERTRAIN.open()" title="自定义动力总成（架构/ICE/电机/变速箱）">动力</button>
+      <button id="tireLabBtn" class="v4-mini" onclick="if(typeof TIRE_LAB!=='undefined')TIRE_LAB.open()" title="自定义轮胎/轮毂尺寸与参数">🛞 轮胎</button>
+      <button id="ptLabBtn" class="v4-mini" onclick="if(typeof POWERTRAIN!=='undefined')POWERTRAIN.open()" title="自定义动力总成（架构/ICE/电机/变速箱）">🔧 动力</button>
     </div>
 
 
@@ -44,23 +44,14 @@
 
     <!-- 工作模式（12 号脚本路由运行按钮） -->
     <div class="v4-seg" id="v4ModeSeg">
-      <button data-mode="geo" class="on" title="硬点与定位角调校">几何</button>
-      <button data-mode="kc" title="运动学与柔量特性">K&amp;C</button>
-      <button data-mode="chassis" title="准静态操稳平衡">整车</button>
-      <button data-mode="track" title="动态圈速舞台">赛道</button>
+      <button data-mode="geo" class="on">几何</button>
+      <button data-mode="kc">K&amp;C</button>
+      <button data-mode="chassis">整车</button>
+      <button data-mode="track">赛道</button>
     </div>
 
     <!-- ▶ 运行：全界面唯一主按钮 -->
     <button class="v4-run" id="v4RunBtn">▶ 运行</button>
-
-    <!-- 模式上下文提示（2026-11-21 五轮）：占据顶栏中部富余空间，随模式切换变化；
-         窄屏（≤1400）隐藏，空间归还给右簇 auto 边距 -->
-    <div class="v4-ctx" id="v4Ctx">
-      <span class="v4-ctx-mode" id="v4CtxTxt">几何 · 硬点拖拽与定位角联动</span>
-      <span class="v4-ro ro-base"><i>Baseline</i><b id="tbBase">未锁定</b></span>
-      <span class="v4-ro ro-kernel"><i>求解内核</i><b id="tbSolver">闭式几何 + 静力平衡</b></span>
-      <span class="v4-ro ro-fps"><i>fps</i><b id="tbFps">--</b></span>
-    </div>
 
     <!-- 状态胶囊 -->
     <button class="v4-pill warn" id="engPillV4" title="点击 连接 / 断开 引擎">
@@ -68,8 +59,14 @@
     <div class="v4-pill ro ok" title="仿真状态">
       <b class="g" id="tbStateBox" style="display:flex;align-items:center;gap:6px;font-weight:inherit"><span class="dot" id="tbStateDot" style="background:var(--ok)"></span><span id="tbState">运行</span></b></div>
     <div class="v4-pill ro" title="正在调校对象"><span id="tbArch">前悬架 PUSHROD</span></div>
-    <!-- 更多（低频件收纳；id 全保留 ⇒ JS 写入零感知） -->
-    <button id="v4MoreBtn" class="v4-mini" title="更多：状态 / 评价报告 / 外观">⋯</button>
+    <div class="v4-pill ro" title="Baseline 快照状态"><span id="tbBase">未锁定</span></div>
+    <div class="v4-pill ro" title="求解内核"><span id="tbSolver">闭式几何 + 静力平衡</span></div>
+
+    <button id="evalModalBtn" class="v4-mini" title="查看全维度悬架工程评价与AI调校建议">📊 评价报告</button>
+    <button id="pureSuspTg" class="v4-mini" title="切换纯悬架透视 (隐藏车架与外围附件)">透视</button>
+    <button id="v4ThemeBtn" title="配色方案选择">🎨</button>
+    <div id="themeTg" class="theme-tg" title="切换浅色 / 深色模式"><i></i></div>
+    <div class="cell slim"><i>fps</i><b id="tbFps">--</b></div>
   </div>
 
   <!-- ═══════════ 主区：左坞站 + 中央舞台 + 右坞站 ═══════════ -->
@@ -87,7 +84,6 @@
           <button data-vi="3">4 轴测</button>
         </div>
         <button class="v4-mini" id="v4QuadBtn" title="四宫格 / 单视口切换">▦ 四宫格</button>
-        <button id="pureSuspTg" class="v4-mini" title="切换纯悬架透视 (隐藏车架与外围附件)">透视</button>
         <div class="v4-sp"></div>
         <span id="v4VpTitle" style="font:500 10px var(--font-ui);color:var(--ink-2)">正视图 FRONT VIEW</span>
         <button class="v4-mini" id="v4FullBtn" title="舞台全屏">⛶ 全屏</button>
@@ -126,18 +122,6 @@
 
 <!-- 主题选择浮层（12 号脚本填充内容） -->
 <div id="v4ThemePop" style="display:none"></div>
-
-<!-- 更多浮层（2026-11-21 UI 翻新）：低频工具/外观收纳。
-     状态只读件（Baseline/内核/fps）已于七轮回填顶栏中部 #v4Ctx（川陀提议）。 -->
-<div id="v4MorePop">
-  <div class="mp-h">工具 TOOLS</div>
-  <button id="evalModalBtn" class="mp-btn" title="查看全维度悬架工程评价与AI调校建议">📊 评价报告</button>
-  <div class="mp-h">外观 APPEARANCE</div>
-  <div class="mp-appear">
-    <button id="v4ThemeBtn" title="配色方案选择">🎨 配色方案</button>
-    <div id="themeTg" class="theme-tg" title="切换浅色 / 深色模式"><i></i></div>
-  </div>
-</div>
 
 <!-- ================================ 综合悬架工程评价与诊断模态窗口 ================================ -->
 <div id="suspEvalModal" class="susp-eval-modal-backdrop">

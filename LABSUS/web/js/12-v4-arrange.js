@@ -32,7 +32,7 @@ rose:{
   dark:{"bg-base":"#141127","glass":"rgba(27,23,53,0.82)","glass-2":"rgba(27,23,53,0.65)","glass-3":"rgba(38,32,72,0.70)",
     "glass-hov":"rgba(122,96,180,0.30)","sh-bg":"rgba(30,25,58,0.80)",
     "glass-bd":"rgba(255,255,255,0.10)","glass-bd-2":"rgba(255,255,255,0.15)","hairline":"rgba(255,255,255,0.06)",
-    "ink-1":"#ece9f6","ink-2":"#a9a3c2","ink-3":"#8a83a8","cream":"#fc85ae",
+    "ink-1":"#ece9f6","ink-2":"#a9a3c2","ink-3":"#6f6890","cream":"#fc85ae",
     "pri":"#b79ce8","pri-strong":"#9d7fd8","pri-fill":"rgba(158,87,157,0.25)","pri-bd":"rgba(183,156,232,0.35)",
     "ok":"#9e579d","warn":"#f25d9c","err":"#b61aae",
     "ok-fill":"rgba(158,87,157,0.18)","warn-fill":"rgba(242,93,156,0.12)","err-fill":"rgba(182,26,174,0.22)",
@@ -41,7 +41,7 @@ rose:{
   light:{"bg-base":"#f7f2f6","glass":"rgba(255,255,255,0.88)","glass-2":"rgba(247,240,246,0.75)","glass-3":"rgba(240,231,240,0.80)",
     "glass-hov":"rgba(255,255,255,0.95)","sh-bg":"rgba(240,231,240,0.85)",
     "glass-bd":"rgba(42,36,64,0.10)","glass-bd-2":"rgba(42,36,64,0.16)","hairline":"rgba(42,36,64,0.06)",
-    "ink-1":"#2a2440","ink-2":"#675f85","ink-3":"#6b6585","cream":"#ee6f9f",
+    "ink-1":"#2a2440","ink-2":"#675f85","ink-3":"#9d95b5","cream":"#ee6f9f",
     "pri":"#7b5fc0","pri-strong":"#64489f","pri-fill":"rgba(158,87,157,0.12)","pri-bd":"rgba(123,95,192,0.30)",
     "ok":"#8a4a89","warn":"#e2448a","err":"#a0139a",
     "ok-fill":"rgba(138,74,137,0.14)","warn-fill":"rgba(226,68,138,0.12)","err-fill":"rgba(160,19,154,0.10)",
@@ -59,7 +59,7 @@ rose:{
     tie:"#9e579d",rack:"#4a4363",chas:"#3d3752",chas2:"#2f2a40",
     gnd:"#363046",path:"#b61aae",pathC:"#9e579d",pathK:"#fc85ae",
     ic:"#f25d9c",rc:"#9e579d",dim:"#7a7090",dimT:"#b5abc9",
-    arb:"#8a79c9",frc:"#b61aae",txt:"#ece9f6",txt2:"#a9a3c2",txt3:"#8a83a8",base:"#8a83a8"},
+    arb:"#8a79c9",frc:"#b61aae",txt:"#ece9f6",txt2:"#a9a3c2",txt3:"#6f6890",base:"#6f6890"},
   light:{bg:"#f7f2f6",grid:"#e9e0ee",grid2:"#dcd0e6",axis:"#c6b8d4",
     rig:"#8c86a2",rigArm:"#6e6883",arm:"rgba(120,90,160,0.05)",
     strut:"#7b5fc0",rocker:"#ee6f9f",rockerF:"rgba(238,111,159,0.14)",
@@ -71,7 +71,7 @@ rose:{
     tie:"#8a4a89",rack:"#8a8898",chas:"#a9a6b5",chas2:"#b9b6c3",
     gnd:"#e0d8e4",path:"#a0139a",pathC:"#8a4a89",pathK:"#ee6f9f",
     ic:"#e2448a",rc:"#8a4a89",dim:"#9a98a7",dimT:"#5c5a6b",
-    arb:"#8a6bb0",frc:"#a0139a",txt:"#2a2440",txt2:"#675f85",txt3:"#6b6585",base:"#a9a6b5"}}
+    arb:"#8a6bb0",frc:"#a0139a",txt:"#2a2440",txt2:"#675f85",txt3:"#9d95b5",base:"#a9a6b5"}}
 },
 sunset:{
   name:"落日靛蓝",desc:"No.64",
@@ -80,7 +80,7 @@ sunset:{
   dark:{"bg-base":"#130b2e","glass":"rgba(26,17,69,0.82)","glass-2":"rgba(26,17,69,0.65)","glass-3":"rgba(38,26,94,0.70)",
     "glass-hov":"rgba(120,90,200,0.28)","sh-bg":"rgba(30,20,76,0.80)",
     "glass-bd":"rgba(255,255,255,0.10)","glass-bd-2":"rgba(255,255,255,0.15)","hairline":"rgba(255,255,255,0.06)",
-    "ink-1":"#efecf7","ink-2":"#aaa2c8","ink-3":"#8a81ab","cream":"#ffbd39",
+    "ink-1":"#efecf7","ink-2":"#aaa2c8","ink-3":"#6f6694","cream":"#ffbd39",
     "pri":"#9f7fe8","pri-strong":"#8a66d6","pri-fill":"rgba(147,0,119,0.22)","pri-bd":"rgba(159,127,232,0.35)",
     "ok":"#ffbd39","warn":"#e61c5d","err":"#e61c5d",
     "ok-fill":"rgba(255,189,57,0.14)","warn-fill":"rgba(230,28,93,0.12)","err-fill":"rgba(230,28,93,0.22)",
@@ -89,7 +89,7 @@ sunset:{
   light:{"bg-base":"#f8f5ef","glass":"rgba(255,255,255,0.88)","glass-2":"rgba(244,239,229,0.75)","glass-3":"rgba(238,231,218,0.80)",
     "glass-hov":"rgba(255,255,255,0.95)","sh-bg":"rgba(238,231,218,0.85)",
     "glass-bd":"rgba(34,26,58,0.10)","glass-bd-2":"rgba(34,26,58,0.16)","hairline":"rgba(34,26,58,0.06)",
-    "ink-1":"#221a3a","ink-2":"#5d5480","ink-3":"#686283","cream":"#e8a41e",
+    "ink-1":"#221a3a","ink-2":"#5d5480","ink-3":"#9790b5","cream":"#e8a41e",
     "pri":"#6b4fc0","pri-strong":"#57409e","pri-fill":"rgba(147,0,119,0.10)","pri-bd":"rgba(107,79,192,0.30)",
     "ok":"#d99a12","warn":"#d91257","err":"#d91257",
     "ok-fill":"rgba(217,154,18,0.14)","warn-fill":"rgba(217,18,87,0.10)","err-fill":"rgba(217,18,87,0.10)",
@@ -107,7 +107,7 @@ sunset:{
     tie:"#c04aa8",rack:"#4a4363",chas:"#3b3452",chas2:"#2d2740",
     gnd:"#342c46",path:"#e61c5d",pathC:"#ffbd39",pathK:"#ffbd39",
     ic:"#ffbd39",rc:"#ffbd39",dim:"#7a7090",dimT:"#b8aecc",
-    arb:"#a44ac0",frc:"#e61c5d",txt:"#efecf7",txt2:"#aaa2c8",txt3:"#8a81ab",base:"#8a81ab"},
+    arb:"#a44ac0",frc:"#e61c5d",txt:"#efecf7",txt2:"#aaa2c8",txt3:"#6f6694",base:"#6f6694"},
   light:{bg:"#f8f5ef",grid:"#eae2d4",grid2:"#ddd2be",axis:"#c6b9a2",
     rig:"#8c8a9a",rigArm:"#6e6c7b",arm:"rgba(120,80,180,0.05)",
     strut:"#6b4fc0",rocker:"#e8a41e",rockerF:"rgba(232,164,30,0.14)",
@@ -119,7 +119,7 @@ sunset:{
     tie:"#930077",rack:"#8a8c93",chas:"#aba9b2",chas2:"#bbb9c1",
     gnd:"#e2dcce",path:"#d91257",pathC:"#d99a12",pathK:"#e8a41e",
     ic:"#e8a41e",rc:"#d99a12",dim:"#9a9ca3",dimT:"#5c5e65",
-    arb:"#93538f",frc:"#d91257",txt:"#221a3a",txt2:"#5d5480",txt3:"#686283",base:"#aba9b2"}}
+    arb:"#93538f",frc:"#d91257",txt:"#221a3a",txt2:"#5d5480",txt3:"#9790b5",base:"#aba9b2"}}
 }};
 
 /* ---------- 画布调色板：基于经典 PAL 做键替换 ---------- */
@@ -248,41 +248,11 @@ function v4ArrangeLeft(){
     b.onclick=()=>{V4.lpane=k;
       bar.querySelectorAll(".v4-ltab").forEach(x=>x.classList.toggle("on",x===b));
       Object.keys(panes).forEach(p=>panes[p].classList.toggle("on",p===k));
-      /* 切 Tab 清空搜索（过滤只针对当前 Tab，切走即复原） */
-      const si=document.getElementById("v4Lsearch");
-      if(si&&si.value){si.value="";si.dispatchEvent(new Event("input"));}
       try{localStorage.setItem("labsus-v4-lpane",k);}catch(e){}};
     bar.appendChild(b);
     const p=document.createElement("div");p.className="v4-pane";p.dataset.pane=k;panes[k]=p;
   });
-  lp.appendChild(bar);
-  /* 参数搜索（2026-11-21 UI 翻新）：当前 Tab 内按折叠头标题+行标签过滤；
-     命中自动展开并高亮，清空复原（重放已保存折叠态） */
-  const srow=document.createElement("div");srow.className="v4-lsearchrow";
-  const srch=document.createElement("input");
-  srch.className="v4-lsearch";srch.id="v4Lsearch";srch.type="text";srch.placeholder="🔍 搜索参数…";
-  srow.appendChild(srch);lp.appendChild(srow);
-  Object.keys(panes).forEach(k=>lp.appendChild(panes[k]));
-  const filterSecs=()=>{
-    const q=srch.value.trim().toLowerCase();
-    const pane=panes[V4.lpane];if(!pane)return;
-    let any=false;
-    pane.querySelectorAll(".sec").forEach(s=>{
-      if(!q){s.style.display="";s.classList.remove("v4-hit");return;}
-      const zh=s.querySelector(".sh .zh");
-      const t=((zh?zh.textContent:"")+" "+
-        Array.from(s.querySelectorAll("label,button,.chk span")).map(x=>x.textContent).join(" ")).toLowerCase();
-      const hit=t.includes(q);
-      s.style.display=hit?"":"none";
-      s.classList.toggle("v4-hit",hit);
-      if(hit){s.classList.remove("col");any=true;}
-    });
-    let no=pane.querySelector(".v4-nohit");
-    if(!no){no=document.createElement("div");no.className="v4-nohit";no.textContent="无匹配参数";pane.appendChild(no);}
-    no.style.display=(any||!q)?"none":"block";
-    if(!q)v4RestoreAccordions(lp);
-  };
-  srch.addEventListener("input",filterSecs);
+  lp.appendChild(bar);Object.keys(panes).forEach(k=>lp.appendChild(panes[k]));
   kids.forEach(el=>{
     if(el.classList.contains("sec")){
       const zh=el.querySelector(".sh .zh");
@@ -352,7 +322,7 @@ const V4_WIN={roCam:[-1.6,-0.6,"目标 −1.2°±0.4"],roToe:[-0.9,0.3,"目标�
   roUsGrad:[0.2,2.0,"目标 0.2–2.0 °/g"]};
 function v4BuildHero(){
   const host=document.getElementById("v4Hero");if(!host)return;
-  host.innerHTML='<div class="v4-hero-hd"><b>核心结论</b><i>Key Results</i><span class="v4-live">实时</span><span class="v4-modechip" id="v4ModeChip">几何</span></div>'+
+  host.innerHTML='<div class="v4-hero-hd"><b>核心结论</b><i>Key Results</i><span class="v4-live">实时</span></div>'+
   '<div class="v4-hero-grid">'+
   '<div class="v4-hc" id="hcCam"><div class="en">Camber 外倾</div><div class="v">--</div><div class="hint">'+V4_WIN.roCam[2]+'</div></div>'+
   '<div class="v4-hc" id="hcToe"><div class="en">Toe 前束</div><div class="v">--</div><div class="hint">'+V4_WIN.roToe[2]+'</div></div>'+
@@ -413,9 +383,6 @@ function v4MirrorHero(){
     const pill=document.getElementById("engPillV4");
     if(pill){pill.classList.toggle("warn",!ENG.ok);pill.classList.toggle("ok",!!ENG.ok);}
   }
-  /* 模式徽标：右坞站永远显示当前工作模式（250ms 自愈，无时序依赖） */
-  const mchip=document.getElementById("v4ModeChip");
-  if(mchip){const nm={geo:"几何",kc:"K&C",chassis:"整车",track:"赛道"}[V4.runMode];mchip.textContent=nm||V4.runMode;}
   const sc=document.getElementById("evalOverallScore"),out=document.getElementById("v4Score");
   if(sc&&out)out.textContent=sc.textContent+" 分";
 }
@@ -468,35 +435,11 @@ function v4Run(){
   else if(m==="chassis"){if(typeof chassisRun==="function")chassisRun();}
   else if(m==="track"){if(typeof openCircuitStage==="function")openCircuitStage();}
 }
-/* 模式上下文一句话提示（2026-11-21 五轮）：顶栏中部 .v4-ctx 的文案真源，
-   与 v4ModeSeg 按钮 title 同口径；随模式切换刷新，启动时初始化一次。 */
-const V4_CTX={geo:"几何 · 硬点拖拽与定位角实时联动",
-  kc:"K&C · 转鼓扫掠看外倾 / 前束 / 侧倾中心",
-  chassis:"整车 · 准静态平衡：侧倾梯度与不足转向",
-  track:"赛道 · 闭环圈速舞台与调校对比"};
-function v4SyncCtx(){
-  const e=document.getElementById("v4CtxTxt");
-  if(e)e.textContent=V4_CTX[V4.runMode]||"";
-}
 function v4InitTopbar(){
   const seg=document.getElementById("v4ModeSeg");
   if(seg)seg.querySelectorAll("button").forEach(b=>b.onclick=()=>{
     V4.runMode=b.dataset.mode;
-    seg.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));
-    const chip=document.getElementById("v4ModeChip");
-    if(chip)chip.textContent=b.textContent;
-    v4SyncCtx();});
-  /* 更多浮层（2026-11-21）：低频件收纳；开合 = 按钮切换 + 点外部关闭 + Esc */
-  const mb=document.getElementById("v4MoreBtn"),mp=document.getElementById("v4MorePop");
-  if(mb&&mp){
-    mb.onclick=e=>{e.stopPropagation();
-      const r=mb.getBoundingClientRect();
-      mp.style.top=(r.bottom+6)+"px";
-      mp.style.right=Math.max(8,window.innerWidth-r.right)+"px";
-      mp.classList.toggle("show");};
-    document.addEventListener("click",e=>{if(!mp.contains(e.target))mp.classList.remove("show");});
-    document.addEventListener("keydown",e=>{if(e.key==="Escape")mp.classList.remove("show");});
-  }
+    seg.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));});
   const run=document.getElementById("v4RunBtn");if(run)run.onclick=v4Run;
   const pill=document.getElementById("engPillV4");
   if(pill)pill.onclick=()=>{if(typeof ENG==="undefined")return;
@@ -513,7 +456,6 @@ function v4InitTopbar(){
     if(e.code==="Space"){e.preventDefault();v4Run();}
     else if(/^Digit[1-4]$/.test(e.code)){v4SetQuad(false);v4ShowView(+e.code.slice(-1)-1);}
   });
-  v4SyncCtx();
 }
 
 /* ============================================================

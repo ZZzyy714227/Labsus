@@ -560,63 +560,6 @@ require('./test_tire_wiring')(webDir, ok, failures.push.bind(failures), { log(){
   ok(/trackFlagsNote\(res\)/.test(src), 'track flags: 状态行实际消费（接线守卫）');
 }
 
-/* ── UI 翻新 2026-11-21：字号阶梯与对比度令牌（Task 1） ── */
-{
-  const css = fs.readFileSync(path.join(webDir, 'css', 'fullchassis.css'), 'utf8');
-  ok(/--fs-hero:\s*20px/.test(css), '字号阶梯: --fs-hero 20px');
-  ok(/--fs-body:\s*12px/.test(css), '字号阶梯: --fs-body 12px');
-  ok(/--fs-label:\s*10\.5px/.test(css), '字号阶梯: --fs-label 10.5px');
-  ok(/--fs-micro:\s*9px/.test(css), '字号阶梯: --fs-micro 9px');
-  ok(/--ink-3:#8B867D/.test(css), '对比度: 深色 --ink-3=#8B867D');
-  ok(/--ink-2:#4A505A/.test(css) && /--ink-3:#626872/.test(css), '对比度: 浅色 ink-2/ink-3 加深');
-  ok(/font:12px\/1\.45 var\(--font-ui\)/.test(css), '根字号 12px');
-  const themeSrc = fs.readFileSync(path.join(webDir, 'js', '12-v4-arrange.js'), 'utf8');
-  ['#8a83a8', '#6b6585', '#8a81ab', '#686283'].forEach(h =>
-    ok(themeSrc.includes(h), `对比度: 主题预设 ink-3/txt3 同步 ${h}`));
-}
-
-/* ── UI 翻新 2026-11-21：顶栏重排（Task 2） ── */
-{
-  const v4 = readHtml('dwb-pro-v4.html');
-  ['tbBase','tbSolver','tbFps','evalModalBtn','v4ThemeBtn','themeTg','pureSuspTg','v4MoreBtn','v4MorePop']
-    .forEach(id => ok((v4.match(new RegExp('id="'+id+'"'))||[]).length === 1, `顶栏重排: #${id} 存在且唯一`));
-  const tbBlock = (v4.match(/<div id="tb">[\s\S]*?<\/div>\s*<!--[\s═]*主区/) || [''])[0];
-  ok(tbBlock !== '' && /id="tbBase"/.test(tbBlock) && /id="tbSolver"/.test(tbBlock) && /id="tbFps"/.test(tbBlock),
-    '顶栏七轮: Baseline/内核/fps 回填顶栏中部 v4Ctx');
-  ok(tbBlock !== '' && !/id="evalModalBtn"|id="v4ThemeBtn"|id="themeTg"/.test(tbBlock),
-    '顶栏重排: 评价/主题/明暗仍在更多浮层');
-  ok(/class="v4-vpbar"[\s\S]{0,900}id="pureSuspTg"/.test(v4),
-    '顶栏重排: 透视按钮位于视口工具条');
-  ok((v4.match(/id="v4Ctx"/g) || []).length === 1, '顶栏五轮: 模式上下文提示条存在且唯一');
-  ok(/v4SyncCtx/.test(fs.readFileSync(path.join(webDir, 'js', '12-v4-arrange.js'), 'utf8')),
-    '顶栏五轮: 上下文随模式切换联动（v4SyncCtx）');
-}
-
-/* ── UI 翻新 2026-11-21：参数搜索 + 调参反馈（Task 3） ── */
-{
-  const arrange = fs.readFileSync(path.join(webDir, 'js', '12-v4-arrange.js'), 'utf8');
-  ok(/id="v4Lsearch"/.test(arrange) && /filterSecs/.test(arrange), '坞站搜索: 搜索输入与过滤逻辑存在');
-  ok(/v4-nohit/.test(arrange), '坞站搜索: 无匹配提示');
-  const panels = fs.readFileSync(path.join(webDir, 'js', '06-ui-panels.js'), 'utf8');
-  ok(/just-chg/.test(panels) && /_jcT/.test(panels), '调参反馈: rowSlider 加 just-chg 闪烁');
-  ok(/sl\.title="范围 \["/.test(panels), '调参反馈: 滑块挂 [min~max] title');
-  ok(/\.ctl\.just-chg>label\{color:var\(--acc-in\)\}/.test(fs.readFileSync(path.join(webDir, 'css', 'fullchassis.css'), 'utf8')),
-    '调参反馈: .just-chg 样式存在（暖色语义）');
-  ok(/v4-lsearch/.test(fs.readFileSync(path.join(webDir, 'css', 'v4.css'), 'utf8')), '坞站搜索: 样式存在');
-}
-
-/* ── UI 翻新 2026-11-21：评价弹窗令牌化（Task 4） ── */
-{
-  const css = fs.readFileSync(path.join(webDir, 'css', 'fullchassis.css'), 'utf8');
-  const evalBlock = (css.match(/── 评价报告弹窗[\s\S]*/) || [''])[0].slice(0, 4000);
-  ok(evalBlock.length > 500, '评价弹窗: 令牌化块存在');
-  ['#0d1117', '#161b22', '#238636', '#58a6ff', '#8b949e', '#e6edf3', '#c9d1d9', '#2ea043', '#f85149', '#d29922', '#f1e05a']
-    .forEach(h => ok(!evalBlock.includes(h), `评价弹窗: 硬编码色 ${h} 已清除`));
-  ok(/var\(--ok-fill\)/.test(evalBlock) && /var\(--r-xl\)/.test(evalBlock), '评价弹窗: 使用 ok-fill/r-xl 令牌');
-  const ev = fs.readFileSync(path.join(webDir, 'js', '10-eval.js'), 'utf8');
-  ok(/evalCssVar\("--pri"\)/.test(ev) && /evalCssVar\("--ink-3"\)/.test(ev), '评价弹窗: 雷达图取色接主题变量');
-}
-
 // ── 结果（必须在所有断言之后，见文件中部 M10b 注释）──────────────────────
 if (failures.length) {
   console.error(`DOM/结构测试 FAIL：${failures.length}/${checks} 项失败`);

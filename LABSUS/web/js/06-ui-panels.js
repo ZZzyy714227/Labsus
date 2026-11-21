@@ -8,7 +8,7 @@ function EH(t,c,html){const e=document.createElement(t);if(c)e.className=c;if(ht
 /* G12：分组分隔线——用灰色小号字 + hairline 隔开面板内的逻辑组 */
 function groupDiv(host,label){
   const d=E("div");
-  d.style.cssText="display:flex;align-items:center;gap:8px;padding:6px 12px 2px;color:var(--ink-3);font:500 9px/1 var(--font-ui);letter-spacing:.16em;text-transform:uppercase;user-select:none";
+  d.style.cssText="display:flex;align-items:center;gap:8px;padding:6px 12px 2px;color:var(--ink-3);font:500 8px/1 var(--font-ui);letter-spacing:.16em;text-transform:uppercase;user-select:none";
   const l=E("span"); l.style.cssText="flex:1;height:1px;background:var(--hairline)";
   const r=E("span"); r.style.cssText="flex:1;height:1px;background:var(--hairline)";
   d.appendChild(l);d.appendChild(document.createTextNode(label));d.appendChild(r);
@@ -32,17 +32,13 @@ function rowSlider(b,zh,en,unit,min,max,step,get,set,dec){
   const sl=E("input");sl.type="range";sl.min=min;sl.max=max;sl.step=step;
   const nb=E("input");nb.type="number";nb.step=step;
   r.appendChild(sl);r.appendChild(nb);b.appendChild(r);
-  const push=v=>{set(clamp(parseFloat(v),typeof min==="function"?min():min,typeof max==="function"?max():max));
-    /* 改动反馈（2026-11-21 UI 翻新）：行标签闪暖色 1.2s，"改完不知道生效没有"的直接解法 */
-    r.classList.add("just-chg");clearTimeout(r._jcT);
-    r._jcT=setTimeout(()=>r.classList.remove("just-chg"),1200);};
+  const push=v=>{set(clamp(parseFloat(v),typeof min==="function"?min():min,typeof max==="function"?max():max));};
   sl.oninput=()=>push(sl.value);
   nb.onchange=()=>push(nb.value);
   nb.oninput=()=>{if(nb.value!=="")push(nb.value);};
   UI.sync.push(()=>{
-    const lo=typeof min==="function"?min():min,hi=typeof max==="function"?max():max;
-    sl.min=lo;sl.max=hi;sl.title="范围 ["+lo+" ~ "+hi+"]";
     const v=get();
+    sl.min=typeof min==="function"?min():min;sl.max=typeof max==="function"?max():max;
     if(document.activeElement!==sl)sl.value=v;
     if(document.activeElement!==nb)nb.value=fmt(v,dec===undefined?1:dec);
   });
@@ -89,7 +85,7 @@ function buildVehiclePresetSection(host){
     const btn = E("button", "eng-btn veh-btn-tab");
     btn.dataset.veh = k;
     btn.textContent = label;
-    btn.style.cssText = "flex:1;min-width:0;font-size:10.5px;padding:4px 1px;";
+    btn.style.cssText = "flex:1;min-width:0;font-size:9.5px;padding:4px 1px;";
     if(S.vehicleType === k) btn.classList.add("on");
     btn.onclick = () => {
       loadVehiclePreset(k);
@@ -100,7 +96,7 @@ function buildVehiclePresetSection(host){
   
   const desc = E("div");
   desc.id = "vehPresetDesc";
-  desc.style.cssText = "font:10.5px var(--font-mono);color:var(--ink-2);padding:2px 8px 6px;line-height:1.3;";
+  desc.style.cssText = "font:9.5px var(--font-mono);color:var(--ink-2);padding:2px 8px 6px;line-height:1.3;";
   const curName = (VEHICLE_PRESETS[S.vehicleType]||{}).name || "";
   desc.textContent = "当前载入: " + curName;
   b.appendChild(desc);
