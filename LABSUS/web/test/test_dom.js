@@ -597,6 +597,18 @@ require('./test_tire_wiring')(webDir, ok, failures.push.bind(failures), { log(){
   ok(/v4-lsearch/.test(fs.readFileSync(path.join(webDir, 'css', 'v4.css'), 'utf8')), '坞站搜索: 样式存在');
 }
 
+/* ── UI 翻新 2026-11-21：评价弹窗令牌化（Task 4） ── */
+{
+  const css = fs.readFileSync(path.join(webDir, 'css', 'fullchassis.css'), 'utf8');
+  const evalBlock = (css.match(/── 评价报告弹窗[\s\S]*/) || [''])[0].slice(0, 4000);
+  ok(evalBlock.length > 500, '评价弹窗: 令牌化块存在');
+  ['#0d1117', '#161b22', '#238636', '#58a6ff', '#8b949e', '#e6edf3', '#c9d1d9', '#2ea043', '#f85149', '#d29922', '#f1e05a']
+    .forEach(h => ok(!evalBlock.includes(h), `评价弹窗: 硬编码色 ${h} 已清除`));
+  ok(/var\(--ok-fill\)/.test(evalBlock) && /var\(--r-xl\)/.test(evalBlock), '评价弹窗: 使用 ok-fill/r-xl 令牌');
+  const ev = fs.readFileSync(path.join(webDir, 'js', '10-eval.js'), 'utf8');
+  ok(/evalCssVar\("--pri"\)/.test(ev) && /evalCssVar\("--ink-3"\)/.test(ev), '评价弹窗: 雷达图取色接主题变量');
+}
+
 // ── 结果（必须在所有断言之后，见文件中部 M10b 注释）──────────────────────
 if (failures.length) {
   console.error(`DOM/结构测试 FAIL：${failures.length}/${checks} 项失败`);

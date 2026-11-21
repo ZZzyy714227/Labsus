@@ -392,115 +392,51 @@ canvas.plot{display:block;width:100%;height:150px;background:var(--well);border:
   opacity: 1;
 }
 
-.susp-eval-modal-container {
-  width: 92vw;
-  max-width: 1380px;
-  height: 88vh;
-  margin: auto;
-  background: #0d1117;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 0;
-  box-shadow: 10px 10px 0 rgba(0, 0, 0, 0.6);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.susp-eval-header {
-  padding: 16px 24px;
-  background: #161b22;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.susp-eval-title { font-size: 17px; font-weight: 700; color: #fff; margin: 0; }
-.susp-eval-subtitle { font-size: 12px; color: #8b949e; margin-top: 4px; display: block; }
-.susp-eval-close-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #c9d1d9;
-  border-radius: 0;
-  padding: 6px 14px;
-  cursor: pointer;
-}
-.susp-eval-body {
-  flex: 1;
-  display: flex;
-  gap: 16px;
-  padding: 16px 20px;
-  overflow-y: auto;
-}
-.susp-eval-col-left { width: 380px; display: flex; flex-direction: column; gap: 14px; }
-.susp-eval-col-right { flex: 1; display: flex; flex-direction: column; }
-
-.eval-card {
-  background: #161b22;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0;
-  padding: 14px;
-}
-.eval-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.eval-card-header h3 { font-size: 13px; font-weight: 700; color: #e6edf3; margin: 0; }
-
-.eval-grade-badge {
-  background: #238636;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 800;
-  padding: 2px 8px;
-  border-radius: 0;
-}
-
-.radar-container { display: flex; justify-content: center; align-items: center; margin: 6px 0; }
-.eval-score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px; }
-.eval-score-item {
-  background: rgba(255, 255, 255, 0.03);
-  padding: 6px 8px;
-  border-radius: 0;
-  display: flex;
-  justify-content: space-between;
-}
-.eval-score-item b { color: #58a6ff; }
-
-.eval-advice-list { font-size: 11.5px; color: #c9d1d9; display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
-.eval-advice-item {
-  background: rgba(255, 255, 255, 0.03);
-  padding: 8px 10px;
-  border-radius: 0;
-  border-left: 3px solid #f1e05a;
-}
-.eval-advice-item.danger { border-left-color: #f85149; }
-.eval-advice-item.good { border-left-color: #2ea043; }
-
-.eval-metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 10px;
-  max-height: 70vh;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-.metric-card {
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 0;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.metric-card-top { display: flex; justify-content: space-between; align-items: center; }
-.metric-name { font-size: 12px; font-weight: 700; color: #e6edf3; }
-.metric-status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.metric-status-dot.green { background: #2ea043; box-shadow: 0 0 6px #2ea043; }
-.metric-status-dot.yellow { background: #d29922; box-shadow: 0 0 6px #d29922; }
-.metric-status-dot.red { background: #f85149; box-shadow: 0 0 6px #f85149; }
-
-.metric-val-row { display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px; }
-.metric-val { font-size: 15px; font-weight: 800; font-family: ui-monospace, monospace; color: #58a6ff; }
-.metric-target { font-size: 10.5px; color: #8b949e; }
-.metric-desc { font-size: 10.5px; color: #8b949e; line-height: 1.35; margin-top: 2px; }
+/* ── 评价报告弹窗（2026-11-21 UI 翻新：GitHub-dark 硬编码 → 仪器风令牌） ── */
+.susp-eval-modal-container{
+  width:92vw;max-width:1380px;height:88vh;margin:auto;
+  background:var(--glass-2);border:1px solid var(--glass-bd-2);border-radius:var(--r-xl);
+  box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
+.susp-eval-header{padding:14px 22px;background:var(--glass-3);border-bottom:1px solid var(--glass-bd);
+  display:flex;justify-content:space-between;align-items:center;gap:12px}
+.susp-eval-title{font-size:16px;font-weight:700;color:var(--ink-1);margin:0}
+.susp-eval-subtitle{font-size:11.5px;color:var(--ink-3);margin-top:3px;display:block}
+.susp-eval-subtitle b{color:var(--pri)}
+.susp-eval-close-btn{background:transparent;border:1px solid var(--glass-bd-2);color:var(--ink-2);
+  border-radius:var(--r-md);padding:6px 14px;cursor:pointer;font:500 11px var(--font-ui);
+  transition:background .15s,color .15s,border-color .15s}
+.susp-eval-close-btn:hover{background:var(--glass-hov);color:var(--ink-1);border-color:var(--pri-bd)}
+.susp-eval-body{flex:1;display:flex;gap:14px;padding:14px 18px;overflow-y:auto}
+.susp-eval-col-left{width:380px;flex:0 0 380px;display:flex;flex-direction:column;gap:12px}
+.susp-eval-col-right{flex:1;display:flex;flex-direction:column;min-width:0}
+.eval-card{background:var(--glass-2);border:1px solid var(--glass-bd);border-radius:var(--r-lg);padding:14px}
+.eval-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.eval-card-header h3{font-size:12.5px;font-weight:700;color:var(--ink-1);margin:0;letter-spacing:.02em}
+.eval-grade-badge{background:var(--ok-fill);color:var(--ok);border:1px solid var(--ok);
+  font:700 10.5px var(--font-ui);letter-spacing:.06em;padding:2px 9px;border-radius:var(--r-pill)}
+.radar-container{display:flex;justify-content:center;align-items:center;margin:6px 0}
+.eval-score-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px}
+.eval-score-item{background:var(--well);border:1px solid var(--hairline);padding:6px 9px;
+  border-radius:var(--r-md);display:flex;justify-content:space-between;color:var(--ink-2)}
+.eval-score-item b{color:var(--pri);font-variant-numeric:tabular-nums}
+.eval-advice-list{font-size:11.5px;color:var(--ink-2);display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto}
+.eval-advice-item{background:var(--well);padding:8px 10px;border-radius:var(--r-sm);border-left:3px solid var(--warn)}
+.eval-advice-item.danger{border-left-color:var(--err)}
+.eval-advice-item.good{border-left-color:var(--ok)}
+.eval-metrics-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;
+  max-height:70vh;overflow-y:auto;padding-right:4px}
+.metric-card{background:var(--well);border:1px solid var(--glass-bd);border-radius:var(--r-md);
+  padding:10px;display:flex;flex-direction:column;gap:4px}
+.metric-card-top{display:flex;justify-content:space-between;align-items:center}
+.metric-name{font-size:11.5px;font-weight:700;color:var(--ink-1)}
+.metric-status-dot{width:8px;height:8px;border-radius:var(--r-pill);display:inline-block}
+.metric-status-dot.green{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+.metric-status-dot.yellow{background:var(--warn);box-shadow:0 0 6px var(--warn)}
+.metric-status-dot.red{background:var(--err);box-shadow:0 0 6px var(--err)}
+.metric-val-row{display:flex;justify-content:space-between;align-items:baseline;margin-top:2px}
+.metric-val{font:700 15px/1.2 var(--font-mono);font-variant-numeric:tabular-nums;color:var(--pri)}
+.metric-target{font-size:10px;color:var(--ink-3)}
+.metric-desc{font-size:10px;color:var(--ink-3);line-height:1.35;margin-top:2px}
 
 /* 定圆绕环舞台全屏模态窗口 */
 .circuit-stage-modal-backdrop {
