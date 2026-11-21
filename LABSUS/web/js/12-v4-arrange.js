@@ -322,7 +322,7 @@ const V4_WIN={roCam:[-1.6,-0.6,"目标 −1.2°±0.4"],roToe:[-0.9,0.3,"目标�
   roUsGrad:[0.2,2.0,"目标 0.2–2.0 °/g"]};
 function v4BuildHero(){
   const host=document.getElementById("v4Hero");if(!host)return;
-  host.innerHTML='<div class="v4-hero-hd"><b>核心结论</b><i>Key Results</i><span class="v4-live">实时</span></div>'+
+  host.innerHTML='<div class="v4-hero-hd"><b>核心结论</b><i>Key Results</i><span class="v4-live">实时</span><span class="v4-modechip" id="v4ModeChip">几何</span></div>'+
   '<div class="v4-hero-grid">'+
   '<div class="v4-hc" id="hcCam"><div class="en">Camber 外倾</div><div class="v">--</div><div class="hint">'+V4_WIN.roCam[2]+'</div></div>'+
   '<div class="v4-hc" id="hcToe"><div class="en">Toe 前束</div><div class="v">--</div><div class="hint">'+V4_WIN.roToe[2]+'</div></div>'+
@@ -383,6 +383,9 @@ function v4MirrorHero(){
     const pill=document.getElementById("engPillV4");
     if(pill){pill.classList.toggle("warn",!ENG.ok);pill.classList.toggle("ok",!!ENG.ok);}
   }
+  /* 模式徽标：右坞站永远显示当前工作模式（250ms 自愈，无时序依赖） */
+  const mchip=document.getElementById("v4ModeChip");
+  if(mchip){const nm={geo:"几何",kc:"K&C",chassis:"整车",track:"赛道"}[V4.runMode];mchip.textContent=nm||V4.runMode;}
   const sc=document.getElementById("evalOverallScore"),out=document.getElementById("v4Score");
   if(sc&&out)out.textContent=sc.textContent+" 分";
 }
@@ -439,7 +442,20 @@ function v4InitTopbar(){
   const seg=document.getElementById("v4ModeSeg");
   if(seg)seg.querySelectorAll("button").forEach(b=>b.onclick=()=>{
     V4.runMode=b.dataset.mode;
-    seg.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));});
+    seg.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));
+    const chip=document.getElementById("v4ModeChip");
+    if(chip)chip.textContent=b.textContent;});
+  /* 更多浮层（2026-11-21）：低频件收纳；开合 = 按钮切换 + 点外部关闭 + Esc */
+  const mb=document.getElementById("v4MoreBtn"),mp=document.getElementById("v4MorePop");
+  if(mb&&mp){
+    mb.onclick=e=>{e.stopPropagation();
+      const r=mb.getBoundingClientRect();
+      mp.style.top=(r.bottom+6)+"px";
+      mp.style.right=Math.max(8,window.innerWidth-r.right)+"px";
+      mp.classList.toggle("show");};
+    document.addEventListener("click",e=>{if(!mp.contains(e.target))mp.classList.remove("show");});
+    document.addEventListener("keydown",e=>{if(e.key==="Escape")mp.classList.remove("show");});
+  }
   const run=document.getElementById("v4RunBtn");if(run)run.onclick=v4Run;
   const pill=document.getElementById("engPillV4");
   if(pill)pill.onclick=()=>{if(typeof ENG==="undefined")return;

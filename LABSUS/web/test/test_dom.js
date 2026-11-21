@@ -572,6 +572,18 @@ require('./test_tire_wiring')(webDir, ok, failures.push.bind(failures), { log(){
   ok(/font:12px\/1\.45 var\(--font-ui\)/.test(css), '根字号 12px');
 }
 
+/* ── UI 翻新 2026-11-21：顶栏重排（Task 2） ── */
+{
+  const v4 = readHtml('dwb-pro-v4.html');
+  ['tbBase','tbSolver','tbFps','evalModalBtn','v4ThemeBtn','themeTg','pureSuspTg','v4MoreBtn','v4MorePop']
+    .forEach(id => ok((v4.match(new RegExp('id="'+id+'"'))||[]).length === 1, `顶栏重排: #${id} 存在且唯一`));
+  const tbBlock = (v4.match(/<div id="tb">[\s\S]*?<\/div>\s*<!--[\s═]*主区/) || [''])[0];
+  ok(tbBlock !== '' && !/id="tbBase"|id="tbSolver"|id="tbFps"|id="evalModalBtn"|id="v4ThemeBtn"|id="themeTg"/.test(tbBlock),
+    '顶栏重排: Baseline/内核/fps/评价/主题/明暗 已移出 #tb');
+  ok(/class="v4-vpbar"[\s\S]{0,900}id="pureSuspTg"/.test(v4),
+    '顶栏重排: 透视按钮位于视口工具条');
+}
+
 // ── 结果（必须在所有断言之后，见文件中部 M10b 注释）──────────────────────
 if (failures.length) {
   console.error(`DOM/结构测试 FAIL：${failures.length}/${checks} 项失败`);

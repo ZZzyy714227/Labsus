@@ -39,7 +39,7 @@
 .v4-seg button{border:none;background:transparent;color:var(--ink-3);font:500 10.5px var(--font-ui);
   padding:3px 8px;border-radius:var(--r-sm);cursor:pointer;transition:.15s;white-space:nowrap}
 .v4-seg button:hover{color:var(--ink-2)}
-.v4-seg button.on{background:var(--pri-fill);color:var(--ink-1)}
+.v4-seg button.on{background:var(--pri-fill);color:var(--ink-1);box-shadow:inset 0 0 0 1px var(--pri-bd)}
 .v4-mini{display:flex;align-items:center;gap:5px;border:1px solid var(--glass-bd);background:transparent;
   color:var(--ink-2);font:500 10.5px var(--font-ui);padding:3px 8px;border-radius:var(--r-md);cursor:pointer;transition:.15s}
 .v4-mini:hover{background:var(--glass-hov);color:var(--ink-1)}
@@ -85,9 +85,9 @@
 #tb .tt span{white-space:nowrap}
 #tb .tt span:last-child{margin-top:0}
 #tb .tt span:last-child::before{content:"·";margin:0 7px;color:var(--ink-3)}
-#tb .v4-run{display:flex;align-items:center;gap:6px;margin:0 6px;padding:0 16px;height:30px;
+#tb .v4-run{display:flex;align-items:center;gap:6px;margin:0 6px;padding:0 20px;height:34px;
   border:none;border-radius:var(--r-md);cursor:pointer;color:#fff;
-  font:600 11px var(--font-ui);letter-spacing:.04em;
+  font:600 12.5px var(--font-ui);letter-spacing:.04em;
   background:linear-gradient(135deg,var(--acc-in),var(--err));
   box-shadow:0 3px 12px var(--err-fill);transition:filter .15s,transform .1s}
 #tb .v4-run:hover{filter:brightness(1.12)}
@@ -117,7 +117,7 @@
 #tb .perf-tier-btn{flex:0 0 auto;white-space:nowrap;font:600 10px var(--font-mono);letter-spacing:.03em}
 #perfTierBtn.on{border-color:var(--pri-bd);background:var(--pri-fill)}
 #perfTierPop{position:fixed;z-index:99999;display:none;min-width:250px;padding:10px 12px;
-  background:#0E1520;border:1px solid var(--pri-bd);border-radius:var(--r-lg);
+  background:var(--bg-base);border:1px solid var(--pri-bd);border-radius:var(--r-lg);
   box-shadow:0 8px 28px rgba(0,0,0,.45);color:var(--ink-2);
   font:500 11px var(--font-ui)}
 #perfTierPop.show{display:block}
@@ -132,6 +132,32 @@
 #perfTierPop .pt-hint{margin-top:8px;color:var(--pri);font:600 10px var(--font-mono)}
 #perfTierPop .pt-foot{margin-top:8px;padding-top:8px;border-top:1px solid var(--glass-bd);
   color:var(--ink-3);font-size:10px;line-height:1.5}
+/* 更多浮层（2026-11-21）：低频件收纳；开合复用 perfTierPop 模式（按钮/点外部/Esc）。
+   背景用 --bg-base 令牌（同族 perfTierPop 的硬编码 #0E1520 一并令牌化）。 */
+#v4MoreBtn{flex:0 0 auto;width:30px;justify-content:center;font:600 12px var(--font-ui)}
+#v4MorePop{position:fixed;z-index:100000;display:none;min-width:252px;padding:10px 12px;
+  background:var(--bg-base);border:1px solid var(--pri-bd);border-radius:var(--r-lg);
+  box-shadow:0 8px 28px rgba(0,0,0,.45);color:var(--ink-2);font:500 11px var(--font-ui)}
+#v4MorePop.show{display:block}
+#v4MorePop .mp-h{font:600 9.5px var(--font-ui);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-3);margin:10px 0 6px}
+#v4MorePop .mp-h:first-child{margin-top:0}
+#v4MorePop .mp-row{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:4px 0;border-bottom:1px solid var(--hairline)}
+#v4MorePop .mp-row span:first-child{color:var(--ink-3)}
+#v4MorePop .mp-val{font:500 10.5px var(--font-mono);color:var(--ink-1);text-align:right;font-variant-numeric:tabular-nums}
+#v4MorePop .mp-btn{display:flex;align-items:center;gap:6px;width:100%;padding:7px 9px;margin:4px 0;
+  border:1px solid var(--glass-bd);border-radius:var(--r-md);background:transparent;
+  color:var(--ink-2);font:500 10.5px var(--font-ui);cursor:pointer;transition:.15s;text-transform:none}
+#v4MorePop .mp-btn:hover{background:var(--glass-hov);color:var(--ink-1)}
+#v4MorePop .mp-appear{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#v4MorePop .mp-appear #v4ThemeBtn{width:auto;padding:6px 10px}
+/* topVehSelect 内联样式转 CSS（2026-11-21：内联样式清零） */
+#tb .cell.slim select{background:transparent;border:none;color:var(--pri);
+  font:600 11.5px var(--font-ui);cursor:pointer;outline:none}
+/* 模式徽标（2026-11-21）：右坞站结论卡头部显示当前工作模式 */
+.v4-modechip{margin-left:6px;padding:1px 8px;border:1px solid var(--pri-bd);border-radius:var(--r-pill);
+  font:600 9.5px var(--font-ui);color:var(--pri);background:var(--pri-fill)}
 #tb .cell.slim{min-width:0;padding:0 9px;flex-direction:row;align-items:center;gap:6px;flex-wrap:nowrap}
 #tb .cell.slim i{flex:0 0 auto;margin-right:2px}
 #tb .cell.slim select{flex:1 1 auto;min-width:104px;max-width:220px;text-overflow:ellipsis}
@@ -165,7 +191,7 @@
 #v4ThemeBtn{display:flex;align-items:center;justify-content:center;width:30px;height:30px;margin:0 2px;
   border:1px solid var(--glass-bd);border-radius:var(--r-md);background:transparent;color:var(--ink-2);cursor:pointer;transition:.15s}
 #v4ThemeBtn:hover{background:var(--glass-hov);color:var(--ink-1)}
-#v4ThemePop{position:fixed;z-index:400;width:300px;max-height:80vh;overflow-y:auto;
+#v4ThemePop{position:fixed;z-index:100001;width:300px;max-height:80vh;overflow-y:auto;
   background:var(--glass);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
   border:1px solid var(--glass-bd-2);border-radius:var(--r-xl);box-shadow:var(--shadow);padding:12px}
 #v4ThemePop .tp-h{font:600 11px var(--font-ui);color:var(--ink-1);margin-bottom:8px}
@@ -214,10 +240,6 @@
 .v4-pill.ro:hover{background:transparent;color:var(--ink-2)}
 /* 状态簇起始处的竖分隔（借首个状态胶囊的伪元素，不新增 DOM） */
 #tb .v4-pill.ro.ok::before{content:"";width:1px;height:16px;background:var(--glass-bd);margin-right:5px}
-
-/* 工具区（评价报告 / 透视 / 主题 / fps）与状态簇拉开呼吸 */
-#evalModalBtn{margin-left:12px}
-#tb .cell.slim:last-child{min-width:40px;padding:0 10px}
 
 /* 导航簇与右侧动作簇之间的留白 */
 #tb > #v4ModeSeg{margin-right:14px}
