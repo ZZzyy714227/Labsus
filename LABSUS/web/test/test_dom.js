@@ -585,6 +585,9 @@ require('./test_tire_wiring')(webDir, ok, failures.push.bind(failures), { log(){
     '顶栏重排: Baseline/内核/fps/评价/主题/明暗 已移出 #tb');
   ok(/class="v4-vpbar"[\s\S]{0,900}id="pureSuspTg"/.test(v4),
     '顶栏重排: 透视按钮位于视口工具条');
+  ok((v4.match(/id="v4Ctx"/g) || []).length === 1, '顶栏五轮: 模式上下文提示条存在且唯一');
+  ok(/v4SyncCtx/.test(fs.readFileSync(path.join(webDir, 'js', '12-v4-arrange.js'), 'utf8')),
+    '顶栏五轮: 上下文随模式切换联动（v4SyncCtx）');
 }
 
 /* ── UI 翻新 2026-11-21：参数搜索 + 调参反馈（Task 3） ── */

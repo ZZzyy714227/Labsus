@@ -468,13 +468,24 @@ function v4Run(){
   else if(m==="chassis"){if(typeof chassisRun==="function")chassisRun();}
   else if(m==="track"){if(typeof openCircuitStage==="function")openCircuitStage();}
 }
+/* 模式上下文一句话提示（2026-11-21 五轮）：顶栏中部 .v4-ctx 的文案真源，
+   与 v4ModeSeg 按钮 title 同口径；随模式切换刷新，启动时初始化一次。 */
+const V4_CTX={geo:"几何 · 硬点拖拽与定位角实时联动",
+  kc:"K&C · 转鼓扫掠看外倾 / 前束 / 侧倾中心",
+  chassis:"整车 · 准静态平衡：侧倾梯度与不足转向",
+  track:"赛道 · 闭环圈速舞台与调校对比"};
+function v4SyncCtx(){
+  const e=document.getElementById("v4CtxTxt");
+  if(e)e.textContent=V4_CTX[V4.runMode]||"";
+}
 function v4InitTopbar(){
   const seg=document.getElementById("v4ModeSeg");
   if(seg)seg.querySelectorAll("button").forEach(b=>b.onclick=()=>{
     V4.runMode=b.dataset.mode;
     seg.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));
     const chip=document.getElementById("v4ModeChip");
-    if(chip)chip.textContent=b.textContent;});
+    if(chip)chip.textContent=b.textContent;
+    v4SyncCtx();});
   /* 更多浮层（2026-11-21）：低频件收纳；开合 = 按钮切换 + 点外部关闭 + Esc */
   const mb=document.getElementById("v4MoreBtn"),mp=document.getElementById("v4MorePop");
   if(mb&&mp){
@@ -502,6 +513,7 @@ function v4InitTopbar(){
     if(e.code==="Space"){e.preventDefault();v4Run();}
     else if(/^Digit[1-4]$/.test(e.code)){v4SetQuad(false);v4ShowView(+e.code.slice(-1)-1);}
   });
+  v4SyncCtx();
 }
 
 /* ============================================================

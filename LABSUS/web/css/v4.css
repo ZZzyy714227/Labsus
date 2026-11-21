@@ -202,6 +202,7 @@
   #tb .cell.slim{gap:4px;padding:0 6px}
   #tb .v4-seg.v4-axis button{padding:3px 5px}
   #tb .v4-pill{padding:0 6px}
+  #tb .v4-ctx{display:none}
 }
 
 /* ---------- 主题选择器浮层 ---------- */
@@ -255,6 +256,12 @@
    #engPillV4 (1,0,0) > .v4-pill (0,1,0)，无压制风险。 */
 #tb .sp{flex:0 0 0}
 #engPillV4{margin-left:auto}
+
+/* 模式上下文提示（2026-11-21 五轮）：flex:1 吃掉顶栏中部富余空间（"莫名其妙空了一截"的
+   所有者），文字居中、随模式切换（v4SyncCtx）；与右簇 auto 边距共存——ctx 可见时
+   auto 归零，ctx 隐藏（≤1400）时 auto 接管。 */
+.v4-ctx{flex:1 1 auto;min-width:0;overflow:hidden;text-align:center;
+  font:500 10.5px var(--font-ui);color:var(--ink-3);white-space:nowrap;text-overflow:ellipsis;padding:0 12px}
 
 /* 只读状态降级：不画边框、不占按钮语义，只留色点 + 小字
    （cursor:default 原在文件前部单列一条，2026-11-16 E10 并入本条） */
