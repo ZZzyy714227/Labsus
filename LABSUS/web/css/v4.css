@@ -94,7 +94,7 @@
 #tb .tt span{white-space:nowrap}
 #tb .tt span:last-child{margin-top:0}
 #tb .tt span:last-child::before{content:"·";margin:0 7px;color:var(--ink-3)}
-#tb .v4-run{display:flex;align-items:center;gap:6px;margin:0 6px 0 auto;padding:0 20px;height:34px;
+#tb .v4-run{display:flex;align-items:center;gap:6px;margin:0 6px;padding:0 20px;height:34px;
   border:none;border-radius:var(--r-md);cursor:pointer;color:#fff;
   font:600 12.5px var(--font-ui);letter-spacing:.04em;
   background:linear-gradient(135deg,var(--acc-in),var(--err));
@@ -246,10 +246,15 @@
 
 /* 副标题基规则已移至顶栏节首（media 之前，见该处级联顺序注释） */
 
-/* 左簇贴左、右簇贴右：#tb .sp 置零（大占位退役）；右簇贴右由 #tb .v4-run 的
-   margin-left:auto 承担——历史上单列 #v4RunBtn{margin-left:auto} 被
-   #tb .v4-run{margin:0 6px}（同 ID 更高特异度）整段压制，从未生效（2026-11-21 修）。 */
+/* 左簇贴左、右簇贴右：#tb .sp 置零（大占位退役）。
+   2026-11-21 四轮定稿：▶运行紧贴模式分段（执行亲和——选完模式立刻执行），
+   右簇（引擎/状态/调校对象/更多）贴右由 #engPillV4{margin-left:auto} 承担。
+   ⚠ 历史教训 ×2：margin-left:auto 必须≈与压制规则同级特异度——
+   · v1：#v4RunBtn (1,0,0) 被 #tb .v4-run{margin:0 6px} (1,1,0) 压制，从未生效；
+   · v2：auto 放 .v4-run 上会把运行推去右缘（川陀裁定"运行位置不对"）。
+   #engPillV4 (1,0,0) > .v4-pill (0,1,0)，无压制风险。 */
 #tb .sp{flex:0 0 0}
+#engPillV4{margin-left:auto}
 
 /* 只读状态降级：不画边框、不占按钮语义，只留色点 + 小字
    （cursor:default 原在文件前部单列一条，2026-11-16 E10 并入本条） */
