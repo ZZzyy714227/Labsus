@@ -32,7 +32,7 @@ rose:{
   dark:{"bg-base":"#141127","glass":"rgba(27,23,53,0.82)","glass-2":"rgba(27,23,53,0.65)","glass-3":"rgba(38,32,72,0.70)",
     "glass-hov":"rgba(122,96,180,0.30)","sh-bg":"rgba(30,25,58,0.80)",
     "glass-bd":"rgba(255,255,255,0.10)","glass-bd-2":"rgba(255,255,255,0.15)","hairline":"rgba(255,255,255,0.06)",
-    "ink-1":"#ece9f6","ink-2":"#a9a3c2","ink-3":"#6f6890","cream":"#fc85ae",
+    "ink-1":"#ece9f6","ink-2":"#a9a3c2","ink-3":"#8a83a8","cream":"#fc85ae",
     "pri":"#b79ce8","pri-strong":"#9d7fd8","pri-fill":"rgba(158,87,157,0.25)","pri-bd":"rgba(183,156,232,0.35)",
     "ok":"#9e579d","warn":"#f25d9c","err":"#b61aae",
     "ok-fill":"rgba(158,87,157,0.18)","warn-fill":"rgba(242,93,156,0.12)","err-fill":"rgba(182,26,174,0.22)",
@@ -41,7 +41,7 @@ rose:{
   light:{"bg-base":"#f7f2f6","glass":"rgba(255,255,255,0.88)","glass-2":"rgba(247,240,246,0.75)","glass-3":"rgba(240,231,240,0.80)",
     "glass-hov":"rgba(255,255,255,0.95)","sh-bg":"rgba(240,231,240,0.85)",
     "glass-bd":"rgba(42,36,64,0.10)","glass-bd-2":"rgba(42,36,64,0.16)","hairline":"rgba(42,36,64,0.06)",
-    "ink-1":"#2a2440","ink-2":"#675f85","ink-3":"#9d95b5","cream":"#ee6f9f",
+    "ink-1":"#2a2440","ink-2":"#675f85","ink-3":"#6b6585","cream":"#ee6f9f",
     "pri":"#7b5fc0","pri-strong":"#64489f","pri-fill":"rgba(158,87,157,0.12)","pri-bd":"rgba(123,95,192,0.30)",
     "ok":"#8a4a89","warn":"#e2448a","err":"#a0139a",
     "ok-fill":"rgba(138,74,137,0.14)","warn-fill":"rgba(226,68,138,0.12)","err-fill":"rgba(160,19,154,0.10)",
@@ -59,7 +59,7 @@ rose:{
     tie:"#9e579d",rack:"#4a4363",chas:"#3d3752",chas2:"#2f2a40",
     gnd:"#363046",path:"#b61aae",pathC:"#9e579d",pathK:"#fc85ae",
     ic:"#f25d9c",rc:"#9e579d",dim:"#7a7090",dimT:"#b5abc9",
-    arb:"#8a79c9",frc:"#b61aae",txt:"#ece9f6",txt2:"#a9a3c2",txt3:"#6f6890",base:"#6f6890"},
+    arb:"#8a79c9",frc:"#b61aae",txt:"#ece9f6",txt2:"#a9a3c2",txt3:"#8a83a8",base:"#8a83a8"},
   light:{bg:"#f7f2f6",grid:"#e9e0ee",grid2:"#dcd0e6",axis:"#c6b8d4",
     rig:"#8c86a2",rigArm:"#6e6883",arm:"rgba(120,90,160,0.05)",
     strut:"#7b5fc0",rocker:"#ee6f9f",rockerF:"rgba(238,111,159,0.14)",
@@ -71,7 +71,7 @@ rose:{
     tie:"#8a4a89",rack:"#8a8898",chas:"#a9a6b5",chas2:"#b9b6c3",
     gnd:"#e0d8e4",path:"#a0139a",pathC:"#8a4a89",pathK:"#ee6f9f",
     ic:"#e2448a",rc:"#8a4a89",dim:"#9a98a7",dimT:"#5c5a6b",
-    arb:"#8a6bb0",frc:"#a0139a",txt:"#2a2440",txt2:"#675f85",txt3:"#9d95b5",base:"#a9a6b5"}}
+    arb:"#8a6bb0",frc:"#a0139a",txt:"#2a2440",txt2:"#675f85",txt3:"#6b6585",base:"#a9a6b5"}}
 },
 sunset:{
   name:"落日靛蓝",desc:"No.64",
@@ -80,7 +80,7 @@ sunset:{
   dark:{"bg-base":"#130b2e","glass":"rgba(26,17,69,0.82)","glass-2":"rgba(26,17,69,0.65)","glass-3":"rgba(38,26,94,0.70)",
     "glass-hov":"rgba(120,90,200,0.28)","sh-bg":"rgba(30,20,76,0.80)",
     "glass-bd":"rgba(255,255,255,0.10)","glass-bd-2":"rgba(255,255,255,0.15)","hairline":"rgba(255,255,255,0.06)",
-    "ink-1":"#efecf7","ink-2":"#aaa2c8","ink-3":"#6f6694","cream":"#ffbd39",
+    "ink-1":"#efecf7","ink-2":"#aaa2c8","ink-3":"#8a81ab","cream":"#ffbd39",
     "pri":"#9f7fe8","pri-strong":"#8a66d6","pri-fill":"rgba(147,0,119,0.22)","pri-bd":"rgba(159,127,232,0.35)",
     "ok":"#ffbd39","warn":"#e61c5d","err":"#e61c5d",
     "ok-fill":"rgba(255,189,57,0.14)","warn-fill":"rgba(230,28,93,0.12)","err-fill":"rgba(230,28,93,0.22)",
@@ -89,7 +89,7 @@ sunset:{
   light:{"bg-base":"#f8f5ef","glass":"rgba(255,255,255,0.88)","glass-2":"rgba(244,239,229,0.75)","glass-3":"rgba(238,231,218,0.80)",
     "glass-hov":"rgba(255,255,255,0.95)","sh-bg":"rgba(238,231,218,0.85)",
     "glass-bd":"rgba(34,26,58,0.10)","glass-bd-2":"rgba(34,26,58,0.16)","hairline":"rgba(34,26,58,0.06)",
-    "ink-1":"#221a3a","ink-2":"#5d5480","ink-3":"#9790b5","cream":"#e8a41e",
+    "ink-1":"#221a3a","ink-2":"#5d5480","ink-3":"#686283","cream":"#e8a41e",
     "pri":"#6b4fc0","pri-strong":"#57409e","pri-fill":"rgba(147,0,119,0.10)","pri-bd":"rgba(107,79,192,0.30)",
     "ok":"#d99a12","warn":"#d91257","err":"#d91257",
     "ok-fill":"rgba(217,154,18,0.14)","warn-fill":"rgba(217,18,87,0.10)","err-fill":"rgba(217,18,87,0.10)",
@@ -107,7 +107,7 @@ sunset:{
     tie:"#c04aa8",rack:"#4a4363",chas:"#3b3452",chas2:"#2d2740",
     gnd:"#342c46",path:"#e61c5d",pathC:"#ffbd39",pathK:"#ffbd39",
     ic:"#ffbd39",rc:"#ffbd39",dim:"#7a7090",dimT:"#b8aecc",
-    arb:"#a44ac0",frc:"#e61c5d",txt:"#efecf7",txt2:"#aaa2c8",txt3:"#6f6694",base:"#6f6694"},
+    arb:"#a44ac0",frc:"#e61c5d",txt:"#efecf7",txt2:"#aaa2c8",txt3:"#8a81ab",base:"#8a81ab"},
   light:{bg:"#f8f5ef",grid:"#eae2d4",grid2:"#ddd2be",axis:"#c6b9a2",
     rig:"#8c8a9a",rigArm:"#6e6c7b",arm:"rgba(120,80,180,0.05)",
     strut:"#6b4fc0",rocker:"#e8a41e",rockerF:"rgba(232,164,30,0.14)",
@@ -119,7 +119,7 @@ sunset:{
     tie:"#930077",rack:"#8a8c93",chas:"#aba9b2",chas2:"#bbb9c1",
     gnd:"#e2dcce",path:"#d91257",pathC:"#d99a12",pathK:"#e8a41e",
     ic:"#e8a41e",rc:"#d99a12",dim:"#9a9ca3",dimT:"#5c5e65",
-    arb:"#93538f",frc:"#d91257",txt:"#221a3a",txt2:"#5d5480",txt3:"#9790b5",base:"#aba9b2"}}
+    arb:"#93538f",frc:"#d91257",txt:"#221a3a",txt2:"#5d5480",txt3:"#686283",base:"#aba9b2"}}
 }};
 
 /* ---------- 画布调色板：基于经典 PAL 做键替换 ---------- */

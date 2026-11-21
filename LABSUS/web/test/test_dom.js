@@ -568,8 +568,11 @@ require('./test_tire_wiring')(webDir, ok, failures.push.bind(failures), { log(){
   ok(/--fs-label:\s*10\.5px/.test(css), '字号阶梯: --fs-label 10.5px');
   ok(/--fs-micro:\s*9px/.test(css), '字号阶梯: --fs-micro 9px');
   ok(/--ink-3:#8B867D/.test(css), '对比度: 深色 --ink-3=#8B867D');
-  ok(/--ink-3:#82878F/.test(css), '对比度: 浅色 --ink-3=#82878F');
+  ok(/--ink-2:#4A505A/.test(css) && /--ink-3:#626872/.test(css), '对比度: 浅色 ink-2/ink-3 加深');
   ok(/font:12px\/1\.45 var\(--font-ui\)/.test(css), '根字号 12px');
+  const themeSrc = fs.readFileSync(path.join(webDir, 'js', '12-v4-arrange.js'), 'utf8');
+  ['#8a83a8', '#6b6585', '#8a81ab', '#686283'].forEach(h =>
+    ok(themeSrc.includes(h), `对比度: 主题预设 ink-3/txt3 同步 ${h}`));
 }
 
 /* ── UI 翻新 2026-11-21：顶栏重排（Task 2） ── */
