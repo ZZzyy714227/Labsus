@@ -27,6 +27,15 @@
 .v4-ltab.on{color:var(--ink-1);background:var(--pri-fill);border-color:var(--pri-bd)}
 .v4-pane{display:none;flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding:8px;min-height:0}
 .v4-pane.on{display:block}
+/* 参数搜索（2026-11-21）：Tab 栏下方，当前 Tab 内过滤 .sec */
+.v4-lsearchrow{padding:6px 8px 4px;flex:0 0 auto;border-bottom:1px solid var(--hairline)}
+.v4-lsearch{width:100%;height:26px;padding:0 9px;background:var(--well);
+  border:1px solid var(--glass-bd);border-radius:var(--r-md);color:var(--ink-1);
+  font:500 11px var(--font-ui);outline:none;transition:border-color .15s,box-shadow .15s}
+.v4-lsearch:focus{border-color:var(--pri-bd);box-shadow:var(--ring)}
+.v4-lsearch::placeholder{color:var(--ink-3)}
+.v4-nohit{padding:14px 10px;color:var(--ink-3);font:500 10.5px var(--font-ui);text-align:center;display:none}
+.sec.v4-hit .sh::before{opacity:1}
 
 /* 中央舞台 */
 #v4stage{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;min-height:0;

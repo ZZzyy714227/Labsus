@@ -584,6 +584,19 @@ require('./test_tire_wiring')(webDir, ok, failures.push.bind(failures), { log(){
     '顶栏重排: 透视按钮位于视口工具条');
 }
 
+/* ── UI 翻新 2026-11-21：参数搜索 + 调参反馈（Task 3） ── */
+{
+  const arrange = fs.readFileSync(path.join(webDir, 'js', '12-v4-arrange.js'), 'utf8');
+  ok(/id="v4Lsearch"/.test(arrange) && /filterSecs/.test(arrange), '坞站搜索: 搜索输入与过滤逻辑存在');
+  ok(/v4-nohit/.test(arrange), '坞站搜索: 无匹配提示');
+  const panels = fs.readFileSync(path.join(webDir, 'js', '06-ui-panels.js'), 'utf8');
+  ok(/just-chg/.test(panels) && /_jcT/.test(panels), '调参反馈: rowSlider 加 just-chg 闪烁');
+  ok(/sl\.title="范围 \["/.test(panels), '调参反馈: 滑块挂 [min~max] title');
+  ok(/\.ctl\.just-chg>label\{color:var\(--acc-in\)\}/.test(fs.readFileSync(path.join(webDir, 'css', 'fullchassis.css'), 'utf8')),
+    '调参反馈: .just-chg 样式存在（暖色语义）');
+  ok(/v4-lsearch/.test(fs.readFileSync(path.join(webDir, 'css', 'v4.css'), 'utf8')), '坞站搜索: 样式存在');
+}
+
 // ── 结果（必须在所有断言之后，见文件中部 M10b 注释）──────────────────────
 if (failures.length) {
   console.error(`DOM/结构测试 FAIL：${failures.length}/${checks} 项失败`);

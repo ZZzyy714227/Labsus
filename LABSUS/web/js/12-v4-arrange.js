@@ -248,11 +248,41 @@ function v4ArrangeLeft(){
     b.onclick=()=>{V4.lpane=k;
       bar.querySelectorAll(".v4-ltab").forEach(x=>x.classList.toggle("on",x===b));
       Object.keys(panes).forEach(p=>panes[p].classList.toggle("on",p===k));
+      /* 切 Tab 清空搜索（过滤只针对当前 Tab，切走即复原） */
+      const si=document.getElementById("v4Lsearch");
+      if(si&&si.value){si.value="";si.dispatchEvent(new Event("input"));}
       try{localStorage.setItem("labsus-v4-lpane",k);}catch(e){}};
     bar.appendChild(b);
     const p=document.createElement("div");p.className="v4-pane";p.dataset.pane=k;panes[k]=p;
   });
-  lp.appendChild(bar);Object.keys(panes).forEach(k=>lp.appendChild(panes[k]));
+  lp.appendChild(bar);
+  /* 参数搜索（2026-11-21 UI 翻新）：当前 Tab 内按折叠头标题+行标签过滤；
+     命中自动展开并高亮，清空复原（重放已保存折叠态） */
+  const srow=document.createElement("div");srow.className="v4-lsearchrow";
+  const srch=document.createElement("input");
+  srch.className="v4-lsearch";srch.id="v4Lsearch";srch.type="text";srch.placeholder="🔍 搜索参数…";
+  srow.appendChild(srch);lp.appendChild(srow);
+  Object.keys(panes).forEach(k=>lp.appendChild(panes[k]));
+  const filterSecs=()=>{
+    const q=srch.value.trim().toLowerCase();
+    const pane=panes[V4.lpane];if(!pane)return;
+    let any=false;
+    pane.querySelectorAll(".sec").forEach(s=>{
+      if(!q){s.style.display="";s.classList.remove("v4-hit");return;}
+      const zh=s.querySelector(".sh .zh");
+      const t=((zh?zh.textContent:"")+" "+
+        Array.from(s.querySelectorAll("label,button,.chk span")).map(x=>x.textContent).join(" ")).toLowerCase();
+      const hit=t.includes(q);
+      s.style.display=hit?"":"none";
+      s.classList.toggle("v4-hit",hit);
+      if(hit){s.classList.remove("col");any=true;}
+    });
+    let no=pane.querySelector(".v4-nohit");
+    if(!no){no=document.createElement("div");no.className="v4-nohit";no.textContent="无匹配参数";pane.appendChild(no);}
+    no.style.display=(any||!q)?"none":"block";
+    if(!q)v4RestoreAccordions(lp);
+  };
+  srch.addEventListener("input",filterSecs);
   kids.forEach(el=>{
     if(el.classList.contains("sec")){
       const zh=el.querySelector(".sh .zh");

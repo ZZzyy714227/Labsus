@@ -162,6 +162,9 @@ body{
 .ctl>input[type=number]{grid-column:2;grid-row:2}
 .ctl>select{grid-column:1/3;grid-row:2}
 .ctl:hover>label{color:var(--ink-1)}
+/* 改动反馈（2026-11-21 UI 翻新）：调参行变更时标签闪暖色 1.2s（rowSlider 加 .just-chg） */
+.ctl.just-chg>label{color:var(--acc-in)}
+.ctl.just-chg>label u{color:var(--acc-in)}
 
 input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:14px;background:transparent;cursor:pointer}
 input[type=range]::-webkit-slider-runnable-track{height:3px;background:var(--track);border:none;border-radius:var(--r-pill)}

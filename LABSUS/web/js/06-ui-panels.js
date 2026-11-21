@@ -32,13 +32,17 @@ function rowSlider(b,zh,en,unit,min,max,step,get,set,dec){
   const sl=E("input");sl.type="range";sl.min=min;sl.max=max;sl.step=step;
   const nb=E("input");nb.type="number";nb.step=step;
   r.appendChild(sl);r.appendChild(nb);b.appendChild(r);
-  const push=v=>{set(clamp(parseFloat(v),typeof min==="function"?min():min,typeof max==="function"?max():max));};
+  const push=v=>{set(clamp(parseFloat(v),typeof min==="function"?min():min,typeof max==="function"?max():max));
+    /* 改动反馈（2026-11-21 UI 翻新）：行标签闪暖色 1.2s，"改完不知道生效没有"的直接解法 */
+    r.classList.add("just-chg");clearTimeout(r._jcT);
+    r._jcT=setTimeout(()=>r.classList.remove("just-chg"),1200);};
   sl.oninput=()=>push(sl.value);
   nb.onchange=()=>push(nb.value);
   nb.oninput=()=>{if(nb.value!=="")push(nb.value);};
   UI.sync.push(()=>{
+    const lo=typeof min==="function"?min():min,hi=typeof max==="function"?max():max;
+    sl.min=lo;sl.max=hi;sl.title="范围 ["+lo+" ~ "+hi+"]";
     const v=get();
-    sl.min=typeof min==="function"?min():min;sl.max=typeof max==="function"?max():max;
     if(document.activeElement!==sl)sl.value=v;
     if(document.activeElement!==nb)nb.value=fmt(v,dec===undefined?1:dec);
   });
