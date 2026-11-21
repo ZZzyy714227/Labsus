@@ -17,12 +17,12 @@
 
 /* 左坞站：Tab 条 + 面板区（.sec 由 JS 生成，样式继承旧体系） */
 #lp{display:flex;flex-direction:column;overflow:hidden}
-.v4-sum{margin-left:auto;margin-right:6px;font:500 8.5px var(--font-mono);color:var(--ink-3);
+.v4-sum{margin-left:auto;margin-right:6px;font:500 9px var(--font-mono);color:var(--ink-3);
   background:var(--well);border:1px solid var(--hairline);border-radius:var(--r-sm);padding:1px 5px;white-space:nowrap}
 .v4-ltabs{display:flex;gap:3px;padding:8px 8px 6px;flex:0 0 auto;border-bottom:1px solid var(--glass-bd)}
 .v4-ltab{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;
   padding:6px 2px;border-radius:var(--r-md);border:1px solid transparent;
-  background:transparent;color:var(--ink-3);font:500 10.5px var(--font-ui);cursor:pointer;transition:.15s}
+  background:transparent;color:var(--ink-3);font:500 11.5px var(--font-ui);cursor:pointer;transition:.15s}
 .v4-ltab:hover{color:var(--ink-2);background:var(--glass-hov)}
 .v4-ltab.on{color:var(--ink-1);background:var(--pri-fill);border-color:var(--pri-bd)}
 .v4-pane{display:none;flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding:8px;min-height:0}
@@ -36,12 +36,12 @@
   border-bottom:1px solid var(--glass-bd);background:var(--sh-bg)}
 .v4-vpbar .v4-sp{flex:1}
 .v4-seg{display:flex;gap:2px;background:var(--well);border:1px solid var(--glass-bd);border-radius:var(--r-md);padding:2px}
-.v4-seg button{border:none;background:transparent;color:var(--ink-3);font:500 10px var(--font-ui);
+.v4-seg button{border:none;background:transparent;color:var(--ink-3);font:500 10.5px var(--font-ui);
   padding:3px 8px;border-radius:var(--r-sm);cursor:pointer;transition:.15s;white-space:nowrap}
 .v4-seg button:hover{color:var(--ink-2)}
 .v4-seg button.on{background:var(--pri-fill);color:var(--ink-1)}
 .v4-mini{display:flex;align-items:center;gap:5px;border:1px solid var(--glass-bd);background:transparent;
-  color:var(--ink-2);font:500 10px var(--font-ui);padding:3px 8px;border-radius:var(--r-md);cursor:pointer;transition:.15s}
+  color:var(--ink-2);font:500 10.5px var(--font-ui);padding:3px 8px;border-radius:var(--r-md);cursor:pointer;transition:.15s}
 .v4-mini:hover{background:var(--glass-hov);color:var(--ink-1)}
 .v4-mini.on{background:var(--pri-fill);border-color:var(--pri-bd);color:var(--ink-1)}
 /* 覆盖 fullchassis.css:266 #vp（2x2 grid 基）：v4 舞台列内补 flex 尺寸与内边距；
@@ -60,21 +60,21 @@
 #v4scroll{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;min-height:0;display:flex;flex-direction:column;gap:8px;padding:0}
 .v4-hero{flex:0 0 auto;background:var(--glass);border:1px solid var(--glass-bd);border-radius:var(--r-xl);padding:10px}
 .v4-hero-hd{display:flex;align-items:baseline;gap:7px;margin-bottom:8px}
-.v4-hero-hd b{font:600 11.5px var(--font-ui);color:var(--ink-1)}
-.v4-hero-hd i{font:500 8px var(--font-ui);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);font-style:normal}
-.v4-hero-hd .v4-live{margin-left:auto;font:500 8px var(--font-mono);color:var(--ink-3)}
+.v4-hero-hd b{font:600 12.5px var(--font-ui);color:var(--ink-1)}
+.v4-hero-hd i{font:500 9px var(--font-ui);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);font-style:normal}
+.v4-hero-hd .v4-live{margin-left:auto;font:500 9px var(--font-mono);color:var(--ink-3)}
 .v4-hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .v4-hc{background:var(--well);border:1px solid var(--hairline);border-radius:var(--r-lg);padding:8px 9px}
-.v4-hc .en{font:500 8px var(--font-ui);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
-.v4-hc .v{font:600 16px/1.25 var(--font-mono);letter-spacing:-.02em;color:var(--ink-1);margin-top:2px;font-variant-numeric:tabular-nums}
-.v4-hc .hint{font:400 8.5px var(--font-ui);color:var(--ink-3);margin-top:2px}
+.v4-hc .en{font:500 9.5px var(--font-ui);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.v4-hc .v{font:600 var(--fs-hero)/1.2 var(--font-mono);letter-spacing:-.02em;color:var(--ink-1);margin-top:2px;font-variant-numeric:tabular-nums}
+.v4-hc .hint{font:400 10.5px var(--font-ui);color:var(--ink-3);margin-top:2px}
 .v4-hc.ok .v{color:var(--ok)} .v4-hc.ok .hint{color:var(--ok)}
 .v4-hc.warn .v{color:var(--warn)} .v4-hc.warn .hint{color:var(--warn)}
 .v4-hc.bad .v{color:var(--err)} .v4-hc.bad .hint{color:var(--err)}
 .v4-bar{height:4px;border-radius:var(--r-pill);background:var(--track);overflow:hidden;margin-top:6px}
 .v4-bar i{display:block;height:100%;border-radius:var(--r-pill);background:var(--pri);transition:width .3s}
 .v4-diag{flex:0 0 auto;background:var(--glass);border:1px solid var(--pri-bd);border-radius:var(--r-xl);padding:10px}
-.v4-diag p{font:400 10px/1.6 var(--font-ui);color:var(--ink-2);margin-top:6px}
+.v4-diag p{font:400 10.5px/1.6 var(--font-ui);color:var(--ink-2);margin-top:6px}
 
 /* ---------- 顶栏（v4 版：决策与执行） ---------- */
 #tb{height:52px}
@@ -95,7 +95,7 @@
 #tb .v4-run:disabled{filter:grayscale(.4) brightness(.8);cursor:wait}
 .v4-pill{display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;margin:0 2px;
   border:1px solid var(--glass-bd);border-radius:var(--r-pill);background:transparent;
-  font:500 9.5px var(--font-mono);color:var(--ink-2);cursor:pointer;transition:.15s;white-space:nowrap}
+  font:500 10.5px var(--font-mono);color:var(--ink-2);cursor:pointer;transition:.15s;white-space:nowrap}
 .v4-pill:hover{background:var(--glass-hov)}
 .v4-pill .dot{width:7px;height:7px;border-radius:var(--r-pill);background:currentColor;flex:0 0 7px}
 .v4-pill.ok{color:var(--ok);border-color:var(--ok)}
@@ -210,7 +210,7 @@
 /* 只读状态降级：不画边框、不占按钮语义，只留色点 + 小字
    （cursor:default 原在文件前部单列一条，2026-11-16 E10 并入本条） */
 .v4-pill.ro{cursor:default;border-color:transparent;background:transparent;color:var(--ink-3);
-  font-size:9px;padding:0 6px;gap:5px}
+  font-size:10.5px;padding:0 6px;gap:5px}
 .v4-pill.ro:hover{background:transparent;color:var(--ink-2)}
 /* 状态簇起始处的竖分隔（借首个状态胶囊的伪元素，不新增 DOM） */
 #tb .v4-pill.ro.ok::before{content:"";width:1px;height:16px;background:var(--glass-bd);margin-right:5px}

@@ -8,7 +8,7 @@ function EH(t,c,html){const e=document.createElement(t);if(c)e.className=c;if(ht
 /* G12：分组分隔线——用灰色小号字 + hairline 隔开面板内的逻辑组 */
 function groupDiv(host,label){
   const d=E("div");
-  d.style.cssText="display:flex;align-items:center;gap:8px;padding:6px 12px 2px;color:var(--ink-3);font:500 8px/1 var(--font-ui);letter-spacing:.16em;text-transform:uppercase;user-select:none";
+  d.style.cssText="display:flex;align-items:center;gap:8px;padding:6px 12px 2px;color:var(--ink-3);font:500 9px/1 var(--font-ui);letter-spacing:.16em;text-transform:uppercase;user-select:none";
   const l=E("span"); l.style.cssText="flex:1;height:1px;background:var(--hairline)";
   const r=E("span"); r.style.cssText="flex:1;height:1px;background:var(--hairline)";
   d.appendChild(l);d.appendChild(document.createTextNode(label));d.appendChild(r);
@@ -85,7 +85,7 @@ function buildVehiclePresetSection(host){
     const btn = E("button", "eng-btn veh-btn-tab");
     btn.dataset.veh = k;
     btn.textContent = label;
-    btn.style.cssText = "flex:1;min-width:0;font-size:9.5px;padding:4px 1px;";
+    btn.style.cssText = "flex:1;min-width:0;font-size:10.5px;padding:4px 1px;";
     if(S.vehicleType === k) btn.classList.add("on");
     btn.onclick = () => {
       loadVehiclePreset(k);
@@ -96,7 +96,7 @@ function buildVehiclePresetSection(host){
   
   const desc = E("div");
   desc.id = "vehPresetDesc";
-  desc.style.cssText = "font:9.5px var(--font-mono);color:var(--ink-2);padding:2px 8px 6px;line-height:1.3;";
+  desc.style.cssText = "font:10.5px var(--font-mono);color:var(--ink-2);padding:2px 8px 6px;line-height:1.3;";
   const curName = (VEHICLE_PRESETS[S.vehicleType]||{}).name || "";
   desc.textContent = "当前载入: " + curName;
   b.appendChild(desc);

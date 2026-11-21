@@ -560,6 +560,18 @@ require('./test_tire_wiring')(webDir, ok, failures.push.bind(failures), { log(){
   ok(/trackFlagsNote\(res\)/.test(src), 'track flags: 状态行实际消费（接线守卫）');
 }
 
+/* ── UI 翻新 2026-11-21：字号阶梯与对比度令牌（Task 1） ── */
+{
+  const css = fs.readFileSync(path.join(webDir, 'css', 'fullchassis.css'), 'utf8');
+  ok(/--fs-hero:\s*20px/.test(css), '字号阶梯: --fs-hero 20px');
+  ok(/--fs-body:\s*12px/.test(css), '字号阶梯: --fs-body 12px');
+  ok(/--fs-label:\s*10\.5px/.test(css), '字号阶梯: --fs-label 10.5px');
+  ok(/--fs-micro:\s*9px/.test(css), '字号阶梯: --fs-micro 9px');
+  ok(/--ink-3:#8B867D/.test(css), '对比度: 深色 --ink-3=#8B867D');
+  ok(/--ink-3:#82878F/.test(css), '对比度: 浅色 --ink-3=#82878F');
+  ok(/font:12px\/1\.45 var\(--font-ui\)/.test(css), '根字号 12px');
+}
+
 // ── 结果（必须在所有断言之后，见文件中部 M10b 注释）──────────────────────
 if (failures.length) {
   console.error(`DOM/结构测试 FAIL：${failures.length}/${checks} 项失败`);
