@@ -48,7 +48,7 @@
 .v4-seg button{border:none;background:transparent;color:var(--ink-3);font:500 10.5px var(--font-ui);
   padding:3px 8px;border-radius:var(--r-sm);cursor:pointer;transition:.15s;white-space:nowrap}
 .v4-seg button:hover{color:var(--ink-2)}
-.v4-seg button.on{background:var(--pri-fill);color:var(--ink-1);box-shadow:inset 0 0 0 1px var(--pri-bd)}
+.v4-seg button.on{background:var(--pri-fill);color:var(--ink-1)}
 .v4-mini{display:flex;align-items:center;gap:5px;border:1px solid var(--glass-bd);background:transparent;
   color:var(--ink-2);font:500 10.5px var(--font-ui);padding:3px 8px;border-radius:var(--r-md);cursor:pointer;transition:.15s}
 .v4-mini:hover{background:var(--glass-hov);color:var(--ink-1)}
@@ -124,7 +124,8 @@
 @media (max-width: 1320px){ #tb .v4-axis{min-width:0} #tb .v4-axis button{padding:3px 6px} }
 @media (max-width: 1180px){ #tb .perf-tier-btn #perfTierLabel{display:none} }
 #tb .perf-tier-btn{flex:0 0 auto;white-space:nowrap;font:600 10px var(--font-mono);letter-spacing:.03em}
-#perfTierBtn.on{border-color:var(--pri-bd);background:var(--pri-fill)}
+/* 档位按钮的常驻 .on 高亮退役（2026-11-21 三轮打磨）：它是"基准入口"不是开关，
+   档位值已写在按钮文字里，永久高亮看起来像卡在按下态。 */
 #perfTierPop{position:fixed;z-index:99999;display:none;min-width:250px;padding:10px 12px;
   background:var(--bg-base);border:1px solid var(--pri-bd);border-radius:var(--r-lg);
   box-shadow:0 8px 28px rgba(0,0,0,.45);color:var(--ink-2);
@@ -166,6 +167,9 @@
    为 .btnrow 平分设计）传染到顶栏 ⇒ ▶运行与"引擎"胶囊被 flex 拉成巨条。
    顶栏按钮一律内容宽，剩余空间交给 #v4RunBtn 的 margin-left:auto（导航左/动作右）。 */
 #tb button{flex:0 0 auto}
+/* 顶栏入口统一幽灵形态（2026-11-21 三轮打磨）：轮胎/动力/档位/更多是"入口"不是开关，
+   去常驻边框（hover 才浮起），与轴/模式两个分段控件的框线区分层级。 */
+#tb .v4-mini{border-color:transparent}
 #tb .cell.slim select{background:transparent;border:none;color:var(--ink-1);
   font:600 11.5px var(--font-ui);cursor:pointer;outline:none}
 /* 模式徽标（2026-11-21）：右坞站结论卡头部显示当前工作模式 */
