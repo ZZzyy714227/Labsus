@@ -1106,6 +1106,14 @@ function buildTrackPanel(host){
   b3.style.padding = "7px 8px"; b3.style.background = "rgba(88,166,255,0.12)"; b3.style.border = "1px solid rgba(88,166,255,0.35)"; 
   b3.style.color = "#79c0ff"; b3.style.borderRadius = "var(--r-sm)"; b3.style.cursor = "pointer"; b3.style.fontWeight = "600"; b3.style.fontSize = "10.5px"; b3.style.letterSpacing = "0.04em";
   b3.style.transition = "background .18s, border-color .18s, transform .1s";
+
+  const b4 = E("button");
+  b4.id = "btnFsaeArena";
+  b4.innerHTML = "🏆 大学生方程式动态赛场 (FSAE / FSC)";
+  b4.onclick = () => { if (typeof openFsaeStage === "function") openFsaeStage(); };
+  b4.style.padding = "7px 8px"; b4.style.background = "rgba(249,115,22,0.14)"; b4.style.border = "1px solid rgba(249,115,22,0.45)";
+  b4.style.color = "#fdba74"; b4.style.borderRadius = "var(--r-sm)"; b4.style.cursor = "pointer"; b4.style.fontWeight = "700"; b4.style.fontSize = "10.5px"; b4.style.letterSpacing = "0.04em";
+  b4.style.transition = "background .18s, border-color .18s, transform .1s";
   
   b1.onmouseover = () => { b1.style.background = "rgba(46,160,67,0.25)"; b1.style.borderColor = "#2ea043"; };
   b1.onmouseout = () => { b1.style.background = "rgba(46,160,67,0.12)"; b1.style.borderColor = "rgba(46,160,67,0.35)"; };
@@ -1113,10 +1121,13 @@ function buildTrackPanel(host){
   b2.onmouseout = () => { b2.style.background = "rgba(210,153,34,0.12)"; b2.style.borderColor = "rgba(210,153,34,0.35)"; };
   b3.onmouseover = () => { b3.style.background = "rgba(88,166,255,0.25)"; b3.style.borderColor = "#58a6ff"; };
   b3.onmouseout = () => { b3.style.background = "rgba(88,166,255,0.12)"; b3.style.borderColor = "rgba(88,166,255,0.35)"; };
+  b4.onmouseover = () => { b4.style.background = "rgba(249,115,22,0.28)"; b4.style.borderColor = "#f97316"; };
+  b4.onmouseout = () => { b4.style.background = "rgba(249,115,22,0.14)"; b4.style.borderColor = "rgba(249,115,22,0.45)"; };
   
   d.appendChild(b1);
   d.appendChild(b2);
   d.appendChild(b3);
+  d.appendChild(b4);
   b.appendChild(d);
 }
 function buildTrackTelemetry(host){

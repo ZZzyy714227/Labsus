@@ -2024,6 +2024,216 @@ canvas.plot{display:block;width:100%;height:150px;background:var(--well);border:
 .kpi-q:hover,.kpi-q.on{color:var(--pri,#38bdf8);border-color:var(--pri-bd,rgba(56,189,248,.6))}
 .kpi-tip{grid-column:1 / -1;font:400 9.5px/1.45 var(--font-ui);color:var(--ink-2);background:var(--well,rgba(15,23,42,.5));border-left:2px solid var(--pri,#38bdf8);padding:4px 7px;margin-top:4px;border-radius:3px}
 
+/* ---------- 大学生方程式动态赛场 (FSAE / FSC Arena Modal) ---------- */
+.fsae-stage-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: #0b0f17;
+  display: none;
+  flex-direction: column;
+  color: #e6edf3;
+  font-family: var(--font-ui, Inter, sans-serif);
+}
+.fsae-stage-modal-backdrop.show {
+  display: flex;
+}
+.fsae-stage-topbar {
+  background: #0d1117;
+  border-bottom: 1px solid #30363d;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.fsae-bar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-wrap: wrap;
+}
+.fsae-bar-sub {
+  padding: 4px 14px;
+  background: rgba(0, 0, 0, 0.35);
+  border-bottom: none;
+}
+.fsae-pill {
+  background: rgba(249, 115, 22, 0.16);
+  border: 1px solid rgba(249, 115, 22, 0.55);
+  color: #fdba74;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.fsae-seg-group {
+  display: inline-flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 2px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+.fsae-ev-btn, .fsae-trk-btn, .fsae-cam-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #c9d1d9;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+.fsae-ev-btn:hover, .fsae-trk-btn:hover, .fsae-cam-btn:hover {
+  background: rgba(255, 255, 255, 0.10);
+  color: #fff;
+}
+.fsae-ev-btn.on {
+  background: #ea580c;
+  border-color: #fb923c;
+  color: #fff;
+}
+.fsae-trk-btn.on {
+  background: #1d4ed8;
+  border-color: #60a5fa;
+  color: #fff;
+}
+.fsae-cam-btn.on {
+  background: #238636;
+  border-color: #3fb950;
+  color: #fff;
+}
+.fsae-select {
+  background: #161b22;
+  border: 1px solid #30363d;
+  color: #e6edf3;
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.fsae-sub-lbl {
+  font-size: 11px;
+  color: #8b949e;
+  font-weight: 600;
+}
+.fsae-stage-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 310px;
+}
+.fsae-viewport-wrap {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: #161b22;
+  display: flex;
+  flex-direction: column;
+}
+#fsaeCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: none;
+  cursor: grab;
+}
+.fsae-bottom-hint {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  background: rgba(13, 17, 23, 0.80);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 10.5px;
+  color: #c9d1d9;
+  pointer-events: none;
+}
+.fsae-sidebar {
+  background: #0d1117;
+  border-left: 1px solid #30363d;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+.fsae-card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.fsae-card-hd {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #e6edf3;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.fsae-kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11.5px;
+  padding: 3px 0;
+  color: #8b949e;
+  font-family: var(--font-mono, monospace);
+}
+.fsae-kv b {
+  color: #e6edf3;
+}
+.fsae-score-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+}
+.fsae-sc-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #e6edf3;
+}
+.fsae-sc-sub {
+  font-size: 10px;
+  color: #8b949e;
+  font-family: monospace;
+  margin-top: 2px;
+}
+.fsae-sc-pts {
+  font-size: 12px;
+  color: #7ee787;
+  font-family: monospace;
+}
+.fsae-score-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  padding-top: 6px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #fde68a;
+}
+.fsae-score-total b {
+  font-size: 15px;
+  color: #fb923c;
+  font-family: monospace;
+}
+.fsae-rule-txt {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.55;
+  color: #9ca3af;
+}
+
 
 
 
