@@ -93,7 +93,16 @@
         gearboxType: pt.gearbox && pt.gearbox.type,
         finalDrive: pt.gearbox && pt.gearbox.finalDrive,
         diffType: pt.diff && pt.diff.type
-      } : null
+      } : null,
+      perfTiers: (typeof PERF !== "undefined" && typeof PERF.describe === "function") ? PERF.describe() : null,
+      workshop: {
+        tire: (typeof SIM !== "undefined" && SIM.userTire) ? JSON.parse(JSON.stringify(SIM.userTire)) : null,
+        powerSpec: (typeof POWERTRAIN !== "undefined" && POWERTRAIN.spec) ? {
+          architecture: POWERTRAIN.spec.architecture,
+          drive: POWERTRAIN.spec.drive,
+          splitFront: POWERTRAIN.spec.splitFront
+        } : null
+      }
     };
   }
 
@@ -156,6 +165,7 @@
         fz: qs.fz ? { FL: fin(qs.fz.FL), FR: fin(qs.fz.FR), RL: fin(qs.fz.RL), RR: fin(qs.fz.RR) } : null
       } : null,
       kinematicAudit: { front: optF, rear: optR },
+      charts: (function () { const cs = _kcCharts(); const r = _radarChart(ev); if (r) cs.unshift(r); return cs; })(),
       kpis
     };
   }
@@ -163,6 +173,75 @@
   /* --------------------------------------------------------------------------
    * 3~6. 台架测试封装（Ride / Lat / Long / Capability）
    * -------------------------------------------------------------------------- */
+
+  /* --------------------------------------------------------------------------
+   * P1 图表构建（2026-11-24）：每个分析面统一产出 CHART.line / CHART.radar spec。
+   * 数据与绘图分离——spec.data 进 JSON，PNG 只用于 HTML/MD 展示。
+   * -------------------------------------------------------------------------- */
+  function _chartLine(title, unit, xLabel, yLabel, x, series, zero) {
+    if (typeof CHART === "undefined" || typeof CHART.line !== "function") return null;
+    const ok = series && series.some(s => s && s.y && s.y.some(v => typeof v === "number" && isFinite(v)));
+    if (!ok || !x || x.length < 2) return null;
+    return CHART.line({ title: title, unit: unit, xLabel: xLabel, yLabel: yLabel,
+      x: x, series: series, zero: !!zero });
+  }
+  function _sub(arr, step) {
+    if (!Array.isArray(arr)) return [];
+    if (!step || step <= 1) return arr.slice();
+    const out = [];
+    for (let i = 0; i < arr.length; i += step) out.push(arr[i]);
+    return out;
+  }
+  function _mm(arr) { return (arr || []).map(v => (isFinite(v) ? +(v * 1000).toFixed(2) : null)); }
+
+  /** K&C：bump/droop 扫掠曲线（前/后轴 + 5 个指标） */
+  function _kcCharts() {
+    const out = [];
+    if (typeof runSweep !== "function" || typeof SIM === "undefined") return out;
+    const axes = [
+      { M: SIM.FR, rack: S.rack || 0, lim: SIM.limF || [-35, 35], tag: "前轴", ax: "front" },
+      { M: SIM.RR, rack: 0, lim: SIM.limR || [-35, 35], tag: "后轴", ax: "rear" }
+    ];
+    [["cam", "Camber", "deg"], ["toe", "Toe", "deg"], ["rcH", "侧倾中心高", "mm"],
+     ["mr", "运动比 MR", "-"], ["bs", "Bump Steer", "deg/25mm"]].forEach(([key, label, unit]) => {
+      let xs = [], series = [];
+      axes.forEach(a => {
+        if (!a.M) return;
+        let rows = [];
+        try {
+          const r = runSweep(a.M, a.rack, a.lim, 25, a.ax);
+          rows = (r && r.rows) || [];
+        } catch (e) { rows = []; }
+        if (!rows.length) return;
+        if (!xs.length) xs = rows.map(r => +(r.tr != null ? r.tr : 0).toFixed(2));
+        series.push({ name: a.tag, y: rows.map(r => {
+          let v = r[key];
+          if (key === "rcH" && v == null) v = r.rc;
+          return isFinite(v) ? +v.toFixed(4) : null;
+        }) });
+      });
+      const chart = _chartLine(label + " vs 轮跳", unit, "轮跳 (mm)", label, xs, series);
+      if (chart) out.push(chart);
+    });
+    return out;
+  }
+
+  /** 评价雷达（复用 10-eval 的 dimScores） */
+  function _radarChart(ev) {
+    if (!ev || !ev.dimScores || typeof CHART === "undefined" || typeof CHART.radar !== "function") return null;
+    const axes = Object.keys(ev.dimScores);
+    const values = axes.map(k => { const v = ev.dimScores[k]; return isFinite(v) ? +v : 0; });
+    if (axes.length < 3) return null;
+    return CHART.radar({ title: "六维评价雷达", axes: axes, values: values, max: 100 });
+  }
+
+  /** FSAE 事件速度曲线 */
+  function _fsaeChart(title, samples) {
+    if (!samples || samples.length < 2) return null;
+    return _chartLine(title + " 速度曲线", "m/s", "时间 (s)", "u (m/s)",
+      samples.map(s => s.t), [{ name: "u", y: samples.map(s => s.v) }]);
+  }
+
   function collectRideBench() {
     if (typeof RIDE_BENCH === "undefined") return { skipped: true };
     const step = RIDE_BENCH.run("step", { ampMm: 5, dur: 2.5 });
@@ -170,12 +249,29 @@
     const impulse = RIDE_BENCH.run("impulse", { ampMm: 10, dur: 1.8 });
     const randomC = RIDE_BENCH.run("random", { isoClass: "C", speedMs: 16.7, dur: 6.0 });
     const freedecay = RIDE_BENCH.run("freedecay", { dur: 3.0, over: { zeroDamping: true } });
+
+    const charts = [];
+    const pushTime = (res, title, key, scale) => {
+      if (!res || !res.series || !Array.isArray(res.series.t)) return;
+      const c = _chartLine(title, "mm", "时间 (s)", "车身 Z (mm)", _sub(res.series.t, 5),
+        [{ name: "Z", y: _sub(res.series[key] || res.series.Z, 5).map(v => (isFinite(v) ? +(v * 1000).toFixed(2) : null)) }]);
+      if (c) charts.push(c);
+    };
+    pushTime(step, "阶跃响应 (5 mm)", "Z");
+    pushTime(freedecay, "自由衰减 (无阻尼)", "Z");
+    pushTime(randomC, "ISO-C 随机路面 (60 km/h)", "Z");
+    if (sweep && Array.isArray(sweep.points) && sweep.points.length > 1) {
+      const c = _chartLine("扫频传递率", "-", "频率 (Hz)", "传递率",
+        sweep.points.map(p => p.f), [{ name: "传递率", y: sweep.points.map(p => (p.trans != null ? p.trans : p.ratio)) }]);
+      if (c) charts.push(c);
+    }
     return {
       step: step && step.metrics,
       sweep: sweep && sweep.metrics,
       impulse: impulse && impulse.metrics,
       randomIsoC60kmh: randomC && randomC.metrics,
-      freeDecayNoDamp: freedecay && freedecay.metrics
+      freeDecayNoDamp: freedecay && freedecay.metrics,
+      charts: charts
     };
   }
 
@@ -205,7 +301,23 @@
         KrollRearNmRad: fin(analytic.KrollR),
         hRollArmM: fin(analytic.hRollArm)
       } : null,
-      skidpadLimit: trackLim
+      skidpadLimit: trackLim,
+      charts: (function () {
+        const cs = [];
+        const pts = rollGrad && rollGrad.metrics && rollGrad.metrics.points;
+        if (pts && pts.length > 1) {
+          const c1 = _chartLine("侧倾梯度 φ(ay)", "deg", "ay (g)", "φ (deg)",
+            pts.map(p => +(+p.ayG).toFixed(3)), [{ name: "实测", y: pts.map(p => +(+p.phiDeg).toFixed(3)) }]);
+          if (c1) cs.push(c1);
+        }
+        if (steerStep && steerStep.series && Array.isArray(steerStep.series.t)) {
+          const s = steerStep.series;
+          const c2 = _chartLine("转向阶跃 yawRate(t)", "deg/s", "时间 (s)", "yawRate (deg/s)",
+            _sub(s.t, 5), [{ name: "yawRate", y: _sub(s.yawRate, 5).map(v => (isFinite(v) ? +(v * 180 / Math.PI).toFixed(3) : null)) }]);
+          if (c2) cs.push(c2);
+        }
+        return cs;
+      })()
     };
   }
 
@@ -233,7 +345,29 @@
           bias: fin(p.brakeBias), stopDistM: fin(p.stopDistM),
           peakDecelG: fin(p.peakDecelG), lockupFront: !!p.lockupFront, lockupRear: !!p.lockupRear
         }))
-      } : null
+      } : null,
+      charts: (function () {
+        const cs = [];
+        if (acc && Array.isArray(acc.trace) && acc.trace.length > 3) {
+          const tr = acc.trace;
+          const c = _chartLine("75 m 加速 v(t)", "km/h", "时间 (s)", "速度 (km/h)",
+            tr.map(p => p.t), [{ name: "速度", y: tr.map(p => p.vKmh) }]);
+          if (c) cs.push(c);
+        }
+        if (brk && Array.isArray(brk.trace) && brk.trace.length > 3) {
+          const tr = brk.trace;
+          const c = _chartLine("100→0 制动 v(t)", "km/h", "时间 (s)", "速度 (km/h)",
+            tr.map(p => p.t), [{ name: "速度", y: tr.map(p => p.vKmh) }]);
+          if (c) cs.push(c);
+        }
+        const sp = (sweep && sweep.points) || [];
+        if (sp.length > 1) {
+          const c = _chartLine("制动力分配扫描", "m", "前制动力比例", "制动距离 (m)",
+            sp.map(p => +(+p.brakeBias).toFixed(3)), [{ name: "制动距离", y: sp.map(p => +(+p.stopDistM).toFixed(2)) }]);
+          if (c) cs.push(c);
+        }
+        return cs;
+      })()
     };
   }
 
@@ -250,7 +384,22 @@
       brakeCurve: c.brkPts,
       accelPeakMs2: fin(c.acc0),
       accelHiSpeedMs2: fin(c.accHi),
-      accelCurve: c.accPts
+      accelCurve: c.accPts,
+      charts: (function () {
+        const cs = [];
+        const ap = c.accPts || [], bp = c.brkPts || [];
+        if (ap.length > 1) {
+          const ch = _chartLine("加速极限 a(v)", "m/s²", "速度 (m/s)", "a (m/s²)",
+            ap.map(p => +(+p.v).toFixed(2)), [{ name: "加速", y: ap.map(p => +(+p.a).toFixed(3)) }]);
+          if (ch) cs.push(ch);
+        }
+        if (bp.length > 1) {
+          const ch = _chartLine("制动极限 a(v)", "m/s²", "速度 (m/s)", "a (m/s²)",
+            bp.map(p => +(+p.v).toFixed(2)), [{ name: "制动", y: bp.map(p => +(+p.a).toFixed(3)) }]);
+          if (ch) cs.push(ch);
+        }
+        return cs;
+      })()
     };
   }
 
@@ -273,7 +422,7 @@
       swAngle: S.swAngle
     };
 
-    const out = { accel: null, skidpad: null, autocrossFsg: null, autocrossFsc: null, total275: 0 };
+    const out = { accel: null, skidpad: null, autocrossFsg: null, autocrossFsc: null, total275: 0, charts: [] };
     try {
       FSAE_STAGE.headless = true;
       FSAE_STAGE.active = true;
@@ -284,6 +433,7 @@
         if (trk) FSAE_STAGE.autocrossTrack = trk;
         fsaeSwitchEvent(ev);
         let maxBeta = 0;
+        const samples = [];
         const steps = Math.round(maxSec * 60);
         for (let i = 0; i < steps; i++) {
           if (_cancelFlag) break;
@@ -291,6 +441,8 @@
           if (r && r.st) {
             const beta = Math.abs(Math.atan2(r.st.v, Math.max(1, r.st.u)) * 180 / Math.PI);
             if (beta > maxBeta) maxBeta = beta;
+            if (i % 6 === 0) samples.push({ t: +(i / 60).toFixed(2),
+              v: +(r.st.u || 0).toFixed(3), vlat: +(r.st.v || 0).toFixed(3) });
             if (FSAE_STAGE.run.finished) {
               if (ev === "accel" && r.st.u < 0.35) break;
               if (ev === "skidpad" && r.st.u < 0.5) break;
@@ -299,7 +451,8 @@
           }
           if (i % 300 === 299) await _tick();
         }
-        return { maxBetaDeg: fin(maxBeta), run: JSON.parse(JSON.stringify(FSAE_STAGE.run)) };
+        return { maxBetaDeg: fin(maxBeta), samples: samples,
+          run: JSON.parse(JSON.stringify(FSAE_STAGE.run)) };
       };
 
       const rA = await runOne("accel", null, 15);
@@ -320,6 +473,9 @@
         await _tick();
       }
 
+      const cA = _fsaeChart("75m 加速", rA.samples); if (cA) out.charts.push(cA);
+      const cS = _fsaeChart("八字绕环", rS.samples); if (cS) out.charts.push(cS);
+      const cF = _fsaeChart("FSG 单圈赛", rFsg.samples); if (cF) out.charts.push(cF);
       out.total275 = (out.accel.pts || 0) + (out.skidpad.pts || 0) + (out.autocrossFsg.pts || 0);
     } finally {
       FSAE_STAGE.active = snap.active;

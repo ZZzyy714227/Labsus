@@ -100,8 +100,8 @@ python tools/gates/check_all.py --quick   # 5 项秒级检查（ruff / 角色审
 # 独立验证入口
 pytest engine/tests -q                 # 359 passed / 1 skipped（skip = OptimumK 未录入，显式）
 ruff check engine                      # All checks passed
-node web/test/test_dom.js              # 372 断言：薄壳结构 / 双端同构 / 回归守卫
-node web/test/stage_boot_check.js      # 54 断言：模块序 / TDZ / 三舞台 20 帧
+node web/test/test_dom.js              # 378 断言：薄壳结构 / 双端同构 / 回归守卫
+node web/test/stage_boot_check.js      # 57 断言：模块序 / TDZ / 三舞台 20 帧
 node web/test/tphys_parity.cjs         # JS TPHYS ↔ Python transient 对拍（实测 worst 0.51%）
 node web/test/kc_parity.cjs            # 4 预设双轴 K&C / ARB / Modal 跨语言对拍（< 1e-4）
 node web/test/physics_audit.js         # 物理审计（60 项，进 CI 回归）
@@ -150,7 +150,8 @@ LABSUS/                           # 工程代码根
 │   │   ├── 22-optimizer.js       # 正向硬点运动学优化器（多尺度有界寻优）
 │   │   ├── 23-long-bench.js      # 纵向加减速与制动台架（Brake-Bias / 纵倾）
 │   │   ├── 24-fsae-arena.js      # 大学生方程式动态赛场（75m 加速 / 八字绕环 / 单圈赛组合）
-│   │   └── 25-full-report.js     # 一键全量分析与终极数据报告（K&C + 全台架 + FSAE + AI Markdown/JSON）
+│   │   ├── 25-full-report.js     # 一键全量分析与终极数据报告（K&C + 全台架 + FSAE + AI Markdown/JSON）
+│   │   └── 26-report-charts.js   # 报告图表层（chart spec → canvas → PNG，数据与绘图分离）
 │   └── test/                     # 前端 32 套回归 + physics_audit + 双端对拍
 ├── engine/                       # Python FastAPI 数值计算引擎
 │   ├── server.py                 # FastAPI 入口服务 (:8001)

@@ -24,6 +24,7 @@ const { ctx } = loadStage([
   '22-optimizer.js',
   '23-long-bench.js',
   '24-fsae-arena.js',
+  '26-report-charts.js',
   '25-full-report.js'
 ]);
 
@@ -53,6 +54,18 @@ const { ctx } = loadStage([
   assert(rep.tracks && rep.tracks.provingGround.length === 3 && rep.tracks.shanghaiEnvelope.theoreticalLapSec > 60, 'Proving ground + Shanghai envelope collected');
   assert(Array.isArray(rep.insights) && rep.insights.length >= 4, `Engineering insights generated (${rep.insights.length})`);
   assert(typeof rep.markdown === 'string' && rep.markdown.includes('## 🤖 给 AI 工程助手的提示词') && rep.markdown.length > 1500, `AI Markdown report generated (${rep.markdown.length} chars)`);
+
+  const _cs = (x) => (x && Array.isArray(x.charts)) ? x.charts : [];
+  assert(_cs(rep.staticKC).length >= 4, `K&C 图表生成 (${_cs(rep.staticKC).length})`);
+  assert(_cs(rep.ride).length >= 2, `振动/平顺图表生成 (${_cs(rep.ride).length})`);
+  assert(_cs(rep.lateral).length >= 1, `横向台架图表生成 (${_cs(rep.lateral).length})`);
+  assert(_cs(rep.longitudinal).length >= 2, `纵向台架图表生成 (${_cs(rep.longitudinal).length})`);
+  assert(_cs(rep.capability).length >= 1, `能力包络图表生成 (${_cs(rep.capability).length})`);
+  assert(Array.isArray(rep.fsae.charts) && rep.fsae.charts.length >= 2, `FSAE 事件图表生成 (${rep.fsae && rep.fsae.charts ? rep.fsae.charts.length : 0})`);
+  const _all = [].concat(_cs(rep.staticKC), _cs(rep.ride), _cs(rep.lateral), _cs(rep.longitudinal), _cs(rep.capability), (rep.fsae && rep.fsae.charts) || []);
+  assert(_all.length >= 10, `全量图表总数 >= 10 (${_all.length})`);
+  assert(_all.every(c => c && c.data && Array.isArray(c.data.series)), '每张图都带原始数据（JSON 可导出）');
+  assert(rep.vehicle.perfTiers !== undefined && rep.vehicle.workshop, '档位/工坊快照已采集');
 
   console.log('\n========================================');
   console.log(`Full Report Tests: ${passed} passed, ${failed} failed`);

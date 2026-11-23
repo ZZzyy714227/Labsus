@@ -100,8 +100,8 @@ python tools/gates/check_all.py --quick   # 5 sub-second checks (ruff / module-r
 # Individual entry points
 pytest engine/tests -q                 # 359 passed / 1 skipped (skip = OptimumK rows not entered, explicit)
 ruff check engine                      # All checks passed
-node web/test/test_dom.js              # 372 assertions: shell structure / dual-entry parity / regressions
-node web/test/stage_boot_check.js      # 54 assertions: module order / TDZ / 3 stages x 20 frames
+node web/test/test_dom.js              # 378 assertions: shell structure / dual-entry parity / regressions
+node web/test/stage_boot_check.js      # 57 assertions: module order / TDZ / 3 stages x 20 frames
 node web/test/tphys_parity.cjs         # JS TPHYS <-> Python transient parity (measured worst 0.51%)
 node web/test/kc_parity.cjs            # 4-preset dual-axle K&C / ARB / Modal parity (< 1e-4)
 node web/test/physics_audit.js         # Physics audit（60 checks, in CI regression）
@@ -150,7 +150,8 @@ LABSUS/                           # Engineering root
 │   │   ├── 22-optimizer.js       # Bounded multi-scale kinematic hardpoint optimizer
 │   │   ├── 23-long-bench.js      # Longitudinal accel & braking / Brake-Bias bench
 │   │   ├── 24-fsae-arena.js      # Formula Student dynamic arena (75m Accel / Fig-8 Skidpad / Autocross)
-│   │   └── 25-full-report.js     # One-click full analysis & AI-ready Markdown/JSON ultimate report
+│   │   ├── 25-full-report.js     # One-click full analysis & AI-ready Markdown/JSON ultimate report
+│   │   └── 26-report-charts.js   # Report chart layer (chart spec → canvas → PNG, data/plot separated)
 │   └── test/                     # 32 regression suites + physics_audit + dual parity
 ├── engine/                       # Python FastAPI numerical engine
 │   ├── server.py                 # FastAPI server entry (:8001)
