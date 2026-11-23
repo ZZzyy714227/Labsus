@@ -677,6 +677,7 @@ function slopeStageLoop(now){
     };
     
     const alpha = env.grade;
+    SLOPE_STAGE.lastCtrl = ctrl;
     renderSlopeScene(alpha, st);
     updateSlopeHUD(st, alpha, tel);
   } catch(err) {
@@ -1174,12 +1175,13 @@ function renderSlopeScene(alpha, st){
     return projFast(rx, ry, gZ);
   };
 
+  const glActive = (typeof CAR3D_GL !== "undefined" && CAR3D_GL.isActiveForStage());
   const s1 = projShad(-shadowW/2, -shadowL/2);
   const s2 = projShad(shadowW/2, -shadowL/2);
   const s3 = projShad(shadowW/2, shadowL/2);
   const s4 = projShad(-shadowW/2, shadowL/2);
 
-  if(s1 && s2 && s3 && s4){
+  if((!glActive || isUndulating) && s1 && s2 && s3 && s4){
     ctx.beginPath();
     ctx.moveTo(s1[0], s1[1]); ctx.lineTo(s2[0], s2[1]); ctx.lineTo(s3[0], s3[1]); ctx.lineTo(s4[0], s4[1]);
     ctx.closePath();
@@ -1229,61 +1231,79 @@ function renderSlopeScene(alpha, st){
   const R21 = sY * cR + cY * sP * sR,  R22 = cY * cP,   R23 = sY * sR - cY * sP * cR;
   const R31 = -cP * sR,                R32 = sP,        R33 = cP * cR;
 
-  const projBodyFast = (lx, ly, lz) => {
-    const rx = R11 * lx + R12 * ly + R13 * lz;
-    const ry = R21 * lx + R22 * ly + R23 * lz;
-    const rz = R31 * lx + R32 * ly + R33 * lz;
-    return projFast(rx + cx, ry + cy, rz + cz);
-  };
+  const glRendered = glActive && CAR3D_GL.renderStageCar(ctx, {
+    w, h, dpr,
+    eye: [cam_dx, cam_dy, cam_dz],
+    rt: [m11, m12, m13],
+    up: [m21, m22, m23],
+    fw: [m31, m32, m33],
+    fovDist,
+    carPos: [cx, cy, cz],
+    R: [R11, R12, R13, R21, R22, R23, R31, R32, R33],
+    yaw: st && st.psi ? st.psi : 0,
+    groundZ: (!isUndulating && pathObj) ? ((pathObj.getRoadElevation(cx / 1000, carY).z_road || 0) * 1000 + 2) : 2,
+    shadowAlpha: isUndulating ? 0 : shadowAlpha,
+    hideDriver: SLOPE_STAGE.camMode === "cockpit",
+    brakeIntensity: SLOPE_STAGE.lastCtrl ? SLOPE_STAGE.lastCtrl.brake : 0
+  });
 
-  try {
-    for(let i = 0; i < sc.length; i++){
-      const o = sc[i];
-      if(!o) continue;
-      if(o.k === "l"){
-        if(!o.a || !o.b) continue;
-        const A = projBodyFast(o.a[0], o.a[1], o.a[2]);
-        const B = projBodyFast(o.b[0], o.b[1], o.b[2]);
-        if(!A || !B) continue;
-        ctx.beginPath();
-        if(o.d && o.d.length) ctx.setLineDash(o.d); else ctx.setLineDash([]);
-        ctx.strokeStyle = o.c || "#58a6ff";
-        ctx.lineWidth = o.w || 1.2;
-        if(o.al !== undefined) ctx.globalAlpha = o.al;
-        ctx.moveTo(A[0], A[1]);
-        ctx.lineTo(B[0], B[1]);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      } else if(o.k === "p"){
-        if(!o.pts || o.pts.length < 2) continue;
-        ctx.beginPath();
-        if(o.d && o.d.length) ctx.setLineDash(o.d); else ctx.setLineDash([]);
-        let started = false;
-        for(let j = 0; j < o.pts.length; j++){
-          const Q = projBodyFast(o.pts[j][0], o.pts[j][1], o.pts[j][2]);
-          if(!Q){ started = false; continue; }
-          if(!started){ ctx.moveTo(Q[0], Q[1]); started = true; }
-          else ctx.lineTo(Q[0], Q[1]);
+  if (!glRendered) {
+    const projBodyFast = (lx, ly, lz) => {
+      const rx = R11 * lx + R12 * ly + R13 * lz;
+      const ry = R21 * lx + R22 * ly + R23 * lz;
+      const rz = R31 * lx + R32 * ly + R33 * lz;
+      return projFast(rx + cx, ry + cy, rz + cz);
+    };
+
+    try {
+      for(let i = 0; i < sc.length; i++){
+        const o = sc[i];
+        if(!o) continue;
+        if(o.k === "l"){
+          if(!o.a || !o.b) continue;
+          const A = projBodyFast(o.a[0], o.a[1], o.a[2]);
+          const B = projBodyFast(o.b[0], o.b[1], o.b[2]);
+          if(!A || !B) continue;
+          ctx.beginPath();
+          if(o.d && o.d.length) ctx.setLineDash(o.d); else ctx.setLineDash([]);
+          ctx.strokeStyle = o.c || "#58a6ff";
+          ctx.lineWidth = o.w || 1.2;
+          if(o.al !== undefined) ctx.globalAlpha = o.al;
+          ctx.moveTo(A[0], A[1]);
+          ctx.lineTo(B[0], B[1]);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        } else if(o.k === "p"){
+          if(!o.pts || o.pts.length < 2) continue;
+          ctx.beginPath();
+          if(o.d && o.d.length) ctx.setLineDash(o.d); else ctx.setLineDash([]);
+          let started = false;
+          for(let j = 0; j < o.pts.length; j++){
+            const Q = projBodyFast(o.pts[j][0], o.pts[j][1], o.pts[j][2]);
+            if(!Q){ started = false; continue; }
+            if(!started){ ctx.moveTo(Q[0], Q[1]); started = true; }
+            else ctx.lineTo(Q[0], Q[1]);
+          }
+          if(o.f){ ctx.fillStyle = o.f; ctx.fill(); }
+          ctx.strokeStyle = o.c || "#58a6ff";
+          ctx.lineWidth = o.w || 1.2;
+          ctx.stroke();
+        } else if(o.k === "n"){
+          if(!o.p) continue;
+          const A = projBodyFast(o.p[0], o.p[1], o.p[2]);
+          if(!A) continue;
+          ctx.beginPath();
+          ctx.arc(A[0], A[1], 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = o.fix ? "#e0a040" : "#fff";
+          ctx.fill();
+          ctx.strokeStyle = "#000";
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
         }
-        if(o.f){ ctx.fillStyle = o.f; ctx.fill(); }
-        ctx.strokeStyle = o.c || "#58a6ff";
-        ctx.lineWidth = o.w || 1.2;
-        ctx.stroke();
-      } else if(o.k === "n"){
-        if(!o.p) continue;
-        const A = projBodyFast(o.p[0], o.p[1], o.p[2]);
-        if(!A) continue;
-        ctx.beginPath();
-        ctx.arc(A[0], A[1], 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = o.fix ? "#e0a040" : "#fff";
-        ctx.fill();
-        ctx.strokeStyle = "#000";
-        ctx.lineWidth = 0.8;
-        ctx.stroke();
       }
+    } catch(e) {
+      console.error("Render Loop Error:", e);
     }
-  } catch(e) {
-    console.error("Render Loop Error:", e);
   }
 
   ctx.setLineDash([]);
@@ -1772,7 +1792,7 @@ const SKIDPAD_STAGE = {
 
 const SKIDPAD_CAMS_CONFIG = {
   behind:  { dx: 0,     dy: -4500, dz: 1200, lookDy: 800,  lookDz: 350, fov: 1.5 },
-  blimp:   { dx: 0,     dy: -12000, dz: 18000, lookDy: 6000, lookDz: 0,   fov: 1.4 },
+  blimp:   { dx: 0,     dy: -24000, dz: 32000, lookDy: 0,   lookDz: 0,   fov: 1.4 },
   outer:   { dx: 4500,  dy: -1200, dz: 900,  lookDy: 400,  lookDz: 300, fov: 1.5 },
   center:  { dx: 0,     dy: 0,     dz: 1500, lookDy: 0,    lookDz: 400, fov: 1.4 },
   cockpit: { dx: 0,     dy: -150,  dz: 620,  lookDy: 2500, lookDz: 350, fov: 1.3 }
@@ -1987,11 +2007,20 @@ function renderSkidpadScene(st, tel, ctrl){
   const w = cv.width / dpr, h = cv.height / dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  // 1. Sky & Atmosphere Background
-  const skyGrad = ctx.createRadialGradient(w/2, h/2, 50, w/2, h/2, Math.max(w, h));
-  skyGrad.addColorStop(0, "#0c131f");
-  skyGrad.addColorStop(0.6, "#080c14");
-  skyGrad.addColorStop(1, "#030508");
+  // 1. Sky & Atmosphere Background (Daytime clear horizon for Formula / WebGL realism)
+  const glSkidActive = (typeof CAR3D_GL !== "undefined" && CAR3D_GL.isActiveForStage());
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+  if (glSkidActive) {
+    skyGrad.addColorStop(0, "#4c74ab");
+    skyGrad.addColorStop(0.36, "#9ec0e0");
+    skyGrad.addColorStop(0.47, "#d4e2ef");
+    skyGrad.addColorStop(0.50, "#1d2633");
+    skyGrad.addColorStop(1, "#151c26");
+  } else {
+    skyGrad.addColorStop(0, "#0c131f");
+    skyGrad.addColorStop(0.6, "#080c14");
+    skyGrad.addColorStop(1, "#030508");
+  }
   ctx.fillStyle = skyGrad;
   ctx.fillRect(0, 0, w, h);
 
@@ -2025,7 +2054,7 @@ function renderSkidpadScene(st, tel, ctrl){
     E_x = 0; E_y = 0; E_z = cam_dz;
     look_x = carX_mm; look_y = carY_mm; look_z = 350;
   } else if(SKIDPAD_STAGE.camMode === "blimp") {
-    E_x = 0; E_y = 0; E_z = cam_dz;
+    E_x = cam_dx; E_y = cam_dy; E_z = Math.max(8000, cam_dz);
     look_x = 0; look_y = 0; look_z = 0;
   } else {
     // Follows car heading
@@ -2043,11 +2072,12 @@ function renderSkidpadScene(st, tel, ctrl){
   const fw = [fw_un[0]/l_fw, fw_un[1]/l_fw, fw_un[2]/l_fw];
 
   const n_world = [0, 0, 1];
-  const rt_un = [
+  let rt_un = [
     fw[1]*n_world[2] - fw[2]*n_world[1],
     fw[2]*n_world[0] - fw[0]*n_world[2],
     fw[0]*n_world[1] - fw[1]*n_world[0]
   ];
+  if(Math.hypot(rt_un[0], rt_un[1], rt_un[2]) < 1e-4) rt_un = [1, 0, 0];
   const l_rt = Math.hypot(rt_un[0], rt_un[1], rt_un[2]) || 1;
   const rt = [rt_un[0]/l_rt, rt_un[1]/l_rt, rt_un[2]/l_rt];
 
@@ -2126,8 +2156,15 @@ function renderSkidpadScene(st, tel, ctrl){
       ctx.fillStyle = kerbCol; ctx.fill();
     }
 
-    // Center Radius White Dash
-    if(i % 2 === 0){
+    // Center Radius Guide Line (Golden yellow FSAE target path in WebGL mode, white dash otherwise)
+    if (glSkidActive) {
+      const cd1 = projFast(R_mm * Math.cos(a1), R_mm * Math.sin(a1), 2);
+      const cd2 = projFast(R_mm * Math.cos(a2), R_mm * Math.sin(a2), 2);
+      if(cd1 && cd2){
+        ctx.beginPath(); ctx.moveTo(cd1[0], cd1[1]); ctx.lineTo(cd2[0], cd2[1]);
+        ctx.strokeStyle = "#facc15"; ctx.lineWidth = 4.0; ctx.stroke();
+      }
+    } else if(i % 2 === 0){
       const cd1 = projFast(R_mm * Math.cos(a1 + angleStep*0.2), R_mm * Math.sin(a1 + angleStep*0.2), 2);
       const cd2 = projFast(R_mm * Math.cos(a1 + angleStep*0.8), R_mm * Math.sin(a1 + angleStep*0.8), 2);
       if(cd1 && cd2){
@@ -2137,18 +2174,29 @@ function renderSkidpadScene(st, tel, ctrl){
     }
   }
 
-  // Pylon Cones (Orange Track Markers)
+  // Pylon Cones (FSAE Yellow/Black & Blue/White Track Markers)
   for(let i = 0; i < 16; i++){
     const ang = i * (Math.PI * 2 / 16);
     const coneBase = projFast((Rin_mm - 150) * Math.cos(ang), (Rin_mm - 150) * Math.sin(ang), 0);
     const coneTop = projFast((Rin_mm - 150) * Math.cos(ang), (Rin_mm - 150) * Math.sin(ang), 400);
     if(coneBase && coneTop){
       ctx.beginPath();
-      ctx.moveTo(coneBase[0]-6, coneBase[1]);
+      ctx.moveTo(coneBase[0]-7, coneBase[1]);
       ctx.lineTo(coneTop[0], coneTop[1]);
-      ctx.lineTo(coneBase[0]+6, coneBase[1]);
+      ctx.lineTo(coneBase[0]+7, coneBase[1]);
       ctx.closePath();
-      ctx.fillStyle = "#ff6b35"; ctx.fill();
+      ctx.fillStyle = glSkidActive ? "#facc15" : "#ff6b35"; ctx.fill();
+      if (glSkidActive) {
+        const midL = [coneBase[0]*0.55 + coneTop[0]*0.45 - 3.5, coneBase[1]*0.55 + coneTop[1]*0.45];
+        const midR = [coneBase[0]*0.55 + coneTop[0]*0.45 + 3.5, coneBase[1]*0.55 + coneTop[1]*0.45];
+        const hiL  = [coneBase[0]*0.32 + coneTop[0]*0.68 - 2.2, coneBase[1]*0.32 + coneTop[1]*0.68];
+        const hiR  = [coneBase[0]*0.32 + coneTop[0]*0.68 + 2.2, coneBase[1]*0.32 + coneTop[1]*0.68];
+        ctx.beginPath();
+        ctx.moveTo(midL[0], midL[1]); ctx.lineTo(midR[0], midR[1]);
+        ctx.lineTo(hiR[0], hiR[1]); ctx.lineTo(hiL[0], hiL[1]);
+        ctx.closePath();
+        ctx.fillStyle = "#1e293b"; ctx.fill();
+      }
     }
   }
 
@@ -2186,6 +2234,7 @@ function renderSkidpadScene(st, tel, ctrl){
   }
 
   // 3. Dynamic Soft Ground Shadow under Car
+  const glActive = (typeof CAR3D_GL !== "undefined" && CAR3D_GL.isActiveForStage());
   const shadowW = Math.max(1200, (S.front.tire.R || 300) * 3);
   const shadowL = (S.wb || 2600) + 800;
   const cY_c = Math.cos(carYaw), sY_c = Math.sin(carYaw);
@@ -2200,7 +2249,7 @@ function renderSkidpadScene(st, tel, ctrl){
   const s2 = projShad(shadowW/2, -shadowL/2);
   const s3 = projShad(shadowW/2, shadowL/2);
   const s4 = projShad(-shadowW/2, shadowL/2);
-  if(s1 && s2 && s3 && s4){
+  if(!glActive && s1 && s2 && s3 && s4){
     ctx.beginPath();
     ctx.moveTo(s1[0], s1[1]); ctx.lineTo(s2[0], s2[1]); ctx.lineTo(s3[0], s3[1]); ctx.lineTo(s4[0], s4[1]);
     ctx.closePath();
@@ -2233,57 +2282,73 @@ function renderSkidpadScene(st, tel, ctrl){
   const R21 = sY * cR + cY * sP * sR,  R22 =  cY * cP,  R23 = sY * sR - cY * sP * cR;
   const R31 = -cP * sR,                R32 =  sP,       R33 = cP * cR;
 
-  const projSkidpadBody = (lx, ly, lz) => {
-    const rx = R11 * lx + R12 * ly + R13 * lz;
-    const ry = R21 * lx + R22 * ly + R23 * lz;
-    const rz = R31 * lx + R32 * ly + R33 * lz;
-    return projFast(rx + carX_mm, ry + carY_mm, rz + carZ_mm);
-  };
+  const glRendered = glActive && CAR3D_GL.renderStageCar(ctx, {
+    w, h, dpr,
+    eye: [E_x, E_y, E_z],
+    rt, up, fw,
+    fovDist,
+    carPos: [carX_mm, carY_mm, carZ_mm],
+    R: [R11, R12, R13, R21, R22, R23, R31, R32, R33],
+    yaw: st.psi || 0,
+    groundZ: 2,
+    shadowAlpha: 0.48,
+    hideDriver: SKIDPAD_STAGE.camMode === "cockpit",
+    brakeIntensity: ctrl ? ctrl.brake : 0
+  });
 
-  try {
-    for(let i = 0; i < sc.length; i++){
-      const o = sc[i];
-      if(!o) continue;
-      if(o.k === "l"){
-        if(!o.a || !o.b) continue;
-        const A = projSkidpadBody(o.a[0], o.a[1], o.a[2]);
-        const B = projSkidpadBody(o.b[0], o.b[1], o.b[2]);
-        if(!A || !B) continue;
-        ctx.beginPath();
-        if(o.d && o.d.length) ctx.setLineDash(o.d); else ctx.setLineDash([]);
-        ctx.strokeStyle = o.c || "#f39c12";
-        ctx.lineWidth = o.w || 1.2;
-        if(o.al !== undefined) ctx.globalAlpha = o.al;
-        ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]);
-        ctx.stroke(); ctx.globalAlpha = 1;
-      } else if(o.k === "p"){
-        if(!o.pts || o.pts.length < 2) continue;
-        ctx.beginPath();
-        if(o.d && o.d.length) ctx.setLineDash(o.d); else ctx.setLineDash([]);
-        let started = false;
-        for(let j = 0; j < o.pts.length; j++){
-          const Q = projSkidpadBody(o.pts[j][0], o.pts[j][1], o.pts[j][2]);
-          if(!Q){ started = false; continue; }
-          if(!started){ ctx.moveTo(Q[0], Q[1]); started = true; }
-          else ctx.lineTo(Q[0], Q[1]);
+  if (!glRendered) {
+    const projSkidpadBody = (lx, ly, lz) => {
+      const rx = R11 * lx + R12 * ly + R13 * lz;
+      const ry = R21 * lx + R22 * ly + R23 * lz;
+      const rz = R31 * lx + R32 * ly + R33 * lz;
+      return projFast(rx + carX_mm, ry + carY_mm, rz + carZ_mm);
+    };
+
+    try {
+      for(let i = 0; i < sc.length; i++){
+        const o = sc[i];
+        if(!o) continue;
+        if(o.k === "l"){
+          if(!o.a || !o.b) continue;
+          const A = projSkidpadBody(o.a[0], o.a[1], o.a[2]);
+          const B = projSkidpadBody(o.b[0], o.b[1], o.b[2]);
+          if(!A || !B) continue;
+          ctx.beginPath();
+          if(o.d && o.d.length) ctx.setLineDash(o.d); else ctx.setLineDash([]);
+          ctx.strokeStyle = o.c || "#f39c12";
+          ctx.lineWidth = o.w || 1.2;
+          if(o.al !== undefined) ctx.globalAlpha = o.al;
+          ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]);
+          ctx.stroke(); ctx.globalAlpha = 1;
+        } else if(o.k === "p"){
+          if(!o.pts || o.pts.length < 2) continue;
+          ctx.beginPath();
+          if(o.d && o.d.length) ctx.setLineDash(o.d); else ctx.setLineDash([]);
+          let started = false;
+          for(let j = 0; j < o.pts.length; j++){
+            const Q = projSkidpadBody(o.pts[j][0], o.pts[j][1], o.pts[j][2]);
+            if(!Q){ started = false; continue; }
+            if(!started){ ctx.moveTo(Q[0], Q[1]); started = true; }
+            else ctx.lineTo(Q[0], Q[1]);
+          }
+          if(o.f){ ctx.fillStyle = o.f; ctx.fill(); }
+          ctx.strokeStyle = o.c || "#f39c12";
+          ctx.lineWidth = o.w || 1.2;
+          ctx.stroke();
+        } else if(o.k === "n"){
+          if(!o.p) continue;
+          const A = projSkidpadBody(o.p[0], o.p[1], o.p[2]);
+          if(!A) continue;
+          ctx.beginPath();
+          ctx.arc(A[0], A[1], 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = o.fix ? "#e0a040" : "#fff";
+          ctx.fill();
+          ctx.strokeStyle = "#000"; ctx.lineWidth = 0.8; ctx.stroke();
         }
-        if(o.f){ ctx.fillStyle = o.f; ctx.fill(); }
-        ctx.strokeStyle = o.c || "#f39c12";
-        ctx.lineWidth = o.w || 1.2;
-        ctx.stroke();
-      } else if(o.k === "n"){
-        if(!o.p) continue;
-        const A = projSkidpadBody(o.p[0], o.p[1], o.p[2]);
-        if(!A) continue;
-        ctx.beginPath();
-        ctx.arc(A[0], A[1], 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = o.fix ? "#e0a040" : "#fff";
-        ctx.fill();
-        ctx.strokeStyle = "#000"; ctx.lineWidth = 0.8; ctx.stroke();
       }
+    } catch(e) {
+      console.error("Skidpad Render Error:", e);
     }
-  } catch(e) {
-    console.error("Skidpad Render Error:", e);
   }
 
   ctx.setLineDash([]);
@@ -2460,7 +2525,7 @@ function initSkidpadStageEvents(){
   });
 }
 
-function initCircuitStageEvents() {
+function bindCircuitStageCamAndLight() {
   const circuitCamBtns = document.querySelectorAll("#circuitStageModal .circuit-cam-btn");
   circuitCamBtns.forEach(b => {
     b.onclick = () => {
@@ -2513,6 +2578,7 @@ window.SKIDPAD_STAGE = SKIDPAD_STAGE;
       btn.style.color = "#f1c40f";
     }
     rebuild();
+    if(typeof CAR3D_GL !== "undefined") CAR3D_GL.syncControlsUI();
     if(typeof UI !== 'undefined' && UI.sync) UI.sync.forEach(f => { try{ f(); }catch(e){} });
   };
 })();
@@ -2530,7 +2596,7 @@ const CIRCUIT_STAGE = {
   path: null,
   cachedScene: null,
   rebuildCadence: 0,
-  camOrbit: { az: -0.5, elv: 0.3, distFactor: 1.0 },
+  camOrbit: { az: 0, elv: 0.03, distFactor: 1.0 },
   keys: { w:false, a:false, s:false, d:false, space:false, drs:false },
   telemetryTab: "general",
   tabList: ["general", "friction", "suspension", "gmeter", "tires", "temp", "damage"],
@@ -2681,6 +2747,7 @@ function switchCircuitVehicle(type) {
 }
 
 function initCircuitStageEvents() {
+  bindCircuitStageCamAndLight();
   // 1. Telemetry Tab Pills
   const pills = document.querySelectorAll(".c-tel-pill");
   pills.forEach(p => {
@@ -4000,8 +4067,11 @@ function renderCircuitScene(st, tel, ctrl) {
   const carY_mm = st.Y * 1000;
   const carYaw = st.psi;
   
+  const isFormulaCam = (typeof S !== "undefined" && S && S.vehicleType === "formula");
   const CIRCUIT_CAMS = {
-    behind:  { dx: 0, dy: -8500, dz: 3600, lookDx: 0, lookDy: 2500, lookDz: 350, fov: 0.95 },
+    behind:  isFormulaCam
+      ? { dx: 0, dy: -5600, dz: 1580, lookDx: 0, lookDy: 2400, lookDz: 340, fov: 0.95 }
+      : { dx: 0, dy: -8500, dz: 3600, lookDx: 0, lookDy: 2500, lookDz: 350, fov: 0.95 },
     cockpit: { dx: 0, dy: 100, dz: 900, lookDx: 0, lookDy: 16000, lookDz: 800, fov: 0.58 },
     nose:    { dx: 0, dy: 2400, dz: 650, lookDx: 0, lookDy: 14000, lookDz: 100, fov: 0.70 },
     wheel:   { dx: 1750, dy: 1350, dz: 650, lookDx: 0, lookDy: 600, lookDz: 250, fov: 0.85 },
@@ -4565,60 +4635,79 @@ function renderCircuitScene(st, tel, ctrl) {
   const R21 = sY*cR + cY*sP*sR,  R22 = cY*cP,   R23 = sY*sR - cY*sP*cR;
   const R31 = -cP*sR,            R32 = sP,      R33 = cP*cR;
 
-  const projBodyFast = (lx, ly, lz) => {
-    return projFast(
-      R11*lx + R12*ly + R13*lz + cx,
-      R21*lx + R22*ly + R23*lz + cy,
-      R31*lx + R32*ly + R33*lz + cz
-    );
-  };
-  
-  if (CIRCUIT_STAGE.cachedScene) {
-    for(let i = 0; i < CIRCUIT_STAGE.cachedScene.length; i++){
-      const o = CIRCUIT_STAGE.cachedScene[i];
-      if(!o) continue;
-      if(o.k === "l"){
-        if(!o.a || !o.b) continue;
-        const A = projBodyFast(o.a[0], o.a[1], o.a[2]);
-        const B = projBodyFast(o.b[0], o.b[1], o.b[2]);
-        if(!A || !B) continue;
-        ctx.beginPath();
-        if(o.d && o.d.length) ctx.setLineDash(o.d); else ctx.setLineDash([]);
-        ctx.strokeStyle = o.c || "#58a6ff";
-        ctx.lineWidth = o.w || 1.2;
-        ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]);
-        ctx.stroke();
-      } else if(o.k === "p"){
-        if(!o.pts || o.pts.length < 2) continue;
-        ctx.beginPath();
-        if(o.d && o.d.length) ctx.setLineDash(o.d); else ctx.setLineDash([]);
-        let started = false;
-        for(let j = 0; j < o.pts.length; j++){
-          const Q = projBodyFast(o.pts[j][0], o.pts[j][1], o.pts[j][2]);
-          if(!Q){ started = false; continue; }
-          if(!started){ ctx.moveTo(Q[0], Q[1]); started = true; }
-          else ctx.lineTo(Q[0], Q[1]);
+  const glRendered = (typeof CAR3D_GL !== "undefined" && CAR3D_GL.isActiveForStage()) && CAR3D_GL.renderStageCar(ctx, {
+    w, h, dpr,
+    eye: [E_x, E_y, E_z],
+    rt, up, fw,
+    fovDist,
+    carPos: [cx, cy, cz],
+    R: [R11, R12, R13, R21, R22, R23, R31, R32, R33],
+    yaw: carYaw,
+    groundZ: 2,
+    sunDir: lightCfg.sunDir,
+    lightMode,
+    shadowAlpha: lightMode === "night" ? 0.30 : 0.48,
+    hideDriver: CIRCUIT_STAGE.camMode === "cockpit",
+    drs: !!(ctrl && (ctrl.drs || (ctrl.target && ctrl.target.isDRS))),
+    brakeIntensity: ctrl ? ctrl.brake : 0
+  });
+
+  if (!glRendered) {
+    const projBodyFast = (lx, ly, lz) => {
+      return projFast(
+        R11*lx + R12*ly + R13*lz + cx,
+        R21*lx + R22*ly + R23*lz + cy,
+        R31*lx + R32*ly + R33*lz + cz
+      );
+    };
+    
+    if (CIRCUIT_STAGE.cachedScene) {
+      for(let i = 0; i < CIRCUIT_STAGE.cachedScene.length; i++){
+        const o = CIRCUIT_STAGE.cachedScene[i];
+        if(!o) continue;
+        if(o.k === "l"){
+          if(!o.a || !o.b) continue;
+          const A = projBodyFast(o.a[0], o.a[1], o.a[2]);
+          const B = projBodyFast(o.b[0], o.b[1], o.b[2]);
+          if(!A || !B) continue;
+          ctx.beginPath();
+          if(o.d && o.d.length) ctx.setLineDash(o.d); else ctx.setLineDash([]);
+          ctx.strokeStyle = o.c || "#58a6ff";
+          ctx.lineWidth = o.w || 1.2;
+          ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]);
+          ctx.stroke();
+        } else if(o.k === "p"){
+          if(!o.pts || o.pts.length < 2) continue;
+          ctx.beginPath();
+          if(o.d && o.d.length) ctx.setLineDash(o.d); else ctx.setLineDash([]);
+          let started = false;
+          for(let j = 0; j < o.pts.length; j++){
+            const Q = projBodyFast(o.pts[j][0], o.pts[j][1], o.pts[j][2]);
+            if(!Q){ started = false; continue; }
+            if(!started){ ctx.moveTo(Q[0], Q[1]); started = true; }
+            else ctx.lineTo(Q[0], Q[1]);
+          }
+          if(o.f){ ctx.fillStyle = o.f; ctx.fill(); }
+          ctx.strokeStyle = o.c || "#58a6ff";
+          ctx.lineWidth = o.w || 1.2;
+          ctx.stroke();
+        } else if(o.k === "n"){
+          if(!o.p) continue;
+          const A = projBodyFast(o.p[0], o.p[1], o.p[2]);
+          if(!A) continue;
+          ctx.beginPath();
+          ctx.arc(A[0], A[1], 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = o.c || "#58a6ff";
+          ctx.fill();
         }
-        if(o.f){ ctx.fillStyle = o.f; ctx.fill(); }
-        ctx.strokeStyle = o.c || "#58a6ff";
-        ctx.lineWidth = o.w || 1.2;
-        ctx.stroke();
-      } else if(o.k === "n"){
-        if(!o.p) continue;
-        const A = projBodyFast(o.p[0], o.p[1], o.p[2]);
-        if(!A) continue;
-        ctx.beginPath();
-        ctx.arc(A[0], A[1], 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = o.c || "#58a6ff";
-        ctx.fill();
       }
+      ctx.setLineDash([]);
     }
-    ctx.setLineDash([]);
   }
 
   // 4. Draw Official FIA Shanghai International Circuit Telemetry Mini-Map
   if (path && path.pts) {
-    const mmW = 340, mmH = 265;
+    const mmW = 290, mmH = 225;
     const mmPad = 18;
     const mx = w - mmW - mmPad, my = h - mmH - mmPad;
     
@@ -5466,6 +5555,7 @@ initSkidpadStageEvents();
 initCircuitStageEvents();
 
 if(typeof loadVehiclePreset === 'function') loadVehiclePreset("formula");
+if(typeof CAR3D_GL !== 'undefined') CAR3D_GL.bindControls();
 buildLeft();
 buildRight();
 rebuild();

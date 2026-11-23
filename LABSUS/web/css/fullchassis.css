@@ -1983,5 +1983,39 @@ canvas.plot{display:block;width:100%;height:150px;background:var(--well);border:
   font-weight: 700;
 }
 
+/* ---------- 3D 实体建模外观与涂装控制条 ---------- */
+.car3d-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.car3d-swatches {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  background: var(--well, rgba(0, 0, 0, 0.35));
+  border: 1px solid var(--glass-bd, rgba(255, 255, 255, 0.12));
+  border-radius: var(--r-md, 6px);
+}
+.car3d-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.car3d-dot:hover {
+  transform: scale(1.18);
+}
+.car3d-dot.on {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 1.5px rgba(56, 139, 253, 0.9);
+  transform: scale(1.15);
+}
+
+
 
 

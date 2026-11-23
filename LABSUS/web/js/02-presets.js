@@ -293,6 +293,7 @@ function loadVehiclePreset(type) {
   if (typeof TIRE_LAB !== "undefined") TIRE_LAB.refreshPresetSelect();
   /* G31：换车型会重建下拉 DOM 内容 → 重挂自定义动力 optgroup（覆盖层不受车型影响） */
   if (typeof POWERTRAIN !== "undefined") POWERTRAIN.refreshPresetSelect();
+  if (typeof CAR3D_GL !== "undefined") CAR3D_GL.syncControlsUI();
 }
 
 function initData(){

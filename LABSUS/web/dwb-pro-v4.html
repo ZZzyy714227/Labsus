@@ -84,6 +84,21 @@
           <button data-vi="3">4 轴测</button>
         </div>
         <button class="v4-mini" id="v4QuadBtn" title="四宫格 / 单视口切换">▦ 四宫格</button>
+        <div id="v4Car3dTools" class="car3d-tools">
+          <div class="v4-seg" title="方程式 3D 渲染模式">
+            <button data-car3d-mode="solid" class="on">实体</button>
+            <button data-car3d-mode="xray">半透</button>
+            <button data-car3d-mode="wire">线框</button>
+          </div>
+          <div class="car3d-swatches" title="赛车涂装配色">
+            <button class="car3d-dot on" data-car3d-livery="green" style="background:#0e6b3a" title="竞速绿"></button>
+            <button class="car3d-dot" data-car3d-livery="red" style="background:#b91c1c" title="赛道红"></button>
+            <button class="car3d-dot" data-car3d-livery="blue" style="background:#1d4ed8" title="深海蓝"></button>
+            <button class="car3d-dot" data-car3d-livery="cyan" style="background:#0284c7" title="实验室青"></button>
+            <button class="car3d-dot" data-car3d-livery="pearl" style="background:#dbe3ec" title="钛银白"></button>
+            <button class="car3d-dot" data-car3d-livery="carbon" style="background:#1e242e" title="暗夜碳纤"></button>
+          </div>
+        </div>
         <div class="v4-sp"></div>
         <span id="v4VpTitle" style="font:500 10px var(--font-ui);color:var(--ink-2)">正视图 FRONT VIEW</span>
         <button class="v4-mini" id="v4FullBtn" title="舞台全屏">⛶ 全屏</button>
@@ -1039,11 +1054,13 @@
   </div>
 </div>
 
+<script src="vendor/three.min.js"></script>
 <script src="js/01-core.js"></script>
 <script src="js/02-presets.js"></script>
 <script src="js/03-mechanism.js"></script>
 <script src="js/04-dynamics.js"></script>
 <script src="js/05-scene3d.js"></script>
+<script src="js/05b-car3d-webgl.js"></script>
 <script src="js/06-ui-panels.js"></script>
 <script src="js/14-tire-lab.js"></script>
 <script src="js/07-plots.js"></script>

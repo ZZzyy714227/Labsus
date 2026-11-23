@@ -382,7 +382,7 @@ function buildBajaSpaceframe(sc, yF, yR){
     const R_LCA_R = [hR.LCA_R[0], hR.LCA_R[1] + yR, hR.LCA_R[2]], L_LCA_R = [-hR.LCA_R[0], hR.LCA_R[1] + yR, hR.LCA_R[2]];
 
     T(R_UCA_F, RHO_MR, 12, sfC); T(L_UCA_F, RHO_ML, 12, sfC);
-    T(R_LCA_F, RHO_BL, 14, sfC); T(L_LCA_F, RHO_BL, 14, sfC);
+    T(R_LCA_F, RHO_BR, 14, sfC); T(L_LCA_F, RHO_BL, 14, sfC);
     T(R_UCA_R, RR_TR, 12, sfC);  T(L_UCA_R, RR_TL, 12, sfC);
     T(R_LCA_R, RR_BR, 14, sfC);  T(L_LCA_R, RR_BL, 14, sfC);
 
@@ -1040,6 +1040,14 @@ function fitPoints(){
 function fitView(v){
   if(v.w<20||v.h<20){v.s=0.5;return;}   // 防初次布局竞态 (2026-08-24)
   const pts=fitPoints();
+  if((typeof CAR3D_GL!=="undefined" && CAR3D_GL.isActiveForView()) || (v.type==="p" && typeof S!=="undefined" && S && S.vehicleType==="formula")){
+    const yF = S.wb/2, yR = -S.wb/2;
+    if(v.type==="p"){
+      pts.push([-670, yF+585, 120], [670, yF+585, 120], [-560, yR-430, 1020], [560, yR-430, 1020]);
+    }else{
+      pts.push([-670, yF+520, 120], [670, yF+520, 120], [-560, yR-360, 980], [560, yR-360, 980]);
+    }
+  }
   /* M7（2026-09-20）：自适应必须计入"硬点之外的绘制量"。
      fitPoints() 只给硬点节点，而实际画出的是轮胎圆（半径 R）、减振柱、鱼眼球、
      尺寸标注线——它们会画到硬点云之外约一个轮胎半径。旧实现只按硬点云取景，
@@ -1290,7 +1298,60 @@ function drawView(v,sc){
   ctx.save(); ctx.fillStyle=C.bg; ctx.fillRect(0,0,v.w,v.h);
   ctx.lineJoin="round";ctx.lineCap="butt";
 
+  if(v.key==="iso" && typeof CAR3D_GL!=="undefined" && CAR3D_GL.isActiveForView() && CAR3D_GL.renderIso(v)){
+    const isXray = CAR3D_GL.CFG && CAR3D_GL.CFG.shellMode==="xray";
+    if(S.show.node){
+      for(let i=0;i<sc.length;i++){
+        const o=sc[i]; if(o.k!=="n")continue;
+        const sel=(UI.hover===o.id || UI.selHP===o.id) && S.axis===o.axis;
+        if(!isXray && !sel)continue;
+        const A=P2(v,o.p);if(!A)continue;
+        dash(ctx,[]);
+        ctx.fillStyle=C.bg;ctx.strokeStyle=sel?C.nodeSel:(o.fix?C.nodeFix:C.node);ctx.lineWidth=sel?1.8:1.2;
+        if(o.fix){ctx.beginPath();ctx.rect(A[0]-3.5,A[1]-3.5,7,7);ctx.fill();ctx.stroke();}
+        else{ctx.beginPath();ctx.arc(A[0],A[1],3.5,0,6.2832);ctx.fill();ctx.stroke();}
+        if(S.show.label&&sel){
+          ctx.fillStyle=C.nodeSel;ctx.font="8.5px ui-monospace,monospace";
+          ctx.fillText(o.id,A[0]+6,A[1]-5);
+        }
+      }
+    }
+    dash(ctx,[]);
+    drawHUD(v);
+    ctx.restore();
+    return;
+  }
+
   drawGrid(v);
+
+  if(v.type==="o" && typeof CAR3D_GL!=="undefined" && CAR3D_GL.isActiveForView() && CAR3D_GL.renderOrtho(v)){
+    for(let i=0;i<sc.length;i++){
+      const o=sc[i];
+      if(o.k==="l" && o.d){
+        const A=P2(v,o.a),B=P2(v,o.b);if(!A||!B)continue;
+        ctx.beginPath();dash(ctx,o.d);ctx.strokeStyle=o.c;ctx.lineWidth=o.w;
+        if(o.al!==undefined)ctx.globalAlpha=o.al;
+        ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();ctx.globalAlpha=1;
+      }else if(o.k==="n"){
+        const A=P2(v,o.p);if(!A)continue;
+        PICK.push({x:A[0],y:A[1],id:o.id,v:v,p:o.p,sx:o.sx||1,axis:o.axis});
+        const sel=(UI.hover===o.id || UI.selHP===o.id) && S.axis===o.axis;
+        dash(ctx,[]);
+        ctx.fillStyle=C.bg;ctx.strokeStyle=sel?C.nodeSel:(o.fix?C.nodeFix:C.node);ctx.lineWidth=sel?1.8:1.3;
+        if(o.fix){ctx.beginPath();ctx.rect(A[0]-3.5,A[1]-3.5,7,7);ctx.fill();ctx.stroke();}
+        else{ctx.beginPath();ctx.arc(A[0],A[1],3.5,0,6.2832);ctx.fill();ctx.stroke();}
+        if(S.show.label&&sel){
+          ctx.fillStyle=C.nodeSel;ctx.font="8.5px ui-monospace,monospace";
+          ctx.fillText(o.id,A[0]+6,A[1]-5);
+        }
+      }
+    }
+    dash(ctx,[]);
+    drawOverlay(v);
+    drawHUD(v);
+    ctx.restore();
+    return;
+  }
 
   for(let i=0;i<sc.length;i++){
     const o=sc[i];
