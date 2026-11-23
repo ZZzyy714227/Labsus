@@ -426,6 +426,7 @@ function openSlopeStage(){
     window.straightTestPath = new StraightPath(initSpeedMs, SLOPE_STAGE.scenario, cfg);
     window.slopePilot = new UniversalAutoPilot(S);
     window.slopePilot.setPath(window.straightTestPath);
+    window.slopePilot.eng = window.physicsEngine;
     window.slopePilot.active = true;
 
     SLOPE_STAGE.resetVehicle();
@@ -2729,10 +2730,10 @@ function switchCircuitVehicle(type) {
   
   CIRCUIT_STAGE.path = buildShanghaiCircuit(CIRCUIT_STAGE.mu, CIRCUIT_STAGE.aggressiveness);
   const p0 = CIRCUIT_STAGE.path && CIRCUIT_STAGE.path.pts ? CIRCUIT_STAGE.path.pts[0] : null;
-  const startHeading = p0 ? p0.heading : 0;
+  const startHeading = p0 ? (p0.refHeading !== undefined ? p0.refHeading : p0.heading) : 0;
   
   const startState = {
-    X: p0 ? p0.x : 0, Y: p0 ? p0.y : 0, Z: 0.0,
+    X: p0 ? (p0.refX !== undefined ? p0.refX : p0.x) : 0, Y: p0 ? (p0.refY !== undefined ? p0.refY : p0.y) : 0, Z: 0.0,
     phi: 0, theta: 0, psi: startHeading,
     u: 5.0, v: 0, w: 0,
     p: 0, q: 0, r: 0,
@@ -3322,10 +3323,10 @@ function openCircuitStage() {
     CIRCUIT_STAGE.rebuildCadence = 0;
 
     const p0 = CIRCUIT_STAGE.path && CIRCUIT_STAGE.path.pts ? CIRCUIT_STAGE.path.pts[0] : null;
-    const startHeading = p0 ? p0.heading : 0;
+    const startHeading = p0 ? (p0.refHeading !== undefined ? p0.refHeading : p0.heading) : 0;
 
     const startState = {
-      X: p0 ? p0.x : 0, Y: p0 ? p0.y : 0, Z: 0.0,
+      X: p0 ? (p0.refX !== undefined ? p0.refX : p0.x) : 0, Y: p0 ? (p0.refY !== undefined ? p0.refY : p0.y) : 0, Z: 0.0,
       phi: 0, theta: 0, psi: startHeading,
       u: 5.0, v: 0, w: 0,
       p: 0, q: 0, r: 0,

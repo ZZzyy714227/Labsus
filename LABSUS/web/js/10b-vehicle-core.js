@@ -151,9 +151,21 @@ class UniversalAutoPilot {
     const _beta = Math.atan2(_vv, Math.max(3.0, u));
     const _dynActive = (Math.abs(_r) > 1e-4 || Math.abs(_beta) > 1e-4);
 
-    // Speed-adaptive Stanley gain preserves convergence time across 50..300 km/h while staying exact at low speed
-    const K_LAT = _dynActive ? K_LAT_BASE * (1.0 + 0.012 * Math.max(0, u - 18.0)) : K_LAT_BASE;
-    const steer_fb = -e_heading - Math.atan2(K_LAT * safe_ey, Math.max(3.0, u));
+    // Track prolonged airborne flight (>0.09s) vs brief bump hops so jumps/moguls don't crank full steering in mid-air
+    const _dtStep = (typeof dt === "number" && isFinite(dt) && dt > 0) ? Math.min(0.05, dt) : 0.016;
+    if (this.eng && this.eng.telemetry && this.eng.telemetry.Fz) {
+      const fz = this.eng.telemetry.Fz;
+      const fzTotal = Math.max(0, fz.FL || 0) + Math.max(0, fz.FR || 0) + Math.max(0, fz.RL || 0) + Math.max(0, fz.RR || 0);
+      const mg = Math.max(300, (this.eng.m || 1000) * 9.81);
+      if (fzTotal < 0.08 * mg) {
+        this._airTime = (this._airTime || 0) + _dtStep;
+      } else {
+        this._airTime = 0;
+      }
+    } else {
+      this._airTime = 0;
+    }
+    const flightFade = (this._airTime > 0.09) ? Math.max(0.0, 1.0 - (this._airTime - 0.09) / 0.12) : 1.0;
 
     // Curvature preview + real-tire understeer gradient feedforward (K_us * u^2 * k) during live driving
     let kEff = target.targetCurvature || 0;
@@ -164,26 +176,40 @@ class UniversalAutoPilot {
         kEff = 0.50 * kEff + 0.50 * prevPt.targetCurvature;
       }
     }
+
+    // Bounded speed-adaptive Stanley gain + smooth straight-line merge cap (prevents full-lock spin at launch/respawn)
+    const K_LAT = _dynActive ? K_LAT_BASE * (1.0 + 0.006 * Math.max(0, Math.min(40.0, u - 18.0))) : K_LAT_BASE;
+    let stanleyTerm = Math.atan2(K_LAT * safe_ey, _dynActive ? Math.max(8.0, u) : Math.max(3.0, u));
+    if (_dynActive && Math.abs(kEff) < 0.004) {
+      const mergeMax = 0.28 * Math.min(1.0, Math.max(0.30, u / 10.0));
+      stanleyTerm = Math.max(-mergeMax, Math.min(mergeMax, stanleyTerm));
+    }
+    const steer_fb = -e_heading - stanleyTerm;
+
     const kUsFF = _dynActive ? 0.0038 : 0.0; // rad / (m/s^2) real front-tire slip feedforward
     const steer_ff = -Math.atan2(this.wb * kEff, 1.0) - kUsFF * (u * u * kEff);
     
     let raw_steer = (steer_fb + steer_ff) * (180.0 / Math.PI);
     raw_steer = Math.max(-28, Math.min(28, raw_steer));
 
-    // Yaw-rate stability damping + true countersteer (+beta sign catches tail slides before spinout)
+    // Zero-lag speed-scheduled yaw-rate damping (full authority over bumps at mid-speed, calm at 200+ km/h, faded in sustained flight)
     const _rTarget = u * kEff;
-    const kYaw = (typeof this.kYaw === 'number' && isFinite(this.kYaw)) ? this.kYaw : (_dynActive ? 0.14 : 0.04);
-    const kBeta = (typeof this.kBeta === 'number' && isFinite(this.kBeta)) ? this.kBeta : 0.55;
-    const yaw_deg = -(180.0 / Math.PI) * kYaw * (_rTarget - _r);
-    const _bEx = Math.max(0, Math.abs(_beta) - 2.5 * Math.PI / 180);
-    // Right-turn tail-out: v < 0 -> beta < 0 -> countersteer LEFT (< 0), SAME sign as beta!
-    const beta_deg = (_dynActive ? Math.sign(_beta) : 0) * (180.0 / Math.PI) * kBeta * _bEx;
+    const kYawBase = (typeof this.kYaw === 'number' && isFinite(this.kYaw)) ? this.kYaw : (_dynActive ? 0.13 : 0.04);
+    const kYaw = _dynActive ? (kYawBase / (1.0 + 0.008 * Math.max(0, u - 22.0))) : kYawBase;
+    const yaw_deg = -(180.0 / Math.PI) * kYaw * (_rTarget - _r) * flightFade;
+
+    // True countersteer: only when speed > 50 km/h, grounded, and yaw rate actively drives slide outward (_r * _beta > 0)
+    const kBeta = (typeof this.kBeta === 'number' && isFinite(this.kBeta)) ? this.kBeta : 0.45;
+    const _bEx = Math.max(0, Math.abs(_beta) - 3.0 * Math.PI / 180);
+    const isSpinOut = _dynActive && u > 14.0 && (_r * _beta > 0) && flightFade > 0.25;
+    const spinScale = isSpinOut ? Math.min(1.0, Math.abs(_r) / 0.12) * flightFade : 0;
+    const beta_deg = isSpinOut ? (Math.sign(_beta) * (180.0 / Math.PI) * kBeta * _bEx * spinScale) : 0;
     raw_steer = Math.max(-28, Math.min(28, raw_steer + yaw_deg + beta_deg));
 
-    // Pacejka Front-Slip-Angle Guard: prevent cranking front wheels past peak grip (~10.5 deg slip) into understeer washout
+    // Pacejka Front-Slip-Angle Guard (keeps full 10.5 deg on bumps; tightens only after >0.09s airborne flight so landing aligns cleanly)
     if (_dynActive && u > 12.0) {
       const zeroSlipDeg = Math.atan2(_vv - this.a * _r, Math.max(4.0, u)) * (180.0 / Math.PI);
-      const maxSlipDeg = 10.5;
+      const maxSlipDeg = 4.5 + 6.0 * flightFade;
       raw_steer = Math.max(-28, Math.min(28, Math.max(zeroSlipDeg - maxSlipDeg, Math.min(zeroSlipDeg + maxSlipDeg, raw_steer))));
     }
     this.last_beta = _beta;
@@ -191,7 +217,7 @@ class UniversalAutoPilot {
     this.last_r_err = _rTarget - _r;
     const _betaAbs = Math.abs(_beta);
     
-    // Rate limit steering responsive enough for countersteer catches (220 deg/s)
+    // Keep full 220 deg/s countersteer rate across all speeds so emergency high-speed catches never lag
     const max_steer_rate = 220.0; // deg/s
     const d_steer = Math.max(-max_steer_rate * dt, Math.min(max_steer_rate * dt, raw_steer - this.last_steer));
     let ctrl_steer = this.last_steer + d_steer;
