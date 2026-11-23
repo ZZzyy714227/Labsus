@@ -151,7 +151,8 @@ LABSUS/                           # 工程代码根
 │   │   ├── 23-long-bench.js      # 纵向加减速与制动台架（Brake-Bias / 纵倾）
 │   │   ├── 24-fsae-arena.js      # 大学生方程式动态赛场（75m 加速 / 八字绕环 / 单圈赛组合）
 │   │   ├── 25-full-report.js     # 一键全量分析与终极数据报告（K&C + 全台架 + FSAE + AI Markdown/JSON）
-│   │   └── 26-report-charts.js   # 报告图表层（chart spec → canvas → PNG，数据与绘图分离）
+│   │   ├── 26-report-charts.js   # 报告图表层（chart spec → canvas → PNG，数据与绘图分离）
+│   │   └── 27-report-package.js  # 标准交付层（自包含 HTML / ANALYSIS_V2 JSON / AI 提示词三件套）
 │   └── test/                     # 前端 32 套回归 + physics_audit + 双端对拍
 ├── engine/                       # Python FastAPI 数值计算引擎
 │   ├── server.py                 # FastAPI 入口服务 (:8001)

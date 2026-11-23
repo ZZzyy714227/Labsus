@@ -947,6 +947,7 @@
               <button class="fr-btn ai" id="frCopyAiBtn">🤖 复制 AI 完整提示词报告</button>
               <button class="fr-btn" id="frExportMdBtn">📄 导出 .md</button>
               <button class="fr-btn" id="frExportJsonBtn">📦 导出 .json</button>
+              <button class="fr-btn" id="frExportHtmlBtn">🖨 导出 HTML 报告</button>
               <button class="fr-btn cls" id="frCloseBtn">✖ 关闭</button>
             </div>
           </div>
@@ -968,6 +969,7 @@
       modal.querySelector("#frCopyAiBtn").onclick = () => copyMarkdown();
       modal.querySelector("#frExportMdBtn").onclick = () => downloadText("md");
       modal.querySelector("#frExportJsonBtn").onclick = () => downloadText("json");
+      modal.querySelector("#frExportHtmlBtn").onclick = () => downloadText("html");
       modal.querySelectorAll(".fr-tab").forEach(btn => {
         btn.onclick = () => {
           _activeTab = btn.dataset.frtab;
@@ -1071,25 +1073,48 @@
     if (modal) modal.classList.remove("show");
   }
 
+  /* 三件套（P2）：优先走 REPORT_PACKAGE（自包含 HTML / ANALYSIS_V2 / AI 提示词） */
+  function _pkg() {
+    if (!_lastReport) return null;
+    if (typeof REPORT_PACKAGE === "undefined" || typeof REPORT_PACKAGE.build !== "function") return null;
+    try { return REPORT_PACKAGE.build(_lastReport); } catch (e) { return null; }
+  }
+
   function copyMarkdown() {
-    if (!_lastReport || !_lastReport.markdown) return;
+    const pkg = _pkg();
+    const text = pkg ? pkg.markdown : (_lastReport && _lastReport.markdown);
+    if (!text) return;
     if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(_lastReport.markdown).then(() => {
-        updateModalProgress(100, "📋 已复制完整 AI 提示词报告到剪贴板！可直接粘贴给 AI");
+      navigator.clipboard.writeText(text).then(() => {
+        updateModalProgress(100, "📋 已复制 AI 提示词（" + (pkg ? "ANALYSIS_V2 三件套" : "旧版 Markdown") + "）到剪贴板");
       }).catch(() => {});
     }
   }
 
   function downloadText(ext) {
     if (!_lastReport || typeof document === "undefined") return;
-    const isJson = (ext === "json");
-    const clean = isJson ? Object.assign({}, _lastReport) : null;
-    if (clean) delete clean.markdown;
-    const content = isJson ? JSON.stringify(clean, null, 2) : (_lastReport.markdown || "");
-    const blob = new Blob([content], { type: isJson ? "application/json;charset=utf-8" : "text/markdown;charset=utf-8" });
+    const pkg = _pkg();
+    const isHtml = (ext === "html"), isJson = (ext === "json");
+    let content, mime, suffix = "";
+    if (isHtml) {
+      content = pkg ? pkg.html : "";
+      mime = "text/html;charset=utf-8";
+    } else if (isJson) {
+      if (pkg) { content = pkg.json; } else {
+        const clean = Object.assign({}, _lastReport); delete clean.markdown;
+        content = JSON.stringify(clean, null, 2);
+      }
+      mime = "application/json;charset=utf-8";
+    } else {
+      content = pkg ? pkg.markdown : (_lastReport.markdown || "");
+      mime = "text/markdown;charset=utf-8";
+    }
+    if (!content) return;
+    if (pkg && pkg.hash) suffix = "_" + pkg.hash;
+    const blob = new Blob([content], { type: mime });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `LABSUS_FullReport_${(_lastReport.vehicle && _lastReport.vehicle.vehicleType) || "car"}_${Date.now()}.${ext}`;
+    a.download = `LABSUS_FullReport_${(_lastReport.vehicle && _lastReport.vehicle.vehicleType) || "car"}${suffix}_${Date.now()}.${ext}`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1500);
   }

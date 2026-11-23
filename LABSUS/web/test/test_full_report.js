@@ -25,7 +25,8 @@ const { ctx } = loadStage([
   '23-long-bench.js',
   '24-fsae-arena.js',
   '26-report-charts.js',
-  '25-full-report.js'
+  '25-full-report.js',
+  '27-report-package.js'
 ]);
 
 (async () => {

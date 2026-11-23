@@ -151,7 +151,8 @@ LABSUS/                           # Engineering root
 │   │   ├── 23-long-bench.js      # Longitudinal accel & braking / Brake-Bias bench
 │   │   ├── 24-fsae-arena.js      # Formula Student dynamic arena (75m Accel / Fig-8 Skidpad / Autocross)
 │   │   ├── 25-full-report.js     # One-click full analysis & AI-ready Markdown/JSON ultimate report
-│   │   └── 26-report-charts.js   # Report chart layer (chart spec → canvas → PNG, data/plot separated)
+│   │   ├── 26-report-charts.js   # Report chart layer (chart spec → canvas → PNG, data/plot separated)
+│   │   └── 27-report-package.js  # Delivery layer (self-contained HTML / ANALYSIS_V2 JSON / AI prompt)
 │   └── test/                     # 32 regression suites + physics_audit + dual parity
 ├── engine/                       # Python FastAPI numerical engine
 │   ├── server.py                 # FastAPI server entry (:8001)
