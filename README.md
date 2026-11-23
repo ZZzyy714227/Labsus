@@ -146,7 +146,7 @@ node `vm` 无头沙箱（自带 DOM/Canvas stub），唯一跨语言的是 TPHYS
 cd LABSUS
 
 # ── 一条命令跑完全部门禁（推荐；退出码非零即失败）────────────────────
-python tools/gates/check_all.py           # 38 项：ruff / pytest / 30 套 node / 双对拍 / 溯源 / 文档 / 基线
+python tools/gates/check_all.py           # 40 项：ruff / pytest / 32 套 node / 双对拍 / 溯源 / 文档 / 基线
 python tools/gates/check_all.py --quick   # 5 项秒级检查（ruff / 角色审计 / 溯源 / 文档 / 基线）
 
 # ── Python 引擎：物理断言 / 门禁 / 契约守卫 / TPHYS & K&C 双端对拍 / 对抗应力 ──
@@ -159,9 +159,9 @@ pytest engine/tests -q                 # 359 passed / 1 skipped（skip = Optimum
 ruff check engine                      # All checks passed（配置见 pyproject.toml，规则 E/F/W/I）
 python scripts/sync_root_docs.py --check   # 根 ↔ LABSUS 的 README/LICENSE 逐字节一致
 
-# ── 前端防线（逐套件，共 30 套）─────────────────────────────────────────
-node web/test/test_dom.js              # 363 断言：薄壳结构 / 双端同构 / 已知 bug 回访
-node web/test/stage_boot_check.js      # 52 断言：模块加载顺序 / TDZ / 三舞台 20 帧无抛错
+# ── 前端防线（逐套件，共 32 套）─────────────────────────────────────────
+node web/test/test_dom.js              # 372 断言：薄壳结构 / 双端同构 / 已知 bug 回访
+node web/test/stage_boot_check.js      # 54 断言：模块加载顺序 / TDZ / 三舞台 20 帧无抛错
 node web/test/test_lap_15dof.js        # 23 断言：2 圈 5.45km 全闭环 + 6 项 powertrain parity
 node web/test/test_15dof_steady.js     # 18 断言：15-DOF 解析稳态锚 + kT 真源接线
 node web/test/test_powertrain.js       # 625 断言：七架构动力总成
@@ -232,8 +232,10 @@ LABSUS/                           # 工程代码根（下同）
 │   │   ├── 18-ride-bench.js      # 垂向 Ride 动力学测试台（阶跃/扫频/脉冲/随机路面）
 │   │   ├── 19-compare.js         # A/B 三层对比与受控定圆极限（静态/动态/赛道）
 │   │   ├── 20-lat-bench.js       # 横向与侧倾动力学测试台（解析侧倾梯度锚）
-│   │   └── 21-car-capability.js  # 车能力包络表（稳态加减速与过弯包络）
-│   └── test/                     # 前端 30 套回归 + physics_audit + 诊断工具
+│   │   ├── 21-car-capability.js  # 车能力包络表（稳态加减速与过弯包络）
+│   │   ├── 22-optimizer.js       # 正向硬点运动学优化器（多尺度有界寻优）
+│   │   └── 23-long-bench.js      # 纵向加减速与制动台架（Brake-Bias / 俯仰纵倾）
+│   └── test/                     # 前端 32 套回归 + physics_audit + 诊断工具
 ├── engine/                       # Python 高性能数值计算引擎
 │   ├── server.py                 # FastAPI 入口服务 (:8001)
 │   ├── src/                      # 求解器核心源码 (K&C/衬套/Pacejka/轮胎标定/瞬态)

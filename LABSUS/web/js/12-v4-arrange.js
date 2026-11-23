@@ -236,23 +236,57 @@ function v4InitThemePicker(){
    ============================================================ */
 /* tune 是 v4ArrangeLeft 的默认分支（见 :259 的三元），无需单独正则 —— M5 删除了
    全仓零引用的 V4_TUNE_T（同族 V4_ANA_T / V4_SET_T 在用，保留）。 */
-const V4_ANA_T=/引擎连接|整车底盘分析|动态驾驶测试|赛道动态遥测|4-Post|Baseline|轮胎实测标定|台架对拍|衬套刚度标定|灵敏度扫描|双参数交互|方案库/;
+const V4_ANA_T=/引擎连接|整车底盘分析|动态驾驶测试|赛道动态遥测|4-Post|Baseline|轮胎实测标定|台架对拍|衬套刚度标定|灵敏度扫描|双参数交互|方案库|纵动力学台架/;
 const V4_SET_T=/硬点永久保存|系统显示|实体着色|3D 空间硬点表|显示图层控制/;
 function v4ArrangeLeft(){
   const lp=document.getElementById("lp");if(!lp||lp.dataset.v4)return;lp.dataset.v4="1";
   const kids=[...lp.children];
   const bar=document.createElement("div");bar.className="v4-ltabs";
   const panes={};
+  let applyLSearch=function(){};
   [["tune","调校"],["analyze","分析"],["setup","配置"]].forEach(([k,lb])=>{
     const b=document.createElement("button");b.className="v4-ltab";b.dataset.pane=k;b.textContent=lb;
     b.onclick=()=>{V4.lpane=k;
       bar.querySelectorAll(".v4-ltab").forEach(x=>x.classList.toggle("on",x===b));
       Object.keys(panes).forEach(p=>panes[p].classList.toggle("on",p===k));
+      applyLSearch();
       try{localStorage.setItem("labsus-v4-lpane",k);}catch(e){}};
     bar.appendChild(b);
     const p=document.createElement("div");p.className="v4-pane";p.dataset.pane=k;panes[k]=p;
   });
-  lp.appendChild(bar);Object.keys(panes).forEach(k=>lp.appendChild(panes[k]));
+  const sRow=document.createElement("div");sRow.className="v4-lsearchrow";
+  const sInp=document.createElement("input");sInp.id="v4Lsearch";sInp.className="v4-lsearch";
+  sInp.type="search";sInp.placeholder="搜索参数（标题 / 标签）…";sInp.autocomplete="off";
+  const sClr=document.createElement("button");sClr.id="v4LsearchClr";sClr.type="button";sClr.textContent="×";sClr.title="清除搜索";
+  const noHit=document.createElement("div");noHit.className="v4-nohit";noHit.textContent="当前分类无匹配参数";
+  sRow.appendChild(sInp);sRow.appendChild(sClr);
+  lp.appendChild(bar);lp.appendChild(sRow);
+  Object.keys(panes).forEach(k=>lp.appendChild(panes[k]));
+  lp.appendChild(noHit);
+  applyLSearch=function(){
+    const q=(sInp.value||"").trim().toLowerCase();
+    sClr.classList.toggle("on",!!q);
+    const activePane=panes[V4.lpane];
+    if(!activePane)return;
+    let hits=0;
+    activePane.querySelectorAll(".sec").forEach(secEl=>{
+      if(!q){
+        secEl.style.display="";
+        secEl.classList.remove("v4-hit");
+        hits++;
+        return;
+      }
+      const txt=(secEl.textContent||"").toLowerCase();
+      const matched=txt.indexOf(q)>=0;
+      secEl.style.display=matched?"":"none";
+      secEl.classList.toggle("v4-hit",matched);
+      if(matched){secEl.classList.remove("col");hits++;}
+    });
+    if(!q) v4RestoreAccordions(lp);
+    noHit.classList.toggle("on",!!q && hits===0);
+  };
+  sInp.oninput=applyLSearch;
+  sClr.onclick=()=>{sInp.value="";applyLSearch();sInp.focus();};
   kids.forEach(el=>{
     if(el.classList.contains("sec")){
       const zh=el.querySelector(".sh .zh");

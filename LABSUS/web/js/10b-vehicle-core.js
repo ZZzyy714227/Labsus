@@ -971,7 +971,8 @@ class VehicleDynamics15DOF {
     // P2b：压缩侧系数随同轴 liveTune 阻尼比例同乘（c_f/c_r_pct 是轴级调校）
     const CwB_F_eff = this.CwB_F * cfScale;
     const CwB_R_eff = this.CwB_R * crScale;
-    const bbias_eff = (liveTune && liveTune.bbias != null) ? (liveTune.bbias / 100.0) : 0.58;
+    const bbias_eff = (ctrl && ctrl.brakeBias != null) ? ctrl.brakeBias
+      : ((liveTune && liveTune.bbias != null) ? (liveTune.bbias / 100.0) : 0.58);
     const rideOffset = (liveTune && liveTune.ride_height_mm != null) ? (liveTune.ride_height_mm / 1000.0) : 0.0;
     const mu_eff = (typeof CIRCUIT_STAGE !== 'undefined' && CIRCUIT_STAGE.mu) ? CIRCUIT_STAGE.mu : 1.35;
 

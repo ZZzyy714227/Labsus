@@ -146,7 +146,7 @@ DOM/Canvas stubs; only the TPHYS parity check is cross-language:
 cd LABSUS
 
 # ── One command for every gate (recommended; non-zero exit = failure) ───
-python tools/gates/check_all.py           # 38 checks: ruff / pytest / 30 node suites / dual parity / provenance / docs / baselines
+python tools/gates/check_all.py           # 40 checks: ruff / pytest / 32 node suites / dual parity / provenance / docs / baselines
 python tools/gates/check_all.py --quick   # 5 sub-second checks (ruff / module-roles / provenance / docs / baselines)
 
 # ── Python engine: physics assertions / gates / API-contract guard / TPHYS & K&C parity / stress ──
@@ -159,9 +159,9 @@ pytest engine/tests -q                 # 359 passed / 1 skipped (skip = OptimumK
 ruff check engine                      # All checks passed (config in pyproject.toml, rules E/F/W/I)
 python scripts/sync_root_docs.py --check   # root <-> LABSUS README/LICENSE byte-identical
 
-# ── Frontend defense lines (per suite, 30 suites total) ─────────────────
-node web/test/test_dom.js              # 363 assertions: shell structure / dual-entry parity / bug regressions
-node web/test/stage_boot_check.js      # 52 assertions: module order / TDZ / 3 stages x 20 frames
+# ── Frontend defense lines (per suite, 32 suites total) ─────────────────
+node web/test/test_dom.js              # 372 assertions: shell structure / dual-entry parity / bug regressions
+node web/test/stage_boot_check.js      # 54 assertions: module order / TDZ / 3 stages x 20 frames
 node web/test/test_lap_15dof.js        # 23 assertions: 2 laps of 5.45 km + 6 powertrain parity checks
 node web/test/test_15dof_steady.js     # 18 assertions: analytic steady-state anchors + kT source wiring
 node web/test/test_powertrain.js       # 625 assertions (7 powertrain architectures)
@@ -240,8 +240,10 @@ LABSUS/                           # Engineering Root Directory
 │   │   ├── 18-ride-bench.js      # Vertical ride bench (step / sweep / impulse / ISO road)
 │   │   ├── 19-compare.js         # A/B 3-layer compare & controlled skidpad limit (P29)
 │   │   ├── 20-lat-bench.js       # Lateral & roll dynamics bench (analytic roll-gradient anchor)
-│   │   └── 21-car-capability.js  # Vehicle capability envelope table (steady accel / braking / lateral)
-│   └── test/                     # 30 regression suites + physics_audit + diagnostics
+│   │   ├── 21-car-capability.js  # Vehicle capability envelope table (steady accel / braking / lateral)
+│   │   ├── 22-optimizer.js       # Kinematic hardpoint optimizer (bounded multi-scale coordinate descent)
+│   │   └── 23-long-bench.js      # Longitudinal accel & braking bench (Brake-Bias / pitch inertia)
+│   └── test/                     # 32 regression suites + physics_audit + diagnostics
 ├── engine/                       # High-Performance Python Numerical Engine
 │   ├── server.py                 # FastAPI server entry (:8001)
 │   ├── src/                      # Solvers (K&C / Bushing / Pacejka / Tire Fit / Transient)

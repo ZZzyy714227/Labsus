@@ -574,6 +574,27 @@ require('./test_tire_wiring')(webDir, ok, failures.push.bind(failures), { log(){
     'ui-panels: DISPLAY LAYERS 暴露 force 图层开关');
 }
 
+// ── Stage 3 & Stage 4 模块 · 搜索 · 反馈 · 手册浮窗断言 ──
+{
+  const fcHtml = fs.readFileSync(path.join(__dirname, '..', 'dwb-pro-fullchassis.html'), 'utf8');
+  const v4Html = fs.readFileSync(path.join(__dirname, '..', 'dwb-pro-v4.html'), 'utf8');
+  const arrSrc = fs.readFileSync(path.join(__dirname, '..', 'js', '12-v4-arrange.js'), 'utf8');
+  const uiSrc = fs.readFileSync(path.join(__dirname, '..', 'js', '06-ui-panels.js'), 'utf8');
+  const cssSrc = fs.readFileSync(path.join(__dirname, '..', 'css', 'fullchassis.css'), 'utf8');
+  const v4Css = fs.readFileSync(path.join(__dirname, '..', 'css', 'v4.css'), 'utf8');
+
+  ok(fcHtml.includes('22-optimizer.js') && v4Html.includes('22-optimizer.js'),
+    'Stage 4: 22-optimizer.js 已在双 HTML 入口引入');
+  ok(fcHtml.includes('23-long-bench.js') && v4Html.includes('23-long-bench.js'),
+    'Stage 4: 23-long-bench.js 已在双 HTML 入口引入');
+  ok(/id="v4Lsearch"/.test(arrSrc) && !/🔍/.test(arrSrc) && /\.v4-lsearch/.test(v4Css),
+    'Stage 4: 左栏参数搜索 #v4Lsearch（无 emoji）与样式在位');
+  ok(/just-chg/.test(uiSrc) && /\.ctl\.just-chg>label/.test(cssSrc),
+    'Stage 4: 滑条修改 just-chg 瞬态高亮反馈在位');
+  ok(/const KPI_HINTS=/.test(uiSrc) && /classList|kpi-q/.test(uiSrc) && /\.kpi-tip/.test(cssSrc),
+    'Stage 4: KPI 手册速查浮窗 [?] 在位');
+}
+
 // ── 结果（必须在所有断言之后，见文件中部 M10b 注释）──────────────────────
 if (failures.length) {
   console.error(`DOM/结构测试 FAIL：${failures.length}/${checks} 项失败`);

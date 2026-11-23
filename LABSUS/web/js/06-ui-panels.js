@@ -32,13 +32,24 @@ function rowSlider(b,zh,en,unit,min,max,step,get,set,dec){
   const sl=E("input");sl.type="range";sl.min=min;sl.max=max;sl.step=step;
   const nb=E("input");nb.type="number";nb.step=step;
   r.appendChild(sl);r.appendChild(nb);b.appendChild(r);
-  const push=v=>{set(clamp(parseFloat(v),typeof min==="function"?min():min,typeof max==="function"?max():max));};
+  const flash=()=>{
+    r.classList.add("just-chg");
+    clearTimeout(r._chgT);
+    r._chgT=setTimeout(()=>r.classList.remove("just-chg"),1200);
+  };
+  const push=v=>{
+    const lo=typeof min==="function"?min():min, hi=typeof max==="function"?max():max;
+    set(clamp(parseFloat(v),lo,hi));
+    flash();
+  };
   sl.oninput=()=>push(sl.value);
   nb.onchange=()=>push(nb.value);
   nb.oninput=()=>{if(nb.value!=="")push(nb.value);};
   UI.sync.push(()=>{
     const v=get();
-    sl.min=typeof min==="function"?min():min;sl.max=typeof max==="function"?max():max;
+    const lo=typeof min==="function"?min():min, hi=typeof max==="function"?max():max;
+    sl.min=lo;sl.max=hi;
+    sl.title="范围 ["+fmt(lo,dec===undefined?1:dec)+" ~ "+fmt(hi,dec===undefined?1:dec)+"]"+(unit?" "+unit:"");
     if(document.activeElement!==sl)sl.value=v;
     if(document.activeElement!==nb)nb.value=fmt(v,dec===undefined?1:dec);
   });
@@ -61,9 +72,40 @@ function chkList(b,items){
   });
   b.appendChild(g);
 }
+const KPI_HINTS={
+  roCG:"手册 ch05 · 外倾角增益（-0.7~-1.2 °/25mm）：压下车轮时负外倾增加补偿车身侧倾；上调 UCA 内点或降低 UCA 倾角可抑制过度增益。",
+  roBS:"手册 ch05 · 跳动转向（|BS|<0.15 °/25mm）：横拉杆随动面与上下摆臂瞬心交会偏离所致；调节 RACK_Z 或 TRO_Z 使其与摆臂平面对齐即可消除。",
+  roRC:"手册 ch11 · 侧倾中心高度（前 15~55mm / 后 30~80mm）：决定几何抗侧倾力矩分配；过低增大弹性侧倾，过高加剧 Jacking 抬升效应。",
+  roAnti:"手册 ch02 · 抗点头/抗下蹲率：前轴用接地点→SVIC（制动）；后轴用轮心→SVIC 乘以 POWERTRAIN 后驱比（加速），过大 (>50%) 易在制动/开油凹凸引发悬架干涉。",
+  roAck:"手册 ch09 · 阿克曼率（赛道车常用 30%~65%）：由主销后倾投影与转向臂 RACK→TRO 三角偏角决定，调大 RACK_Y 前置量或内移 TRO_X 可改变大小角差。",
+  roArbSh:"手册 ch11 · 稳定杆侧倾刚度占比（推荐 25%~45%）：控制前后 TLLTD 横向载荷转移分配，前占比↑→不足转向↑；支持空心壁厚 arb.wall。",
+  roUsGrad:"手册 ch12 · 不足转向梯度（+1~+3 °/g 稳态中性微不足转向）：综合前后轮胎侧偏差与侧倾转向/柔度转向，>0 为不足转向，<0 存在转向过度风险。",
+  roQsRollGrad:"手册 ch12 · 整车侧倾梯度（Formula <0.8 °/g，GT3 <1.6 °/g）：由簧载侧倾力臂与总侧倾刚度比决定，调硬主弹簧 kS 或 ARB 直径可抑制。",
+  roWarp:"手册 ch24 · 四角模态翘曲刚度：斜对角交叉受力能力，受前后轮端垂向刚度与稳定杆主导；过高会削弱高低路面的抓地随动。",
+  roCompSteer:"手册 ch24 · 等效柔度转向：由 3D 衬套刚度矩阵（或标定 SIM.bushCalib）与六连杆静力平衡派生，增大纵向/外倾柔度会提升不足转向裕度。",
+};
 function ro(b,zh,en,unit,id,cls){
   const r=E("div","ro"+(cls?" "+cls:""));
-  r.appendChild(EH("span",null,zh+' <u>'+en+'</u>'));
+  const tipText=KPI_HINTS[id];
+  let sp;
+  if(tipText){
+    r.classList.add("has-tip");
+    sp=E("span",null);
+    sp.appendChild(EH("span","ro-lbl",zh+' <u>'+en+'</u>'));
+    const q=E("button","kpi-q","?");
+    q.type="button";q.title=tipText;
+    q.onclick=ev=>{
+      ev.stopPropagation();
+      let tip=r.querySelector(".kpi-tip");
+      if(tip){tip.remove();q.classList.remove("on");return;}
+      tip=E("div","kpi-tip",tipText);
+      r.appendChild(tip);q.classList.add("on");
+    };
+    sp.appendChild(q);
+  }else{
+    sp=EH("span",null,zh+' <u>'+en+'</u>');
+  }
+  r.appendChild(sp);
   const v=E("b",null,"--");r.appendChild(v);
   r.appendChild(E("i",null,unit||""));
   b.appendChild(r);UI.ro[id]=v;return v;
@@ -143,10 +185,13 @@ function buildLeft(){
   rowSlider(b,"主弹簧刚度","SPRING RATE","N/mm",40,300,5,()=>S[S.axis].kS,v=>{S[S.axis].kS=v;refreshDerived(false);},0);
   rowSlider(b,"压缩阻尼系数","BUMP DAMP","N·s/mm",1,30,0.5,()=>S[S.axis].cB,v=>S[S.axis].cB=v,1);
   rowSlider(b,"复原阻尼系数","REB DAMP","N·s/mm",1,40,0.5,()=>S[S.axis].cR,v=>S[S.axis].cR=v,1);
-  if(typeof damperForce4Q==="function"){
+  if(true){
     const dqChk=EH("div","chk",'<i></i><span>四象限非线表阻尼 (4Q Table)</span>');
     dqChk.style.margin="2px 10px 4px";
-    dqChk.onclick=()=>{SIM.damperTableOn=!SIM.damperTableOn;if(SIM.clickC==null)SIM.clickC=5;if(SIM.clickR==null)SIM.clickR=7;};
+    dqChk.onclick=()=>{
+      if(typeof damperForce4Q!=="function")return;
+      SIM.damperTableOn=!SIM.damperTableOn;if(SIM.clickC==null)SIM.clickC=5;if(SIM.clickR==null)SIM.clickR=7;
+    };
     UI.sync.push(()=>dqChk.classList.toggle("on",!!SIM.damperTableOn));
     b.appendChild(dqChk);
     rowSlider(b,"压缩挡位","COMP CLICK","clk",0,11,1,()=>SIM.clickC!=null?SIM.clickC:5,v=>{SIM.clickC=Math.round(v);},0);
@@ -161,6 +206,45 @@ function buildLeft(){
   rowSlider(b,"稳定杆连杆位置比","ARB LINK POS","-",0.25,0.92,0.01,()=>S[S.axis].arb.t,v=>{S[S.axis].arb.t=v;SIM.dirtySweep=true;},2);
   rowSlider(b,"稳定杆纵向偏置","ARB OFFSET Y","mm",-60,180,2,()=>S[S.axis].arb.dy,v=>{S[S.axis].arb.dy=v;SIM.dirtySweep=true;},0);
   rowSlider(b,"稳定杆高度偏置","ARB OFFSET Z","mm",40,300,2,()=>S[S.axis].arb.dz,v=>{S[S.axis].arb.dz=v;SIM.dirtySweep=true;},0);
+
+  {
+    const bo=sec(host,"硬点运动学优化","KINEMATIC OPTIMIZER",true,"purp");
+    const optOut=E("div","eng-status"); optOut.id="optOut";
+    optOut.textContent="给定目标 Roll Center 与 Camber Gain，在边界内坐标轮换消除 Bump Steer。";
+    bo.appendChild(optOut);
+    let tgtRc=null, tgtCg=null, boundMm=15;
+    rowSlider(bo,"最大硬点变动界","OPT BOUND","mm",3,25,1,()=>boundMm,v=>{boundMm=Math.round(v);},0);
+    rowSlider(bo,"目标侧倾中心高","TARGET RC H","mm",-20,100,2,()=>tgtRc!=null?tgtRc:(SIM.mFR&&SIM.mFR.rcH!=null?SIM.mFR.rcH:30),v=>{tgtRc=v;},0);
+    rowSlider(bo,"目标外倾角增益","TARGET CAM GAIN","°/25",-2.0,0.0,0.05,()=>tgtCg!=null?tgtCg:-0.9,v=>{tgtCg=v;},2);
+    rowBtns(bo,[
+      ["寻优 OPTIMIZE",()=>{
+        if(typeof OPTIMIZER==="undefined"){optOut.textContent="OPTIMIZER 未加载";return;}
+        const ax=S.axis||"front";
+        const curCg=(SIM.swF&&ax==="front"?sampleSweep(SIM.swF,0,"cg"):null);
+        const rcT=(tgtRc!=null)?tgtRc:(S[ax]&&SIM.mFR&&SIM.mFR.rcH!=null?SIM.mFR.rcH:30);
+        const cgT=(tgtCg!=null)?tgtCg:(curCg!=null&&isFinite(curCg)?curCg:-0.9);
+        const res=OPTIMIZER.optimize({axis:ax,boundMm:boundMm,target:{bs:0,rcH:rcT,cg:cgT}});
+        if(!res.ok){optOut.textContent="寻优失败："+(res.reason||"几何约束不合法");return;}
+        const dStr=Object.entries(res.deltas).filter(([,v])=>Math.abs(v)>=0.05).map(([k,v])=>k+(v>=0?"+":"")+v.toFixed(1)).join(" ");
+        optOut.textContent=`[${ax}] BS ${res.initial.bs.toFixed(3)}→${res.best.bs.toFixed(3)}° · RC ${res.initial.rcH0.toFixed(1)}→${res.best.rcH0.toFixed(1)}mm · (${res.evals}次/${res.elapsedMs}ms) ${dStr}`;
+        if(typeof rebuild==="function") rebuild();
+      },null,"hl"],
+      ["还原 UNDO",()=>{
+        if(typeof OPTIMIZER==="undefined")return;
+        const r=OPTIMIZER.getLastResult();
+        if(r&&r.baselineSnap&&OPTIMIZER.restoreSnapshot(r.baselineSnap)){
+          optOut.textContent="已还原寻优前硬点坐标。";
+          if(typeof rebuild==="function") rebuild();
+        }
+      }],
+      ["存方案 SAVE",()=>{
+        if(typeof OPTIMIZER==="undefined")return;
+        const r=OPTIMIZER.saveToSetup();
+        optOut.textContent=r&&r.ok?("已保存："+r.msg):"保存方案失败";
+        if(typeof renderSetupPanel==="function") renderSetupPanel();
+      }]
+    ]);
+  }
 
   b=sec(host,"准静态操稳工况输入","QUASI-STATIC",true,"amb");
   rowSlider(b,"侧向加速度","LATERAL ACC","g",-1.8,1.8,0.05,()=>S.qs.gy,v=>{S.qs.gy=v;simulate(0.016);},2);
@@ -413,6 +497,58 @@ function buildLeft(){
         {name:"超调", value:m.overshootPct.toFixed(1)+" %", anchor:"—", err:"—"}
       ]);
       latOut.textContent=`14 m/s / 4° 阶跃：yaw 稳态 ${m.yawRateSS.toFixed(4)} rad/s · 上升 ${m.riseTimeMs.toFixed(0)} ms · 超调 ${m.overshootPct.toFixed(1)}%`;
+    },10);}]
+  ]);
+
+  b=sec(host,"纵动力学台架","LONGITUDINAL BENCH",true);
+  const longOut=E("div","eng-status"); longOut.id="longOut";
+  longOut.textContent="开启 15-DOF 俯仰惯量耦合（pitchInertia），实测 75m 起步加速、100→0 制动与 Brake-Bias 抱死扫掠。";
+  b.appendChild(longOut);
+  const longTbl=E("table","hp"); longTbl.id="longTbl"; b.appendChild(longTbl);
+  const renderLong=(cols,rows)=>{
+    longTbl.textContent="";
+    const hd=E("thead"), hr=E("tr");
+    cols.forEach(c=>hr.appendChild(E("th",null,c)));
+    hd.appendChild(hr); longTbl.appendChild(hd);
+    const bd=E("tbody");
+    rows.forEach(r=>{const tr=E("tr");r.forEach(c=>tr.appendChild(E("td",null,String(c))));bd.appendChild(tr);});
+    longTbl.appendChild(bd);
+  };
+  rowBtns(b,[
+    ["75m 起步加速",()=>{ setTimeout(()=>{
+      if(typeof LONG_BENCH==="undefined"){longOut.textContent="LONG_BENCH 未加载";return;}
+      const r=LONG_BENCH.accelTest({distM:75});
+      renderLong(["指标","实测值"],[
+        ["75m 用时",r.timeSec.toFixed(3)+" s"],
+        ["撞线尾速",r.vEndKmh.toFixed(1)+" km/h"],
+        ["峰值纵向加速",r.peakAxG.toFixed(3)+" g"],
+        ["最大抬头 Squat",r.maxSquatDeg.toFixed(3)+" °"],
+        ["前轴载荷转移减少",r.frontLoadDropN.toFixed(0)+" N"],
+      ]);
+      longOut.textContent=`75m 起步：${r.timeSec.toFixed(3)} s · 尾速 ${r.vEndKmh.toFixed(1)} km/h · 抬头 ${r.maxSquatDeg.toFixed(2)}°`;
+    },10);}],
+    ["100→0 制动",()=>{ setTimeout(()=>{
+      if(typeof LONG_BENCH==="undefined"){longOut.textContent="LONG_BENCH 未加载";return;}
+      const r=LONG_BENCH.brakeTest({vStartKmh:100,pedal:0.9,brakeBias:S.brkF||0.62});
+      renderLong(["指标","实测值"],[
+        ["制动距离 (100→0)",r.stopDistM.toFixed(2)+" m"],
+        ["制动时间",r.stopTimeSec.toFixed(3)+" s"],
+        ["峰值减速度",r.peakDecelG.toFixed(3)+" g"],
+        ["最大点头 Dive",r.maxDiveDeg.toFixed(3)+" °"],
+        ["先抱死轴",r.firstLockup||"无抱死"],
+      ]);
+      longOut.textContent=`100→0 km/h (Bias ${(r.brakeBias*100).toFixed(0)}%)：${r.stopDistM.toFixed(2)} m · ${r.peakDecelG.toFixed(2)} g · 点头 ${r.maxDiveDeg.toFixed(2)}°`;
+    },10);}],
+    ["Bias 扫掠",()=>{ setTimeout(()=>{
+      if(typeof LONG_BENCH==="undefined"){longOut.textContent="LONG_BENCH 未加载";return;}
+      const sw=LONG_BENCH.brakeBiasSweep({vStartKmh:100,pedal:0.9});
+      renderLong(["Bias","刹距","峰值g","抱死"],sw.points.map(p=>[
+        (p.brakeBias*100).toFixed(0)+"%",
+        p.stopDistM.toFixed(2)+"m",
+        p.peakDecelG.toFixed(2),
+        p.firstLockup||"无"
+      ]));
+      longOut.textContent=`安全最优 Brake Bias ${(sw.bestBias*100).toFixed(0)}% → 刹距 ${sw.safeBestDistM.toFixed(2)} m`;
     },10);}]
   ]);
 

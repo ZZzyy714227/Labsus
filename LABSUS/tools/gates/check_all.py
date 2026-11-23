@@ -71,6 +71,9 @@ NODE_SUITES = (
     # P29（2026-11-20）：车能力表——速度包络改由 15-DOF 实测（opt-in，默认逐位不变）。
     # 锁定能力实测合理性 / 气动 v² 项 / 剖面不变量 / 确定性 / opt-in 边界 / 几何敏感性。
     "test_car_capability.js",
+    # Stage 4（2026-11-23）：正向硬点运动学优化器（多尺度坐标轮换）& 纵向加减速/制动台架。
+    "test_optimizer.js",
+    "test_long_bench.js",
     # P1-1：physics_audit 57 项进回归。实测物理结果逐位确定，只有性能计时浮动，
     # 故以 --ci 模式跳过 2 项环境敏感的性能阈值断言（见该文件头部说明）。
     "physics_audit.js",
