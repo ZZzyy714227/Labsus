@@ -146,8 +146,8 @@ DOM/Canvas stubs; only the TPHYS parity check is cross-language:
 cd LABSUS
 
 # ── One command for every gate (recommended; non-zero exit = failure) ───
-python tools/gates/check_all.py           # 29 checks: ruff / pytest / 24 node suites / parity / provenance / docs
-python tools/gates/check_all.py --quick   # 3 sub-second checks (ruff / provenance / docs)
+python tools/gates/check_all.py           # 37 checks: ruff / pytest / 30 node suites / parity / provenance / docs / baselines
+python tools/gates/check_all.py --quick   # 5 sub-second checks (ruff / module-roles / provenance / docs / baselines)
 
 # ── Python engine: physics assertions / gates / API-contract guard / TPHYS parity / stress ──
 pytest engine/tests -q                 # 345 passed / 1 skipped (skip = OptimumK rows not entered, explicit)
@@ -159,9 +159,9 @@ pytest engine/tests -q                 # 345 passed / 1 skipped (skip = OptimumK
 ruff check engine                      # All checks passed (config in pyproject.toml, rules E/F/W/I)
 python scripts/sync_root_docs.py --check   # root <-> LABSUS README/LICENSE byte-identical
 
-# ── Frontend defense lines (per suite) ──────────────────────────────────
-node web/test/test_dom.js              # 356 assertions: shell structure / dual-entry parity / bug regressions
-node web/test/stage_boot_check.js      # 50 assertions: module order / TDZ / 3 stages x 20 frames
+# ── Frontend defense lines (per suite, 30 suites total) ─────────────────
+node web/test/test_dom.js              # 359 assertions: shell structure / dual-entry parity / bug regressions
+node web/test/stage_boot_check.js      # 52 assertions: module order / TDZ / 3 stages x 20 frames
 node web/test/test_lap_15dof.js        # 23 assertions: 2 laps of 5.45 km + 6 powertrain parity checks
 node web/test/test_15dof_steady.js     # 18 assertions: analytic steady-state anchors + kT source wiring
 node web/test/test_powertrain.js       # 625 assertions (7 powertrain architectures)
@@ -169,18 +169,20 @@ node web/test/test_tire_lab.js         # 70 · test_tire_wiring.js 36 · proving
 node web/test/test_racingline.js       # 30 · test_kc_wiring.js 25
 node web/test/undulating_road_test.js  # 21 · test_mpc.js 19 · test_p2b_damper.js 28 (incl. 4Q damper table)
 node web/test/test_p2a_aero.js         # 14 · test_circuit_ui.js 100% (64 ids + 22 classes)
-node web/test/test_ride_bench.js       # 17: step/sweep/impulse/random + repeatability + analytic anchor
+node web/test/test_ride_bench.js       # 21: step/sweep/impulse/random + repeatability + analytic anchor
 node web/test/test_compare.js          # 27: three-layer compare + controlled skidpad limit (P29)
 node web/test/test_lat_bench.js        # 20: roll/lateral bench + roll-angle analytic anchor
-node web/test/test_tire_parity.js      # 7: K1 vs K3 tire parity (P18, gap 10/9 quantified)
-node web/test/test_compliance_steer.js # 12: compliance steer into transient (P27)
+node web/test/test_tire_parity.js      # 11: K1 vs K3 tire parity (P18)
+node web/test/test_compliance_steer.js # 11: compliance steer into transient (P27)
 node web/test/test_load_transfer.js    # 20: longitudinal load transfer vs m*ax*h/wb
 node web/test/test_stability_audit.js  # 24: dt convergence + stiffness sweep (no NaN)
+node web/test/test_config_contract.js  # 15: S.* config read/write contract
+node web/test/test_car_capability.js   # 15: CAR_CAPABILITY monotonic envelope
 
 # ── Cross-language physics parity (JS TPHYS <-> Python transient, 5% threshold) ──
 node web/test/tphys_parity.cjs         # measured worst 0.51%
 
-# ── Physics audit (60 checks, **in the CI regression**; --ci skips 2 timing thresholds) ──
+# ── Physics audit（60 checks, **in CI regression**; --ci skips 2 timing thresholds）──
 node web/test/physics_audit.js         # inertia identities / energy / step convergence / Ackermann / ISO road / wheel DOF / collision
 
 # ── Diagnostic tools (not part of the regression) ───────────────────────
@@ -188,7 +190,7 @@ node web/test/preset_balance_sweep.cjs # preset balance sweep (US / TLLTD vs spr
 node web/test/mpc_diag_g30.cjs         # MPC tuning diagnostics · mpc_calib_g30.cjs calibration grid
 ```
 
-> Numbers reflect the current workspace (**baseline 2026-10-31**). After frontend edits run at
+> Numbers reflect the current workspace (**baseline 2026-11-23**). After frontend edits run at
 > least `test_dom` + `stage_boot_check`; after engine edits run `pytest engine/tests` +
 > `ruff check engine`; after touching TPHYS/inlined physics run `tphys_parity.cjs`.
 > When numbers change, update this section together with DEVLOG.
@@ -210,13 +212,17 @@ LABSUS/                           # Engineering Root Directory
 │   ├── dwb-pro-fullchassis.html  # Modular Workbench (Thin shell + css/ + js/)
 │   ├── dwb-pro-allinone.html     # Zero-dependency single-file bundle
 │   ├── css/
-│   │   └── fullchassis.css       # Modular dark/light instrument CSS design system
+│   │   ├── fullchassis.css       # Modular dark/light instrument CSS design system
+│   │   └── v4.css                # V4 workbench layout & theme design tokens
+│   ├── vendor/                   # Vendored offline libraries
+│   │   └── three.min.js          # Three.js r147 offline WebGL kernel
 │   ├── js/                       # Core frontend domain modules (loaded in order)
 │   │   ├── 01-core.js            # Math utilities / state management / matrix ops
 │   │   ├── 02-presets.js         # Vehicle presets (Formula / GT3 / Baja)
 │   │   ├── 03-mechanism.js       # Multibody closed-form projection & K&C sweeps
 │   │   ├── 04-dynamics.js        # Quasi-static load transfer & 4-post solver
 │   │   ├── 05-scene3d.js         # 4-viewport 3D Canvas wireframe rendering engine
+│   │   ├── 05b-car3d-webgl.js    # Three.js offline 3D solid modeling & viewport/stage sync
 │   │   ├── 06-ui-panels.js       # Control panels & measured data calibration UI
 │   │   ├── 07-plots.js           # Interactive kinematic characteristic plots
 │   │   ├── 08-interact.js        # State persistence & viewport interaction
@@ -229,8 +235,12 @@ LABSUS/                           # Engineering Root Directory
 │   │   ├── 14-tire-lab.js        # Tire Laboratory (MF5.2 Brush / Magic Formula fit)
 │   │   ├── 15-mpc.js             # Model Predictive Control (MPC) trajectory solver
 │   │   ├── 16-powertrain.js      # Powertrain & torque vectoring calculations
-│   │   └── 17-damper4q.js        # 4-quadrant damper table (shape-preserving spline + click blending)
-│   └── test/                     # 24 regression suites + physics_audit + diagnostics
+│   │   ├── 17-damper4q.js        # 4-quadrant damper table (shape-preserving spline + click blending)
+│   │   ├── 18-ride-bench.js      # Vertical ride bench (step / sweep / impulse / ISO road)
+│   │   ├── 19-compare.js         # A/B 3-layer compare & controlled skidpad limit (P29)
+│   │   ├── 20-lat-bench.js       # Lateral & roll dynamics bench (analytic roll-gradient anchor)
+│   │   └── 21-car-capability.js  # Vehicle capability envelope table (steady accel / braking / lateral)
+│   └── test/                     # 30 regression suites + physics_audit + diagnostics
 ├── engine/                       # High-Performance Python Numerical Engine
 │   ├── server.py                 # FastAPI server entry (:8001)
 │   ├── src/                      # Solvers (K&C / Bushing / Pacejka / Tire Fit / Transient)

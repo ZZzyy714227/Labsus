@@ -131,6 +131,7 @@ def gates(quick: bool = False, node_only: bool = False) -> list[tuple[str, list[
         ("后端模块角色审计", [PY, "tools/audit/backend_audit.py", "--check"]),
         ("溯源注册表覆盖", [PY, "-c", PROVENANCE_CMD]),
         ("文档一致性（根↔LABSUS）", [PY, "scripts/sync_root_docs.py", "--check"]),
+        ("基线数字一致性", [PY, "tools/gates/check_baselines.py"]),
     ]
     if not quick:
         g.insert(1, ("pytest（引擎测试）", [PY, "-m", "pytest", "engine/tests", "-q",

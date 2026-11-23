@@ -146,8 +146,8 @@ node `vm` 无头沙箱（自带 DOM/Canvas stub），唯一跨语言的是 TPHYS
 cd LABSUS
 
 # ── 一条命令跑完全部门禁（推荐；退出码非零即失败）────────────────────
-python tools/gates/check_all.py           # 36 项：ruff / pytest / 30 套 node / 对拍 / 溯源 / 文档
-python tools/gates/check_all.py --quick   # 3 项秒级检查（ruff / 溯源 / 文档）
+python tools/gates/check_all.py           # 37 项：ruff / pytest / 30 套 node / 对拍 / 溯源 / 文档 / 基线
+python tools/gates/check_all.py --quick   # 5 项秒级检查（ruff / 角色审计 / 溯源 / 文档 / 基线）
 
 # ── Python 引擎：物理断言 / 门禁 / 契约守卫 / TPHYS 双端对拍 / 对抗应力 ──
 pytest engine/tests -q                 # 345 passed / 1 skipped（skip = OptimumK 未录入，显式）
@@ -159,23 +159,24 @@ pytest engine/tests -q                 # 345 passed / 1 skipped（skip = Optimum
 ruff check engine                      # All checks passed（配置见 pyproject.toml，规则 E/F/W/I）
 python scripts/sync_root_docs.py --check   # 根 ↔ LABSUS 的 README/LICENSE 逐字节一致
 
-# ── 前端防线（逐套件）──────────────────────────────────────────────
-node web/test/test_dom.js              # 356 断言：薄壳结构 / 双端同构 / 已知 bug 回访
-node web/test/stage_boot_check.js      # 50 断言：模块加载顺序 / TDZ / 三舞台 20 帧无抛错
+# ── 前端防线（逐套件，共 30 套）─────────────────────────────────────────
+node web/test/test_dom.js              # 359 断言：薄壳结构 / 双端同构 / 已知 bug 回访
+node web/test/stage_boot_check.js      # 52 断言：模块加载顺序 / TDZ / 三舞台 20 帧无抛错
 node web/test/test_lap_15dof.js        # 23 断言：2 圈 5.45km 全闭环 + 6 项 powertrain parity
-node web/test/test_15dof_steady.js     # 14 断言：15-DOF 内核解析稳态锚（自由落体/静载/自行车模型/左右对称）
+node web/test/test_15dof_steady.js     # 18 断言：15-DOF 解析稳态锚 + kT 真源接线
 node web/test/test_powertrain.js       # 625 断言：七架构动力总成
-node web/test/test_tire_lab.js         # 70 断言：轮胎工坊
-node web/test/test_tire_wiring.js      # 36 断言 · proving_ground_test.js 36 断言（含 RIG 回归）
-node web/test/test_racingline.js       # 30 断言
-node web/test/test_kc_wiring.js        # 25 断言 · undulating_road_test.js 21 断言
-node web/test/test_mpc.js              # 19 断言 · test_p2b_damper.js 28 断言（含 4Q 减振器表）
-node web/test/test_p2a_aero.js         # 14 断言 · test_circuit_ui.js 100%（64 id + 22 class）
+node web/test/test_tire_lab.js         # 70 断言：轮胎工坊 · test_tire_wiring 36 · proving_ground 36
+node web/test/test_racingline.js       # 30 断言 · test_kc_wiring 25 · undulating_road 21
+node web/test/test_mpc.js              # 19 断言 · test_p2b_damper 28（含 4Q 减振器表）
+node web/test/test_p2a_aero.js         # 14 断言 · test_circuit_ui 100%（64 id + 22 class）
+node web/test/test_ride_bench.js       # 21 断言 · test_compare 27 · test_lat_bench 20
+node web/test/test_tire_parity.js      # 11 断言 · test_compliance_steer 11 · test_load_transfer 20
+node web/test/test_stability_audit.js  # 24 断言 · test_config_contract 15 · test_car_capability 15
 
 # ── 跨语言物理对拍（JS TPHYS ↔ Python transient，门限 5%）────────────
 node web/test/tphys_parity.cjs         # 实测 worst 0.51%
 
-# ── 物理审计（62 项，**已进 CI 回归**；--ci 跳过 2 项环境敏感的性能阈值）──
+# ── 物理审计（60 项，**已进 CI 回归**；全量 62 项，--ci 跳过 2 项环境性能阈值）──
 node web/test/physics_audit.js         # 惯量恒等式 / 能量单调 / 步长收敛 / 阿克曼 / ISO 路面 / wheel DOF / 碰撞
 
 # ── 诊断工具（不参与回归）─────────────────────────────────────────
@@ -183,7 +184,7 @@ node web/test/preset_balance_sweep.cjs # 预设配平扫描（US / TLLTD ← 簧
 node web/test/mpc_diag_g30.cjs         # MPC 整定诊断 · mpc_calib_g30.cjs 校准网格
 ```
 
-> 测试数字以本仓库当前工作区实测为准（**2026-10-31 基线**）。改前端后至少跑
+> 测试数字以本仓库当前工作区实测为准（**2026-11-23 基线**）。改前端后至少跑
 > `test_dom` + `stage_boot_check`；改引擎后跑 `pytest engine/tests` + `ruff check engine`；
 > 改 TPHYS/内联物理后跑 `tphys_parity.cjs`。数字变更后请同步本段与 DEVLOG。
 >
@@ -203,13 +204,17 @@ LABSUS/                           # 工程代码根（下同）
 │   ├── dwb-pro-fullchassis.html  # 模块化全车工作台（薄壳 + css/ + js/）
 │   ├── dwb-pro-allinone.html     # 零依赖综合交付单文件
 │   ├── css/
-│   │   └── fullchassis.css       # 模块化现代工程仪器台 CSS 设计系统
+│   │   ├── fullchassis.css       # 模块化现代工程仪器台 CSS 设计系统
+│   │   └── v4.css                # V4 布局重排与双主题变量令牌
+│   ├── vendor/                   # 离线第三方库
+│   │   └── three.min.js          # Three.js r147 离线 WebGL 渲染内核
 │   ├── js/                       # 前端核心功能域模块 (按文件名序加载)
 │   │   ├── 01-core.js            # 数学库 / 状态管理 / 矩阵运算
 │   │   ├── 02-presets.js         # 车型预设 (Formula/GT3/Baja)
 │   │   ├── 03-mechanism.js       # 多体闭式几何投影内核与 K&C 扫掠
 │   │   ├── 04-dynamics.js        # 准静态载荷转移与 4-Post 台架解算
 │   │   ├── 05-scene3d.js         # 四视口 3D Canvas 线框渲染引擎
+│   │   ├── 05b-car3d-webgl.js    # Three.js 离线 3D 实体建模与视口/舞台同步
 │   │   ├── 06-ui-panels.js       # 交互面板 / 实测数据标定
 │   │   ├── 07-plots.js           # 运动学特性交互式曲线图
 │   │   ├── 08-interact.js        # 持久化与视图交互
@@ -222,7 +227,11 @@ LABSUS/                           # 工程代码根（下同）
 │   │   ├── 14-tire-lab.js        # 轮胎实验室 (MF5.2 刷子/Magic Formula 拟合)
 │   │   ├── 15-mpc.js             # 赛道自适应模型预测控制 (MPC)
 │   │   ├── 16-powertrain.js      # 动力总成与扭矩矢量分配解算
-│   │   └── 17-damper4q.js        # 四象限减振器表求值（保形样条 + 档位混合）
+│   │   ├── 17-damper4q.js        # 四象限减振器表求值（保形样条 + 档位混合）
+│   │   ├── 18-ride-bench.js      # 垂向 Ride 动力学测试台（阶跃/扫频/脉冲/随机路面）
+│   │   ├── 19-compare.js         # A/B 三层对比与受控定圆极限（静态/动态/赛道）
+│   │   ├── 20-lat-bench.js       # 横向与侧倾动力学测试台（解析侧倾梯度锚）
+│   │   └── 21-car-capability.js  # 车能力包络表（稳态加减速与过弯包络）
 │   └── test/                     # 前端 30 套回归 + physics_audit + 诊断工具
 ├── engine/                       # Python 高性能数值计算引擎
 │   ├── server.py                 # FastAPI 入口服务 (:8001)
