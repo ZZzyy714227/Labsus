@@ -160,7 +160,7 @@ ruff check engine                      # All checks passed (config in pyproject.
 python scripts/sync_root_docs.py --check   # root <-> LABSUS README/LICENSE byte-identical
 
 # ── Frontend defense lines (per suite, 30 suites total) ─────────────────
-node web/test/test_dom.js              # 359 assertions: shell structure / dual-entry parity / bug regressions
+node web/test/test_dom.js              # 363 assertions: shell structure / dual-entry parity / bug regressions
 node web/test/stage_boot_check.js      # 52 assertions: module order / TDZ / 3 stages x 20 frames
 node web/test/test_lap_15dof.js        # 23 assertions: 2 laps of 5.45 km + 6 powertrain parity checks
 node web/test/test_15dof_steady.js     # 18 assertions: analytic steady-state anchors + kT source wiring

@@ -1244,7 +1244,8 @@ function renderSlopeScene(alpha, st){
     groundZ: (!isUndulating && pathObj) ? ((pathObj.getRoadElevation(cx / 1000, carY).z_road || 0) * 1000 + 2) : 2,
     shadowAlpha: isUndulating ? 0 : shadowAlpha,
     hideDriver: SLOPE_STAGE.camMode === "cockpit",
-    brakeIntensity: SLOPE_STAGE.lastCtrl ? SLOPE_STAGE.lastCtrl.brake : 0
+    brakeIntensity: SLOPE_STAGE.lastCtrl ? SLOPE_STAGE.lastCtrl.brake : 0,
+    telemetry: window.physicsEngine ? window.physicsEngine.telemetry : null
   });
 
   if (!glRendered) {
@@ -2293,7 +2294,8 @@ function renderSkidpadScene(st, tel, ctrl){
     groundZ: 2,
     shadowAlpha: 0.48,
     hideDriver: SKIDPAD_STAGE.camMode === "cockpit",
-    brakeIntensity: ctrl ? ctrl.brake : 0
+    brakeIntensity: ctrl ? ctrl.brake : 0,
+    telemetry: tel || null
   });
 
   if (!glRendered) {
@@ -4649,7 +4651,8 @@ function renderCircuitScene(st, tel, ctrl) {
     shadowAlpha: lightMode === "night" ? 0.30 : 0.48,
     hideDriver: CIRCUIT_STAGE.camMode === "cockpit",
     drs: !!(ctrl && (ctrl.drs || (ctrl.target && ctrl.target.isDRS))),
-    brakeIntensity: ctrl ? ctrl.brake : 0
+    brakeIntensity: ctrl ? ctrl.brake : 0,
+    telemetry: tel || null
   });
 
   if (!glRendered) {

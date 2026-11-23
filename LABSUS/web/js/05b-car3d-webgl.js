@@ -66,7 +66,7 @@
   }
 
   function supportsCurrentVehicle() {
-    return typeof S !== "undefined" && S && S.vehicleType === "formula";
+    return typeof S !== "undefined" && S && ["formula", "baja", "gt3", "gt3_sport"].includes(S.vehicleType);
   }
 
   function isPureSuspActive() {
@@ -464,6 +464,27 @@
           color: 0xf1c40f,
           metalness: 0.82,
           roughness: 0.20
+        }),
+        glass: new THREE.MeshPhysicalMaterial({
+          color: 0x0f172a,
+          metalness: 0.12,
+          roughness: 0.08,
+          clearcoat: 1.0,
+          transparent: true,
+          opacity: 0.62,
+          depthWrite: false
+        }),
+        headlight: new THREE.MeshStandardMaterial({
+          color: 0xf8fafc,
+          emissive: 0xe0f2fe,
+          emissiveIntensity: 1.45,
+          roughness: 0.14,
+          metalness: 0.20
+        }),
+        skid: new THREE.MeshStandardMaterial({
+          color: 0xc2cbd6,
+          metalness: 0.78,
+          roughness: 0.36
         })
       };
 
@@ -577,14 +598,15 @@
       }
     }
 
-    const buckets = [[], [], [], []];
+    const buckets = [[], [], [], [], []];
     for (let r = 0; r < nR - 1; r++) {
       for (let p = 0; p < nP; p++) {
         const a = r * stride + p;
         const b = r * stride + p + 1;
         const c = (r + 1) * stride + p + 1;
         const d = (r + 1) * stride + p;
-        const m = quadMatFn ? (quadMatFn(r, p) || 0) : 0;
+        const m = quadMatFn ? (quadMatFn(r, p, nP) || 0) : 0;
+        while (buckets.length <= m) buckets.push([]);
         buckets[m].push(a, b, c, a, c, d);
       }
     }
@@ -879,17 +901,22 @@
   }
 
   /* ============================================================================
-     Formula SAE 完整三维总成构建
+     全车型 3D 共享构建辅助 & 受力/侧倾中心可视化工具
      ============================================================================ */
-  function buildFormulaKey() {
+  function buildCarKey() {
     const f = S.front, r = S.rear;
+    const isDirect = (ax) => ax.arch === "direct" ? 1 : 0;
     return [
       S.vehicleType, S.wb,
       f.arch, f.tire.R, f.tire.W, f.tire.rim, f.tire.disc, f.tire.et || 0, f.tire.rimW || 0,
+      isDirect(f) ? dst(f.hp.STRUT_OUT, f.hp.DMP_BODY).toFixed(1) : dst(f.hp.RCK_DMP, f.hp.DMP_BODY).toFixed(1),
       r.arch, r.tire.R, r.tire.W, r.tire.rim, r.tire.disc, r.tire.et || 0, r.tire.rimW || 0,
-      f.arb ? f.arb.d : 0, r.arb ? r.arb.d : 0
+      isDirect(r) ? dst(r.hp.STRUT_OUT, r.hp.DMP_BODY).toFixed(1) : dst(r.hp.RCK_DMP, r.hp.DMP_BODY).toFixed(1),
+      f.arb ? f.arb.d : 0, f.arb ? f.arb.t : 0,
+      r.arb ? r.arb.d : 0, r.arb ? r.arb.t : 0
     ].join("|");
   }
+  const buildFormulaKey = buildCarKey;
 
   function clearGroup(g) {
     while (g.children.length) {
@@ -897,6 +924,7 @@
       g.remove(ch);
       ch.traverse(o => {
         if (o.geometry) o.geometry.dispose();
+        if (o._ownsMat && o.material && o.material.dispose) o.material.dispose();
       });
     }
   }
@@ -904,6 +932,301 @@
   function createUnitCylinder() {
     return new THREE.CylinderGeometry(1, 1, 1, 14);
   }
+
+  function addTubeMesh(grp, unitCyl, a, b, r, mat) {
+    const m = new THREE.Mesh(unitCyl, mat);
+    orientBetween(m, a, b, r);
+    m.castShadow = true;
+    grp.add(m);
+    return m;
+  }
+
+  function addBoxMesh(grp, center, size, mat, rotXYZ) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]), mat);
+    m.position.set(center[0], center[1], center[2]);
+    if (rotXYZ) m.rotation.set(rotXYZ[0] || 0, rotXYZ[1] || 0, rotXYZ[2] || 0);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    grp.add(m);
+    return m;
+  }
+
+  // Regularized 6x6 solver (A * x = b) for two-force suspension link tension/compression estimation
+  function solveLinear6(A, b) {
+    const n = 6;
+    const M = Array.from({ length: n }, () => new Float64Array(n + 1));
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        let s = i === j ? 1e-4 : 0;
+        for (let k = 0; k < n; k++) s += A[k][i] * A[k][j];
+        M[i][j] = s;
+      }
+      let rhs = 0;
+      for (let k = 0; k < n; k++) rhs += A[k][i] * b[k];
+      M[i][n] = rhs;
+    }
+    for (let col = 0; col < n; col++) {
+      let piv = col;
+      for (let r = col + 1; r < n; r++) if (Math.abs(M[r][col]) > Math.abs(M[piv][col])) piv = r;
+      if (piv !== col) { const t = M[col]; M[col] = M[piv]; M[piv] = t; }
+      const d = M[col][col];
+      if (Math.abs(d) < 1e-12) continue;
+      for (let j = col; j <= n; j++) M[col][j] /= d;
+      for (let r = 0; r < n; r++) {
+        if (r === col) continue;
+        const f = M[r][col];
+        for (let j = col; j <= n; j++) M[r][j] -= f * M[col][j];
+      }
+    }
+    const x = new Float64Array(n);
+    for (let i = 0; i < n; i++) x[i] = Number.isFinite(M[i][n]) ? M[i][n] : 0;
+    return x;
+  }
+
+  function solveCornerLinkLoadsJS(pts, wc, cp, fCp) {
+    // Each link axis u_i points chassis -> knuckle so T_i > 0 means tension (pulling knuckle inward)
+    const pairs = [
+      [pts.LCA_F, pts.LBJ, pts.LBJ],
+      [pts.LCA_R, pts.LBJ, pts.LBJ],
+      [pts.UCA_F, pts.UBJ, pts.UBJ],
+      [pts.UCA_R, pts.UBJ, pts.UBJ],
+      [pts.RACK, pts.TRO, pts.TRO],
+      [pts.STRUT_BASE, pts.ST_O, pts.ST_O]
+    ];
+    const A = Array.from({ length: 6 }, () => new Float64Array(6));
+    for (let i = 0; i < 6; i++) {
+      const a = pairs[i][0], b = pairs[i][1], app = pairs[i][2];
+      const u = nrm(sub(b, a));
+      const r = sub(app, wc);
+      const tau = cross(r, u);
+      A[0][i] = u[0];   A[1][i] = u[1];   A[2][i] = u[2];
+      A[3][i] = tau[0]; A[4][i] = tau[1]; A[5][i] = tau[2];
+    }
+    const rCp = sub(cp, wc);
+    const mCp = cross(rCp, fCp);
+    const rhs = [fCp[0], fCp[1], fCp[2], mCp[0], mCp[1], mCp[2]];
+    return solveLinear6(A, rhs);
+  }
+
+  function buildSuspensionCorners(unitCyl, unitSphere, cornerOpts) {
+    const co = cornerOpts || {};
+    const fState = S.front, rState = S.rear;
+    const frontGeos = makeTireGeometries(
+      fState.tire.R || 230, fState.tire.W || 175, fState.tire.rim || 127,
+      fState.tire.rimW ? Math.max(18, fState.tire.rimW * 0.30) : 6
+    );
+    const rearGeos = makeTireGeometries(
+      rState.tire.R || 235, rState.tire.W || 205, rState.tire.rim || 127,
+      rState.tire.rimW ? Math.max(18, rState.tire.rimW * 0.30) : 6
+    );
+
+    const forceConeGeo = new THREE.ConeGeometry(1, 1, 12);
+    const forceRingGeo = new THREE.RingGeometry(0.76, 1.0, 36);
+    const corners = {};
+
+    [["FR", "front", +1], ["FL", "front", -1], ["RR", "rear", +1], ["RL", "rear", -1]].forEach(([key, axis, sx]) => {
+      const state = S[axis];
+      const geos = axis === "front" ? frontGeos : rearGeos;
+      const tR = state.tire.R || 230, tW = state.tire.W || 175, rimR = state.tire.rim || 127, dR = state.tire.disc || 95;
+      const etOff = -(state.tire.et || 0);
+      const isDirect = state.arch === "direct";
+      const grp = new THREE.Group();
+
+      const lcaF = new THREE.Mesh(unitCyl, ST.mats.wishbone);
+      const lcaR = new THREE.Mesh(unitCyl, ST.mats.wishbone);
+      const ucaF = new THREE.Mesh(unitCyl, ST.mats.wishbone);
+      const ucaR = new THREE.Mesh(unitCyl, ST.mats.wishbone);
+      const strut = new THREE.Mesh(unitCyl, ST.mats.pushrod);
+      const tieRod = new THREE.Mesh(unitCyl, ST.mats.tieRod);
+      const halfshaft = new THREE.Mesh(unitCyl, ST.mats.steelTube);
+      [lcaF, lcaR, ucaF, ucaR, strut, tieRod, halfshaft].forEach(m => { m.castShadow = true; grp.add(m); });
+
+      const joints = {};
+      ["LBJ", "UBJ", "TRO", "ST_O", "ST_I"].forEach(j => {
+        const jm = new THREE.Mesh(unitSphere, ST.mats.joint);
+        jm.scale.setScalar(10);
+        grp.add(jm);
+        joints[j] = jm;
+      });
+
+      const knk1 = new THREE.Mesh(unitCyl, ST.mats.aluminum);
+      const knk2 = new THREE.Mesh(unitCyl, ST.mats.aluminum);
+      const knk3 = new THREE.Mesh(unitCyl, ST.mats.aluminum);
+      [knk1, knk2, knk3].forEach(m => { m.castShadow = true; grp.add(m); });
+
+      const rockerMesh = new THREE.Mesh(new THREE.BufferGeometry(), ST.mats.rocker);
+      const rockerAxle = new THREE.Mesh(unitCyl, ST.mats.steelTube);
+      const dmpBody    = new THREE.Mesh(unitCyl, ST.mats.damper);
+      const dmpShaft   = new THREE.Mesh(unitCyl, ST.mats.aluminum);
+      const L_spr0 = isDirect
+        ? (dst(state.hp.STRUT_OUT, state.hp.DMP_BODY) || 350)
+        : (dst(state.hp.RCK_DMP, state.hp.DMP_BODY) || 180);
+      const sprR = co.isBaja ? 26 : (co.isGT3 ? 23 : 19);
+      const sprTurns = co.isBaja ? 9.5 : (co.isGT3 ? 8.5 : 7.5);
+      const sprWire = co.isBaja ? 5.2 : (co.isGT3 ? 4.4 : 4.0);
+      const springGeo = makeHelicalSpringGeo(sprR, L_spr0, sprTurns, sprWire);
+      const springMesh = new THREE.Mesh(springGeo, ST.mats.spring);
+      [rockerMesh, rockerAxle, dmpBody, dmpShaft, springMesh].forEach(m => { m.castShadow = true; grp.add(m); });
+
+      const carrierGrp = new THREE.Group();
+      carrierGrp.matrixAutoUpdate = false;
+      const calGroup = new THREE.Group();
+      const calSz = co.isGT3 ? [48, 64, 92] : [44, 54, 76];
+      const calBody = new THREE.Mesh(new THREE.BoxGeometry(calSz[0], calSz[1], calSz[2]), ST.mats.caliper);
+      calBody.castShadow = true;
+      calGroup.add(calBody);
+      carrierGrp.add(calGroup);
+
+      const spinGrp = new THREE.Group();
+      const discMesh = new THREE.Mesh(new THREE.CylinderGeometry(dR, dR, 14, 28), ST.mats.disc);
+      discMesh.rotation.z = Math.PI / 2;
+      discMesh.position.set(-5, 0, 0);
+      const discBell = new THREE.Mesh(new THREE.CylinderGeometry(dR * 0.56, dR * 0.60, 22, 20), ST.mats.darkTrim);
+      discBell.rotation.z = Math.PI / 2;
+      discBell.position.set(-8, 0, 0);
+      spinGrp.add(discMesh, discBell);
+
+      const tireMesh = new THREE.Mesh(geos.tireGeo, ST.mats.tireTread);
+      tireMesh.castShadow = true;
+      tireMesh.receiveShadow = true;
+      const sideOut = new THREE.Mesh(geos.sideRingGeo, ST.mats.tireSide);
+      sideOut.position.set(tW * 0.5 + 1.5, 0, 0);
+      const sideIn = new THREE.Mesh(geos.sideRingGeo, ST.mats.tireSide);
+      sideIn.rotation.y = Math.PI;
+      sideIn.position.set(-tW * 0.5 - 1.5, 0, 0);
+      spinGrp.add(tireMesh, sideOut, sideIn);
+
+      // Baja off-road tread lugs
+      if (co.isBaja) {
+        const lugCount = 20;
+        const lugGeo = new THREE.BoxGeometry(tW * 0.36, 22, 13);
+        for (let l = 0; l < lugCount; l++) {
+          const ang = (l / lugCount) * Math.PI * 2;
+          const rowSign = (l % 2 === 0) ? 1 : -1;
+          const lug = new THREE.Mesh(lugGeo, ST.mats.tireTread);
+          lug.position.set(rowSign * tW * 0.22, Math.cos(ang) * (tR - 2), Math.sin(ang) * (tR - 2));
+          lug.rotation.x = ang;
+          spinGrp.add(lug);
+        }
+      }
+
+      const rimGrp = new THREE.Group();
+      rimGrp.position.set(etOff, 0, 0);
+      const barrelMesh = new THREE.Mesh(geos.barrelGeo, ST.mats.rim);
+      barrelMesh.castShadow = true;
+      rimGrp.add(barrelMesh);
+
+      const spokeX = tW * 0.5 - (co.isBaja ? 32 : 24);
+      if (co.isGT3) {
+        const pairCount = 5;
+        for (let s = 0; s < pairCount; s++) {
+          const baseAng = (s / pairCount) * Math.PI * 2;
+          for (const da of [-0.17, 0.17]) {
+            const ang = baseAng + da;
+            const spoke = new THREE.Mesh(new THREE.BoxGeometry(10, 12, rimR * 0.88), ST.mats.rim);
+            spoke.position.set(spokeX, Math.cos(ang) * rimR * 0.49, Math.sin(ang) * rimR * 0.49);
+            spoke.rotation.x = ang + Math.PI / 2 + da * 0.65;
+            rimGrp.add(spoke);
+          }
+        }
+      } else {
+        const spokeCount = co.isBaja ? 6 : 8;
+        for (let s = 0; s < spokeCount; s++) {
+          const ang = (s / spokeCount) * Math.PI * 2;
+          const spoke = new THREE.Mesh(new THREE.BoxGeometry(10, co.isBaja ? 20 : 15, rimR * 0.92), ST.mats.rim);
+          spoke.position.set(spokeX, Math.cos(ang) * rimR * 0.48, Math.sin(ang) * rimR * 0.48);
+          spoke.rotation.x = ang + Math.PI / 2;
+          rimGrp.add(spoke);
+        }
+      }
+      if (co.isBaja) {
+        const beadRing = new THREE.Mesh(new THREE.TorusGeometry(rimR - 4, 5, 8, 28), ST.mats.aluminum);
+        beadRing.rotation.y = Math.PI / 2;
+        beadRing.position.set(tW * 0.5 - 10, 0, 0);
+        rimGrp.add(beadRing);
+      }
+
+      const centerHub = new THREE.Mesh(new THREE.CylinderGeometry(28, 32, 34, 16), ST.mats.rim);
+      centerHub.rotation.z = Math.PI / 2;
+      centerHub.position.set(spokeX - 2, 0, 0);
+      const centerNut = new THREE.Mesh(new THREE.CylinderGeometry(14, 17, 22, 6), ST.mats.centerLock);
+      centerNut.rotation.z = Math.PI / 2;
+      centerNut.position.set(spokeX + 16, 0, 0);
+      rimGrp.add(centerHub, centerNut);
+
+      spinGrp.add(rimGrp);
+      carrierGrp.add(spinGrp);
+      grp.add(carrierGrp);
+
+      // 3D Force Overlay (Friction circle + horizontal traction vector + vertical Fz column)
+      const forceGrp = new THREE.Group();
+      const fricMat = new THREE.MeshBasicMaterial({ color: 0x34d399, side: THREE.DoubleSide, transparent: true, opacity: 0.72, depthWrite: false });
+      const fricFillMat = new THREE.MeshBasicMaterial({ color: 0x34d399, side: THREE.DoubleSide, transparent: true, opacity: 0.14, depthWrite: false });
+      const vecHMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.90 });
+      const vecZMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.85 });
+      const fricRing = new THREE.Mesh(forceRingGeo, fricMat);
+      const fricDisk = new THREE.Mesh(new THREE.CircleGeometry(1, 32), fricFillMat);
+      fricDisk.position.z = -0.5;
+      const vecHShaft = new THREE.Mesh(unitCyl, vecHMat);
+      const vecHHead = new THREE.Mesh(forceConeGeo, vecHMat);
+      const vecZCol = new THREE.Mesh(unitCyl, vecZMat);
+      [fricRing, fricDisk, vecHShaft, vecHHead, vecZCol].forEach(m => { m._ownsMat = true; forceGrp.add(m); });
+      forceGrp.visible = false;
+      grp.add(forceGrp);
+
+      ST.carRoot.add(grp);
+
+      corners[key] = {
+        key, axis, sx, grp, isDirect,
+        lcaF, lcaR, ucaF, ucaR, strut, tieRod, halfshaft, joints,
+        knk1, knk2, knk3,
+        rockerMesh, rockerAxle, dmpBody, dmpShaft, springMesh, L_spr0,
+        carrierGrp, spinGrp, calGroup, dR, discMesh,
+        forceGrp, fricRing, fricDisk, vecHShaft, vecHHead, vecZCol,
+        linkForceMats: null
+      };
+    });
+    return corners;
+  }
+
+  function buildArbAssemblies(unitCyl) {
+    const arbs = {};
+    const arbGrp = new THREE.Group();
+    for (const ax of ["front", "rear"]) {
+      const bar = new THREE.Mesh(unitCyl, ST.mats.pushrod);
+      const armR = new THREE.Mesh(unitCyl, ST.mats.aluminum);
+      const armL = new THREE.Mesh(unitCyl, ST.mats.aluminum);
+      const dropR = new THREE.Mesh(unitCyl, ST.mats.tieRod);
+      const dropL = new THREE.Mesh(unitCyl, ST.mats.tieRod);
+      [bar, armR, armL, dropR, dropL].forEach(m => { m.castShadow = true; arbGrp.add(m); });
+      arbs[ax] = { bar, armR, armL, dropR, dropL };
+    }
+    ST.carRoot.add(arbGrp);
+    return { arbGrp, arbs };
+  }
+
+  function buildRcOverlay(unitSphere) {
+    const rcGrp = new THREE.Group();
+    const rcMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e, transparent: true, opacity: 0.92 });
+    const lineMat = new THREE.LineBasicMaterial({ color: 0xf43f5e, transparent: true, opacity: 0.85 });
+    const frontDot = new THREE.Mesh(unitSphere, rcMat);
+    const rearDot = new THREE.Mesh(unitSphere, rcMat);
+    frontDot.scale.setScalar(18);
+    rearDot.scale.setScalar(18);
+    frontDot._ownsMat = true;
+    const lineGeo = new THREE.BufferGeometry();
+    lineGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(6), 3));
+    const rcLine = new THREE.Line(lineGeo, lineMat);
+    rcLine._ownsMat = true;
+    rcGrp.add(frontDot, rearDot, rcLine);
+    rcGrp.visible = false;
+    ST.carRoot.add(rcGrp);
+    return { rcGrp, frontDot, rearDot, rcLine };
+  }
+
+  /* ============================================================================
+     Formula SAE 完整三维总成构建
+     ============================================================================ */
 
   // Asymmetric chamfered monocoque tub ring: narrow tapered keel at bottom (clears LCA & Rack) + crisp upper shoulder
   function tubSectionRing(y, rxTop, rxBot, zBot, zSplit, zTop, nPts) {
@@ -1443,131 +1766,533 @@
     ST.carRoot.add(steerGroup);
 
     // ------------------------------------------------------------------------
-    // 9. 四轮独立悬架 + 摇臂推杆 + 螺旋弹簧 + 制动系统 + 轮胎轮毂
+    // 9. 四轮独立悬架 + 摇臂推杆 + 螺旋弹簧 + ARB + 受力叠层
     // ------------------------------------------------------------------------
-    const frontGeos = makeTireGeometries(tRf, tWf, S.front.tire.rim || 127, S.front.tire.rimW ? Math.max(18, S.front.tire.rimW * 0.30) : 6);
-    const rearGeos  = makeTireGeometries(tRr, tWr, S.rear.tire.rim || 127,  S.rear.tire.rimW  ? Math.max(18, S.rear.tire.rimW * 0.30) : 6);
-
-    const corners = {};
-    [["FR", "front", +1], ["FL", "front", -1], ["RR", "rear", +1], ["RL", "rear", -1]].forEach(([key, axis, sx]) => {
-      const state = S[axis];
-      const geos = axis === "front" ? frontGeos : rearGeos;
-      const tR = state.tire.R || 230, tW = state.tire.W || 175, rimR = state.tire.rim || 127, dR = state.tire.disc || 95;
-      const etOff = -(state.tire.et || 0);
-      const grp = new THREE.Group();
-
-      // Control arms & rods
-      const lcaF = new THREE.Mesh(unitCyl, ST.mats.wishbone);
-      const lcaR = new THREE.Mesh(unitCyl, ST.mats.wishbone);
-      const ucaF = new THREE.Mesh(unitCyl, ST.mats.wishbone);
-      const ucaR = new THREE.Mesh(unitCyl, ST.mats.wishbone);
-      const strut = new THREE.Mesh(unitCyl, ST.mats.pushrod);
-      const tieRod = new THREE.Mesh(unitCyl, ST.mats.tieRod);
-      const halfshaft = new THREE.Mesh(unitCyl, ST.mats.steelTube);
-      [lcaF, lcaR, ucaF, ucaR, strut, tieRod, halfshaft].forEach(m => { m.castShadow = true; grp.add(m); });
-
-      // Rod-end spherical joints
-      const joints = {};
-      ["LBJ", "UBJ", "TRO", "ST_O", "ST_I"].forEach(j => {
-        const jm = new THREE.Mesh(unitSphere, ST.mats.joint);
-        jm.scale.setScalar(10);
-        grp.add(jm);
-        joints[j] = jm;
-      });
-
-      // Upright / Knuckle struts
-      const knk1 = new THREE.Mesh(unitCyl, ST.mats.aluminum);
-      const knk2 = new THREE.Mesh(unitCyl, ST.mats.aluminum);
-      const knk3 = new THREE.Mesh(unitCyl, ST.mats.aluminum);
-      [knk1, knk2, knk3].forEach(m => { m.castShadow = true; grp.add(m); });
-
-      // Inboard Rocker & Coilover Damper + Helical Spring
-      const rockerMesh = new THREE.Mesh(new THREE.BufferGeometry(), ST.mats.rocker);
-      const rockerAxle = new THREE.Mesh(unitCyl, ST.mats.steelTube);
-      const dmpBody    = new THREE.Mesh(unitCyl, ST.mats.damper);
-      const dmpShaft   = new THREE.Mesh(unitCyl, ST.mats.aluminum);
-      const L_spr0 = dst(state.hp.RCK_DMP, state.hp.DMP_BODY) || 180;
-      const springGeo = makeHelicalSpringGeo(19, L_spr0, 7.5, 4.0);
-      const springMesh = new THREE.Mesh(springGeo, ST.mats.spring);
-      [rockerMesh, rockerAxle, dmpBody, dmpShaft, springMesh].forEach(m => { m.castShadow = true; grp.add(m); });
-
-      // Wheel Carrier Group (steers & cambers, does NOT spin)
-      const carrierGrp = new THREE.Group();
-      carrierGrp.matrixAutoUpdate = false;
-
-      // Knuckle-aligned Brake Caliper
-      const calGroup = new THREE.Group();
-      const calBody = new THREE.Mesh(new THREE.BoxGeometry(44, 54, 76), ST.mats.caliper);
-      calBody.castShadow = true;
-      calGroup.add(calBody);
-      carrierGrp.add(calGroup);
-
-      // Spinning Wheel + Brake Disc Group (rotates around local +X axle)
-      const spinGrp = new THREE.Group();
-
-      const discMesh = new THREE.Mesh(new THREE.CylinderGeometry(dR, dR, 14, 28), ST.mats.disc);
-      discMesh.rotation.z = Math.PI / 2;
-      discMesh.position.set(-5, 0, 0);
-      const discBell = new THREE.Mesh(new THREE.CylinderGeometry(dR * 0.56, dR * 0.60, 22, 20), ST.mats.darkTrim);
-      discBell.rotation.z = Math.PI / 2;
-      discBell.position.set(-8, 0, 0);
-      spinGrp.add(discMesh, discBell);
-
-      // Tire + Rim
-      const tireMesh = new THREE.Mesh(geos.tireGeo, ST.mats.tireTread);
-      tireMesh.castShadow = true;
-      tireMesh.receiveShadow = true;
-      const sideOut = new THREE.Mesh(geos.sideRingGeo, ST.mats.tireSide);
-      sideOut.position.set(tW * 0.5 + 1.5, 0, 0);
-      const sideIn = new THREE.Mesh(geos.sideRingGeo, ST.mats.tireSide);
-      sideIn.rotation.y = Math.PI;
-      sideIn.position.set(-tW * 0.5 - 1.5, 0, 0);
-
-      const rimGrp = new THREE.Group();
-      rimGrp.position.set(etOff, 0, 0);
-      const barrelMesh = new THREE.Mesh(geos.barrelGeo, ST.mats.rim);
-      barrelMesh.castShadow = true;
-      rimGrp.add(barrelMesh);
-
-      const spokeCount = 8;
-      const spokeX = tW * 0.5 - 24;
-      for (let s = 0; s < spokeCount; s++) {
-        const ang = (s / spokeCount) * Math.PI * 2;
-        const spoke = new THREE.Mesh(new THREE.BoxGeometry(10, 15, rimR * 0.92), ST.mats.rim);
-        spoke.position.set(spokeX, Math.cos(ang) * rimR * 0.48, Math.sin(ang) * rimR * 0.48);
-        spoke.rotation.x = ang + Math.PI / 2;
-        rimGrp.add(spoke);
-      }
-      const centerHub = new THREE.Mesh(new THREE.CylinderGeometry(28, 32, 34, 16), ST.mats.rim);
-      centerHub.rotation.z = Math.PI / 2;
-      centerHub.position.set(spokeX - 2, 0, 0);
-      const centerNut = new THREE.Mesh(new THREE.CylinderGeometry(14, 17, 22, 6), ST.mats.centerLock);
-      centerNut.rotation.z = Math.PI / 2;
-      centerNut.position.set(spokeX + 16, 0, 0);
-      rimGrp.add(centerHub, centerNut);
-
-      spinGrp.add(tireMesh, sideOut, sideIn, rimGrp);
-      carrierGrp.add(spinGrp);
-      grp.add(carrierGrp);
-      ST.carRoot.add(grp);
-
-      corners[key] = {
-        key, axis, sx, grp,
-        lcaF, lcaR, ucaF, ucaR, strut, tieRod, halfshaft, joints,
-        knk1, knk2, knk3,
-        rockerMesh, rockerAxle, dmpBody, dmpShaft, springMesh, L_spr0,
-        carrierGrp, spinGrp, calGroup, dR, discMesh
-      };
-    });
+    const corners = buildSuspensionCorners(unitCyl, unitSphere, { isFormula: true });
+    const { arbGrp, arbs } = buildArbAssemblies(unitCyl);
+    const rcOverlay = buildRcOverlay(unitSphere);
 
     ST.parts = {
+      vehicleType: "formula",
+      isOpenFrame: false,
       aeroBodyGroup, paintMeshes, carbonMeshes, accentMeshes,
       driverGroup, rwFlap2M, rwFlap2BaseY: rwY - 146, rwFlap2BaseZ: rwZ + 118,
       frameGroup, fFront, fSide, fMain, fRear,
       powertrainGroup, steerGroup, rackRod, swSpin,
+      arbGrp, arbs, rcOverlay,
       corners
     };
-    ST.carKey = buildFormulaKey();
+    ST.carKey = buildCarKey();
+    applyMaterialModes();
+  }
+
+  /* ============================================================================
+     SAE Baja 全地形越野赛车 3D 总成（管状防滚笼 + 直推螺旋避震 + 越野大花纹胎）
+     ============================================================================ */
+  function buildBajaCar() {
+    clearGroup(ST.carRoot);
+
+    const wb = S.wb || 1400;
+    const yF = wb * 0.5;
+    const yR = -wb * 0.5;
+    const hpF = S.front.hp, hpR = S.rear.hp;
+    const unitCyl = createUnitCylinder();
+    const unitSphere = new THREE.SphereGeometry(1, 12, 10);
+
+    const aeroBodyGroup = new THREE.Group();
+    const paintMeshes = [], carbonMeshes = [], accentMeshes = [];
+    const addBody = (geo, mat, list) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.castShadow = true;
+      m.receiveShadow = true;
+      aeroBodyGroup.add(m);
+      if (list) list.push(m);
+      return m;
+    };
+
+    // Parameterized clearances derived from hardpoints so coilovers & arms never clip cage
+    const fLcaX = Math.min(Math.abs(hpF.LCA_F[0]), Math.abs(hpF.LCA_R[0]));
+    const rLcaX = Math.min(Math.abs(hpR.LCA_F[0]), Math.abs(hpR.LCA_R[0]));
+    const fRailX = Math.max(115, fLcaX - 18);
+    const rRailX = Math.max(115, rLcaX - 18);
+    const fDmpX = Math.abs(hpF.DMP_BODY[0]), fDmpY = yF + hpF.DMP_BODY[1], fDmpZ = hpF.DMP_BODY[2];
+    const rDmpX = Math.abs(hpR.DMP_BODY[0]), rDmpY = yR + hpR.DMP_BODY[1], rDmpZ = hpR.DMP_BODY[2];
+    const zBelly = Math.min(165, hpF.LCA_F[2] - 12, hpR.LCA_F[2] - 12);
+    const wCock = 345;
+    const zRoof = 1145;
+
+    // 1. Sculpted Baja Nose Hood, Skid Plate, Side Panels, Roof Panel & LED Lightbar
+    const hoodRings = [
+      superSectionRing(yF + 325, 118, 255, 365, 1.35, 1.5, 22),
+      superSectionRing(yF + 190, 148, 285, 435, 1.35, 1.5, 22),
+      superSectionRing(yF + 15,  172, 325, 520, 1.4,  1.6, 22),
+      superSectionRing(yF - 200, 235, 370, 625, 1.5,  1.7, 22)
+    ];
+    addBody(buildMultiMatLoftGeometry(hoodRings, true, (r, q, n) => {
+      const th = (q / n) * Math.PI * 2;
+      if (Math.sin(th) < -0.25) return 2; // dark under-hood tray
+      if (Math.abs(Math.cos(th)) < 0.22 && Math.sin(th) > 0.35) return 1; // top center accent stripe
+      return 0;
+    }, [0, 2]), [ST.mats.paint, ST.mats.accent, ST.mats.darkTrim], paintMeshes);
+
+    // Lower Aluminum Skid / Bash Plate (front nose up-kick -> flat cockpit belly -> rear engine tray)
+    const skidPts = [
+      superSectionRing(yF + 360, 115, 210, 240, 2.2, 2.2, 16),
+      superSectionRing(yF + 80,  fRailX - 5, zBelly - 14, zBelly + 6, 2.2, 2.2, 16),
+      superSectionRing(yF - 230, wCock * 0.72, zBelly - 16, zBelly + 4, 2.2, 2.2, 16),
+      superSectionRing(yR + 220, wCock * 0.72, zBelly - 16, zBelly + 4, 2.2, 2.2, 16),
+      superSectionRing(yR - 230, rRailX + 10, zBelly, zBelly + 24, 2.2, 2.2, 16)
+    ];
+    addBody(buildLoftGeometry(skidPts, true), ST.mats.skid, carbonMeshes);
+
+    // Side Hip Number Plates + Rear Mudguard Wings + Roof Skin & Lightbar
+    for (const sx of [-1, 1]) {
+      const sidePanel = makeExtrudedPlateYZ([
+        [yF - 235, 240], [yR + 480, 240], [yR + 360, 520], [yF - 245, 515]
+      ], 14);
+      const spM = addBody(sidePanel, ST.mats.paint, paintMeshes);
+      spM.position.x = sx * (wCock + 10);
+
+      const mudF = makeExtrudedPlateYZ([
+        [yR - 10, 485], [yR - 250, 575], [yR - 295, 520], [yR - 60, 425]
+      ], 165);
+      const mfM = addBody(mudF, ST.mats.darkTrim, carbonMeshes);
+      mfM.position.x = sx * 395;
+    }
+
+    // Roof visor + LED bar
+    const roofPlate = new THREE.Mesh(new THREE.BoxGeometry(580, 490, 16), ST.mats.carbon);
+    roofPlate.position.set(0, (yF + yR) * 0.5 - 60, zRoof + 10);
+    roofPlate.rotation.x = -0.04;
+    roofPlate.castShadow = true;
+    aeroBodyGroup.add(roofPlate);
+    carbonMeshes.push(roofPlate);
+
+    addBoxMesh(aeroBodyGroup, [0, yF - 355, zRoof + 24], [420, 44, 34], ST.mats.darkTrim);
+    addBoxMesh(aeroBodyGroup, [0, yF - 332, zRoof + 24], [385, 10, 20], ST.mats.headlight);
+    addBoxMesh(aeroBodyGroup, [0, yR - 305, 495], [140, 16, 36], ST.mats.rainLight);
+    ST.carRoot.add(aeroBodyGroup);
+
+    // 2. Exposed Tubular Steel Spaceframe Roll Cage (always visible when frame_main on)
+    const frameGroup = new THREE.Group();
+    const fFront = new THREE.Group();
+    const fSide = new THREE.Group();
+    const fMain = new THREE.Group();
+    const fRear = new THREE.Group();
+
+    const Y_fw = yF - 210, Y_brow = yF - 380, Y_b = yR + 350, Y_eng = yR - 290;
+    const FBL = [-fRailX, yF + 140, zBelly], FBR = [fRailX, yF + 140, zBelly];
+    const FTL = [-fRailX - 25, yF + 120, 405], FTR = [fRailX + 25, yF + 120, 405];
+    const NOSE_BL = [-115, yF + 375, 225], NOSE_BR = [115, yF + 375, 225];
+    const NOSE_TL = [-105, yF + 355, 390], NOSE_TR = [105, yF + 355, 390];
+    const FST_L = [-fDmpX, fDmpY, fDmpZ], FST_R = [fDmpX, fDmpY, fDmpZ];
+
+    const FW_BL = [-275, Y_fw, zBelly], FW_BR = [275, Y_fw, zBelly];
+    const FW_TL = [-270, Y_fw, 640], FW_TR = [270, Y_fw, 640];
+    const BRW_L = [-285, Y_brow, zRoof - 10], BRW_R = [285, Y_brow, zRoof - 10];
+    const MH_TL = [-300, Y_b, zRoof], MH_TR = [300, Y_b, zRoof];
+    const MH_ML = [-wCock, Y_b, 560], MH_MR = [wCock, Y_b, 560];
+    const MH_BL = [-wCock, Y_b, zBelly], MH_BR = [wCock, Y_b, zBelly];
+    const NERF_FL = [-wCock - 85, Y_fw - 55, 240], NERF_FR = [wCock + 85, Y_fw - 55, 240];
+    const NERF_RL = [-wCock - 85, Y_b - 20, 240], NERF_RR = [wCock + 85, Y_b - 20, 240];
+
+    const RST_L = [-rDmpX, rDmpY, rDmpZ], RST_R = [rDmpX, rDmpY, rDmpZ];
+    const RBL = [-rRailX, yR, zBelly + 10], RBR = [rRailX, yR, zBelly + 10];
+    const ENG_TL = [-190, Y_eng, 495], ENG_TR = [190, Y_eng, 495];
+    const ENG_BL = [-185, Y_eng, 260], ENG_BR = [185, Y_eng, 260];
+
+    [
+      [NOSE_BL, NOSE_BR, 14], [NOSE_TL, NOSE_TR, 14], [NOSE_BL, NOSE_TL, 14], [NOSE_BR, NOSE_TR, 14],
+      [NOSE_BL, FBL, 13], [NOSE_BR, FBR, 13], [NOSE_TL, FTL, 12], [NOSE_TR, FTR, 12],
+      [FBL, FBR, 13], [FTL, FTR, 12], [FBL, FTL, 12], [FBR, FTR, 12],
+      [FTL, FST_L, 12], [FTR, FST_R, 12], [FBL, FST_L, 11], [FBR, FST_R, 11],
+      [FST_L, FST_R, 14], [FST_L, FW_TL, 13], [FST_R, FW_TR, 13],
+      [FBL, FW_BL, 14], [FBR, FW_BR, 14]
+    ].forEach(t => addTubeMesh(fFront, unitCyl, t[0], t[1], t[2], ST.mats.steelTube));
+
+    [
+      [FW_BL, FW_BR, 14], [FW_TL, FW_TR, 14], [FW_BL, FW_TL, 14], [FW_BR, FW_TR, 14],
+      [FW_TL, BRW_L, 15], [FW_TR, BRW_R, 15], [BRW_L, BRW_R, 15],
+      [BRW_L, MH_TL, 16], [BRW_R, MH_TR, 16], [BRW_L, MH_TR, 10],
+      [MH_TL, MH_TR, 17], [MH_TL, MH_ML, 16], [MH_TR, MH_MR, 16],
+      [MH_ML, MH_BL, 16], [MH_MR, MH_BR, 16], [MH_BL, MH_BR, 15],
+      [MH_ML, MH_MR, 14], [FW_BL, MH_BL, 15], [FW_BR, MH_BR, 15],
+      [FW_TL, MH_ML, 12], [FW_TR, MH_MR, 12]
+    ].forEach(t => addTubeMesh(fMain, unitCyl, t[0], t[1], t[2], ST.mats.steelTube));
+
+    [
+      [FW_BL, NERF_FL, 13], [MH_BL, NERF_RL, 13], [NERF_FL, NERF_RL, 15],
+      [FW_BR, NERF_FR, 13], [MH_BR, NERF_RR, 13], [NERF_FR, NERF_RR, 15],
+      [NERF_FL, FW_TL, 10], [NERF_FR, FW_TR, 10]
+    ].forEach(t => addTubeMesh(fSide, unitCyl, t[0], t[1], t[2], ST.mats.steelTube));
+
+    [
+      [MH_TL, RST_L, 14], [MH_TR, RST_R, 14], [MH_BL, RBL, 14], [MH_BR, RBR, 14],
+      [MH_ML, ENG_TL, 12], [MH_MR, ENG_TR, 12],
+      [RST_L, RST_R, 14], [RBL, RBR, 13], [RBL, RST_L, 12], [RBR, RST_R, 12],
+      [RST_L, ENG_TL, 12], [RST_R, ENG_TR, 12], [RBL, ENG_BL, 12], [RBR, ENG_BR, 12],
+      [ENG_TL, ENG_TR, 13], [ENG_BL, ENG_BR, 13], [ENG_TL, ENG_BL, 12], [ENG_TR, ENG_BR, 12],
+      [ENG_TL, ENG_BR, 9]
+    ].forEach(t => addTubeMesh(fRear, unitCyl, t[0], t[1], t[2], ST.mats.steelTube));
+
+    frameGroup.add(fFront, fSide, fMain, fRear);
+    ST.carRoot.add(frameGroup);
+
+    // 3. Baja Seat & Visor Helmet Driver
+    const driverGroup = new THREE.Group();
+    const seatBack = new THREE.Mesh(new THREE.BoxGeometry(330, 52, 460), ST.mats.darkTrim);
+    seatBack.position.set(0, Y_b + 105, zBelly + 255);
+    seatBack.rotation.x = -0.26;
+    const seatBase = new THREE.Mesh(new THREE.BoxGeometry(330, 310, 48), ST.mats.darkTrim);
+    seatBase.position.set(0, Y_b + 235, zBelly + 50);
+    const helm = new THREE.Mesh(new THREE.SphereGeometry(118, 18, 16), ST.mats.helmet);
+    helm.position.set(0, Y_b + 150, zBelly + 575);
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(155, 58, 52), ST.mats.visor);
+    visor.position.set(0, Y_b + 230, zBelly + 585);
+    const peak = new THREE.Mesh(new THREE.BoxGeometry(148, 72, 10), ST.mats.paint);
+    peak.position.set(0, Y_b + 235, zBelly + 655);
+    peak.rotation.x = 0.25;
+    driverGroup.add(seatBack, seatBase, helm, visor, peak);
+    ST.carRoot.add(driverGroup);
+
+    // 4. Baja Engine / CVT / Rear Differential Powertrain
+    const powertrainGroup = new THREE.Group();
+    addBoxMesh(powertrainGroup, [0, yR + 120, 295], [220, 240, 210], ST.mats.edu);
+    addBoxMesh(powertrainGroup, [-135, yR + 65, 290], [65, 280, 145], ST.mats.darkTrim);
+    const diffC = new THREE.Mesh(new THREE.CylinderGeometry(52, 52, 130, 14), ST.mats.darkTrim);
+    diffC.rotation.z = Math.PI / 2;
+    diffC.position.set(0, yR, 275);
+    powertrainGroup.add(diffC);
+    addTubeMesh(powertrainGroup, unitCyl, [65, yR + 30, 360], [115, yR - 255, 395], 22, ST.mats.aluminum);
+    ST.carRoot.add(powertrainGroup);
+
+    // 5. Steering Rack & Off-road Steering Wheel
+    const steerGroup = new THREE.Group();
+    const rackY = yF + hpF.RACK[1], rackZ = hpF.RACK[2];
+    const rHousing = new THREE.Mesh(new THREE.CylinderGeometry(16, 16, Math.min(260, Math.abs(hpF.RACK[0]) * 1.6), 14), ST.mats.darkTrim);
+    rHousing.rotation.z = Math.PI / 2;
+    rHousing.position.set(0, rackY, rackZ);
+    const rackRod = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, hpF.RACK[0] * 2, 12), ST.mats.aluminum);
+    rackRod.rotation.z = Math.PI / 2;
+    rackRod.position.set(0, rackY, rackZ);
+    steerGroup.add(rHousing, rackRod);
+    const pPin = [0, rackY + 20, rackZ + 45], pWhl = [0, Y_fw - 135, 595];
+    addTubeMesh(steerGroup, unitCyl, pPin, pWhl, 11, ST.mats.aluminum);
+    const swPivot = new THREE.Group();
+    swPivot.position.set(pWhl[0], pWhl[1], pWhl[2]);
+    const colD = new THREE.Vector3(pWhl[0] - pPin[0], pWhl[1] - pPin[1], pWhl[2] - pPin[2]).normalize();
+    swPivot.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), colD);
+    const swSpin = new THREE.Group();
+    const rimTorus = new THREE.Mesh(new THREE.TorusGeometry(132, 15, 10, 28), ST.mats.darkTrim);
+    const barH = new THREE.Mesh(new THREE.BoxGeometry(250, 26, 10), ST.mats.aluminum);
+    const barV = new THREE.Mesh(new THREE.BoxGeometry(26, 125, 10), ST.mats.aluminum);
+    barV.position.set(0, -60, 0);
+    swSpin.add(rimTorus, barH, barV);
+    swPivot.add(swSpin);
+    steerGroup.add(swPivot);
+    ST.carRoot.add(steerGroup);
+
+    const corners = buildSuspensionCorners(unitCyl, unitSphere, { isBaja: true });
+    const { arbGrp, arbs } = buildArbAssemblies(unitCyl);
+    const rcOverlay = buildRcOverlay(unitSphere);
+
+    ST.parts = {
+      vehicleType: "baja",
+      isOpenFrame: true,
+      aeroBodyGroup, paintMeshes, carbonMeshes, accentMeshes,
+      driverGroup, rwFlap2M: null, rwFlap2BaseY: 0, rwFlap2BaseZ: 0,
+      frameGroup, fFront, fSide, fMain, fRear,
+      powertrainGroup, steerGroup, rackRod, swSpin,
+      arbGrp, arbs, rcOverlay,
+      corners
+    };
+    ST.carKey = buildCarKey();
+    applyMaterialModes();
+  }
+
+  /* ============================================================================
+     FIA GT3 房车赛车连续水密多材质蒙皮 + 鹅颈尾翼 + 车架/副车架 3D 总成
+     ============================================================================ */
+  function gt3SectionRing(y, cfg) {
+    const smoothBand = (dist, halfW) => {
+      const u = Math.abs(dist) / halfW;
+      return u < 1 ? Math.pow(Math.cos(u * Math.PI * 0.5), 0.72) : 0;
+    };
+    const uLen = clamp((cfg.yNose - y) / (cfg.yNose - cfg.yTail), 0, 1);
+
+    let rxMax = cfg.halfBodyW;
+    if (y > cfg.yF + 160) {
+      const fn = clamp((y - (cfg.yF + 160)) / (cfg.yNose - (cfg.yF + 160)), 0, 1);
+      rxMax = cfg.halfBodyW * (1 - 0.34 * Math.pow(fn, 1.55));
+    } else if (y < cfg.yR - 140) {
+      const rn = clamp(((cfg.yR - 140) - y) / ((cfg.yR - 140) - cfg.yTail), 0, 1);
+      rxMax = cfg.halfBodyW * (1 - 0.16 * Math.pow(rn, 1.4));
+    }
+
+    const fArch = smoothBand(y - cfg.yF, cfg.tRf + 95);
+    const rArch = smoothBand(y - cfg.yR, cfg.tRr + 95);
+    const arch = Math.max(fArch, rArch);
+    const wellRx = fArch >= rArch ? cfg.fWellRx : cfg.rWellRx;
+    const rxLower = rxMax * (1 - arch) + wellRx * arch;
+    const zArchTop = (fArch >= rArch ? cfg.tRf : cfg.tRr) + 86;
+
+    let zBot = 58;
+    if (y > cfg.yNose - 140) {
+      const k = (y - (cfg.yNose - 140)) / 140;
+      zBot += k * k * 55;
+    } else if (y < cfg.yR - 160) {
+      const k = ((cfg.yR - 160) - y) / (cfg.yR - 160 - cfg.yTail);
+      zBot += clamp(k, 0, 1) * 155;
+    }
+
+    let zBelt = 690;
+    if (y > cfg.yF + 60) {
+      const k = clamp((y - (cfg.yF + 60)) / (cfg.yNose - (cfg.yF + 60)), 0, 1);
+      zBelt = 690 - 470 * Math.pow(k, 1.35);
+    } else if (y < cfg.yR + 120) {
+      const k = clamp(((cfg.yR + 120) - y) / (cfg.yR + 120 - cfg.yTail), 0, 1);
+      zBelt = 690 + 115 * Math.sin(k * Math.PI * 0.65);
+    }
+
+    let zCrown = zBelt + 42;
+    let rxRoof = rxMax * 0.88;
+    const yWs = cfg.yF - 250, yRfF = cfg.yF - 680, yRfR = cfg.yR + 540, yTailTop = cfg.yTail + 30;
+    if (y < yWs && y > yTailTop) {
+      if (y >= yRfF) {
+        const k = clamp((yWs - y) / (yWs - yRfF), 0, 1);
+        const s = k * k * (3 - 2 * k);
+        zCrown = zBelt + 35 + s * (cfg.zRoofMax - (zBelt + 35));
+        rxRoof = rxMax * (0.90 - 0.24 * s);
+      } else if (y >= yRfR) {
+        const midU = (yRfF - y) / Math.max(1, yRfF - yRfR);
+        zCrown = cfg.zRoofMax + Math.sin(midU * Math.PI) * 16;
+        rxRoof = cfg.halfBodyW * 0.65;
+      } else {
+        const k = clamp((yRfR - y) / Math.max(1, yRfR - yTailTop), 0, 1);
+        const s = k * k * (3 - 2 * k);
+        zCrown = cfg.zRoofMax - s * (cfg.zRoofMax - (zBelt + 25));
+        rxRoof = cfg.halfBodyW * (0.65 + 0.19 * s);
+      }
+    } else if (y >= yWs) {
+      zCrown = zBelt + (y > cfg.yNose - 120 ? 18 : 42) - Math.max(0, 26 * (1 - uLen * 2.5));
+      rxRoof = rxMax * 0.86;
+    }
+
+    const right = [
+      [rxLower * 0.55, zBot],
+      [rxLower * 0.94, zBot + 16],
+      [rxLower,        zBot + 115],
+      [rxLower * 0.35 + rxMax * 0.65, Math.max(zBot + 185, zArchTop - 25)],
+      [rxMax * 0.96,   Math.max(zBot + 245, zArchTop + 48)],
+      [rxMax,          zArchTop + (zBelt - zArchTop) * 0.45],
+      [rxMax * 0.95,   zBelt - 25],
+      [rxMax * 0.88,   zBelt],
+      [rxMax * 0.55 + rxRoof * 0.45, zBelt + (zCrown - zBelt) * 0.42],
+      [rxRoof * 0.92,  zBelt + (zCrown - zBelt) * 0.80],
+      [rxRoof * 0.56,  zCrown - 12],
+      [rxRoof * 0.22,  zCrown - 2],
+      [0,              zCrown]
+    ];
+    const pts = [[0, y, zBot]];
+    for (let i = 0; i < right.length; i++) pts.push([right[i][0], y, right[i][1]]);
+    for (let i = right.length - 2; i >= 0; i--) pts.push([-right[i][0], y, right[i][1]]);
+    return { pts, meta: { y, zBelt, zCrown, arch } };
+  }
+
+  function buildGT3Car() {
+    clearGroup(ST.carRoot);
+
+    const isSport = S.vehicleType === "gt3_sport";
+    const wb = S.wb || 2600;
+    const yF = wb * 0.5, yR = -wb * 0.5;
+    const hpF = S.front.hp, hpR = S.rear.hp;
+    const tRf = S.front.tire.R || 300, tWf = S.front.tire.W || 265;
+    const tRr = S.rear.tire.R || 310, tWr = S.rear.tire.W || 285;
+
+    const unitCyl = createUnitCylinder();
+    const unitSphere = new THREE.SphereGeometry(1, 12, 10);
+
+    const aeroBodyGroup = new THREE.Group();
+    const paintMeshes = [], carbonMeshes = [], accentMeshes = [];
+    const addBody = (geo, mat, list) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.castShadow = true;
+      m.receiveShadow = true;
+      aeroBodyGroup.add(m);
+      if (list) list.push(m);
+      return m;
+    };
+
+    const wcXf = Math.abs(hpF.WC[0]), wcXr = Math.abs(hpR.WC[0]);
+    const halfBodyW = Math.max(wcXf + tWf * 0.36, wcXr + tWr * 0.38, 865);
+    const fWellRx = Math.min(wcXf - tWf * 0.5 - 65, 520);
+    const rWellRx = Math.min(wcXr - tWr * 0.5 - 55, 530);
+    const Y_nose = yF + 760, Y_tail = yR - 640;
+    const zRoofMax = isSport ? 1235 : 1190;
+
+    // 1. Watertight multi-material sculpted GT3 Coupe Body Loft
+    const ys = [];
+    for (let i = 0; i <= 36; i++) {
+      const u = i / 36;
+      ys.push(Y_nose + (Y_tail - Y_nose) * u);
+    }
+    const secData = ys.map(y => gt3SectionRing(y, {
+      yF, yR, tRf, tRr, halfBodyW, fWellRx, rWellRx, yNose: Y_nose, yTail: Y_tail, zRoofMax
+    }));
+    const rings = secData.map(d => d.pts);
+    const bodyGeo = buildMultiMatLoftGeometry(rings, true, (r, q, n) => {
+      const ym = (secData[r].meta.y + secData[r + 1].meta.y) * 0.5;
+      const arch = Math.max(secData[r].meta.arch, secData[r + 1].meta.arch);
+      const halfN = n / 2;
+      const symIdx = q < halfN ? q : (n - 1 - q);
+      if (symIdx <= 2) return 1;
+      if (arch > 0.35 && symIdx <= 4) return 2;
+      if (ym < yF - 255 && ym > yR + 120) {
+        if (ym > yF - 690 && symIdx >= 9) return 4;
+        if (ym < yF - 670 && ym > yR + 510 && symIdx >= 9 && symIdx <= 10) return 4;
+        if (ym <= yR + 520 && ym > yR + 150 && symIdx >= 10) return 4;
+      }
+      if (!isSport && symIdx >= 12) return 3;
+      return 0;
+    }, [2, 2]);
+    const bodyMesh = addBody(bodyGeo, [ST.mats.paint, ST.mats.carbon, ST.mats.darkTrim, ST.mats.accent, ST.mats.glass], paintMeshes);
+    bodyMesh.castShadow = true;
+
+    // 2. Carbon Front Splitter, Side Skirts & Mirrors
+    const spPts = [
+      [yF + 810, 48], [yF + 755, 42], [yF + 560, 42], [yF + 560, 62], [yF + 785, 68]
+    ];
+    for (const sx of [-1, 1]) {
+      const sm = addBody(makeExtrudedPlateYZ(spPts, halfBodyW * 0.92), ST.mats.carbon, carbonMeshes);
+      sm.position.x = sx * halfBodyW * 0.45;
+      const sk = new THREE.Mesh(new THREE.BoxGeometry(58, wb - 520, 18), ST.mats.carbon);
+      sk.position.set(sx * (halfBodyW - 14), (yF + yR) * 0.5, 62);
+      sk.castShadow = true;
+      aeroBodyGroup.add(sk);
+      carbonMeshes.push(sk);
+      addBoxMesh(aeroBodyGroup, [sx * (halfBodyW - 75), yF - 460, 745], [140, 82, 52], ST.mats.carbon);
+    }
+
+    // 3. LED Headlight Strips & Full-Width Rear Lightbar + Multi-Strake Rear Diffuser
+    for (const sx of [-1, 1]) {
+      addBoxMesh(aeroBodyGroup, [sx * 545, Y_nose - 230, 465], [160, 56, 38], ST.mats.headlight, [0.35, 0, -sx * 0.25]);
+    }
+    addBoxMesh(aeroBodyGroup, [0, Y_tail - 8, 690], [halfBodyW * 1.48, 22, 30], ST.mats.rainLight);
+    for (let k = -2; k <= 2; k++) {
+      addBoxMesh(aeroBodyGroup, [k * 235, Y_tail + 150, 145], [14, 340, 125], ST.mats.carbon);
+    }
+
+    // 4. GT3 Swan-Neck Wing vs GT3 Sport Track Spoiler
+    let rwFlap2M = null;
+    const rwY = isSport ? (yR - 565) : (yR - 615);
+    const rwZ = isSport ? 965 : 1145;
+    const rwSpan = isSport ? 1480 : 1760;
+    const rwChord = isSport ? 185 : 265;
+    const rwMainGeo = makeAirfoilGeo(rwChord, Math.round(rwChord * 0.11), 16, isSport ? 8 : 11, rwSpan);
+    addBody(rwMainGeo, ST.mats.carbon, carbonMeshes).position.set(0, rwY, rwZ);
+
+    let rwFlap2BaseY = 0, rwFlap2BaseZ = 0;
+    if (!isSport) {
+      const flapGeo = makeAirfoilGeo(110, 14, 10, 24, rwSpan - 20);
+      rwFlap2M = addBody(flapGeo, ST.mats.paint, paintMeshes);
+      rwFlap2BaseY = rwY - 175;
+      rwFlap2BaseZ = rwZ + 52;
+      rwFlap2M.position.set(0, rwFlap2BaseY, rwFlap2BaseZ);
+    }
+
+    const pylonPts = [[rwY + 180, 770], [rwY + 80, rwZ + 45], [rwY - 50, rwZ + 45], [rwY + 40, 770]];
+    for (const sx of [-1, 1]) {
+      const py = addBody(makeExtrudedPlateYZ(pylonPts, 14), ST.mats.carbon, carbonMeshes);
+      py.position.x = sx * 305;
+      const epPts = [[rwY + 130, rwZ - 55], [rwY - 260, rwZ - 40], [rwY - 270, rwZ + 125], [rwY + 120, rwZ + 75]];
+      const ep = addBody(makeExtrudedPlateYZ(epPts, 10), ST.mats.carbon, carbonMeshes);
+      ep.position.x = sx * (rwSpan * 0.5 + 5);
+    }
+    ST.carRoot.add(aeroBodyGroup);
+
+    // 5. Internal Rollbar & Front/Rear Subframes
+    const frameGroup = new THREE.Group();
+    const fFront = new THREE.Group(), fSide = new THREE.Group(), fMain = new THREE.Group(), fRear = new THREE.Group();
+    const fSubX = Math.max(210, hpF.LCA_F[0] - 15), rSubX = Math.max(210, hpR.LCA_F[0] - 15);
+    const Y_fh = yF - 260, Y_b = yR + 480;
+    [
+      [[-fSubX, yF + 260, 155], [fSubX, yF + 260, 155], 16],
+      [[-fSubX, yF + 260, 155], [-fSubX, Y_fh, 130], 16], [[fSubX, yF + 260, 155], [fSubX, Y_fh, 130], 16],
+      [[-hpF.DMP_BODY[0], yF, hpF.DMP_BODY[2]], [hpF.DMP_BODY[0], yF, hpF.DMP_BODY[2]], 15],
+      [[-fSubX, yF + 240, 155], [-hpF.DMP_BODY[0], yF, hpF.DMP_BODY[2]], 13],
+      [[fSubX, yF + 240, 155], [hpF.DMP_BODY[0], yF, hpF.DMP_BODY[2]], 13]
+    ].forEach(t => addTubeMesh(fFront, unitCyl, t[0], t[1], t[2], ST.mats.steelTube));
+    [
+      [[-580, Y_fh, 120], [-580, Y_b, 120], 16], [[580, Y_fh, 120], [580, Y_b, 120], 16],
+      [[-560, Y_fh, 700], [-500, Y_b, zRoofMax - 45], 15], [[560, Y_fh, 700], [500, Y_b, zRoofMax - 45], 15],
+      [[-500, Y_b, zRoofMax - 45], [500, Y_b, zRoofMax - 45], 16],
+      [[-500, Y_b, zRoofMax - 45], [-580, Y_b, 120], 16], [[500, Y_b, zRoofMax - 45], [580, Y_b, 120], 16]
+    ].forEach(t => addTubeMesh(fMain, unitCyl, t[0], t[1], t[2], ST.mats.steelTube));
+    [
+      [[-580, Y_fh, 280], [-580, Y_b, 420], 14], [[580, Y_fh, 280], [580, Y_b, 420], 14]
+    ].forEach(t => addTubeMesh(fSide, unitCyl, t[0], t[1], t[2], ST.mats.steelTube));
+    [
+      [[-rSubX, Y_b, 130], [-rSubX, yR - 260, 180], 16], [[rSubX, Y_b, 130], [rSubX, yR - 260, 180], 16],
+      [[-hpR.DMP_BODY[0], yR, hpR.DMP_BODY[2]], [hpR.DMP_BODY[0], yR, hpR.DMP_BODY[2]], 15],
+      [[-500, Y_b, zRoofMax - 45], [-hpR.DMP_BODY[0], yR, hpR.DMP_BODY[2]], 13],
+      [[500, Y_b, zRoofMax - 45], [hpR.DMP_BODY[0], yR, hpR.DMP_BODY[2]], 13]
+    ].forEach(t => addTubeMesh(fRear, unitCyl, t[0], t[1], t[2], ST.mats.steelTube));
+    frameGroup.add(fFront, fSide, fMain, fRear);
+    ST.carRoot.add(frameGroup);
+
+    // 6. Cockpit Helmet, V8 Powertrain & GT Steering
+    const driverGroup = new THREE.Group();
+    const helm = new THREE.Mesh(new THREE.SphereGeometry(112, 18, 16), ST.mats.helmet);
+    helm.position.set(-285, Y_b + 240, 895);
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(142, 52, 48), ST.mats.visor);
+    visor.position.set(-285, Y_b + 320, 902);
+    driverGroup.add(helm, visor);
+    ST.carRoot.add(driverGroup);
+
+    const powertrainGroup = new THREE.Group();
+    addBoxMesh(powertrainGroup, [0, yF - 35, 310], [340, 520, 320], ST.mats.edu);
+    addBoxMesh(powertrainGroup, [0, yR + 120, 295], [260, 420, 220], ST.mats.darkTrim);
+    addTubeMesh(powertrainGroup, unitCyl, [-160, yR - 220, 195], [-160, yR - 590, 185], 26, ST.mats.aluminum);
+    addTubeMesh(powertrainGroup, unitCyl, [160, yR - 220, 195], [160, yR - 590, 185], 26, ST.mats.aluminum);
+    ST.carRoot.add(powertrainGroup);
+
+    const steerGroup = new THREE.Group();
+    const rackY = yF + hpF.RACK[1], rackZ = hpF.RACK[2];
+    const rHousing = new THREE.Mesh(new THREE.CylinderGeometry(18, 18, Math.min(340, Math.abs(hpF.RACK[0]) * 1.4), 14), ST.mats.darkTrim);
+    rHousing.rotation.z = Math.PI / 2;
+    rHousing.position.set(0, rackY, rackZ);
+    const rackRod = new THREE.Mesh(new THREE.CylinderGeometry(11, 11, hpF.RACK[0] * 2, 12), ST.mats.aluminum);
+    rackRod.rotation.z = Math.PI / 2;
+    rackRod.position.set(0, rackY, rackZ);
+    steerGroup.add(rHousing, rackRod);
+    const pPin = [-220, rackY, rackZ + 55], pWhl = [-285, Y_fh - 360, 680];
+    addTubeMesh(steerGroup, unitCyl, pPin, pWhl, 12, ST.mats.aluminum);
+    const swPivot = new THREE.Group();
+    swPivot.position.set(pWhl[0], pWhl[1], pWhl[2]);
+    const colD = new THREE.Vector3(pWhl[0] - pPin[0], pWhl[1] - pPin[1], pWhl[2] - pPin[2]).normalize();
+    swPivot.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), colD);
+    const swSpin = new THREE.Group();
+    const gtWheel = new THREE.Mesh(new THREE.BoxGeometry(285, 165, 16), ST.mats.carbon);
+    swSpin.add(gtWheel);
+    swPivot.add(swSpin);
+    steerGroup.add(swPivot);
+    ST.carRoot.add(steerGroup);
+
+    const corners = buildSuspensionCorners(unitCyl, unitSphere, { isGT3: true });
+    const { arbGrp, arbs } = buildArbAssemblies(unitCyl);
+    const rcOverlay = buildRcOverlay(unitSphere);
+
+    ST.parts = {
+      vehicleType: S.vehicleType,
+      isOpenFrame: false,
+      aeroBodyGroup, paintMeshes, carbonMeshes, accentMeshes,
+      driverGroup, rwFlap2M, rwFlap2BaseY, rwFlap2BaseZ,
+      frameGroup, fFront, fSide, fMain, fRear,
+      powertrainGroup, steerGroup, rackRod, swSpin,
+      arbGrp, arbs, rcOverlay,
+      corners
+    };
+    ST.carKey = buildCarKey();
     applyMaterialModes();
   }
 
@@ -1618,12 +2343,14 @@
     const xray = CFG.shellMode === "xray" || forceXray;
     const pureSusp = isPureSuspActive();
 
-    const setXray = (mat, op) => {
-      const nextOp = xray ? op : 1.0;
-      if (mat.transparent !== xray || mat.opacity !== nextOp || mat.depthWrite !== !xray) {
-        mat.transparent = xray;
+    const setXray = (mat, op, baseOp) => {
+      const nextOp = xray ? op : (baseOp !== undefined ? baseOp : 1.0);
+      const trans = xray || (baseOp !== undefined && baseOp < 1.0);
+      const dw = !trans;
+      if (mat.transparent !== trans || mat.opacity !== nextOp || mat.depthWrite !== dw) {
+        mat.transparent = trans;
         mat.opacity = nextOp;
-        mat.depthWrite = !xray;
+        mat.depthWrite = dw;
       }
     };
     const isAutoFrontGhost = forceXray && CFG.shellMode !== "xray";
@@ -1631,6 +2358,8 @@
     setXray(ST.mats.carbon, isAutoFrontGhost ? 0.22 : 0.26);
     setXray(ST.mats.accent, isAutoFrontGhost ? 0.26 : 0.30);
     setXray(ST.mats.darkTrim, isAutoFrontGhost ? 0.18 : 0.22);
+    if (ST.mats.skid) setXray(ST.mats.skid, isAutoFrontGhost ? 0.22 : 0.30);
+    if (ST.mats.glass) setXray(ST.mats.glass, isAutoFrontGhost ? 0.14 : 0.20, 0.62);
 
     const p = ST.parts;
     p.aeroBodyGroup.visible = !pureSusp && !!S.show.frame_main;
@@ -1638,27 +2367,80 @@
     p.fSide.visible  = !!S.show.frame_side;
     p.fMain.visible  = !!S.show.frame_main;
     p.fRear.visible  = !!S.show.frame_rear;
-    p.frameGroup.visible = xray || !S.show.frame_main;
-    p.powertrainGroup.visible = (xray || !p.aeroBodyGroup.visible) && !!S.show.powertrain;
+    p.frameGroup.visible = p.isOpenFrame ? !!S.show.frame_main : (xray || !S.show.frame_main);
+    p.powertrainGroup.visible = (xray || !p.aeroBodyGroup.visible || p.isOpenFrame) && !!S.show.powertrain;
     p.steerGroup.visible = (!onlyAxis || onlyAxis === "front") && (!!S.show.steer_rack || !!S.show.steer_col || !!S.show.steer_wheel);
+    if (p.arbGrp) p.arbGrp.visible = !!S.show.arb;
 
-    // Enclose internal inboard rockers/dampers/springs inside smooth bodywork in solid mode; reveal in xray or when bodywork hidden
-    const showInternalSusp = xray || !p.aeroBodyGroup.visible;
+    const showInternalSusp = xray || !p.aeroBodyGroup.visible || p.isOpenFrame;
     p.showInternalSusp = showInternalSusp;
     for (const key of ["FR", "FL", "RR", "RL"]) {
       const c = p.corners && p.corners[key];
       if (!c) continue;
-      c.rockerMesh.visible = showInternalSusp;
-      c.rockerAxle.visible = showInternalSusp;
-      c.dmpBody.visible    = showInternalSusp;
-      c.dmpShaft.visible   = showInternalSusp;
-      c.springMesh.visible = showInternalSusp;
-      if (c.joints && c.joints.ST_I) c.joints.ST_I.visible = showInternalSusp;
+      c.rockerMesh.visible = !c.isDirect && showInternalSusp;
+      c.rockerAxle.visible = !c.isDirect && showInternalSusp;
+      c.dmpBody.visible    = showInternalSusp || c.isDirect;
+      c.dmpShaft.visible   = showInternalSusp || c.isDirect;
+      c.springMesh.visible = showInternalSusp || c.isDirect;
+      if (c.joints && c.joints.ST_I) c.joints.ST_I.visible = !c.isDirect && showInternalSusp;
     }
   }
 
-  function syncFormulaPose(opts) {
-    if (!ST.parts || ST.carKey !== buildFormulaKey()) buildFormulaCar();
+  function buildActiveVehicle() {
+    if (typeof S !== "undefined" && S) {
+      if (S.vehicleType === "baja") { buildBajaCar(); return; }
+      if (S.vehicleType === "gt3" || S.vehicleType === "gt3_sport") { buildGT3Car(); return; }
+    }
+    buildFormulaCar();
+  }
+
+  function linkHeatColor(ratio) {
+    // ratio > 0 (tension): coral/amber-red; ratio < 0 (compression): cyan-blue; near 0: steel slate
+    const a = Math.min(1, Math.abs(ratio));
+    if (ratio >= 0) {
+      return new THREE.Color(0x3b4454).lerp(new THREE.Color(0xef4444), a);
+    }
+    return new THREE.Color(0x3b4454).lerp(new THREE.Color(0x06b6d4), a);
+  }
+
+  function ensureCornerForceMats(c) {
+    if (c.linkForceMats) return c.linkForceMats;
+    const mk = (base) => base.clone();
+    c.linkForceMats = {
+      lcaF: mk(ST.mats.wishbone),
+      lcaR: mk(ST.mats.wishbone),
+      ucaF: mk(ST.mats.wishbone),
+      ucaR: mk(ST.mats.wishbone),
+      tieRod: mk(ST.mats.tieRod),
+      strut: mk(ST.mats.pushrod)
+    };
+    return c.linkForceMats;
+  }
+
+  function estimateAnalysisCornerLoads(wb) {
+    const fW = ((S.front.mS || 0) * 0.5 + (S.front.mU || 0)) * 9.81;
+    const rW = ((S.rear.mS || 0) * 0.5 + (S.rear.mU || 0)) * 9.81;
+    const gy = (S.qs && Number.isFinite(S.qs.gy)) ? S.qs.gy : 0;
+    const gx = (S.qs && Number.isFinite(S.qs.gx)) ? S.qs.gx : 0;
+    const fz = { FL: fW, FR: fW, RL: rW, RR: rW };
+    if (typeof solveQuasiStatic === "function") {
+      try {
+        const qs = solveQuasiStatic(gy, gx);
+        if (qs && qs.fz && Number.isFinite(qs.fz.FL)) {
+          fz.FL = qs.fz.FL; fz.FR = qs.fz.FR; fz.RL = qs.fz.RL; fz.RR = qs.fz.RR;
+        }
+      } catch (e) {}
+    }
+    return {
+      FR: { fx: fz.FR * gy, fy: fz.FR * gx, fz: fz.FR },
+      FL: { fx: fz.FL * gy, fy: fz.FL * gx, fz: fz.FL },
+      RR: { fx: fz.RR * gy, fy: fz.RR * gx, fz: fz.RR },
+      RL: { fx: fz.RL * gy, fy: fz.RL * gx, fz: fz.RL }
+    };
+  }
+
+  function syncCarPose(opts) {
+    if (!ST.parts || ST.carKey !== buildCarKey()) buildActiveVehicle();
     applyMaterialModes(opts);
 
     const p = ST.parts;
@@ -1671,11 +2453,11 @@
     // Optional DRS rear flap visual pitch
     if (p.rwFlap2M) {
       const drsOpen = !!(opts && opts.drs);
-      p.rwFlap2M.rotation.x = drsOpen ? 0.30 : 0.0; // flatten rear flap when DRS active
+      p.rwFlap2M.rotation.x = drsOpen ? 0.30 : 0.0;
       p.rwFlap2M.position.set(0, p.rwFlap2BaseY, p.rwFlap2BaseZ + (drsOpen ? 4 : 0));
     }
 
-    // Steering rack & butterfly wheel live angle
+    // Steering rack & wheel live angle
     if (p.rackRod) p.rackRod.position.x = -(S.rack || 0);
     if (p.swSpin) p.swSpin.rotation.z = -(S.swAngle || 0) * (Math.PI / 180);
 
@@ -1690,7 +2472,6 @@
       RL: { M: SIM.RL, m: SIM.mRL, yOff: yR, driven: true  }
     };
 
-    // Check powertrain drive layout if available
     if (typeof POWERTRAIN !== "undefined" && POWERTRAIN.getActiveSpec) {
       try {
         const spec = POWERTRAIN.getActiveSpec();
@@ -1703,7 +2484,58 @@
       } catch (e) {}
     }
 
+    const forceOn = !!(typeof S !== "undefined" && S && S.show && S.show.force);
+    const stageTel = opts && opts.telemetry && opts.telemetry.Fz ? opts.telemetry : null;
+    // Note: VehicleDynamics15DOF uses +Fx = longitudinal forward (+Y here), +Fy = right lateral (+X here)
+    const cornerLoads = forceOn ? (stageTel ? {
+      FR: { fx: (stageTel.Fy && stageTel.Fy.FR) || 0, fy: (stageTel.Fx && stageTel.Fx.FR) || 0, fz: stageTel.Fz.FR || 0 },
+      FL: { fx: (stageTel.Fy && stageTel.Fy.FL) || 0, fy: (stageTel.Fx && stageTel.Fx.FL) || 0, fz: stageTel.Fz.FL || 0 },
+      RR: { fx: (stageTel.Fy && stageTel.Fy.RR) || 0, fy: (stageTel.Fx && stageTel.Fx.RR) || 0, fz: stageTel.Fz.RR || 0 },
+      RL: { fx: (stageTel.Fy && stageTel.Fy.RL) || 0, fy: (stageTel.Fx && stageTel.Fx.RL) || 0, fz: stageTel.Fz.RL || 0 }
+    } : estimateAnalysisCornerLoads(wb)) : null;
+
     const onlyAxis = opts && opts.onlyAxis;
+
+    // Update 3D ARB torsion bars & LCA drop-links when enabled
+    if (p.arbs) {
+      for (const [ax, yOff, rK, lK] of [["front", yF, "FR", "FL"], ["rear", yR, "RR", "RL"]]) {
+        const ab = p.arbs[ax];
+        const stAx = S[ax];
+        const showAx = !!S.show.arb && stAx && stAx.arb && stAx.arb.d > 0.5 && (!onlyAxis || onlyAxis === ax) && typeof arbGeom === "function";
+        [ab.bar, ab.armR, ab.armL, ab.dropR, ab.dropL].forEach(mesh => { mesh.visible = showAx; });
+        if (showAx) {
+          const mrInfo = mapCorner[rK], mlInfo = mapCorner[lK];
+          const lbjR = (mrInfo && mrInfo.M && mrInfo.M.n) ? mrInfo.M.n[mrInfo.M.idx.LBJ].p : stAx.hp.LBJ;
+          const lbjL = (mlInfo && mlInfo.M && mlInfo.M.n) ? mlInfo.M.n[mlInfo.M.idx.LBJ].p : stAx.hp.LBJ;
+          const gR = arbGeom(lbjR, stAx), gL = arbGeom(lbjL, stAx);
+          const brR = Math.max(4, Math.min(18, stAx.arb.d * 0.44));
+          const pBarR = [gR.xa, gR.ay + yOff, gR.az], pBarL = [-gL.xa, gL.ay + yOff, gL.az];
+          const pArmR = [gR.E[0], gR.E[1] + yOff, gR.E[2]], pArmL = [-gL.E[0], gL.E[1] + yOff, gL.E[2]];
+          const pAttR = [gR.P[0], gR.P[1] + yOff, gR.P[2]], pAttL = [-gL.P[0], gL.P[1] + yOff, gL.P[2]];
+          orientBetween(ab.bar, pBarL, pBarR, brR);
+          orientBetween(ab.armR, pBarR, pArmR, Math.max(4, brR * 0.72));
+          orientBetween(ab.armL, pBarL, pArmL, Math.max(4, brR * 0.72));
+          orientBetween(ab.dropR, pArmR, pAttR, 4.5);
+          orientBetween(ab.dropL, pArmL, pAttL, 4.5);
+        }
+      }
+    }
+
+    // Update 3D Roll Center markers when enabled
+    if (p.rcOverlay) {
+      const showRc = !!(S.show.ic && (forceOn || CFG.shellMode === "xray" || (opts && opts.forceXray)) && !isPureSuspActive());
+      p.rcOverlay.rcGrp.visible = showRc;
+      if (showRc) {
+        const rcF = (SIM.mFR && Number.isFinite(SIM.mFR.rcH)) ? SIM.mFR.rcH : 45;
+        const rcR = (SIM.mRR && Number.isFinite(SIM.mRR.rcH)) ? SIM.mRR.rcH : 65;
+        p.rcOverlay.frontDot.position.set(0, yF, rcF);
+        p.rcOverlay.rearDot.position.set(0, yR, rcR);
+        const posAttr = p.rcOverlay.rcLine.geometry.getAttribute("position");
+        posAttr.setXYZ(0, 0, yF, rcF);
+        posAttr.setXYZ(1, 0, yR, rcR);
+        posAttr.needsUpdate = true;
+      }
+    }
     for (const key of ["FR", "FL", "RR", "RL"]) {
       const c = p.corners[key];
       const info = mapCorner[key];
@@ -1739,8 +2571,10 @@
       c.joints.ST_O.position.set(ST_O[0], ST_O[1], ST_O[2]);
       c.joints.ST_I.position.set(ST_I[0], ST_I[1], ST_I[2]);
 
+      const RCK = c.axis === "front"
+        ? [S.front.hp.RACK[0] * sx - (S.rack || 0), S.front.hp.RACK[1] + yOff, S.front.hp.RACK[2]]
+        : [S.rear.hp.RACK[0] * sx, S.rear.hp.RACK[1] + yOff, S.rear.hp.RACK[2]];
       if (c.axis === "front") {
-        const RCK = [S.front.hp.RACK[0] * sx - (S.rack || 0), S.front.hp.RACK[1] + yOff, S.front.hp.RACK[2]];
         c.tieRod.visible = !!S.show.steer;
         orientBetween(c.tieRod, RCK, TRO, 6.5);
       } else {
@@ -1754,7 +2588,7 @@
         c.rockerAxle.visible = false;
         c.strut.visible = false;
         c.joints.ST_I.visible = false;
-        const showEl = !!S.show.elastic && showInt;
+        const showEl = !!S.show.elastic && (showInt || isDirect);
         c.dmpBody.visible = showEl; c.dmpShaft.visible = showEl; c.springMesh.visible = showEl;
         if (showEl) {
           const midD = lerp3(ST_O, DMP_B, 0.52);
@@ -1836,8 +2670,80 @@
         // Left side:  Y_local = -Y rear => top (+Z) moves fwd (+Y) with +spin around +X_local (-X world)
         c.spinGrp.rotation.x = sx > 0 ? -spin : spin;
       }
+
+      // 3D Force Overlay: Link Tension/Compression Coloring + Contact Patch Friction Circle & Vectors
+      if (forceOn && cornerLoads) {
+        const ld = cornerLoads[key];
+        const CP = m.cp ? T(m.cp) : [WC[0], WC[1], WC[2] - (S[c.axis].tire.R || 230)];
+        const fzVal = Math.max(0, ld.fz || 0);
+        const fzNorm = Math.max(800, fzVal);
+        const mags = solveCornerLinkLoadsJS({
+          LCA_F: LAF, LCA_R: LAR, LBJ,
+          UCA_F: UAF, UCA_R: UAR, UBJ,
+          RACK: RCK, TRO,
+          STRUT_BASE: isDirect ? DMP_B : ST_I, ST_O
+        }, WC, CP, [ld.fx || 0, ld.fy || 0, fzVal]);
+
+        const fm = ensureCornerForceMats(c);
+        const mapLink = [
+          [c.lcaF, fm.lcaF, 0], [c.lcaR, fm.lcaR, 1],
+          [c.ucaF, fm.ucaF, 2], [c.ucaR, fm.ucaR, 3],
+          [c.tieRod, fm.tieRod, 4], [c.strut, fm.strut, 5]
+        ];
+        for (const [mesh, mat, idx] of mapLink) {
+          const col = linkHeatColor(mags[idx] / fzNorm);
+          mat.color.copy(col);
+          mat.emissive.copy(col).multiplyScalar(0.35);
+          mesh.material = mat;
+        }
+
+        c.forceGrp.visible = true;
+        const refFz = Math.max(400, ((S[c.axis].mS || 0) * 0.5 + (S[c.axis].mU || 0)) * 9.81);
+        const fCap = Math.max(120, 1.45 * fzVal);
+        const tW = S[c.axis].tire.W || 200;
+        const rMax = Math.max(60, Math.min(300, tW * 0.92 * Math.sqrt(Math.max(0.05, fzVal / refFz))));
+        const fh = Math.hypot(ld.fx || 0, ld.fy || 0);
+        const sat = Math.min(1.15, fh / fCap);
+        const fCol = sat > 0.88 ? 0xef4444 : (sat > 0.58 ? 0xf59e0b : 0x34d399);
+        c.fricRing.material.color.setHex(fCol);
+        c.fricDisk.material.color.setHex(fCol);
+        c.fricRing.position.set(CP[0], CP[1], CP[2] + 3);
+        c.fricRing.scale.set(rMax, rMax, 1);
+        c.fricDisk.position.set(CP[0], CP[1], CP[2] + 2);
+        c.fricDisk.scale.set(rMax, rMax, 1);
+
+        const fzLen = Math.min(340, Math.max(16, (fzVal / refFz) * 145));
+        orientBetween(c.vecZCol, [CP[0], CP[1], CP[2] + 3], [CP[0], CP[1], CP[2] + 3 + fzLen], 7.5);
+
+        const hLen = Math.min(rMax * 1.15, rMax * (fh / fCap));
+        if (hLen > 14) {
+          c.vecHShaft.visible = true; c.vecHHead.visible = true;
+          const hx = (ld.fx || 0) / fh, hy = (ld.fy || 0) / fh;
+          const tipLen = Math.min(34, Math.max(16, hLen * 0.34));
+          const p0 = [CP[0], CP[1], CP[2] + 9];
+          const pMid = [CP[0] + hx * (hLen - tipLen), CP[1] + hy * (hLen - tipLen), CP[2] + 9];
+          orientBetween(c.vecHShaft, p0, pMid, 7.5);
+          c.vecHHead.position.set(CP[0] + hx * (hLen - tipLen * 0.5), CP[1] + hy * (hLen - tipLen * 0.5), CP[2] + 9);
+          ST.tmpV1.set(hx, hy, 0);
+          c.vecHHead.quaternion.setFromUnitVectors(ST.upY, ST.tmpV1);
+          c.vecHHead.scale.set(17, tipLen, 17);
+        } else {
+          c.vecHShaft.visible = false; c.vecHHead.visible = false;
+        }
+      } else {
+        c.forceGrp.visible = false;
+        if (c.linkForceMats) {
+          c.lcaF.material = ST.mats.wishbone;
+          c.lcaR.material = ST.mats.wishbone;
+          c.ucaF.material = ST.mats.wishbone;
+          c.ucaR.material = ST.mats.wishbone;
+          c.tieRod.material = ST.mats.tieRod;
+          c.strut.material = ST.mats.pushrod;
+        }
+      }
     }
   }
+  const syncFormulaPose = syncCarPose;
 
   function ensureSize(w, h, dpr) {
     const rw = Math.max(10, Math.round(w));
@@ -2011,10 +2917,11 @@
         0, 0, 0, 1
       );
 
-      syncFormulaPose({
+      syncCarPose({
         hideDriver: !!opts.hideDriver,
         drs: !!opts.drs,
-        brakeIntensity: opts.brakeIntensity || 0
+        brakeIntensity: opts.brakeIntensity || 0,
+        telemetry: opts.telemetry || null
       });
 
       // Transparent clear over stage 2D tarmac

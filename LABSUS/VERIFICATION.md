@@ -44,7 +44,7 @@ M5 的前后轴静载对调就是三内核一致地错 —— 双端对拍与镜
 | 手段 | 位置 | 状态 |
 |---|---|---|
 | 特征化快照（PRO 基线数值） | `engine/tests/test_v3_api.py`、`test_v3_chassis.py` | ✅ 在位（**非**正确性证明，代码注释已写明） |
-| 前端结构/接线断言 | `web/test/test_dom.js`（359 项） | ✅ 在位 |
+| 前端结构/接线断言 | `web/test/test_dom.js`（363 项） | ✅ 在位 |
 | 舞台加载与帧循环 | `web/test/stage_boot_check.js`（52 项） | ✅ 在位 |
 
 ### L1 · 内部不变量 —— 项目最强的一层

@@ -1042,7 +1042,12 @@ function fitView(v){
   const pts=fitPoints();
   if((typeof CAR3D_GL!=="undefined" && CAR3D_GL.isActiveForView()) || (v.type==="p" && typeof S!=="undefined" && S && S.vehicleType==="formula")){
     const yF = S.wb/2, yR = -S.wb/2;
-    if(v.type==="p"){
+    const vt = typeof S!=="undefined" && S ? S.vehicleType : "formula";
+    if(vt==="baja"){
+      pts.push([-690, yF+410, 180], [690, yF+410, 180], [-650, yR-350, 1180], [650, yR-350, 1180]);
+    }else if(vt==="gt3" || vt==="gt3_sport"){
+      pts.push([-920, yF+810, 80], [920, yF+810, 80], [-920, yR-680, 1240], [920, yR-680, 1240]);
+    }else if(v.type==="p"){
       pts.push([-670, yF+585, 120], [670, yF+585, 120], [-560, yR-430, 1020], [560, yR-430, 1020]);
     }else{
       pts.push([-670, yF+520, 120], [670, yF+520, 120], [-560, yR-360, 980], [560, yR-360, 980]);
@@ -1176,8 +1181,28 @@ function drawOverlay(v){
         ctx.strokeStyle = C.rc; ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.arc(rS[0], rS[1], 4.5, 0, 6.2832); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(rS[0]-9, rS[1]); ctx.lineTo(rS[0]+9, rS[1]);
-        ctx.moveTo(rS[0], rS[1]-9); ctx.lineTo(rS[0]+9, rS[1]+9); ctx.stroke();
+        ctx.moveTo(rS[0], rS[1]-9); ctx.lineTo(rS[0], rS[1]+9); ctx.stroke();
         ctx.fillStyle = C.rc; ctx.fillText("RC 侧倾中心 "+fmt(rc[1],1)+"mm", rS[0]+11, rS[1]-4);
+
+        // RC 动态迁移包络（沿扫掠行程 rcH 轨迹区间）
+        const sw = isF ? SIM.swF : SIM.swR;
+        if(sw && Array.isArray(sw.rows) && sw.rows.length > 1){
+          let rcMin = Infinity, rcMax = -Infinity;
+          for(const row of sw.rows){
+            if(row && Number.isFinite(row.rcH)){
+              if(row.rcH < rcMin) rcMin = row.rcH;
+              if(row.rcH > rcMax) rcMax = row.rcH;
+            }
+          }
+          if(Number.isFinite(rcMin) && rcMax - rcMin > 0.5){
+            const pLo = P2(v, [rc[0], yOff, rcMin]), pHi = P2(v, [rc[0], yOff, rcMax]);
+            dash(ctx, [3,3]); ctx.strokeStyle = C.rc; ctx.lineWidth = 1.2;
+            ctx.beginPath(); ctx.moveTo(pLo[0], pLo[1]); ctx.lineTo(pHi[0], pHi[1]);
+            ctx.moveTo(pLo[0]-4, pLo[1]); ctx.lineTo(pLo[0]+4, pLo[1]);
+            ctx.moveTo(pHi[0]-4, pHi[1]); ctx.lineTo(pHi[0]+4, pHi[1]);
+            ctx.stroke(); dash(ctx, []);
+          }
+        }
       }
     }
 

@@ -560,6 +560,20 @@ require('./test_tire_wiring')(webDir, ok, failures.push.bind(failures), { log(){
   ok(/trackFlagsNote\(res\)/.test(src), 'track flags: 状态行实际消费（接线守卫）');
 }
 
+// ── Stage 2: 全车型 3D WebGL (Formula / Baja / GT3) & 3D 力学叠加守卫 ───
+{
+  const glSrc = fs.readFileSync(path.join(webDir, 'js/05b-car3d-webgl.js'), 'utf8');
+  const uiSrc = fs.readFileSync(path.join(webDir, 'js/06-ui-panels.js'), 'utf8');
+  ok(/\["formula",\s*"baja",\s*"gt3",\s*"gt3_sport"\]\.includes/.test(glSrc),
+    'car3d-webgl: supportsCurrentVehicle 覆盖 formula/baja/gt3/gt3_sport');
+  ok(/function buildBajaCar\(\)/.test(glSrc) && /function buildGT3Car\(\)/.test(glSrc),
+    'car3d-webgl: buildBajaCar 与 buildGT3Car 已实现');
+  ok(/function solveCornerLinkLoadsJS\(/.test(glSrc) && /S\.show\.force/.test(glSrc),
+    'car3d-webgl: 二力杆静力拉压着色与 S.show.force 摩擦圆叠加接线');
+  ok(/\["force",\s*"3D 力学叠加"\]/.test(uiSrc),
+    'ui-panels: DISPLAY LAYERS 暴露 force 图层开关');
+}
+
 // ── 结果（必须在所有断言之后，见文件中部 M10b 注释）──────────────────────
 if (failures.length) {
   console.error(`DOM/结构测试 FAIL：${failures.length}/${checks} 项失败`);

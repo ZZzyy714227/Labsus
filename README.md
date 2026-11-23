@@ -160,7 +160,7 @@ ruff check engine                      # All checks passed（配置见 pyproject
 python scripts/sync_root_docs.py --check   # 根 ↔ LABSUS 的 README/LICENSE 逐字节一致
 
 # ── 前端防线（逐套件，共 30 套）─────────────────────────────────────────
-node web/test/test_dom.js              # 359 断言：薄壳结构 / 双端同构 / 已知 bug 回访
+node web/test/test_dom.js              # 363 断言：薄壳结构 / 双端同构 / 已知 bug 回访
 node web/test/stage_boot_check.js      # 52 断言：模块加载顺序 / TDZ / 三舞台 20 帧无抛错
 node web/test/test_lap_15dof.js        # 23 断言：2 圈 5.45km 全闭环 + 6 项 powertrain parity
 node web/test/test_15dof_steady.js     # 18 断言：15-DOF 解析稳态锚 + kT 真源接线
