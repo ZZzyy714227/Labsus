@@ -1054,6 +1054,123 @@
   </div>
 </div>
 
+<!-- ================================ 大学生方程式动态赛场 (FSAE / FSC ARENA) ================================ -->
+<div id="fsaeStageModal" class="fsae-stage-modal-backdrop">
+  <div class="fsae-stage-topbar">
+    <div class="fsae-bar-row">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="color:#fb923c;font-size:13.5px;font-weight:800;display:inline-flex;align-items:center;gap:6px;">
+          <span>🏆</span> 大学生方程式动态赛场 · FSAE / FSC ARENA
+        </span>
+        <span id="fsaeHudEventBadge" class="fsae-pill">⚡ 直线加速 (75m)</span>
+        <div class="fsae-seg-group">
+          <button class="fsae-ev-btn on" data-ev="accel" title="FSAE D5: 75m 静止起步直线加速赛 + ≥75m 制动区">⚡ 直线加速 (75m)</button>
+          <button class="fsae-ev-btn" data-ev="skidpad" title="FSAE D6: 双切圆 18.25m 八字绕环（右2圈+左2圈）">∞ 八字绕环 (Skidpad)</button>
+          <button class="fsae-ev-btn" data-ev="autocross" title="FSAE D7: 窄道桩桶单圈赛（含 FSG / FSI 官方数据 + FSC 标准赛道）">🏁 单圈赛 (Autocross)</button>
+          <button class="fsae-ev-btn" data-ev="combined" title="依次自动跑完 直线加速 → 八字绕环 → 单圈赛 并计算 275 分动态赛总成绩">🏆 三项组合联测</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:7px;">
+        <select id="fsaeVehSelect" class="fsae-select" title="切换测试车型（默认 Formula SAE 方程式）">
+          <option value="formula">🏎️ Formula SAE</option>
+          <option value="gt3">🏁 FIA GT3</option>
+          <option value="gt3_sport">🚗 GT3 公路运动</option>
+          <option value="baja">🏜️ SAE Baja</option>
+        </select>
+        <button class="skidpad-action-btn" id="fsaeAutoBtn">🤖 自动驾驶: 开</button>
+        <button class="skidpad-action-btn" id="fsaePlayBtn">⏸ 暂停</button>
+        <button class="skidpad-action-btn" id="fsaeResetBtn" title="重置当前项目 (快捷键: R)">↺ 重跑</button>
+        <button class="skidpad-action-btn skidpad-exit-btn" id="fsaeExitBtn" onclick="closeFsaeStage()">✖ 退出赛场</button>
+      </div>
+    </div>
+
+    <div class="fsae-bar-row fsae-bar-sub">
+      <div id="fsaeTrackSelectorRow" style="display:none;align-items:center;gap:6px;">
+        <span class="fsae-sub-lbl">单圈赛赛道:</span>
+        <button class="fsae-trk-btn on" data-trk="fsg" title="GitHub MIT 开源真实数据: Formula Student Germany (~305m)">🇩🇪 FSG 德国官方 (305m)</button>
+        <button class="fsae-trk-btn" data-trk="fsi" title="GitHub MIT 开源真实数据: Formula Student Italy (~215m)">🇮🇹 FSI 意大利官方 (215m)</button>
+        <button class="fsae-trk-btn" data-trk="fsc_std" title="按 FSC/FSAE 规则自研全要素单圈：3.6m道宽 / ≤80m直线 / 5桩绕桩 / 发卡弯 / 回旋弯">🇨🇳 FSC 标准单圈 (744m)</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span class="fsae-sub-lbl">机位:</span>
+        <button class="fsae-cam-btn on" data-cam="behind">🏎️ 追尾</button>
+        <button class="fsae-cam-btn" data-cam="cockpit">💺 驾驶舱</button>
+        <button class="fsae-cam-btn" data-cam="nose">🔭 前鼻锥</button>
+        <button class="fsae-cam-btn" data-cam="wheel">🛞 车轮</button>
+        <button class="fsae-cam-btn" data-cam="aerial">🚁 高空鸟瞰</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+        <label class="fsae-sub-lbl">附着系数 μ <b id="fsaeMuVal" style="color:#7ee787;">1.35</b>
+          <input type="range" id="fsaeMuSlider" min="0.80" max="1.65" step="0.05" value="1.35" style="width:76px;vertical-align:middle;margin-left:4px;">
+        </label>
+        <label class="fsae-sub-lbl">倍速
+          <select id="fsaeTimeScale" class="fsae-select" style="padding:2px 6px;">
+            <option value="0.5">0.5x</option>
+            <option value="1.0" selected>1.0x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2.0">2.0x</option>
+          </select>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="fsae-stage-body">
+    <div class="fsae-viewport-wrap">
+      <canvas id="fsaeCanvas" tabindex="0"></canvas>
+      <div class="fsae-bottom-hint">
+        🎮 控制：<b>W/S/A/D</b> 接管驾驶 · <b>空格</b> 紧急制动 · <b>R</b> 重置当前项目 · <b>鼠标拖拽/滚轮</b> 环绕与缩放 · 蓝色=左侧桩桶 / 黄色=右侧桩桶 / 橙色=计时门
+      </div>
+    </div>
+
+    <aside class="fsae-sidebar">
+      <div class="fsae-card">
+        <div class="fsae-card-hd">📡 实时遥测与赛段状态</div>
+        <div class="fsae-kv"><span>当前赛段</span><b id="fsaeHudPhase" style="color:#79c0ff;">--</b></div>
+        <div class="fsae-kv"><span>实时车速</span><b id="fsaeHudSpeed" style="color:#7ee787;font-size:15px;">0.0 km/h</b></div>
+        <div class="fsae-kv"><span>项目计时</span><b id="fsaeHudTimer" style="color:#fde047;font-size:15px;">0.00 s</b></div>
+        <div class="fsae-kv"><span>纵向 / 侧向 G</span><b id="fsaeHudAxAy">0.00 g / 0.00 g</b></div>
+        <div class="fsae-kv"><span>前轮转角</span><b id="fsaeHudSteer">0.0°</b></div>
+        <div class="fsae-kv"><span>撞桶判定 (DOO)</span><b id="fsaeHudCones" style="color:#86efac;">0 桶 (干净)</b></div>
+      </div>
+
+      <div class="fsae-card">
+        <div class="fsae-card-hd">🏆 FSAE / FSC 动态赛官方成绩单</div>
+        <div class="fsae-score-row">
+          <div>
+            <div class="fsae-sc-title">⚡ 直线加速 (75m)</div>
+            <div class="fsae-sc-sub" id="fsaeScAccelTime">--</div>
+          </div>
+          <b class="fsae-sc-pts" id="fsaeScAccelPts">0.0 / 100</b>
+        </div>
+        <div class="fsae-score-row">
+          <div>
+            <div class="fsae-sc-title">∞ 八字绕环 (Skidpad)</div>
+            <div class="fsae-sc-sub" id="fsaeScSkidTime">--</div>
+          </div>
+          <b class="fsae-sc-pts" id="fsaeScSkidPts">0.0 / 75</b>
+        </div>
+        <div class="fsae-score-row">
+          <div>
+            <div class="fsae-sc-title">🏁 单圈赛 (Autocross)</div>
+            <div class="fsae-sc-sub" id="fsaeScAutoTime">--</div>
+          </div>
+          <b class="fsae-sc-pts" id="fsaeScAutoPts">0.0 / 100</b>
+        </div>
+        <div class="fsae-score-total">
+          <span>动态赛组合总分</span>
+          <b id="fsaeScTotalPts">0.0 / 275.0</b>
+        </div>
+      </div>
+
+      <div class="fsae-card">
+        <div class="fsae-card-hd">📐 当前项目规则与数据溯源</div>
+        <p id="fsaeRuleHint" class="fsae-rule-txt">FSAE D5 规则：静止起步 75m 计时 + ≥75m 制动区，道宽 3.6m (≥3.0m)，撞桶 +2.0s。</p>
+      </div>
+    </aside>
+  </div>
+</div>
+
 <script src="vendor/three.min.js"></script>
 <script src="js/01-core.js"></script>
 <script src="js/02-presets.js"></script>
@@ -1079,5 +1196,6 @@
   <script src="js/21-car-capability.js"></script>
 <script src="js/22-optimizer.js"></script>
 <script src="js/23-long-bench.js"></script>
+<script src="js/24-fsae-arena.js"></script>
 </body>
 </html>

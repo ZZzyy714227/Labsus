@@ -1111,8 +1111,8 @@ function buildTrackPanel(host){
   b4.id = "btnFsaeArena";
   b4.innerHTML = "🏆 大学生方程式动态赛场 (FSAE / FSC)";
   b4.onclick = () => { if (typeof openFsaeStage === "function") openFsaeStage(); };
-  b4.style.padding = "7px 8px"; b4.style.background = "rgba(249,115,22,0.14)"; b4.style.border = "1px solid rgba(249,115,22,0.45)";
-  b4.style.color = "#fdba74"; b4.style.borderRadius = "var(--r-sm)"; b4.style.cursor = "pointer"; b4.style.fontWeight = "700"; b4.style.fontSize = "10.5px"; b4.style.letterSpacing = "0.04em";
+  b4.style.padding = "7px 8px"; b4.style.background = "rgba(249,115,22,0.14)"; b4.style.border = "1px solid rgba(249,115,22,0.50)";
+  b4.style.color = "#f97316"; b4.style.borderRadius = "var(--r-sm)"; b4.style.cursor = "pointer"; b4.style.fontWeight = "700"; b4.style.fontSize = "10.5px"; b4.style.letterSpacing = "0.04em";
   b4.style.transition = "background .18s, border-color .18s, transform .1s";
   
   b1.onmouseover = () => { b1.style.background = "rgba(46,160,67,0.25)"; b1.style.borderColor = "#2ea043"; };
