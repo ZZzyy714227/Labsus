@@ -636,10 +636,10 @@ function slopeStageLoop(now){
     const st = window.physicsEngine.state;
     const tel = window.physicsEngine.telemetry;
     
-    // 2. Multibody Suspension Kinematics (60fps on undulating terrain)
+    // 2. Multibody Suspension Kinematics (sync at full frame rate; throttle legacy 2D scene cache only)
     SLOPE_STAGE.rebuildCadence++;
     const cadenceRate = (SLOPE_STAGE.scenario === "undulating_road") ? 1 : 2;
-    if(SLOPE_STAGE.rebuildCadence % cadenceRate === 0 || !SLOPE_STAGE.cachedScene) {
+    {
       const isFormula = S.vehicleType === "formula";
       const rackRatio = isFormula ? -0.55 : -1.5;
       const rackMax = isFormula ? 18 : 38;
@@ -663,6 +663,9 @@ function slopeStageLoop(now){
       }
       S.rack = rackDisplacement;
       S.swAngle = (ctrl.steer || 0) * (isFormula ? 3.5 : 4.5);
+    }
+    const glSlope = typeof CAR3D_GL !== "undefined" && CAR3D_GL.isActiveForStage();
+    if (!glSlope && (SLOPE_STAGE.rebuildCadence % cadenceRate === 0 || !SLOPE_STAGE.cachedScene)) {
       SLOPE_STAGE.cachedScene = buildScenePRO();
     }
     
@@ -1955,9 +1958,9 @@ function skidpadStageLoop(now){
     const st = eng.state;
     const tel = eng.telemetry;
 
-    // Kinematics update
+    // Kinematics update at full frame rate to stay strictly locked to body Z/pitch/roll
     SKIDPAD_STAGE.rebuildCadence++;
-    if(SKIDPAD_STAGE.rebuildCadence % 3 === 0 || !SKIDPAD_STAGE.cachedScene) {
+    {
       const tr = tel.tr || { FL:0, FR:0, RL:0, RR:0 };
       const z0F = (SIM.FR && SIM.FR.n && SIM.FR.idx) ? SIM.FR.n[SIM.FR.idx.WC].p0[2] : 250;
       const z0R = (SIM.RR && SIM.RR.n && SIM.RR.idx) ? SIM.RR.n[SIM.RR.idx.WC].p0[2] : 250;
@@ -1972,6 +1975,9 @@ function skidpadStageLoop(now){
       }
       S.rack = rackDisplacement;
       S.swAngle = (ctrl.steer || 0) * (isFormula ? 3.5 : 4.5);
+    }
+    const glSkid = typeof CAR3D_GL !== "undefined" && CAR3D_GL.isActiveForStage();
+    if (!glSkid && (SKIDPAD_STAGE.rebuildCadence % 3 === 0 || !SKIDPAD_STAGE.cachedScene)) {
       SKIDPAD_STAGE.cachedScene = buildScenePRO();
     }
 
@@ -2738,6 +2744,7 @@ function switchCircuitVehicle(type) {
 
   window.circuitPilot = new UniversalAutoPilot(S);
   window.circuitPilot.setPath(CIRCUIT_STAGE.path);
+  window.circuitPilot.eng = window.physicsEngine;
   window.circuitPilot.active = CIRCUIT_STAGE.autoPilot;
 
   CIRCUIT_STAGE.cachedScene = null;
@@ -3330,6 +3337,7 @@ function openCircuitStage() {
 
     window.circuitPilot = new UniversalAutoPilot(S);
     window.circuitPilot.setPath(CIRCUIT_STAGE.path);
+    window.circuitPilot.eng = window.physicsEngine;
     window.circuitPilot.active = CIRCUIT_STAGE.autoPilot;
 
     CIRCUIT_STAGE.active = true;
@@ -3595,8 +3603,9 @@ function circuitStageLoop(now) {
     const st = eng.state;
     const tel = eng.telemetry;
     
+    // Full-frame-rate suspension & wheel kinematics sync (eliminates 20Hz visual wheel oscillation vs 60Hz body Z/pitch/roll)
     CIRCUIT_STAGE.rebuildCadence++;
-    if(CIRCUIT_STAGE.rebuildCadence % 3 === 0 || !CIRCUIT_STAGE.cachedScene) {
+    {
       const z0F = (SIM.FR && SIM.FR.n && SIM.FR.idx) ? SIM.FR.n[SIM.FR.idx.WC].p0[2] : 250;
       const z0R = (SIM.RR && SIM.RR.n && SIM.RR.idx) ? SIM.RR.n[SIM.RR.idx.WC].p0[2] : 250;
       
@@ -3621,6 +3630,9 @@ function circuitStageLoop(now) {
       }
       S.rack = rackDisplacement;
       S.swAngle = (ctrl.steer || 0) * (isFormula ? 3.5 : 4.5);
+    }
+    const glCircuit = typeof CAR3D_GL !== "undefined" && CAR3D_GL.isActiveForStage();
+    if(!glCircuit && (CIRCUIT_STAGE.rebuildCadence % 3 === 0 || !CIRCUIT_STAGE.cachedScene)) {
       CIRCUIT_STAGE.cachedScene = buildScenePRO();
     }
     

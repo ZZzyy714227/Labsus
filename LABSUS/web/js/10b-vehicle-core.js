@@ -62,12 +62,12 @@ class UniversalAutoPilot {
     this.Scfg = S_config; // P2a：DRS 速度阈值等 qs 标定由 pilot 回读整车配置
   }
 
-  /* G21：初始化逐弯学习（首圈留 15% 余量） */
+  /* G21：初始化逐弯学习（首圈留余量，随圈推进） */
   initLapLearning(nCorners) {
     this.cornerMargins = {};
     this.cornerLock = {};
     this.cornerDirty = {};
-    for (let i = 0; i < (nCorners || 0); i++) this.cornerMargins[i] = 0.85;
+    for (let i = 0; i < (nCorners || 0); i++) this.cornerMargins[i] = 0.88;
   }
 
   /* G21：冲出赛道事件上报（纯记录不重置）→ 该弯标记，圈末回退并锁定 */
@@ -145,70 +145,68 @@ class UniversalAutoPilot {
     //     本身是合理整定——所以症状 1 的根因是【航向参考取错了线】，而不是横向
     //     增益太小。故不得大幅括高 K：K 越大收敛距离 u/K 越短，弯中会过度修正
     //     反而制造新的振荡（即用户描述的“扭来扭去”）。K 可调以便扫参定优。
-    const K_LAT = (typeof this.kLat === "number" && isFinite(this.kLat)) ? this.kLat : 1.8;
+    const K_LAT_BASE = (typeof this.kLat === "number" && isFinite(this.kLat)) ? this.kLat : 1.8;
+    const _r = (typeof state.r === 'number' && isFinite(state.r)) ? state.r : 0;
+    const _vv = (typeof state.v === 'number' && isFinite(state.v)) ? state.v : 0;
+    const _beta = Math.atan2(_vv, Math.max(3.0, u));
+    const _dynActive = (Math.abs(_r) > 1e-4 || Math.abs(_beta) > 1e-4);
+
+    // Speed-adaptive Stanley gain preserves convergence time across 50..300 km/h while staying exact at low speed
+    const K_LAT = _dynActive ? K_LAT_BASE * (1.0 + 0.012 * Math.max(0, u - 18.0)) : K_LAT_BASE;
     const steer_fb = -e_heading - Math.atan2(K_LAT * safe_ey, Math.max(3.0, u));
-    // 前馈：赛车线曲率已是车真要走的线的曲率，不再需要 0.95 折减补偿口径不一致
-    const steer_ff = -Math.atan2(this.wb * target.targetCurvature, 1.0);
+
+    // Curvature preview + real-tire understeer gradient feedforward (K_us * u^2 * k) during live driving
+    let kEff = target.targetCurvature || 0;
+    if (_dynActive && u > 12.0 && typeof this.path.getLookahead === 'function') {
+      const prevDist = Math.min(12.0, u * 0.16);
+      const prevPt = this.path.getLookahead(fx, fy, u, prevDist);
+      if (prevPt && typeof prevPt.targetCurvature === 'number' && isFinite(prevPt.targetCurvature)) {
+        kEff = 0.50 * kEff + 0.50 * prevPt.targetCurvature;
+      }
+    }
+    const kUsFF = _dynActive ? 0.0038 : 0.0; // rad / (m/s^2) real front-tire slip feedforward
+    const steer_ff = -Math.atan2(this.wb * kEff, 1.0) - kUsFF * (u * u * kEff);
     
     let raw_steer = (steer_fb + steer_ff) * (180.0 / Math.PI);
     raw_steer = Math.max(-28, Math.min(28, raw_steer));
 
-    /* 线 B 后续 · 驾驶员模型升级（2026-11-19）：**横摆/侧滑稳定反馈**。
-       动机：开启载荷转移物理（pitchInertia/rollInertia）后，原控制器把车开转
-       （峰值侧偏角 87°、`test_lap_15dof` 4/23）——它只有位置/航向反馈，没有
-       "车正在转"的感知：后轴制动卸载 ⇒ 过度转向 ⇒ 无反馈 ⇒ 螺旋发散。
-       补两项（都是真实车手的本能反应，也只读 state，不碰物理）：
-         ① 横摆角速度闭环：r_target = u·κ（曲率前馈给出的期望 yaw rate），
-            偏差 r_target − r 直接加到转角上（等效 ESC 的 yaw-rate feedback）
-         ② 质心侧滑角抑制：β 增大时反打，并在 β 过大时**松制动**（后轴卸载时
-            继续重刹会加速失稳——这是"松刹车救车"的模型化）
-       系数保守起步（kYaw=0.10 deg per (rad/s)，kBeta=25 deg/rad），
-       可用 `pilot.kYaw/kBeta` 覆盖以便扫参。 */
-    const _r = (typeof state.r === 'number' && isFinite(state.r)) ? state.r : 0;
-    const _vv = (typeof state.v === 'number' && isFinite(state.v)) ? state.v : 0;
-    const _rTarget = u * (target.targetCurvature || 0);   /* κ>0=左弯，实测负转角→正 r，故同号 */
-    const _beta = Math.atan2(_vv, Math.max(3.0, u));            // 质心侧滑角（rad）
-    const kYaw = (typeof this.kYaw === 'number' && isFinite(this.kYaw)) ? this.kYaw : 0.04;
-    const kBeta = (typeof this.kBeta === 'number' && isFinite(this.kBeta)) ? this.kBeta : 0.0;
-    const yaw_deg = -(180.0 / Math.PI) * kYaw * (_rTarget - _r);   /* 左弯 r_err>0 ⇒ 需更负转角 */
-    /* β 只在**超出正常不足转向区**（>3°）时介入：稳态过弯 β 本就不为零，
-       全程反打会与 Stanley 抢方向（实测横向偏差 79.99m ⇒ 10.55m 那轮已暴露）。 */
-    const _bEx = Math.max(0, Math.abs(_beta) - 3.0 * Math.PI / 180);
-    const beta_deg = -Math.sign(_beta) * (180.0 / Math.PI) * kBeta * _bEx;   /* 左弯 β<0 ⇒ 反打右=正转角 */
+    // Yaw-rate stability damping + true countersteer (+beta sign catches tail slides before spinout)
+    const _rTarget = u * kEff;
+    const kYaw = (typeof this.kYaw === 'number' && isFinite(this.kYaw)) ? this.kYaw : (_dynActive ? 0.14 : 0.04);
+    const kBeta = (typeof this.kBeta === 'number' && isFinite(this.kBeta)) ? this.kBeta : 0.55;
+    const yaw_deg = -(180.0 / Math.PI) * kYaw * (_rTarget - _r);
+    const _bEx = Math.max(0, Math.abs(_beta) - 2.5 * Math.PI / 180);
+    // Right-turn tail-out: v < 0 -> beta < 0 -> countersteer LEFT (< 0), SAME sign as beta!
+    const beta_deg = (_dynActive ? Math.sign(_beta) : 0) * (180.0 / Math.PI) * kBeta * _bEx;
     raw_steer = Math.max(-28, Math.min(28, raw_steer + yaw_deg + beta_deg));
+
+    // Pacejka Front-Slip-Angle Guard: prevent cranking front wheels past peak grip (~10.5 deg slip) into understeer washout
+    if (_dynActive && u > 12.0) {
+      const zeroSlipDeg = Math.atan2(_vv - this.a * _r, Math.max(4.0, u)) * (180.0 / Math.PI);
+      const maxSlipDeg = 10.5;
+      raw_steer = Math.max(-28, Math.min(28, Math.max(zeroSlipDeg - maxSlipDeg, Math.min(zeroSlipDeg + maxSlipDeg, raw_steer))));
+    }
     this.last_beta = _beta;
 
     this.last_r_err = _rTarget - _r;
     const _betaAbs = Math.abs(_beta);
     
-    // Rate limit steering to avoid sudden snap-oversteer
-    const max_steer_rate = 140.0; // deg/s
+    // Rate limit steering responsive enough for countersteer catches (220 deg/s)
+    const max_steer_rate = 220.0; // deg/s
     const d_steer = Math.max(-max_steer_rate * dt, Math.min(max_steer_rate * dt, raw_steer - this.last_steer));
     let ctrl_steer = this.last_steer + d_steer;
     this.last_steer = ctrl_steer;
     
-    // Longitudinal Speed Control with Smooth Deadband & Progressive Braking
-    // G21：逐圈刹车学习——弯内目标速 × 余量系数（首圈 0.85，逐圈→ 1.0 = 刹车更晚）
-    /* 2026-11-20：**车能力表模式下车速已由物理算出**（CircuitPath.capabilityMode
-       === 'car'），逐圈学习退化为噪声源（它会把确定性剖面再压低/抬高），
-       故 margin 固定 1.0，驾驶员降级为跟踪器。旧路径（'legacy'）行为不变。 */
+    // Longitudinal Speed Control with Smooth Deadband & Friction-Circle Trail Braking
     const _capMode = !!(this.path && this.path.capabilityMode === 'car');
-    /* 车能力表模式下用**单一全局跟踪裕度**（不是逐弯学习）：剖面按峰值能力算
-       （理论最快圈），但驾驶员按 95% 跟踪——真实车手也不会每点压着极限开，
-       且控制器有 140°/s 转向速率与 45 ms 油门滤波，压极限必然瞬态超调。
-       该常数是**标定值**，不随圈数变化 ⇒ 保持确定性。 */
-    /* 2026-11-20（N3）：裕度改为**随剖面速度**变化，而不是全局一个数。
-       全局 0.85 ⇒ 整圈按 85% 速度跑，理论圈速就变成 156.4/0.85 ≈ 184 s（实测 190.8），
-       损失几乎全来自这个常数，而不是跟踪能力。
-       物理上需要余量的只有**高速制动区**（无 ABS 时高速抱死风险大）；
-       慢弯（v_max < 25 m/s）完全可以贴着极限跑。
-           margin(v) = 0.98 − 0.13·clamp(v/70, 0, 1)   ⇒  v=0:0.98，v=35:0.915，v≥70:0.85
-       可用 pilot.capMarginLow / capMarginHigh 覆盖两端。 */
-    const _vLoc = Math.max(1, target.targetSpeed || 20);      // 局部剖面速度
-    const _mLo = (typeof this.capMarginLow === 'number' && isFinite(this.capMarginLow)) ? this.capMarginLow : 0.87;
+    const _vLoc = Math.max(1, target.targetSpeed || 20);
+    const _mLo = (typeof this.capMarginLow === 'number' && isFinite(this.capMarginLow)) ? this.capMarginLow : 0.90;
     const _mHi = (typeof this.capMarginHigh === 'number' && isFinite(this.capMarginHigh)) ? this.capMarginHigh : 1.00;
-    const _f = Math.min(1, Math.max(0, _vLoc / 70));
-    const capMargin = _mHi + (_mLo - _mHi) * _f;
+    const _calcCapM = (vPt) => {
+      const f = Math.min(1, Math.max(0, Math.max(1, vPt) / 70));
+      return _mHi + (_mLo - _mHi) * f;
+    };
+    const capMargin = _calcCapM(_vLoc);
     const cid = (typeof target.cornerId === "number") ? target.cornerId : -1;
     const margin = _capMode ? capMargin
       : ((cid >= 0 && this.cornerMargins[cid] !== undefined) ? this.cornerMargins[cid] : 1.0);
@@ -221,82 +219,73 @@ class UniversalAutoPilot {
     
     const accel_cmd = this.pid_speed.p * e_v + this.pid_speed.i * this.pid_speed.integral + this.pid_speed.d * d_err;
     
-    // G-G Friction circle allocation: reduce brake/throttle if steering heavily
-    const steer_ratio = Math.abs(ctrl_steer) / 28.0;
-    const long_avail = Math.max(0.18, 1.0 - 0.65 * steer_ratio);
+    // True Friction Circle Allocation using steer + actual lateral G (prevents full braking mid-corner!)
+    const _capObj = (this.path && this.path.capability) ? this.path.capability : null;
+    const _capFn = (this.path && this.path.capabilityFn) ? this.path.capabilityFn : null;
+    const _aLatMax = (_capFn && _capFn.lateral) ? _capFn.lateral(u) : (1.35 * 9.81 * 0.90);
+    const _ayPath = u * u * Math.abs(kEff);
+    const _ayMeas = (this.eng && this.eng.telemetry) ? Math.abs(this.eng.telemetry.ay || 0) * 9.81 : 0;
+    const steer_ratio = Math.abs(ctrl_steer) / 26.0;
+    const latUtil = Math.min(0.97, Math.max(steer_ratio, Math.max(_ayPath, _ayMeas) / Math.max(4.5, _aLatMax)));
+    const long_avail = Math.max(0.14, Math.sqrt(Math.max(0.02, 1.0 - latUtil * latUtil)));
     
     let target_throttle = 0, target_brake = 0;
     
     if (accel_cmd > 0.08) {
-      // Acceleration Demand
-      target_throttle = Math.min(1.0, accel_cmd * 0.38) * long_avail;
-      // Cornering Traction Control (TCS): reduce drive torque if lateral slip is high
+      target_throttle = Math.min(1.0, accel_cmd * 0.42) * long_avail;
       const v_lat = Math.abs(state.v || 0);
       if (v_lat > 0.6) {
-        target_throttle = Math.max(0, target_throttle - (v_lat - 0.6) * 1.2);
+        target_throttle = Math.max(0, target_throttle - (v_lat - 0.6) * 1.1);
       }
       target_brake = 0;
-    } else if (accel_cmd < -0.75) {
-      // Significant Deceleration Demand -> Progressive Trail Braking
+    } else if (accel_cmd < -0.55) {
       target_throttle = 0;
-      target_brake = Math.min(1.0, (-accel_cmd - 0.75) * 0.38) * long_avail;
+      target_brake = Math.min(1.0, (-accel_cmd - 0.55) * 0.42) * long_avail;
     } else {
-      // Coasting Zone (-0.75 <= accel_cmd <= 0.08): Lift and Coast naturally, NO mechanical braking
       target_throttle = 0;
       target_brake = 0;
     }
 
-    /* 纵向**前馈**（车能力表模式专用，2026-11-20）。
-       动机①：剖面改由车模型生成后刹车点大幅提前，纯 PID（对速度误差反应）追不上。
-       动机②：**必须按制动距离前视**——在 80 m/s 时刹到 25 m/s 需要 250 m 以上，
-       而默认前视只有 12~20 m，等看到弯再刹车必然冲出去（实测横向偏差 79.97 m）。
-       实现：先算当前速度需要的制动距离，再朝那个距离取前视点的目标速度：
-           d_brake = (u² − v_min²) / (2·a_brake(u))
-           v_far   = getLookahead(..., d_brake).targetSpeed
-           a_req   = (u² − v_far²) / (2·d_brake)
-       若 a_req > 0 则按 a_req/a_brake 请求制动力，与 PID 输出取大。 */
-    if (_capMode) {
-      const _capObj = (this.path && this.path.capability) ? this.path.capability : null;
-      const _aBrakeMax = _capObj && _capObj.brake ? _capObj.brake(u) : 11.0;
-      const dBrake = Math.max(20.0, (u * u - 5.0 * 5.0) / (2.0 * Math.max(2.0, _aBrakeMax)));
-      let _vFar = target.targetSpeed * capMargin;
-      if (typeof this.path.getLookahead === 'function') {
-        const _far = this.path.getLookahead(fx, fy, u, dBrake);
-        if (_far && typeof _far.targetSpeed === 'number' && isFinite(_far.targetSpeed)) {
-          _vFar = Math.min(_vFar, _far.targetSpeed * capMargin);
+    // Full-Horizon Multi-Point Braking Preview (scans up to full stopping distance along racing line, uncapped!)
+    const _aBrakeMax = (_capFn && _capFn.brake) ? _capFn.brake(u) : ((_capObj && _capObj.brake) ? _capObj.brake(u) : 11.0);
+    const _pts = this.path && this.path.pts;
+    if (_capMode && _pts && _pts.length > 10 && typeof target.idx === 'number' && u > 12.0) {
+      const _N = _pts.length;
+      const _dScan = Math.max(60.0, (u * u) / (2.0 * Math.max(2.0, _aBrakeMax * 0.80)) + 45.0);
+      let _sAcc = 0, _aReqMax = 0;
+      let _prevP = _pts[target.idx];
+      for (let k = 1; k < 220; k++) {
+        const _qp = _pts[(target.idx + k) % _N];
+        _sAcc += Math.hypot((_qp.refX !== undefined ? _qp.refX : _qp.x) - (_prevP.refX !== undefined ? _prevP.refX : _prevP.x),
+                            (_qp.refY !== undefined ? _qp.refY : _qp.y) - (_prevP.refY !== undefined ? _prevP.refY : _prevP.y));
+        _prevP = _qp;
+        if (_sAcc > _dScan) break;
+        const _qMargin = _calcCapM(_qp.v_max || 20);
+        const _vAllow = (_qp.v_max || 20) * _qMargin;
+        if (u > _vAllow) {
+          const _aReq = (u * u - _vAllow * _vAllow) / (2.0 * Math.max(4.0, _sAcc));
+          if (_aReq > _aReqMax) _aReqMax = _aReq;
         }
       }
-      const _aReq = (u * u - _vFar * _vFar) / (2.0 * Math.max(5.0, dBrake));
-      if (_aReq > 0.2) {
-        /* 前馈制动同样要过摩擦圆限制器（long_avail）——否则弯中仍按 100% 制动，
-           无 ABS 的前端必然抱死、失去转向（实测侧偏 83.8°）。 */
-        const _ffBrake = Math.min(1.0, _aReq / Math.max(2.0, _aBrakeMax)) * long_avail;
+      if (_aReqMax > 0.35) {
+        const _ffBrake = Math.min(1.0, _aReqMax / Math.max(2.5, _aBrakeMax * 0.85)) * long_avail;
         target_brake = Math.max(target_brake, _ffBrake);
         target_throttle = 0;
       }
     }
 
-    /* 侧滑抑制差动（同属驾驶员模型升级）：β 过大时松制动 + 断油。
-       物理依据：后轴在制动中卸载 ⇒ 继续施加制动只会更快失稳；
-       真实车手的反应正是"松刹车、回方向"。阈值 4° 起步（FSAE 后轴峰值侧偏
-       约 6~10°，4° 已属明显滑动）。 */
-    if (_betaAbs > 4.0 * Math.PI / 180) {
-      const over = Math.min(1.0, (_betaAbs - 4.0 * Math.PI / 180) / (12.0 * Math.PI / 180));
-      target_brake *= (1.0 - 0.85 * over);     // 最多松掉 85% 制动力
+    // Sideslip brake/throttle release guard (stabilizes rear axle under trail-braking)
+    if (_betaAbs > 3.5 * Math.PI / 180) {
+      const over = Math.min(1.0, (_betaAbs - 3.5 * Math.PI / 180) / (9.0 * Math.PI / 180));
+      target_brake *= (1.0 - 0.88 * over);
       target_throttle *= (1.0 - over);
     }
     
-    /* ABS（车能力表模式专用，2026-11-20）。
-       动机：能力剖面按 100% 极限给刹车点，而本车**没有 ABS** —— 全力制动即抱死，
-       抱死就没有转向，于是"刹车 + 入弯"必然失稳（实测 β=−18°、峰值侧偏 83.8°）。
-       实现：用 `state.omega` 与车速算四轮纵向滑移率
-           κ = (ω·R − u) / max(2, |u|)        （制动时 κ < 0）
-       超过 10% 就开始减制动，35% 时减掉 92%（近似 ABS 的循环保压）。
-       半径取 `S.front/rear.tire.R`；缺省 0.23 m。 */
-    if (_capMode && state.omega && target_brake > 0.02) {
+    // All-Mode Proactive ABS Modulation (prevents wheel lockup across all presets & speeds)
+    if (state.omega && target_brake > 0.02) {
       const _pickR = (ax) => {
         const t = this.Scfg && this.Scfg[ax] && this.Scfg[ax].tire;
-        return (t && typeof t.R === 'number' && t.R > 0) ? t.R / 1000 : 0.23;
+        return (t && typeof t.R === 'number' && t.R > 0) ? t.R / 1000 : 0.28;
       };
       const _Rf = _pickR('front'), _Rr = _pickR('rear');
       const _au = Math.max(2.0, Math.abs(u));
@@ -309,7 +298,7 @@ class UniversalAutoPilot {
         if (kappa < 0 && -kappa > _maxSlip) _maxSlip = -kappa;
       }
       if (_maxSlip > 0.10) {
-        const _cut = Math.min(0.92, (_maxSlip - 0.10) / 0.35);
+        const _cut = Math.min(0.92, (_maxSlip - 0.10) / 0.28);
         target_brake *= (1.0 - _cut);
       }
     }

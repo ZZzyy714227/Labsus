@@ -1821,57 +1821,23 @@
     const zBelly = Math.min(165, hpF.LCA_F[2] - 12, hpR.LCA_F[2] - 12);
     const wCock = 345;
     const zRoof = 1145;
+    const Y_fw = yF - 210, Y_brow = yF - 380, Y_b = yR + 350, Y_eng = yR - 290;
 
-    // 1. Sculpted Baja Nose Hood, Skid Plate, Side Panels, Roof Panel & LED Lightbar
-    const hoodRings = [
-      superSectionRing(yF + 325, 118, 255, 365, 1.35, 1.5, 22),
-      superSectionRing(yF + 190, 148, 285, 435, 1.35, 1.5, 22),
-      superSectionRing(yF + 15,  172, 325, 520, 1.4,  1.6, 22),
-      superSectionRing(yF - 200, 235, 370, 625, 1.5,  1.7, 22)
-    ];
-    addBody(buildMultiMatLoftGeometry(hoodRings, true, (r, q, n) => {
-      const th = (q / n) * Math.PI * 2;
-      if (Math.sin(th) < -0.25) return 2; // dark under-hood tray
-      if (Math.abs(Math.cos(th)) < 0.22 && Math.sin(th) > 0.35) return 1; // top center accent stripe
-      return 0;
-    }, [0, 2]), [ST.mats.paint, ST.mats.accent, ST.mats.darkTrim], paintMeshes);
-
-    // Lower Aluminum Skid / Bash Plate (front nose up-kick -> flat cockpit belly -> rear engine tray)
+    // 1. Baja Bottom Belly Skid Plate ONLY (clean open-cage look: no nose/side/roof body panels, no rear black blocks)
     const skidPts = [
-      superSectionRing(yF + 360, 115, 210, 240, 2.2, 2.2, 16),
-      superSectionRing(yF + 80,  fRailX - 5, zBelly - 14, zBelly + 6, 2.2, 2.2, 16),
-      superSectionRing(yF - 230, wCock * 0.72, zBelly - 16, zBelly + 4, 2.2, 2.2, 16),
-      superSectionRing(yR + 220, wCock * 0.72, zBelly - 16, zBelly + 4, 2.2, 2.2, 16),
-      superSectionRing(yR - 230, rRailX + 10, zBelly, zBelly + 24, 2.2, 2.2, 16)
+      superSectionRing(yF + 370, 110, 212, 226, 2.6, 2.6, 16),
+      superSectionRing(yF + 140, fRailX - 4, zBelly - 12, zBelly + 2, 2.6, 2.6, 16),
+      superSectionRing(Y_fw,     268, zBelly - 12, zBelly + 2, 2.6, 2.6, 16),
+      superSectionRing(Y_b,      wCock - 8, zBelly - 12, zBelly + 2, 2.6, 2.6, 16),
+      superSectionRing(yR,       rRailX - 4, zBelly - 4, zBelly + 10, 2.6, 2.6, 16),
+      superSectionRing(Y_eng + 10, 178, 246, 260, 2.6, 2.6, 16)
     ];
     addBody(buildLoftGeometry(skidPts, true), ST.mats.skid, carbonMeshes);
 
-    // Side Hip Number Plates + Rear Mudguard Wings + Roof Skin & Lightbar
-    for (const sx of [-1, 1]) {
-      const sidePanel = makeExtrudedPlateYZ([
-        [yF - 235, 240], [yR + 480, 240], [yR + 360, 520], [yF - 245, 515]
-      ], 14);
-      const spM = addBody(sidePanel, ST.mats.paint, paintMeshes);
-      spM.position.x = sx * (wCock + 10);
-
-      const mudF = makeExtrudedPlateYZ([
-        [yR - 10, 485], [yR - 250, 575], [yR - 295, 520], [yR - 60, 425]
-      ], 165);
-      const mfM = addBody(mudF, ST.mats.darkTrim, carbonMeshes);
-      mfM.position.x = sx * 395;
-    }
-
-    // Roof visor + LED bar
-    const roofPlate = new THREE.Mesh(new THREE.BoxGeometry(580, 490, 16), ST.mats.carbon);
-    roofPlate.position.set(0, (yF + yR) * 0.5 - 60, zRoof + 10);
-    roofPlate.rotation.x = -0.04;
-    roofPlate.castShadow = true;
-    aeroBodyGroup.add(roofPlate);
-    carbonMeshes.push(roofPlate);
-
-    addBoxMesh(aeroBodyGroup, [0, yF - 355, zRoof + 24], [420, 44, 34], ST.mats.darkTrim);
-    addBoxMesh(aeroBodyGroup, [0, yF - 332, zRoof + 24], [385, 10, 20], ST.mats.headlight);
-    addBoxMesh(aeroBodyGroup, [0, yR - 305, 495], [140, 16, 36], ST.mats.rainLight);
+    // Compact LED lightbar mounted flush on the front roof brow bar + rear brake light on tail bar
+    addBoxMesh(aeroBodyGroup, [0, Y_brow + 14, zRoof + 8], [380, 32, 26], ST.mats.darkTrim);
+    addBoxMesh(aeroBodyGroup, [0, Y_brow + 30, zRoof + 8], [350, 8, 16], ST.mats.headlight);
+    addBoxMesh(aeroBodyGroup, [0, Y_eng - 12, 495], [130, 14, 28], ST.mats.rainLight);
     ST.carRoot.add(aeroBodyGroup);
 
     // 2. Exposed Tubular Steel Spaceframe Roll Cage (always visible when frame_main on)
@@ -1881,7 +1847,6 @@
     const fMain = new THREE.Group();
     const fRear = new THREE.Group();
 
-    const Y_fw = yF - 210, Y_brow = yF - 380, Y_b = yR + 350, Y_eng = yR - 290;
     const FBL = [-fRailX, yF + 140, zBelly], FBR = [fRailX, yF + 140, zBelly];
     const FTL = [-fRailX - 25, yF + 120, 405], FTR = [fRailX + 25, yF + 120, 405];
     const NOSE_BL = [-115, yF + 375, 225], NOSE_BR = [115, yF + 375, 225];
@@ -1939,35 +1904,39 @@
     frameGroup.add(fFront, fSide, fMain, fRear);
     ST.carRoot.add(frameGroup);
 
-    // 3. Baja Seat & Visor Helmet Driver
+    // 3. Sculpted Baja Racing Bucket Seat (NO spherical driver figure)
     const driverGroup = new THREE.Group();
-    const seatBack = new THREE.Mesh(new THREE.BoxGeometry(330, 52, 460), ST.mats.darkTrim);
-    seatBack.position.set(0, Y_b + 105, zBelly + 255);
-    seatBack.rotation.x = -0.26;
-    const seatBase = new THREE.Mesh(new THREE.BoxGeometry(330, 310, 48), ST.mats.darkTrim);
-    seatBase.position.set(0, Y_b + 235, zBelly + 50);
-    const helm = new THREE.Mesh(new THREE.SphereGeometry(118, 18, 16), ST.mats.helmet);
-    helm.position.set(0, Y_b + 150, zBelly + 575);
-    const visor = new THREE.Mesh(new THREE.BoxGeometry(155, 58, 52), ST.mats.visor);
-    visor.position.set(0, Y_b + 230, zBelly + 585);
-    const peak = new THREE.Mesh(new THREE.BoxGeometry(148, 72, 10), ST.mats.paint);
-    peak.position.set(0, Y_b + 235, zBelly + 655);
-    peak.rotation.x = 0.25;
-    driverGroup.add(seatBack, seatBase, helm, visor, peak);
+    const seatBack = new THREE.Mesh(new THREE.BoxGeometry(310, 44, 470), ST.mats.darkTrim);
+    seatBack.position.set(0, Y_b + 100, zBelly + 255);
+    seatBack.rotation.x = -0.25;
+    const seatBase = new THREE.Mesh(new THREE.BoxGeometry(310, 320, 44), ST.mats.darkTrim);
+    seatBase.position.set(0, Y_b + 240, zBelly + 40);
+    const headRest = new THREE.Mesh(new THREE.BoxGeometry(195, 42, 115), ST.mats.carbon);
+    headRest.position.set(0, Y_b + 35, zBelly + 505);
+    headRest.rotation.x = -0.18;
+    for (const sx of [-1, 1]) {
+      const bolster = new THREE.Mesh(new THREE.BoxGeometry(34, 105, 390), ST.mats.carbon);
+      bolster.position.set(sx * 162, Y_b + 145, zBelly + 240);
+      bolster.rotation.x = -0.25;
+      const thigh = new THREE.Mesh(new THREE.BoxGeometry(34, 290, 82), ST.mats.carbon);
+      thigh.position.set(sx * 162, Y_b + 255, zBelly + 72);
+      aeroBodyGroup.add(bolster, thigh);
+    }
+    aeroBodyGroup.add(seatBack, seatBase, headRest);
     ST.carRoot.add(driverGroup);
 
-    // 4. Baja Engine / CVT / Rear Differential Powertrain
+    // 4. Baja Engine / CVT / Rear Differential Powertrain (compact, clear of springs & arms)
     const powertrainGroup = new THREE.Group();
-    addBoxMesh(powertrainGroup, [0, yR + 120, 295], [220, 240, 210], ST.mats.edu);
-    addBoxMesh(powertrainGroup, [-135, yR + 65, 290], [65, 280, 145], ST.mats.darkTrim);
-    const diffC = new THREE.Mesh(new THREE.CylinderGeometry(52, 52, 130, 14), ST.mats.darkTrim);
+    addBoxMesh(powertrainGroup, [0, yR + 125, 295], [200, 225, 200], ST.mats.edu);
+    addBoxMesh(powertrainGroup, [-118, yR + 65, 290], [56, 255, 138], ST.mats.darkTrim);
+    const diffC = new THREE.Mesh(new THREE.CylinderGeometry(48, 48, 120, 14), ST.mats.darkTrim);
     diffC.rotation.z = Math.PI / 2;
     diffC.position.set(0, yR, 275);
     powertrainGroup.add(diffC);
-    addTubeMesh(powertrainGroup, unitCyl, [65, yR + 30, 360], [115, yR - 255, 395], 22, ST.mats.aluminum);
+    addTubeMesh(powertrainGroup, unitCyl, [60, yR + 30, 355], [105, Y_eng + 30, 390], 20, ST.mats.aluminum);
     ST.carRoot.add(powertrainGroup);
 
-    // 5. Steering Rack & Off-road Steering Wheel
+    // 5. Steering Rack & Clear 3-Spoke Circular Off-road Steering Wheel
     const steerGroup = new THREE.Group();
     const rackY = yF + hpF.RACK[1], rackZ = hpF.RACK[2];
     const rHousing = new THREE.Mesh(new THREE.CylinderGeometry(16, 16, Math.min(260, Math.abs(hpF.RACK[0]) * 1.6), 14), ST.mats.darkTrim);
@@ -1977,18 +1946,23 @@
     rackRod.rotation.z = Math.PI / 2;
     rackRod.position.set(0, rackY, rackZ);
     steerGroup.add(rHousing, rackRod);
-    const pPin = [0, rackY + 20, rackZ + 45], pWhl = [0, Y_fw - 135, 595];
+    const pPin = [0, rackY + 10, rackZ + 38], pWhl = [0, Y_fw - 205, 610];
     addTubeMesh(steerGroup, unitCyl, pPin, pWhl, 11, ST.mats.aluminum);
     const swPivot = new THREE.Group();
     swPivot.position.set(pWhl[0], pWhl[1], pWhl[2]);
-    const colD = new THREE.Vector3(pWhl[0] - pPin[0], pWhl[1] - pPin[1], pWhl[2] - pPin[2]).normalize();
-    swPivot.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), colD);
+    // Orient steering wheel cleanly toward driver (~22 deg tilt from vertical)
+    const wheelNorm = new THREE.Vector3(0, -0.92, 0.39).normalize();
+    swPivot.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), wheelNorm);
     const swSpin = new THREE.Group();
-    const rimTorus = new THREE.Mesh(new THREE.TorusGeometry(132, 15, 10, 28), ST.mats.darkTrim);
-    const barH = new THREE.Mesh(new THREE.BoxGeometry(250, 26, 10), ST.mats.aluminum);
-    const barV = new THREE.Mesh(new THREE.BoxGeometry(26, 125, 10), ST.mats.aluminum);
+    const rimTorus = new THREE.Mesh(new THREE.TorusGeometry(132, 14, 12, 32), ST.mats.darkTrim);
+    const hubCap = new THREE.Mesh(new THREE.CylinderGeometry(36, 36, 22, 16), ST.mats.carbon);
+    hubCap.rotation.x = Math.PI / 2;
+    const barH = new THREE.Mesh(new THREE.BoxGeometry(245, 22, 10), ST.mats.aluminum);
+    const barV = new THREE.Mesh(new THREE.BoxGeometry(22, 122, 10), ST.mats.aluminum);
     barV.position.set(0, -60, 0);
-    swSpin.add(rimTorus, barH, barV);
+    const topBand = new THREE.Mesh(new THREE.BoxGeometry(20, 18, 30), ST.mats.rainLight);
+    topBand.position.set(0, 132, 0);
+    swSpin.add(rimTorus, hubCap, barH, barV, topBand);
     swPivot.add(swSpin);
     steerGroup.add(swPivot);
     ST.carRoot.add(steerGroup);
@@ -2012,92 +1986,138 @@
   }
 
   /* ============================================================================
-     FIA GT3 房车赛车连续水密多材质蒙皮 + 鹅颈尾翼 + 车架/副车架 3D 总成
+     Mercedes-AMG GT3 风格连续水密多材质蒙皮（真圆弧轮拱零穿模）+ 鹅颈尾翼 + 车架/座舱 3D 总成
      ============================================================================ */
   function gt3SectionRing(y, cfg) {
-    const smoothBand = (dist, halfW) => {
-      const u = Math.abs(dist) / halfW;
-      return u < 1 ? Math.pow(Math.cos(u * Math.PI * 0.5), 0.72) : 0;
+    const smoothstep = (e0, e1, x) => {
+      const t = clamp((x - e0) / Math.max(1e-6, e1 - e0), 0, 1);
+      return t * t * (3 - 2 * t);
     };
-    const uLen = clamp((cfg.yNose - y) / (cfg.yNose - cfg.yTail), 0, 1);
 
-    let rxMax = cfg.halfBodyW;
-    if (y > cfg.yF + 160) {
-      const fn = clamp((y - (cfg.yF + 160)) / (cfg.yNose - (cfg.yF + 160)), 0, 1);
-      rxMax = cfg.halfBodyW * (1 - 0.34 * Math.pow(fn, 1.55));
+    // Widebody planform: muscular front & rear fender flares with gentle mid-door waist scallop (AMG GT3)
+    const uMid = clamp((cfg.yF - y) / Math.max(1, cfg.yF - cfg.yR), 0, 1);
+    const waistDip = Math.sin(uMid * Math.PI) * (cfg.isSport ? 22 : 34);
+    let rxMax = cfg.halfBodyF * (1 - uMid) + cfg.halfBodyR * uMid - waistDip;
+    if (y > cfg.yF + 190) {
+      const fn = clamp((y - (cfg.yF + 190)) / Math.max(1, cfg.yNose - (cfg.yF + 190)), 0, 1);
+      rxMax = cfg.halfBodyF * (1 - 0.30 * Math.pow(fn, 1.85));
+    } else if (y < cfg.yR - 170) {
+      const rn = clamp(((cfg.yR - 170) - y) / Math.max(1, (cfg.yR - 170) - cfg.yTail), 0, 1);
+      rxMax = cfg.halfBodyR * (1 - 0.16 * Math.pow(rn, 1.65));
+    }
+
+    // Bottom underbody height (flush front chin -> flat floor -> integrated rear diffuser rise)
+    let zBot = cfg.isSport ? 105 : 82;
+    if (y > cfg.yNose - 110) {
+      const k = clamp((y - (cfg.yNose - 110)) / 110, 0, 1);
+      zBot += k * k * 42;
+    } else if (y < cfg.yR - 210) {
+      const k = clamp(((cfg.yR - 210) - y) / Math.max(1, (cfg.yR - 210) - cfg.yTail), 0, 1);
+      zBot += k * k * 140;
+    }
+
+    // True circular wheel-arch openings centered at (yF, wcZf) and (yR, wcZr)
+    // Strictly clears full tire diameter (wcZ + tR + 38mm) so tires NEVER clip or get wrapped!
+    const dyF = Math.abs(y - cfg.yF);
+    const dyR = Math.abs(y - cfg.yR);
+    let inArch = 0, archMask = 0, zArch = zBot + 36, wellRx = rxMax;
+    const evalArch = (dy, rArch, wcZ, wRx) => {
+      if (dy < rArch) {
+        const zCirc = wcZ + Math.sqrt(Math.max(0, rArch * rArch - dy * dy));
+        return { active: 1, mask: 1, zCut: Math.max(zBot + 36, zCirc), wRx };
+      }
+      if (dy < rArch + 45) {
+        const s = 1 - smoothstep(rArch, rArch + 45, dy);
+        return { active: s, mask: s, zCut: zBot + 36 + s * (wcZ - (zBot + 36)) * 0.45, wRx };
+      }
+      return null;
+    };
+    const aF = evalArch(dyF, cfg.rArchF, cfg.wcZf, cfg.fWellRx);
+    const aR = evalArch(dyR, cfg.rArchR, cfg.wcZr, cfg.rWellRx);
+    const aHit = (aF && (!aR || aF.mask >= aR.mask)) ? aF : aR;
+    if (aHit) {
+      inArch = aHit.active;
+      archMask = aHit.mask;
+      zArch = aHit.zCut;
+      wellRx = rxMax * (1 - archMask) + aHit.wRx * archMask;
+    }
+
+    // AMG GT3 sculpted fender beltline: muscular peak over front & rear arches, sloping down to Panamericana nose
+    const zFenderF = cfg.wcZf + cfg.rArchF + (cfg.isSport ? 88 : 98);
+    const zFenderR = cfg.wcZr + cfg.rArchR + (cfg.isSport ? 118 : 128);
+    let zBelt = zFenderF * (1 - uMid) + zFenderR * uMid;
+    if (y > cfg.yF + 120) {
+      const k = clamp((y - (cfg.yF + 120)) / Math.max(1, cfg.yNose - (cfg.yF + 120)), 0, 1);
+      zBelt = zFenderF - (zFenderF - 455) * Math.pow(k, 1.55);
     } else if (y < cfg.yR - 140) {
-      const rn = clamp(((cfg.yR - 140) - y) / ((cfg.yR - 140) - cfg.yTail), 0, 1);
-      rxMax = cfg.halfBodyW * (1 - 0.16 * Math.pow(rn, 1.4));
+      const k = clamp(((cfg.yR - 140) - y) / Math.max(1, (cfg.yR - 140) - cfg.yTail), 0, 1);
+      // Slight AMG GT3 ducktail rear deck kick
+      zBelt = zFenderR + 28 * Math.sin(k * Math.PI * 0.65) - 18 * k * k;
     }
+    // Ensure fender crown always rises cleanly above wheel-arch opening
+    if (zBelt < zArch + 62 && archMask > 0.15) zBelt = zArch + 62;
 
-    const fArch = smoothBand(y - cfg.yF, cfg.tRf + 95);
-    const rArch = smoothBand(y - cfg.yR, cfg.tRr + 95);
-    const arch = Math.max(fArch, rArch);
-    const wellRx = fArch >= rArch ? cfg.fWellRx : cfg.rWellRx;
-    const rxLower = rxMax * (1 - arch) + wellRx * arch;
-    const zArchTop = (fArch >= rArch ? cfg.tRf : cfg.tRr) + 86;
-
-    let zBot = 58;
-    if (y > cfg.yNose - 140) {
-      const k = (y - (cfg.yNose - 140)) / 140;
-      zBot += k * k * 55;
-    } else if (y < cfg.yR - 160) {
-      const k = ((cfg.yR - 160) - y) / (cfg.yR - 160 - cfg.yTail);
-      zBot += clamp(k, 0, 1) * 155;
-    }
-
-    let zBelt = 690;
-    if (y > cfg.yF + 60) {
-      const k = clamp((y - (cfg.yF + 60)) / (cfg.yNose - (cfg.yF + 60)), 0, 1);
-      zBelt = 690 - 470 * Math.pow(k, 1.35);
-    } else if (y < cfg.yR + 120) {
-      const k = clamp(((cfg.yR + 120) - y) / (cfg.yR + 120 - cfg.yTail), 0, 1);
-      zBelt = 690 + 115 * Math.sin(k * Math.PI * 0.65);
-    }
-
-    let zCrown = zBelt + 42;
-    let rxRoof = rxMax * 0.88;
-    const yWs = cfg.yF - 250, yRfF = cfg.yF - 680, yRfR = cfg.yR + 540, yTailTop = cfg.yTail + 30;
-    if (y < yWs && y > yTailTop) {
+    // Long sculpted hood -> set-back fastback greenhouse (signature Mercedes-AMG GT3 proportions)
+    const yWs = cfg.yF - 470;
+    const yRfF = cfg.yF - 930;
+    const yRfR = cfg.yR + 500;
+    const yTailDeck = cfg.yR - 280;
+    let zCrown = zBelt + 26;
+    let rxRoof = rxMax * 0.86;
+    if (y < yWs && y > yTailDeck) {
       if (y >= yRfF) {
-        const k = clamp((yWs - y) / (yWs - yRfF), 0, 1);
-        const s = k * k * (3 - 2 * k);
-        zCrown = zBelt + 35 + s * (cfg.zRoofMax - (zBelt + 35));
-        rxRoof = rxMax * (0.90 - 0.24 * s);
+        // Steep raked panoramic windshield
+        const s = smoothstep(yWs, yRfF, y);
+        zCrown = (zBelt + 24) + s * (cfg.zRoofMax - (zBelt + 24));
+        rxRoof = rxMax * (0.86 - 0.25 * s);
       } else if (y >= yRfR) {
+        // Arched coupe roofline
         const midU = (yRfF - y) / Math.max(1, yRfF - yRfR);
-        zCrown = cfg.zRoofMax + Math.sin(midU * Math.PI) * 16;
-        rxRoof = cfg.halfBodyW * 0.65;
+        zCrown = cfg.zRoofMax + Math.sin(midU * Math.PI) * 18;
+        rxRoof = cfg.halfBodyR * 0.61;
       } else {
-        const k = clamp((yRfR - y) / Math.max(1, yRfR - yTailTop), 0, 1);
-        const s = k * k * (3 - 2 * k);
-        zCrown = cfg.zRoofMax - s * (cfg.zRoofMax - (zBelt + 25));
-        rxRoof = cfg.halfBodyW * (0.65 + 0.19 * s);
+        // Smooth fastback rear glass tapering cleanly into muscular rear haunches
+        const s = smoothstep(yRfR, yTailDeck, y);
+        zCrown = cfg.zRoofMax - s * (cfg.zRoofMax - (zBelt + 24));
+        rxRoof = cfg.halfBodyR * (0.61 + 0.22 * s);
       }
     } else if (y >= yWs) {
-      zCrown = zBelt + (y > cfg.yNose - 120 ? 18 : 42) - Math.max(0, 26 * (1 - uLen * 2.5));
-      rxRoof = rxMax * 0.86;
+      // Sculpted AMG GT3 long hood: gentle central dome sloping into the Panamericana grille top
+      const hoodDrop = y > cfg.yF + 260 ? 22 * smoothstep(cfg.yF + 260, cfg.yNose, y) : 0;
+      zCrown = zBelt + 22 - hoodDrop;
+      rxRoof = rxMax * 0.84;
+    } else {
+      zCrown = zBelt + 18;
+      rxRoof = rxMax * 0.82;
     }
 
+    // Cross-section ring:
+    //   0..3 : flat floor -> inner wheelwell recess (strictly inboard at wellRx when inside wheel arch!)
+    //   4    : crisp wheel-arch ceiling lip / flush rocker sill outside arch
+    //   5..7 : widebody fender flare & rounded upper shoulder up to zBelt
+    //   8..12: greenhouse tumblehome / hood / roof crown
+    const zWellMid = zBot + (zArch - zBot) * 0.52;
+    const zFendMid = zArch + (zBelt - zArch) * 0.52;
+    const rxLip = inArch > 0.2 ? rxMax : (rxMax - 12);
     const right = [
-      [rxLower * 0.55, zBot],
-      [rxLower * 0.94, zBot + 16],
-      [rxLower,        zBot + 115],
-      [rxLower * 0.35 + rxMax * 0.65, Math.max(zBot + 185, zArchTop - 25)],
-      [rxMax * 0.96,   Math.max(zBot + 245, zArchTop + 48)],
-      [rxMax,          zArchTop + (zBelt - zArchTop) * 0.45],
-      [rxMax * 0.95,   zBelt - 25],
-      [rxMax * 0.88,   zBelt],
-      [rxMax * 0.55 + rxRoof * 0.45, zBelt + (zCrown - zBelt) * 0.42],
-      [rxRoof * 0.92,  zBelt + (zCrown - zBelt) * 0.80],
-      [rxRoof * 0.56,  zCrown - 12],
-      [rxRoof * 0.22,  zCrown - 2],
-      [0,              zCrown]
+      [wellRx * 0.58, zBot],
+      [wellRx * 0.96, zBot + 10],
+      [wellRx,        zWellMid],
+      [wellRx,        Math.max(zBot + 24, zArch - 6)],
+      [rxLip,         zArch],
+      [rxMax,         zFendMid],
+      [rxMax * 0.965, zBelt - 18],
+      [rxMax * 0.89,  zBelt],
+      [rxMax * 0.56 + rxRoof * 0.44, zBelt + (zCrown - zBelt) * 0.40],
+      [rxRoof * 0.94, zBelt + (zCrown - zBelt) * 0.80],
+      [rxRoof * 0.58, zCrown - 10],
+      [rxRoof * 0.24, zCrown - 2],
+      [0,             zCrown]
     ];
     const pts = [[0, y, zBot]];
     for (let i = 0; i < right.length; i++) pts.push([right[i][0], y, right[i][1]]);
     for (let i = right.length - 2; i >= 0; i--) pts.push([-right[i][0], y, right[i][1]]);
-    return { pts, meta: { y, zBelt, zCrown, arch } };
+    return { pts, meta: { y, zBelt, zCrown, arch: archMask, rxMax, rxRoof, zBot, yWs, yRfF, yRfR, yTailDeck } };
   }
 
   function buildGT3Car() {
@@ -2109,6 +2129,8 @@
     const hpF = S.front.hp, hpR = S.rear.hp;
     const tRf = S.front.tire.R || 300, tWf = S.front.tire.W || 265;
     const tRr = S.rear.tire.R || 310, tWr = S.rear.tire.W || 285;
+    const wcXf = Math.abs(hpF.WC[0]), wcXr = Math.abs(hpR.WC[0]);
+    const wcZf = hpF.WC[2] || tRf, wcZr = hpR.WC[2] || tRr;
 
     const unitCyl = createUnitCylinder();
     const unitSphere = new THREE.SphereGeometry(1, 12, 10);
@@ -2124,98 +2146,206 @@
       return m;
     };
 
-    const wcXf = Math.abs(hpF.WC[0]), wcXr = Math.abs(hpR.WC[0]);
-    const halfBodyW = Math.max(wcXf + tWf * 0.36, wcXr + tWr * 0.38, 865);
-    const fWellRx = Math.min(wcXf - tWf * 0.5 - 65, 520);
-    const rWellRx = Math.min(wcXr - tWr * 0.5 - 55, 530);
-    const Y_nose = yF + 760, Y_tail = yR - 640;
-    const zRoofMax = isSport ? 1235 : 1190;
+    // Tire-derived widebody clearances: outer fenders wrap cleanly outside tire face, wheelwells clear inside
+    const halfBodyF = Math.max(wcXf + tWf * 0.5 + (isSport ? 20 : 32), 910);
+    const halfBodyR = Math.max(wcXr + tWr * 0.5 + (isSport ? 24 : 38), 945);
+    const fWellRx = Math.min(wcXf - tWf * 0.5 - 88, 515);
+    const rWellRx = Math.min(wcXr - tWr * 0.5 - 75, 530);
+    const rArchF = tRf + 38;
+    const rArchR = tRr + 38;
+    const Y_nose = yF + 820, Y_tail = yR - 635;
+    const zRoofMax = isSport ? 1245 : 1215;
 
-    // 1. Watertight multi-material sculpted GT3 Coupe Body Loft
+    // 1. Dense Clustered Longitudinal Stations (ultra-smooth circular wheel arches + nose/tail curves)
+    const addSpan = (arr, y0, y1, n) => {
+      for (let i = 0; i < n; i++) arr.push(y0 + (y1 - y0) * (i / n));
+    };
     const ys = [];
-    for (let i = 0; i <= 36; i++) {
-      const u = i / 36;
-      ys.push(Y_nose + (Y_tail - Y_nose) * u);
-    }
-    const secData = ys.map(y => gt3SectionRing(y, {
-      yF, yR, tRf, tRr, halfBodyW, fWellRx, rWellRx, yNose: Y_nose, yTail: Y_tail, zRoofMax
-    }));
+    const fA0 = Math.min(Y_nose - 80, yF + rArchF + 38);
+    const fA1 = yF - rArchF - 38;
+    const rA0 = yR + rArchR + 38;
+    const rA1 = Math.max(Y_tail + 80, yR - rArchR - 38);
+    addSpan(ys, Y_nose, fA0, 9);
+    addSpan(ys, fA0, fA1, 18);
+    addSpan(ys, fA1, rA0, 14);
+    addSpan(ys, rA0, rA1, 18);
+    addSpan(ys, rA1, Y_tail, 7);
+    ys.push(Y_tail);
+
+    const ringCfg = {
+      isSport, yF, yR, wcZf, wcZr, rArchF, rArchR,
+      halfBodyF, halfBodyR, fWellRx, rWellRx,
+      yNose: Y_nose, yTail: Y_tail, zRoofMax
+    };
+    const secData = ys.map(y => gt3SectionRing(y, ringCfg));
     const rings = secData.map(d => d.pts);
+    const yWs = yF - 470, yRfF = yF - 930, yRfR = yR + 500, yTailDeck = yR - 280;
+
     const bodyGeo = buildMultiMatLoftGeometry(rings, true, (r, q, n) => {
       const ym = (secData[r].meta.y + secData[r + 1].meta.y) * 0.5;
       const arch = Math.max(secData[r].meta.arch, secData[r + 1].meta.arch);
       const halfN = n / 2;
       const symIdx = q < halfN ? q : (n - 1 - q);
-      if (symIdx <= 2) return 1;
-      if (arch > 0.35 && symIdx <= 4) return 2;
-      if (ym < yF - 255 && ym > yR + 120) {
-        if (ym > yF - 690 && symIdx >= 9) return 4;
-        if (ym < yF - 670 && ym > yR + 510 && symIdx >= 9 && symIdx <= 10) return 4;
-        if (ym <= yR + 520 && ym > yR + 150 && symIdx >= 10) return 4;
+      // Flat floor pan & inner wheelwell arch liner
+      if (symIdx <= 2) return 2;
+      if (arch > 0.12 && symIdx <= 4) return 2;
+      // Flush lower rocker molding strip (body-integrated, no detached floating black plank)
+      if (arch <= 0.12 && symIdx === 3) return 1;
+      // Panoramic windshield, side coupe windows, and tapered C-pillar fastback glass
+      if (ym < yWs - 15 && ym > yTailDeck + 45) {
+        if (ym > yRfF - 15 && symIdx >= 8) return 4; // wraparound raked windshield
+        if (ym <= yRfF - 15 && ym >= yRfR + 10 && symIdx >= 8 && symIdx <= 10) return 4; // side coupe windows
+        if (ym < yRfR + 10 && ym > yTailDeck + 115 && symIdx >= 9 && symIdx <= 10) return 4; // smooth C-pillar quarter glass
+        if (ym < yRfR + 10 && ym > yTailDeck + 70 && symIdx >= 11) return 4; // fastback rear glass
       }
-      if (!isSport && symIdx >= 12) return 3;
+      // Subtle AMG GT3 center racing stripe along hood & roof (only in Race mode)
+      if (!isSport && symIdx >= 12 && (ym > yWs + 20 || (ym < yRfF - 10 && ym > yRfR + 10))) return 3;
       return 0;
-    }, [2, 2]);
+    }, [0, 2]);
     const bodyMesh = addBody(bodyGeo, [ST.mats.paint, ST.mats.carbon, ST.mats.darkTrim, ST.mats.accent, ST.mats.glass], paintMeshes);
     bodyMesh.castShadow = true;
 
-    // 2. Carbon Front Splitter, Side Skirts & Mirrors
-    const spPts = [
-      [yF + 810, 48], [yF + 755, 42], [yF + 560, 42], [yF + 560, 62], [yF + 785, 68]
-    ];
+    // 2. Mercedes-AMG GT3 Signature Panamericana Elliptical Grille, Brake Ducts & Swept LED Headlights
+    // Build curved column segments proud of the painted nose bumper (clean mouth border on white nose)
+    for (let k = -5; k <= 5; k++) {
+      const gx = k * 52;
+      const ellipseH = Math.sqrt(Math.max(0.35, 1 - Math.pow(gx / 305, 2)));
+      const backH = 166 * ellipseH;
+      const bowY = Y_nose + 4 - 0.00018 * gx * gx;
+      const backCol = new THREE.Mesh(new THREE.BoxGeometry(54, 14, backH), ST.mats.darkTrim);
+      backCol.position.set(gx, bowY, 302);
+      aeroBodyGroup.add(backCol);
+
+      const slat = new THREE.Mesh(new THREE.BoxGeometry(10, 10, backH - 12), ST.mats.aluminum);
+      slat.position.set(gx, bowY + 6, 302);
+      aeroBodyGroup.add(slat);
+    }
+    // Lower central splitter cooling slot contoured cleanly across the lower painted bumper
+    for (let k = -4; k <= 4; k++) {
+      const gx = k * 64;
+      const bowY = Y_nose + 2 - 0.00016 * gx * gx;
+      const lowSeg = new THREE.Mesh(new THREE.BoxGeometry(66, 12, 54), ST.mats.darkTrim);
+      lowSeg.position.set(gx, bowY, 166);
+      aeroBodyGroup.add(lowSeg);
+    }
+    // Center circular metallic emblem ring & 3-pointed star spokes
+    const emblemGrp = new THREE.Group();
+    emblemGrp.position.set(0, Y_nose + 12, 304);
+    emblemGrp.rotation.x = Math.PI / 2;
+    const embRing = new THREE.Mesh(new THREE.TorusGeometry(54, 6.0, 10, 28), ST.mats.aluminum);
+    emblemGrp.add(embRing);
+    for (let s = 0; s < 3; s++) {
+      const ang = (s * 2 * Math.PI) / 3 + Math.PI / 2;
+      const spk = new THREE.Mesh(new THREE.BoxGeometry(8.5, 47, 8), ST.mats.aluminum);
+      spk.position.set(Math.cos(ang) * 23, Math.sin(ang) * 23, 0);
+      spk.rotation.z = ang - Math.PI / 2;
+      emblemGrp.add(spk);
+    }
+    aeroBodyGroup.add(emblemGrp);
+
+    // Swept LED headlights (seated flush on sculpted fender slope), brake ducts, louvers, mirrors & side exhaust
+    const yHead = Y_nose - 210;
+    const sHead = gt3SectionRing(yHead, ringCfg).meta;
     for (const sx of [-1, 1]) {
-      const sm = addBody(makeExtrudedPlateYZ(spPts, halfBodyW * 0.92), ST.mats.carbon, carbonMeshes);
-      sm.position.x = sx * halfBodyW * 0.45;
-      const sk = new THREE.Mesh(new THREE.BoxGeometry(58, wb - 520, 18), ST.mats.carbon);
-      sk.position.set(sx * (halfBodyW - 14), (yF + yR) * 0.5, 62);
-      sk.castShadow = true;
-      aeroBodyGroup.add(sk);
-      carbonMeshes.push(sk);
-      addBoxMesh(aeroBodyGroup, [sx * (halfBodyW - 75), yF - 460, 745], [140, 82, 52], ST.mats.carbon);
+      // Flanking lower bumper brake-cooling ducts tucked behind curved nose corners
+      addBoxMesh(aeroBodyGroup, [sx * 440, Y_nose - 105, 178], [160, 18, 62], ST.mats.darkTrim, [0, 0, -sx * 0.42]);
+
+      // Swept AMG GT3 headlight cluster seated smoothly on outer hood shoulder
+      const hx = sx * sHead.rxMax * 0.72;
+      const hz = sHead.zBelt - 2;
+      addBoxMesh(aeroBodyGroup, [hx, yHead, hz], [176, 128, 32], ST.mats.darkTrim, [0.27, sx * 0.14, -sx * 0.36]);
+      addBoxMesh(aeroBodyGroup, [hx - sx * 4, yHead + 14, hz + 10], [160, 30, 18], ST.mats.headlight, [0.27, sx * 0.14, -sx * 0.36]);
+
+      // AMG GT3 front fender top louver vents (5 flush carbon gills over each front arch)
+      if (!isSport) {
+        for (let g = 0; g < 5; g++) {
+          const gy = yF + 110 - g * 58;
+          const sInfo = gt3SectionRing(gy, ringCfg).meta;
+          addBoxMesh(
+            aeroBodyGroup,
+            [sx * (sInfo.rxMax * 0.78), gy, sInfo.zBelt + 6],
+            [118, 22, 10],
+            ST.mats.darkTrim,
+            [0.06, sx * 0.12, -sx * 0.18]
+          );
+        }
+      }
+
+      // Sculpted aerodynamic teardrop side mirrors connected cleanly on stalks
+      const mirBase = [sx * (halfBodyF * 0.78), yWs - 140, 765];
+      const mirTip = [sx * (halfBodyF * 0.98), yWs - 175, 818];
+      addTubeMesh(aeroBodyGroup, unitCyl, mirBase, mirTip, 11, ST.mats.carbon);
+      const mirPod = new THREE.Mesh(new THREE.SphereGeometry(48, 14, 12), ST.mats.paint);
+      mirPod.scale.set(1.45, 1.05, 0.72);
+      mirPod.position.set(mirTip[0], mirTip[1], mirTip[2]);
+      mirPod.castShadow = true;
+      aeroBodyGroup.add(mirPod);
+      paintMeshes.push(mirPod);
+
+      // Side-exit metallic exhaust port tucked cleanly at lower sill behind front wheel
+      const exh = new THREE.Mesh(new THREE.CylinderGeometry(18, 18, 36, 12), ST.mats.aluminum);
+      exh.rotation.z = Math.PI / 2;
+      exh.position.set(sx * (halfBodyF - 40), yF - rArchF - 145, 125);
+      aeroBodyGroup.add(exh);
+
+      // Slim horizontal rear LED taillights
+      addBoxMesh(aeroBodyGroup, [sx * 545, Y_tail - 2, 765], [340, 20, 32], ST.mats.rainLight, [0, 0, sx * 0.06]);
     }
 
-    // 3. LED Headlight Strips & Full-Width Rear Lightbar + Multi-Strake Rear Diffuser
-    for (const sx of [-1, 1]) {
-      addBoxMesh(aeroBodyGroup, [sx * 545, Y_nose - 230, 465], [160, 56, 38], ST.mats.headlight, [0.35, 0, -sx * 0.25]);
-    }
-    addBoxMesh(aeroBodyGroup, [0, Y_tail - 8, 690], [halfBodyW * 1.48, 22, 30], ST.mats.rainLight);
+    // Central recessed AMG hood extractor louver (flush on hood surface)
+    const hoodMid = gt3SectionRing(yF + 20, ringCfg).meta;
+    addBoxMesh(aeroBodyGroup, [0, yF + 20, hoodMid.zCrown - 2], [440, 230, 14], ST.mats.darkTrim, [0.12, 0, 0]);
+
+    // Clean integrated rear diffuser strakes strictly tucked inside rear under-bumper contour
     for (let k = -2; k <= 2; k++) {
-      addBoxMesh(aeroBodyGroup, [k * 235, Y_tail + 150, 145], [14, 340, 125], ST.mats.carbon);
+      addBoxMesh(aeroBodyGroup, [k * 215, Y_tail + 165, 152], [12, 260, 96], ST.mats.carbon);
     }
 
-    // 4. GT3 Swan-Neck Wing vs GT3 Sport Track Spoiler
+    // 3. GT3 Swan-Neck Wing vs GT3 Sport Subtle Ducktail Lip
     let rwFlap2M = null;
-    const rwY = isSport ? (yR - 565) : (yR - 615);
-    const rwZ = isSport ? 965 : 1145;
-    const rwSpan = isSport ? 1480 : 1760;
-    const rwChord = isSport ? 185 : 265;
-    const rwMainGeo = makeAirfoilGeo(rwChord, Math.round(rwChord * 0.11), 16, isSport ? 8 : 11, rwSpan);
-    addBody(rwMainGeo, ST.mats.carbon, carbonMeshes).position.set(0, rwY, rwZ);
-
     let rwFlap2BaseY = 0, rwFlap2BaseZ = 0;
     if (!isSport) {
-      const flapGeo = makeAirfoilGeo(110, 14, 10, 24, rwSpan - 20);
-      rwFlap2M = addBody(flapGeo, ST.mats.paint, paintMeshes);
-      rwFlap2BaseY = rwY - 175;
-      rwFlap2BaseZ = rwZ + 52;
+      const rwY = yR - 610;
+      const rwZ = 1135;
+      const rwSpan = 1780;
+      const rwChord = 255;
+      const rwMainGeo = makeAirfoilGeo(rwChord, 28, 16, 10, rwSpan);
+      addBody(rwMainGeo, ST.mats.carbon, carbonMeshes).position.set(0, rwY, rwZ);
+
+      const flapGeo = makeAirfoilGeo(105, 13, 10, 22, rwSpan - 20);
+      rwFlap2M = addBody(flapGeo, ST.mats.accent, accentMeshes);
+      rwFlap2BaseY = rwY - 168;
+      rwFlap2BaseZ = rwZ + 48;
       rwFlap2M.position.set(0, rwFlap2BaseY, rwFlap2BaseZ);
+
+      const pylonPts = [[rwY + 170, 770], [rwY + 82, rwZ + 44], [rwY - 38, rwZ + 44], [rwY + 42, 770]];
+      for (const sx of [-1, 1]) {
+        const py = addBody(makeExtrudedPlateYZ(pylonPts, 14), ST.mats.carbon, carbonMeshes);
+        py.position.x = sx * 310;
+        const epPts = [[rwY + 125, rwZ - 55], [rwY - 245, rwZ - 38], [rwY - 255, rwZ + 122], [rwY + 115, rwZ + 72]];
+        const ep = addBody(makeExtrudedPlateYZ(epPts, 10), ST.mats.carbon, carbonMeshes);
+        ep.position.x = sx * (rwSpan * 0.5 + 5);
+      }
+    } else {
+      const lipGeo = makeAirfoilGeo(135, 18, 12, 7, 1440);
+      addBody(lipGeo, ST.mats.carbon, carbonMeshes).position.set(0, yR - 595, 865);
     }
 
-    const pylonPts = [[rwY + 180, 770], [rwY + 80, rwZ + 45], [rwY - 50, rwZ + 45], [rwY + 40, 770]];
-    for (const sx of [-1, 1]) {
-      const py = addBody(makeExtrudedPlateYZ(pylonPts, 14), ST.mats.carbon, carbonMeshes);
-      py.position.x = sx * 305;
-      const epPts = [[rwY + 130, rwZ - 55], [rwY - 260, rwZ - 40], [rwY - 270, rwZ + 125], [rwY + 120, rwZ + 75]];
-      const ep = addBody(makeExtrudedPlateYZ(epPts, 10), ST.mats.carbon, carbonMeshes);
-      ep.position.x = sx * (rwSpan * 0.5 + 5);
-    }
+    // 4. Clean Interior Cockpit (Recessed Dark Dashboard + Carbon Bucket Seat — NO spherical driver!)
+    const Y_fh = yF - 460, Y_b = yR + 460;
+    addBoxMesh(aeroBodyGroup, [0, Y_fh - 355, 595], [860, 165, 85], ST.mats.darkTrim);
+    const seatBack = new THREE.Mesh(new THREE.BoxGeometry(360, 48, 520), ST.mats.darkTrim);
+    seatBack.position.set(-295, Y_b + 130, 505);
+    seatBack.rotation.x = -0.22;
+    const seatBase = new THREE.Mesh(new THREE.BoxGeometry(360, 360, 48), ST.mats.darkTrim);
+    seatBase.position.set(-295, Y_b + 285, 260);
+    aeroBodyGroup.add(seatBack, seatBase);
     ST.carRoot.add(aeroBodyGroup);
 
-    // 5. Internal Rollbar & Front/Rear Subframes
+    // 5. Internal Rollcage & Front/Rear Subframes (kept strictly inside greenhouse envelope)
     const frameGroup = new THREE.Group();
     const fFront = new THREE.Group(), fSide = new THREE.Group(), fMain = new THREE.Group(), fRear = new THREE.Group();
     const fSubX = Math.max(210, hpF.LCA_F[0] - 15), rSubX = Math.max(210, hpR.LCA_F[0] - 15);
-    const Y_fh = yF - 260, Y_b = yR + 480;
     [
       [[-fSubX, yF + 260, 155], [fSubX, yF + 260, 155], 16],
       [[-fSubX, yF + 260, 155], [-fSubX, Y_fh, 130], 16], [[fSubX, yF + 260, 155], [fSubX, Y_fh, 130], 16],
@@ -2224,37 +2354,32 @@
       [[fSubX, yF + 240, 155], [hpF.DMP_BODY[0], yF, hpF.DMP_BODY[2]], 13]
     ].forEach(t => addTubeMesh(fFront, unitCyl, t[0], t[1], t[2], ST.mats.steelTube));
     [
-      [[-580, Y_fh, 120], [-580, Y_b, 120], 16], [[580, Y_fh, 120], [580, Y_b, 120], 16],
-      [[-560, Y_fh, 700], [-500, Y_b, zRoofMax - 45], 15], [[560, Y_fh, 700], [500, Y_b, zRoofMax - 45], 15],
-      [[-500, Y_b, zRoofMax - 45], [500, Y_b, zRoofMax - 45], 16],
-      [[-500, Y_b, zRoofMax - 45], [-580, Y_b, 120], 16], [[500, Y_b, zRoofMax - 45], [580, Y_b, 120], 16]
+      [[-540, Y_fh, 130], [-540, Y_b, 130], 16], [[540, Y_fh, 130], [540, Y_b, 130], 16],
+      [[-510, Y_fh, 720], [-470, Y_b, zRoofMax - 70], 15], [[510, Y_fh, 720], [470, Y_b, zRoofMax - 70], 15],
+      [[-470, Y_b, zRoofMax - 70], [470, Y_b, zRoofMax - 70], 16],
+      [[-470, Y_b, zRoofMax - 70], [-540, Y_b, 130], 16], [[470, Y_b, zRoofMax - 70], [540, Y_b, 130], 16]
     ].forEach(t => addTubeMesh(fMain, unitCyl, t[0], t[1], t[2], ST.mats.steelTube));
     [
-      [[-580, Y_fh, 280], [-580, Y_b, 420], 14], [[580, Y_fh, 280], [580, Y_b, 420], 14]
+      [[-540, Y_fh, 290], [-540, Y_b, 430], 14], [[540, Y_fh, 290], [540, Y_b, 430], 14]
     ].forEach(t => addTubeMesh(fSide, unitCyl, t[0], t[1], t[2], ST.mats.steelTube));
     [
       [[-rSubX, Y_b, 130], [-rSubX, yR - 260, 180], 16], [[rSubX, Y_b, 130], [rSubX, yR - 260, 180], 16],
       [[-hpR.DMP_BODY[0], yR, hpR.DMP_BODY[2]], [hpR.DMP_BODY[0], yR, hpR.DMP_BODY[2]], 15],
-      [[-500, Y_b, zRoofMax - 45], [-hpR.DMP_BODY[0], yR, hpR.DMP_BODY[2]], 13],
-      [[500, Y_b, zRoofMax - 45], [hpR.DMP_BODY[0], yR, hpR.DMP_BODY[2]], 13]
+      [[-470, Y_b, zRoofMax - 70], [-hpR.DMP_BODY[0], yR, hpR.DMP_BODY[2]], 13],
+      [[470, Y_b, zRoofMax - 70], [hpR.DMP_BODY[0], yR, hpR.DMP_BODY[2]], 13]
     ].forEach(t => addTubeMesh(fRear, unitCyl, t[0], t[1], t[2], ST.mats.steelTube));
     frameGroup.add(fFront, fSide, fMain, fRear);
     ST.carRoot.add(frameGroup);
 
-    // 6. Cockpit Helmet, V8 Powertrain & GT Steering
+    // 6. Empty driverGroup (NO driver sphere) + Front-Mid V8 Powertrain + Proper GT3 Racing Steering Wheel
     const driverGroup = new THREE.Group();
-    const helm = new THREE.Mesh(new THREE.SphereGeometry(112, 18, 16), ST.mats.helmet);
-    helm.position.set(-285, Y_b + 240, 895);
-    const visor = new THREE.Mesh(new THREE.BoxGeometry(142, 52, 48), ST.mats.visor);
-    visor.position.set(-285, Y_b + 320, 902);
-    driverGroup.add(helm, visor);
     ST.carRoot.add(driverGroup);
 
     const powertrainGroup = new THREE.Group();
-    addBoxMesh(powertrainGroup, [0, yF - 35, 310], [340, 520, 320], ST.mats.edu);
-    addBoxMesh(powertrainGroup, [0, yR + 120, 295], [260, 420, 220], ST.mats.darkTrim);
-    addTubeMesh(powertrainGroup, unitCyl, [-160, yR - 220, 195], [-160, yR - 590, 185], 26, ST.mats.aluminum);
-    addTubeMesh(powertrainGroup, unitCyl, [160, yR - 220, 195], [160, yR - 590, 185], 26, ST.mats.aluminum);
+    addBoxMesh(powertrainGroup, [0, yF - 90, 320], [340, 520, 310], ST.mats.edu);
+    addBoxMesh(powertrainGroup, [0, yR + 120, 295], [260, 400, 215], ST.mats.darkTrim);
+    addTubeMesh(powertrainGroup, unitCyl, [-160, yR - 200, 195], [-160, yR - 560, 195], 24, ST.mats.aluminum);
+    addTubeMesh(powertrainGroup, unitCyl, [160, yR - 200, 195], [160, yR - 560, 195], 24, ST.mats.aluminum);
     ST.carRoot.add(powertrainGroup);
 
     const steerGroup = new THREE.Group();
@@ -2266,15 +2391,23 @@
     rackRod.rotation.z = Math.PI / 2;
     rackRod.position.set(0, rackY, rackZ);
     steerGroup.add(rHousing, rackRod);
-    const pPin = [-220, rackY, rackZ + 55], pWhl = [-285, Y_fh - 360, 680];
+    const pPin = [-235, rackY, rackZ + 55], pWhl = [-295, Y_fh - 410, 710];
     addTubeMesh(steerGroup, unitCyl, pPin, pWhl, 12, ST.mats.aluminum);
     const swPivot = new THREE.Group();
     swPivot.position.set(pWhl[0], pWhl[1], pWhl[2]);
-    const colD = new THREE.Vector3(pWhl[0] - pPin[0], pWhl[1] - pPin[1], pWhl[2] - pPin[2]).normalize();
-    swPivot.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), colD);
+    // Orient steering wheel cleanly toward driver (~18 deg tilt from vertical)
+    const gtWhlNorm = new THREE.Vector3(0, -0.95, 0.31).normalize();
+    swPivot.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), gtWhlNorm);
     const swSpin = new THREE.Group();
-    const gtWheel = new THREE.Mesh(new THREE.BoxGeometry(285, 165, 16), ST.mats.carbon);
-    swSpin.add(gtWheel);
+    const gtRim = new THREE.Mesh(new THREE.TorusGeometry(132, 13, 12, 32), ST.mats.darkTrim);
+    const gtHub = new THREE.Mesh(new THREE.CylinderGeometry(38, 38, 22, 16), ST.mats.carbon);
+    gtHub.rotation.x = Math.PI / 2;
+    const gtSpokeH = new THREE.Mesh(new THREE.BoxGeometry(245, 22, 10), ST.mats.aluminum);
+    const gtSpokeV = new THREE.Mesh(new THREE.BoxGeometry(22, 122, 10), ST.mats.aluminum);
+    gtSpokeV.position.set(0, -60, 0);
+    const gtTopMark = new THREE.Mesh(new THREE.BoxGeometry(18, 18, 28), ST.mats.rainLight);
+    gtTopMark.position.set(0, 132, 0);
+    swSpin.add(gtRim, gtHub, gtSpokeH, gtSpokeV, gtTopMark);
     swPivot.add(swSpin);
     steerGroup.add(swPivot);
     ST.carRoot.add(steerGroup);

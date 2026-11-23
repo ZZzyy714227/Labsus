@@ -1347,37 +1347,16 @@ class CircuitPath extends TrackPath {
       curr.curvature = dpsi / (ds + 1e-6);
     }
     
-    // 3b. G22 赛车线：外-内-外目标线偏移（激进走线——吃满路肩、追求圈速）。
-    //     ── G21 原实现的两个根因缺陷（scratch/diag_*.cjs 三脚本实测确认）────
-    //     (a) 弯道分段碎片化：退出阈值 0.6× 太紧，T1-T4 蜗牛弯被切成 4 段，每段
-    //         独立跑一遍完整「外侧→弯心→外侧」剖面；且存在弧长 15m/转角 3.6°
-    //         的样条噪声伪弯段。实测 15 段中 5 段总转角 <25°。
-    //     (b) apexOff/outOff 幅度只由赛道宽度与 severity 决定，完全不随段长缩放
-    //         ⇒ 弧长仅 74m 的短弯也被要求做 ~10m 横向摆动，实测目标线折角
-    //         0.806 m/m = 38.9°，物理上不可跟 → 车把一个弯扭成好几个弯。
-    //     ── 修复 ────────────────────────────────────────────────────────────
-    //     (1) 退出阈值放宽到 0.30×，减少同一物理弯被局部曲率回落切碎；
-    //     (2) 丢弃总转角 < MIN_TURN_DEG 的伪弯段（样条噪声不是弯）；
-    //     (3) 偏移剖面改【弧长参数化】并向相邻直道两侧各延伸 EXT_M —— 真实车手
-    //         在入弯前的直道上就已靠外侧，横向移动的距离来自直道而非弯内。
-    //         这是把折角降下来的关键：靠加长行程，而不是靠砍幅度，故仍能吃满路肩；
-    //     (4) 幅度按有效长度限幅。四段余弦剖面的峰值斜率解析式为
-    //         peak|d(offset)/ds| = 2π·(apexOff+outOff)/L_eff
-    //         （实测校验：L=74m、A=10m → 0.85 m/m，与量到的 0.806 吻合），
-    //         故反解 A ≤ SLOPE_MAX·L_eff/(2π)：短弯自动少摆、长弯吃满。
-    //     (5) 窗口重叠时用「弯心权重」交叉淡入淡出，而非硬切归属，保证符号连续。
-    //     注：与赛道宽度无关。hw_m=4.9（总宽 9.8m，比真实 F1 赛道 13~15m 更窄），
-    //         且幅度由 hw_m 推导 —— 加宽赛道只会放大摆幅、扭得更凶。
+    // 3b. Variational Minimum-Curvature Racing Line (Multi-scale Elastic Band inside FIA Kerb Bounds)
     const HW_M = 4.9, KERB_M = 1.35;
-    const CURV_ENTER = 0.0045;              // 进入弯道阈值（R<222m）
-    const CURV_EXIT = CURV_ENTER * 0.30;    // 退出阈值（R<740m）——迟滞放宽防切碎
-    const MIN_TURN_DEG = 25.0;              // 段总转角下限，低于此为样条噪声
-    const EXT_M = 55.0;                     // 剖面向两侧直道延伸（横向行程的真正来源）
-    const SLOPE_MAX = 0.24;                 // |d(offset)/ds| 上限 m/m（≈13.5° 折角）
+    const CURV_ENTER = 0.0045;
+    const CURV_EXIT = CURV_ENTER * 0.30;
+    const MIN_TURN_DEG = 25.0;
+    const SLOPE_MAX = 0.24;
     this.hw_m = HW_M; this.kerb_m = KERB_M;
     for (let i2 = 0; i2 < P; i2++) { this.pts[i2].offset = 0; this.pts[i2].cornerId = -1; }
 
-    // (1) 曲率分弯（带迟滞）
+    // (1) Detect corner segments with hysteresis (used for cornerId telemetry & lap-learning)
     const rawSegs = [];
     let ci = 0;
     while (ci < P) {
@@ -1388,7 +1367,6 @@ class CircuitPath extends TrackPath {
         ci = cj;
       } else ci++;
     }
-    // (2) 段总转角 = 曲率沿弧长积分；弯心侧由符号定（右弯 curv<0 → 弯心在右 +）
     const turnOf = (i0, i1) => {
       let t = 0;
       for (let k = i0; k < i1; k++) t += this.pts[k].curvature * (this.pts[k + 1].s - this.pts[k].s);
@@ -1400,30 +1378,14 @@ class CircuitPath extends TrackPath {
     }
     this.cornerSegsDropped = rawSegs.length - cornerSegs.length;
 
-    // (3)(4)(5) 逐段生成偏移剖面，交叉淡入淡出累加
+    // Assign cornerId windows (extends 40m into entry/exit for lap-learning attribution)
     const TL = this.totalLength;
-    const offNum = new Array(P).fill(0), offDen = new Array(P).fill(0);
     const cidW = new Array(P).fill(-1), cidBest = new Array(P).fill(-1);
     let cid = 0;
     for (const [i0, i1] of cornerSegs) {
       const s0 = this.pts[i0].s, s1 = this.pts[i1].s;
-      const wA = s0 - EXT_M, wB = s1 + EXT_M;              // 延伸后的窗口
-      const L_eff = Math.max(1.0, wB - wA);
-      const sumCurv = turnOf(i0, i1);
-      const apexDir = (sumCurv < 0) ? 1 : -1;
-      const avgCurvAbs = Math.abs(sumCurv) / Math.max(1, i1 - i0 + 1) / 2.0;
-      const severity = Math.min(1, avgCurvAbs / 0.010);     // 弯越急 → 越贴路肩/越外放
-      // 激进口径：弯心骑满路肩内侧（HW+0.65·KERB≈5.78m），入/出弯贴外侧沥青边
-      const sevF = 0.62 + 0.38 * severity;
-      let apexOff = (HW_M + 0.65 * KERB_M) * sevF;
-      let outOff = (HW_M - 0.10) * sevF;
-      // (4) 折角预算反解幅度上限
-      const ampMax = SLOPE_MAX * L_eff / (2 * Math.PI);
-      const ampScale = Math.min(1.0, ampMax / Math.max(0.01, apexOff + outOff));
-      apexOff *= ampScale; outOff *= ampScale;
-
+      const wA = s0 - 40.0, wB = s1 + 40.0, L_eff = Math.max(1.0, wB - wA);
       for (let k = 0; k < P; k++) {
-        // 环状窗口：s 可能跨起终点，取落在 [wA,wB] 内的那个镜像
         const sk = this.pts[k].s;
         let cand = null;
         for (let m = -1; m <= 1; m++) {
@@ -1431,39 +1393,125 @@ class CircuitPath extends TrackPath {
           if (c >= wA && c <= wB) { cand = c; break; }
         }
         if (cand === null) continue;
-        const phi = (cand - wA) / L_eff;
-        // 四段余弦（C¹）：0 → −outOff → +apexOff → −outOff → 0，段边界归零不跳变
-        let prof;
-        if (phi < 0.25) { const t = phi / 0.25; prof = -outOff * (1 - Math.cos(Math.PI * t)) / 2; }
-        else if (phi < 0.5) { const t = (phi - 0.25) / 0.25; prof = -outOff + (apexOff + outOff) * (1 - Math.cos(Math.PI * t)) / 2; }
-        else if (phi < 0.75) { const t = (phi - 0.5) / 0.25; prof = apexOff - (apexOff + outOff) * (1 - Math.cos(Math.PI * t)) / 2; }
-        else { const t = (phi - 0.75) / 0.25; prof = -outOff * (1 + Math.cos(Math.PI * t)) / 2; }
-        // (5) 弯心权重：phi=0.5 处 1，窗口两端 0 —— 重叠段之间平滑过渡
-        const w = Math.max(0, 1 - Math.abs(phi - 0.5) * 2);
-        if (w <= 0) continue;
-        offNum[k] += apexDir * prof * w;
-        offDen[k] += w;
+        const w = 1.0 - Math.abs((cand - wA) / L_eff - 0.5) * 2.0;
         if (w > cidBest[k]) { cidBest[k] = w; cidW[k] = cid; }
       }
       cid++;
     }
-    for (let k = 0; k < P; k++) {
-      this.pts[k].offset = offDen[k] > 1e-9 ? offNum[k] / offDen[k] : 0;
-      this.pts[k].cornerId = offDen[k] > 1e-9 ? cidW[k] : -1;
-    }
+    for (let k = 0; k < P; k++) this.pts[k].cornerId = cidW[k];
     this.cornerCount = cid;
-    // 移动平均平滑（防段间微跳与离散噪声），环状窗口 7 点
-    const offRaw = this.pts.map(p => p.offset);
-    for(let i3 = 0; i3 < P; i3++){
-      let s = 0;
-      for(let w2 = -3; w2 <= 3; w2++) s += offRaw[(i3 + w2 + P) % P];
-      this.pts[i3].offset = s / 7;
+
+    // (2) Asymmetric corridor bounds: allow riding inside apex kerbs up to HW + 0.62*KERB (~5.74m, leaving >0.55m safety margin to EDGE=7.20m),
+    //     stay cleanly within asphalt edges (HW - 0.15 = 4.75m) on outside & straights
+    const MAX_ASPH = HW_M - 0.15;
+    const MAX_KERB = HW_M + 0.62 * KERB_M; // ~5.737m (>= 5.20m apex requirement, <= 5.90m safe from EDGE overshoots)
+    const lb = new Array(P), ub = new Array(P);
+    for (let k = 0; k < P; k++) {
+      let kSum = 0;
+      for (let w2 = -10; w2 <= 10; w2++) kSum += this.pts[(k + w2 + P) % P].curvature;
+      const kAvg = kSum / 21;
+      const kerbBlend = Math.min(1.0, Math.max(0.0, (Math.abs(kAvg) - 0.0025) / 0.005));
+      // Right bend (kAvg < 0): inside is +offset (ub); Left bend (kAvg > 0): inside is -offset (lb)
+      ub[k] = (kAvg < 0) ? (MAX_ASPH + (MAX_KERB - MAX_ASPH) * kerbBlend) : MAX_ASPH;
+      lb[k] = (kAvg > 0) ? -(MAX_ASPH + (MAX_KERB - MAX_ASPH) * kerbBlend) : -MAX_ASPH;
     }
-    // (6) 斜率硬限幅。步骤 (4) 的幅度预算只对【单段】剖面成立（峰值斜率
-    //     2π·A/L_eff）；步骤 (5) 的交叉淡入淡出在窗口重叠区会合成出超出该解析界
-    //     的斜率（实测 0.291 > 0.24）。故对 offset 数组做前向+后向双向限幅，
-    //     使 |d(offset)/ds| ≤ SLOPE_MAX 【恒成立】，不依赖剖面形状的假设。
-    for (let pass = 0; pass < 6; pass++) {
+
+    // (3) Multi-Grid Minimum-Curvature Optimization: Minimize sum(kappa_ref^2 * ds) across coarse -> medium -> fine grids
+    //     Multi-grid sweeps converge rapidly across both 400m sweeping complexes (T1-T2, T13) and tight hairpins (T6, T14).
+    const evalGrid = (nX, nY, Lseg, kap, ptsG, offG, M) => {
+      for (let j = 0; j < M; j++) {
+        const pt = ptsG[j];
+        nX[j] = pt.x + pt.nx * offG[j];
+        nY[j] = pt.y + pt.ny * offG[j];
+      }
+      for (let j = 0; j < M; j++) {
+        const jp = (j + 1) % M;
+        Lseg[j] = Math.max(1.0, Math.hypot(nX[jp] - nX[j], nY[jp] - nY[j]));
+      }
+      for (let j = 0; j < M; j++) {
+        const jm = (j - 1 + M) % M, jp = (j + 1) % M;
+        const ax = nX[j] - nX[jm], ay = nY[j] - nY[jm];
+        const bx = nX[jp] - nX[j], by = nY[jp] - nY[j];
+        const cx = nX[jp] - nX[jm], cy = nY[jp] - nY[jm];
+        const cross = ax * by - ay * bx;
+        const denom = Math.max(1.0, Lseg[jm] * Lseg[j] * Math.hypot(cx, cy));
+        kap[j] = 2.0 * cross / denom;
+      }
+    };
+
+    const solveGrid = (stride, nIter, stepMul, prevNodes, prevStride) => {
+      const M = Math.floor(P / stride);
+      const ptsG = new Array(M), offG = new Float64Array(M), lbG = new Float64Array(M), ubG = new Float64Array(M);
+      for (let j = 0; j < M; j++) {
+        const pi = j * stride;
+        ptsG[j] = this.pts[pi];
+        lbG[j] = lb[pi];
+        ubG[j] = ub[pi];
+        if (prevNodes) {
+          const fp = (pi / prevStride) % prevNodes.length;
+          const i0 = Math.floor(fp), i1 = (i0 + 1) % prevNodes.length, tf = fp - i0;
+          offG[j] = Math.max(lbG[j], Math.min(ubG[j], prevNodes[i0] * (1 - tf) + prevNodes[i1] * tf));
+        }
+      }
+      const nX = new Float64Array(M), nY = new Float64Array(M), Lseg = new Float64Array(M), kap = new Float64Array(M);
+      const vel = new Float64Array(M);
+      const Lavg = stride * 2.0;
+      const stepSize = stepMul * (Lavg * Lavg * Lavg) * 0.045;
+      for (let it = 0; it < nIter; it++) {
+        evalGrid(nX, nY, Lseg, kap, ptsG, offG, M);
+        for (let j = 0; j < M; j++) {
+          const jm = (j - 1 + M) % M, jp = (j + 1) % M;
+          const dJ = (-kap[jm] / Lseg[jm] + kap[j] * (1.0 / Lseg[jm] + 1.0 / Lseg[j]) - kap[jp] / Lseg[j])
+                   + (1e-5 * (2.0 * offG[j] - offG[jm] - offG[jp]));
+          vel[j] = 0.80 * vel[j] - stepSize * dJ;
+          let next = offG[j] + vel[j];
+          if (next < lbG[j]) { next = lbG[j]; vel[j] *= 0.15; }
+          else if (next > ubG[j]) { next = ubG[j]; vel[j] *= 0.15; }
+          offG[j] = next;
+        }
+      }
+      return { offG, stride };
+    };
+
+    const g1 = solveGrid(14, 240, 1.0, null, 1);
+    const g2 = solveGrid(7,  160, 0.85, g1.offG, g1.stride);
+    const g3 = solveGrid(3,  100, 0.70, g2.offG, g2.stride);
+    const nodes = [];
+    const M = g3.offG.length;
+    for (let j = 0; j < M; j++) {
+      nodes.push({ idx: j * g3.stride, off: g3.offG[j] });
+    }
+
+    // Smooth C1 Catmull-Rom interpolation from fine nodes back onto dense spline points P
+    const off = new Array(P).fill(0);
+    for (let j = 0; j < M; j++) {
+      const pi0 = nodes[j].idx;
+      const pi1 = (j + 1 < M) ? nodes[j + 1].idx : P;
+      const v_m1 = nodes[(j - 1 + M) % M].off;
+      const v0   = nodes[j].off;
+      const v1   = nodes[(j + 1) % M].off;
+      const v2   = nodes[(j + 2) % M].off;
+      const span = pi1 - pi0;
+      for (let k = 0; k < span; k++) {
+        const t = k / span, t2 = t * t, t3 = t2 * t;
+        off[(pi0 + k) % P] = 0.5 * ((2 * v0) + (-v_m1 + v1) * t + (2 * v_m1 - 5 * v0 + 4 * v1 - v2) * t2 + (-v_m1 + 3 * v0 - 3 * v1 + v2) * t3);
+      }
+    }
+
+    // (4) Multi-pass C2 Hann smoothing -> bidirectional slope clamp -> final polish smooth
+    for (let sp = 0; sp < 4; sp++) {
+      const src = (sp === 0) ? off : this.pts.map(p => p.offset);
+      for (let i3 = 0; i3 < P; i3++) {
+        let s = 0, ws = 0;
+        for (let w2 = -5; w2 <= 5; w2++) {
+          const wt = 6 - Math.abs(w2);
+          s += wt * src[(i3 + w2 + P) % P];
+          ws += wt;
+        }
+        this.pts[i3].offset = Math.max(lb[i3], Math.min(ub[i3], s / ws));
+      }
+    }
+    for (let pass = 0; pass < 8; pass++) {
       let changed = false;
       for (let k = 0; k < P - 1; k++) {
         const lim = SLOPE_MAX * Math.max(1e-6, this.pts[k + 1].s - this.pts[k].s);
@@ -1478,6 +1526,14 @@ class CircuitPath extends TrackPath {
         else if (d < -lim) { this.pts[k - 1].offset = this.pts[k].offset + lim; changed = true; }
       }
       if (!changed) break;
+    }
+    // Single gentle C2 smooth without breaking bounds/slope
+    {
+      const snap = this.pts.map(p => p.offset);
+      for (let k = 0; k < P; k++) {
+        const sm = (snap[(k - 2 + P) % P] + 2 * snap[(k - 1 + P) % P] + 4 * snap[k] + 2 * snap[(k + 1) % P] + snap[(k + 2) % P]) / 10.0;
+        this.pts[k].offset = Math.max(lb[k], Math.min(ub[k], sm));
+      }
     }
     for(let i4 = 0; i4 < P; i4++){
       const pt = this.pts[i4];
@@ -1550,10 +1606,11 @@ class CircuitPath extends TrackPath {
       const kLine = (pt.refCurvature !== undefined) ? pt.refCurvature : pt.curvature;
       let curv_v;
       if (_cap) {
-        /* 迭代解 v = sqrt(a_lat(v)/|κ|)：a_lat 随 v² 增长（气动），两次迭代足够 */
+        /* Target ~0.78x steady-circle peak (accounts for tire load sensitivity under aero/roll
+           so corners sit right inside peak controllable grip without front washout) */
         const ak = Math.abs(kLine) + 1e-5;
-        let v = Math.sqrt(_cap.lateral(20) / ak);
-        v = Math.sqrt(_cap.lateral(v) / ak);
+        let v = Math.sqrt((0.78 * _cap.lateral(20)) / ak);
+        v = Math.sqrt((0.78 * _cap.lateral(v)) / ak);
         curv_v = v;
       } else {
         curv_v = Math.sqrt(a_lat_max / (Math.abs(kLine) + 1e-5));
@@ -1561,8 +1618,7 @@ class CircuitPath extends TrackPath {
       pt.v_max = Math.min(v_top_veh, Math.min(pt.v_max, curv_v));
     }
     
-    // 5. Backward & Forward Braking/Acceleration Passes
-    // G21：push 口径——真实车手试探刹车点的包络上限（逐圈学习会在运行时继续压低）
+    // 5. Backward & Forward Braking/Acceleration Passes with Friction-Circle Trail-Braking Budget
     const a_brake = 5.5 * Math.min(1.2, Math.max(0.8, aggrScale));
     const a_accel = 5.8 * Math.min(1.2, Math.max(0.8, aggrScale));
     
@@ -1570,13 +1626,21 @@ class CircuitPath extends TrackPath {
       let maxDiff = 0;
       for(let i = P - 1; i >= 0; i--){
         const nextIdx = (i + 1) % P;
-        const ds = Math.hypot(this.pts[nextIdx].x - this.pts[i].x, this.pts[nextIdx].y - this.pts[i].y);
-        /* 车能力表：制动减速度随速度变（气动下压力）；无能力表时用旧常数 */
-        const aB = _cap ? _cap.brake(this.pts[nextIdx].v_max) : a_brake;
-        const v_limit = Math.sqrt(this.pts[nextIdx].v_max**2 + 2 * aB * ds);
-        if(v_limit < this.pts[i].v_max){
-          maxDiff = Math.max(maxDiff, this.pts[i].v_max - v_limit);
-          this.pts[i].v_max = v_limit;
+        const pCur = this.pts[i], pNxt = this.pts[nextIdx];
+        const ds = Math.hypot((pNxt.refX !== undefined ? pNxt.refX : pNxt.x) - (pCur.refX !== undefined ? pCur.refX : pCur.x),
+                              (pNxt.refY !== undefined ? pNxt.refY : pNxt.y) - (pCur.refY !== undefined ? pCur.refY : pCur.y));
+        let aB = _cap ? _cap.brake(pNxt.v_max) * 0.80 : a_brake;
+        if (_cap) {
+          const kNxt = Math.abs(pNxt.refCurvature !== undefined ? pNxt.refCurvature : (pNxt.curvature || 0));
+          const ayUse = pNxt.v_max * pNxt.v_max * kNxt;
+          const aLatRef = Math.max(1.0, _cap.lateral(pNxt.v_max));
+          const latFrac = Math.min(0.95, ayUse / aLatRef);
+          aB *= Math.sqrt(Math.max(0.08, 1.0 - latFrac * latFrac));
+        }
+        const v_limit = Math.sqrt(pNxt.v_max * pNxt.v_max + 2 * aB * ds);
+        if(v_limit < pCur.v_max){
+          maxDiff = Math.max(maxDiff, pCur.v_max - v_limit);
+          pCur.v_max = v_limit;
         }
       }
       if(maxDiff < 0.01) break;
@@ -1586,12 +1650,21 @@ class CircuitPath extends TrackPath {
       let maxDiff = 0;
       for(let i = 0; i < P; i++){
         const prevIdx = (i - 1 + P) % P;
-        const ds = Math.hypot(this.pts[i].x - this.pts[prevIdx].x, this.pts[i].y - this.pts[prevIdx].y);
-        const aA = _cap ? _cap.accel(this.pts[prevIdx].v_max) : a_accel;
-        const v_limit = Math.sqrt(this.pts[prevIdx].v_max**2 + 2 * aA * ds);
-        if(v_limit < this.pts[i].v_max){
-          maxDiff = Math.max(maxDiff, this.pts[i].v_max - v_limit);
-          this.pts[i].v_max = v_limit;
+        const pCur = this.pts[i], pPrv = this.pts[prevIdx];
+        const ds = Math.hypot((pCur.refX !== undefined ? pCur.refX : pCur.x) - (pPrv.refX !== undefined ? pPrv.refX : pPrv.x),
+                              (pCur.refY !== undefined ? pCur.refY : pCur.y) - (pPrv.refY !== undefined ? pPrv.refY : pPrv.y));
+        let aA = _cap ? _cap.accel(pPrv.v_max) : a_accel;
+        if (_cap) {
+          const kPrv = Math.abs(pPrv.refCurvature !== undefined ? pPrv.refCurvature : (pPrv.curvature || 0));
+          const ayUse = pPrv.v_max * pPrv.v_max * kPrv;
+          const aLatRef = Math.max(1.0, _cap.lateral(pPrv.v_max));
+          const latFrac = Math.min(0.95, ayUse / aLatRef);
+          aA *= Math.sqrt(Math.max(0.08, 1.0 - latFrac * latFrac));
+        }
+        const v_limit = Math.sqrt(pPrv.v_max * pPrv.v_max + 2 * aA * ds);
+        if(v_limit < pCur.v_max){
+          maxDiff = Math.max(maxDiff, pCur.v_max - v_limit);
+          pCur.v_max = v_limit;
         }
       }
       if(maxDiff < 0.01) break;
@@ -1785,16 +1858,18 @@ class CircuitPath extends TrackPath {
     if (absEy > hw && absEy <= (hw + kw) && hasKerb) {
       isKerb = true;
       kerbRatio = (absEy - hw) / kw;
-      // Smooth sinusoidal bevel slope (up to 38mm kerb crest)
-      const z_bevel = 0.038 * Math.sin(kerbRatio * (Math.PI / 2.0));
-      // High-frequency Rumble Strip sinusoidal serrations (wavelength 0.35m, amplitude 12mm)
-      const lambda = 0.35;
-      const z_rumble = 0.012 * Math.sin((Math.PI * s) / lambda)**2;
-      z_road = z_bevel + z_rumble * Math.sin(kerbRatio * Math.PI);
+      // Smooth continuous arch (0mm at both edges -> 26mm crest) eliminating lateral 50mm step cliff
+      const archEnv = Math.sin(kerbRatio * Math.PI);
+      const z_bevel = 0.026 * archEnv;
+      // Realistic subtle rumble strip modulation (4mm serrations at 0.55m wavelength)
+      const lambda = 0.55;
+      const z_rumble = 0.004 * Math.sin((Math.PI * s) / lambda) ** 2;
+      z_road = z_bevel + z_rumble * archEnv;
       mu = 1.18; // Painted kerb friction coefficient
     } else if (absEy > (hw + kw)) {
-      // Off-track grass / gravel apron
-      z_road = -0.012 + 0.004 * Math.sin(s * 3.1) * Math.cos(ey * 2.0);
+      // Smooth ramp down into grass / gravel apron (zero instantaneous vertical drop)
+      const apronT = Math.min(1.0, (absEy - (hw + kw)) / 0.45);
+      z_road = apronT * (-0.010 + 0.003 * Math.sin(s * 2.4) * Math.cos(ey * 1.6));
       mu = 0.78;
     } else {
       // Pristine track asphalt
