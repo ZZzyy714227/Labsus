@@ -149,7 +149,8 @@ LABSUS/                           # 工程代码根
 │   │   ├── 21-car-capability.js  # 车能力包络表（加减速/过弯极限）
 │   │   ├── 22-optimizer.js       # 正向硬点运动学优化器（多尺度有界寻优）
 │   │   ├── 23-long-bench.js      # 纵向加减速与制动台架（Brake-Bias / 纵倾）
-│   │   └── 24-fsae-arena.js      # 大学生方程式动态赛场（75m 加速 / 八字绕环 / 单圈赛组合）
+│   │   ├── 24-fsae-arena.js      # 大学生方程式动态赛场（75m 加速 / 八字绕环 / 单圈赛组合）
+│   │   └── 25-full-report.js     # 一键全量分析与终极数据报告（K&C + 全台架 + FSAE + AI Markdown/JSON）
 │   └── test/                     # 前端 32 套回归 + physics_audit + 双端对拍
 ├── engine/                       # Python FastAPI 数值计算引擎
 │   ├── server.py                 # FastAPI 入口服务 (:8001)

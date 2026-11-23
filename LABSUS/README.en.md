@@ -149,7 +149,8 @@ LABSUS/                           # Engineering root
 │   │   ├── 21-car-capability.js  # Vehicle capability envelope table
 │   │   ├── 22-optimizer.js       # Bounded multi-scale kinematic hardpoint optimizer
 │   │   ├── 23-long-bench.js      # Longitudinal accel & braking / Brake-Bias bench
-│   │   └── 24-fsae-arena.js      # Formula Student dynamic arena (75m Accel / Fig-8 Skidpad / Autocross)
+│   │   ├── 24-fsae-arena.js      # Formula Student dynamic arena (75m Accel / Fig-8 Skidpad / Autocross)
+│   │   └── 25-full-report.js     # One-click full analysis & AI-ready Markdown/JSON ultimate report
 │   └── test/                     # 32 regression suites + physics_audit + dual parity
 ├── engine/                       # Python FastAPI numerical engine
 │   ├── server.py                 # FastAPI server entry (:8001)

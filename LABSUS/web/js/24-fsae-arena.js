@@ -704,6 +704,7 @@ const FSAE_CAMS_CONFIG = {
 
 const FSAE_STAGE = {
   active: false,
+  headless: false,       // true ⇒ 批量分析（25-full-report.js）：跳过 3D 场景重建 / 悬架驱动 / DOM 同步
   playing: true,
   autoPilot: true,
   event: "accel",        // "accel" | "skidpad" | "autocross" | "combined"
@@ -817,10 +818,10 @@ function fsaeBuildSubEvent(subEvent) {
     FSAE_STAGE.run.startTime = 0;
     FSAE_STAGE.run.lapStartTime = 0;
   }
-  if (typeof buildScenePRO === "function") {
+  if (!FSAE_STAGE.headless && typeof buildScenePRO === "function") {
     try { FSAE_STAGE.cachedScene = buildScenePRO(); } catch (e) {}
   }
-  syncFsaeUI();
+  if (!FSAE_STAGE.headless) syncFsaeUI();
 }
 
 function fsaeSwitchEvent(ev) {
@@ -1022,8 +1023,8 @@ function fsaeStepSimulation(dt) {
     }
   }
 
-  // Drive live 4-corner 3D suspension rack & wheel travel
-  if (typeof SIM !== "undefined" && typeof driveTo === "function" && tel && tel.tr) {
+  // Drive live 4-corner 3D suspension rack & wheel travel (skipped in headless batch analysis)
+  if (!FSAE_STAGE.headless && typeof SIM !== "undefined" && typeof driveTo === "function" && tel && tel.tr) {
     const z0F = (S && S.front && S.front.hp && S.front.hp.WC) ? S.front.hp.WC[2] : 255;
     const z0R = (S && S.rear && S.rear.hp && S.rear.hp.WC) ? S.rear.hp.WC[2] : 255;
     const rackDisp = (ctrl.steer || 0) * 1.15;
