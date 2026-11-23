@@ -245,7 +245,6 @@ function loop(ts){
   const dt=Math.min(0.045,_last?(ts-_last)/1000:0.016);_last=ts;
   if(S.play){
     S.t+=dt;
-    if(S.mode==="rig") S.simT+=dt;
     if(S.mode==="kin"&&S.exc!=="off"){
       const ph=2*PI*S.excF*S.t;
       const u=S.exc==="sine"?sin(ph):(2/PI)*Math.asin(sin(ph));

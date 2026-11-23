@@ -984,7 +984,8 @@
   }
 
   function solveCornerLinkLoadsJS(pts, wc, cp, fCp) {
-    // Each link axis u_i points chassis -> knuckle so T_i > 0 means tension (pulling knuckle inward)
+    if (typeof solveStaticLinkLoads === "function") return solveStaticLinkLoads(pts, wc, cp, fCp);
+    // Fallback when 03-mechanism.js is unavailable
     const pairs = [
       [pts.LCA_F, pts.LBJ, pts.LBJ],
       [pts.LCA_R, pts.LBJ, pts.LBJ],

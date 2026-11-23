@@ -75,7 +75,7 @@ M5 的前后轴静载对调就是三内核一致地错 —— 双端对拍与镜
 | TPHYS 闭包 JS ↔ Python transient | `web/test/tphys_parity.cjs`、`engine/tests/test_tphys_parity.py` | ✅ worst 0.51%（门限 5%） |
 | 差速器双实现 | `engine/tests/test_differential.py` + `engine/data/diff_parity_cases.json` | ✅ 162 例 |
 | **15-DOF 舞台内核 ↔ 引擎** | — | ❌ **无跨语言对拍**；但已有**绝对量解析锚**：ride 测试台的自由衰减主频 vs 串联等效刚度解析式（实测 1.6%）、阶跃稳态跟随、ISO 路面 RMS vs 理论谱 |
-| **K&C 扫掠 JS ↔ Python** | — | ❌ 无对拍（前端几何解与引擎机构解各自独立） |
+| **K&C 扫掠 / ARB / 模态 JS ↔ Python** | `web/test/kc_parity.cjs`、`engine/tests/test_kc_parity.py` | ✅ 4 预设双轴对拍（cam/toe/damper/mr < 1e-4，空心/实心 arb_rate < 1e-6，modal_audit warp/耦合 < 0.01%） |
 
 > 对拍范围要说清：`tphys_parity` 校验的是 `dwb-pro-allinone.html` 内联的 **TPHYS 闭包**，
 > 不是 `11-stages.js` 的 15-DOF 内核。把"对拍通过"读成"整车模型双端一致"是错的。

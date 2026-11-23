@@ -204,12 +204,13 @@ class PoseResponse(BaseModel):
 # ── 整车分析（S2-5：四角装配 + 准静态载荷转移，镜像单文件版 solveQuasiStatic） ──
 
 class ArbSpec(BaseModel):
-    """横向稳定杆（每轴）。d<=0.5 视为拆除。"""
-    d: float = 18.0              # 直径 mm
+    """横向稳定杆（每轴）。d<=0.5 视为拆除。wall=0 为实心杆，>0 为空心壁厚 mm。"""
+    d: float = 18.0              # 外径 mm
     t: float = 0.55              # 连杆位置比（LCA_F→LBJ 插值）
     dy: float = 50.0             # 纵向偏置 mm
     dz: float = 120.0            # 高度偏置 mm
     G: float = 79000.0           # 剪切模量 MPa
+    wall: float = 0.0            # 空心管壁厚 mm（0 = 实心）
 
 
 class KwCurve(BaseModel):

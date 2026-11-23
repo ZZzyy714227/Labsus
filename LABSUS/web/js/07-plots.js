@@ -87,6 +87,9 @@ function updateReadouts(){
   setRO("roArbKr", fmt(Ka, 0));
   setRO("roArbTot", fmt(Ks+Ka, 0));
   setRO("roArbSh", fmt(100*Ka/Math.max(1e-6, Ks+Ka), 0));
+  setRO("roWarp", SIM.modalAudit ? fmt(SIM.modalAudit.kWarp/1000, 1) : "--");
+  setRO("roCouple", SIM.modalAudit ? fmt(SIM.modalAudit.coupleRatio*100, 1) : "--");
+  setRO("roCompSteer", (SIM.compSteerF!=null && SIM.compSteerR!=null) ? (fmt(SIM.compSteerF, 3)+" / "+fmt(SIM.compSteerR, 3)) : "--");
 
   /* 准静态分析结果读数 */
   const qs = SIM.qsRes;

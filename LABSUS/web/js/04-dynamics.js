@@ -122,7 +122,7 @@ function roadSignal(t, axis){
 function stepDyn(M,dt,rack,tSim,axis){
   const NS=10,h=dt/NS,g=9810, state=S[axis];
   const kS=state.kS*FS,cB=state.cB*FS,cR=state.cR*FS,kT=state.kT*FS,cT=0.55*FS,kBS=S.kBS*FS;
-  const iW=M.idx.WC, iDmpR=M.idx.RCK_DMP, iDmpB=M.idx.DMP_BODY;
+  const iW=M.idx.WC, iDmpR=(state.arch==="direct"?M.idx.STRUT_OUT:M.idx.RCK_DMP), iDmpB=M.idx.DMP_BODY;
   const z0=M.n[iW].p0[2];
   let Fs=0,Fd=0,Ft=0,pen=0,accz=0;
   setChassis(M,rack,axis);
@@ -136,12 +136,18 @@ function stepDyn(M,dt,rack,tSim,axis){
     const d=sub(B.p,A.p),L=len(d)||1e-9,u=mul(d,1/L);
     const rel=dot(sub(B.v,A.v),u);
     const Fk=M.springF0+kS*(M.damperL0-L);
-    // T5/P4：四象限表阻尼（17-damper4q.js）。开关关闭或缺模块时退回线性两常数模型。
+    // T5/P4：四象限表阻尼（17-damper4q.js，输出 N 乘 FS 转 mN 统一动力学量纲）。开关关闭或缺模块时退回线性两常数模型。
     const Fc=(typeof damperForce4Q==='function'&&SIM&&SIM.damperTableOn)
-      ?damperForce4Q(-rel/1000,(SIM.clickC!=null?SIM.clickC:5),(SIM.clickR!=null?SIM.clickR:7))
+      ?damperForce4Q(-rel/1000,(SIM.clickC!=null?SIM.clickC:5),(SIM.clickR!=null?SIM.clickR:7))*FS
       :-(rel<0?cB:cR)*rel;
     let F=Fk+Fc; if(F<0)F=0;
     A.f=add(A.f,mul(u,-F));
+    // P15：sweepProj 仅按几何反推从动端(RCK_DMP / STRUT_OUT)，A.f 会被运动学覆盖；
+    // 按瞬时杠杆比 MR(tr) 以虚功等效垂向力作用于 WC，闭合垂向静平衡与簧载/减振传递路径。
+    const trNow=M.n[iW].p[2]-M.n[iW].p0[2];
+    const swAx=axis==="front"?SIM.swF:SIM.swR;
+    const mrInst=Math.max(0.05,(swAx&&typeof sampleSweep==="function"?sampleSweep(swAx,trNow,"mr"):null)||(axis==="front"?SIM.mrRefF:SIM.mrRefR)||0.7);
+    M.n[iW].f[2]-=F*mrInst;
     Fs=Fk; Fd=Fc;
 
     const tr=M.n[iW].p[2]-z0;
@@ -224,7 +230,19 @@ function refreshDerived(full){
   
   loadState(SIM.FR, stFR); loadState(SIM.FL, stFL);
   loadState(SIM.RR, stRR); loadState(SIM.RL, stRL);
+  if(typeof deriveComplianceSteer==="function"){
+    SIM.compSteerF=deriveComplianceSteer("front");
+    SIM.compSteerR=deriveComplianceSteer("rear");
+    if(S.front.compSteerDegPerKN==null||S.front.compSteerDegPerKN===SIM._lastCompF){
+      S.front.compSteerDegPerKN=SIM.compSteerF; SIM._lastCompF=SIM.compSteerF;
+    }
+    if(S.rear.compSteerDegPerKN==null||S.rear.compSteerDegPerKN===SIM._lastCompR){
+      S.rear.compSteerDegPerKN=SIM.compSteerR; SIM._lastCompR=SIM.compSteerR;
+    }
+  }
+  if(typeof evalAckermannPct==="function") S.ackermann=evalAckermannPct();
   SIM.qsRes = solveQuasiStatic();
+  SIM.modalAudit = (SIM.qsRes && SIM.qsRes.modal) ? SIM.qsRes.modal : (typeof modalAuditJS==="function" ? modalAuditJS() : null);
   SIM.dirtySweep=true;
 }
 
@@ -276,6 +294,7 @@ function simulate(dt){
       }else{SIM.mFL=null; SIM.mRL=null;}
       SIM.trace.push({t:S.simT,tr:SIM.mFR.tr,load:rF.load,fs:rF.fs,fd:rF.fd,road:rF.road});
       if(SIM.trace.length>1400)SIM.trace.shift();
+      S.simT+=dt;
     }else{
       SIM.mFR=metrics(MF, 'front'); SIM.mRR=metrics(MR, 'rear');
       if(S.show.mirror){SIM.mFL=metrics(NF, 'front'); SIM.mRL=metrics(NR, 'rear');}

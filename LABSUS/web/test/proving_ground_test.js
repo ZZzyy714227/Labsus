@@ -296,9 +296,9 @@ console.log("=== M13/P10: RIG 力元数值断言（此前只断言 不 NaN）===
      `roadZ0 = m0.cp[2] + corN/kT` 的预置口径与力元实际平衡的载荷不一致（6.70mm × kT180
      ≈ 1206N 量级）。此处不掩盖，改为断言"可复现"（同一初始条件必然收敛到同一平衡点），
      并把数值打进测试输出，等定位口径差后再收紧为 eq1≈0。 */
-  const eqRef = 6.70;
-  assert(Math.abs(eq1 - eqRef) < 1.0,
-    `RIG 静平衡点应为 tr≈${eqRef}mm（实测 ${eq1.toFixed(4)}mm；P15 待定位口径差）`);
+  const eqRef = 0.0;
+  assert(Math.abs(eq1 - eqRef) < 0.5,
+    `RIG 静平衡点应贴近零位移 |tr|<0.5mm（实测 ${eq1.toFixed(4)}mm；P15 已闭合）`);
   /* 可复现：再次沉降到同一平衡点（力元与积分必须确定性） */
   vm.runInContext("S.travel=0; S.roll=0; S.rack=0; rebuild();", ctx);
   vm.runInContext("for(let i=0;i<250;i++) simulate(0.016);", ctx);

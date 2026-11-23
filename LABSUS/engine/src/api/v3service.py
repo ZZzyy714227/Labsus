@@ -171,7 +171,7 @@ def _estimate_rotation(m) -> np.ndarray:
     return R
 
 
-def pose_metrics(m, tire_R: float, design: DesignSpec) -> dict:
+def pose_metrics(m, tire_R: float, design: DesignSpec, arch: str = "pushrod") -> dict:
     """从已求解机构提取定位指标（与前端 metrics() 同数学，纯 numpy 重写）。
 
     侧别约定（2026-08-22 镜像修复，P0）：按轮心 X 符号判别左右角；
@@ -217,7 +217,8 @@ def pose_metrics(m, tire_R: float, design: DesignSpec) -> dict:
         if r is not None:
             rc_h = float(r[1])
 
-    damper = float(np.linalg.norm(P["RK_DAMPER"] - P["DAMPER_CHASSIS"]))
+    dmp_node = "UP4" if arch == "direct" else "RK_DAMPER"
+    damper = float(np.linalg.norm(P[dmp_node] - P["DAMPER_CHASSIS"]))
     return {
         "cam": cam, "toe": toe, "kpi": kpi, "cast": cast,
         "scrub": scrub, "trail": trail, "rc_h": rc_h,
@@ -225,7 +226,7 @@ def pose_metrics(m, tire_R: float, design: DesignSpec) -> dict:
     }
 
 
-_ARCH_TO_ATTACH = {"pushrod": "lca", "pullrod": "uca"}
+_ARCH_TO_ATTACH = {"pushrod": "lca", "pullrod": "uca", "direct": "lca"}
 
 
 def _arch_attach(arch: str) -> str:
@@ -261,11 +262,11 @@ def _solve_point(points, bushings, case: CaseLoad, travel: float, rack: float,
                                     travel=travel, rack=rack, tire_radius=tire_R)
         status = res.status
         warn = [] if status in ("VALID", "APPROXIMATE") else [f"compliance status={status}"]
-        return pose_metrics(mech, tire_R, design), status, warn, res
+        return pose_metrics(mech, tire_R, design, arch=arch), status, warn, res
     rep = solve_pose(mech, travel, rack)
     status = "VALID" if rep.ok else "SOLVER_FAILED"
     warn = _pose_warnings(rep)
-    return pose_metrics(mech, tire_R, design), status, warn, None
+    return pose_metrics(mech, tire_R, design, arch=arch), status, warn, None
 
 
 def _gains_from_curves(x: list[float], y: dict[str, list[float]], axis_key: str) -> dict:
@@ -447,10 +448,12 @@ def run_pose(req: PoseRequest) -> PoseResponse:
     t0 = time.perf_counter()
     mech = _new_mech(points, arch=req.arch)
     rep = solve_pose(mech, req.travel, req.rack)
-    m = pose_metrics(mech, req.tire_radius, req.design)
+    m = pose_metrics(mech, req.tire_radius, req.design, arch=req.arch)
     pose = {k: [round(float(v), 6) for v in mech.node(k).pos] for k in _ENGINE_KEYS}
     rocker = None
-    if rep.rocker_ok and rep.damper_len is not None:
+    if req.arch == "direct":
+        rocker = {"damper_len_mm": round(float(m["damper"]), 4), "rocker_theta_rad": 0.0}
+    elif rep.rocker_ok and rep.damper_len is not None:
         rocker = {
             "damper_len_mm": round(float(rep.damper_len), 4),
             "rocker_theta_rad": round(float(rep.rocker_theta), 6),

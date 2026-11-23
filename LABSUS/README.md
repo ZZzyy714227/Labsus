@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.11+](https://img.shields.io/badge/Python-3.11%2B-brightgreen.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-v3%20REST%20API-009688.svg)](https://fastapi.tiangolo.com/)
-[![Tests: 100% Passed](https://img.shields.io/badge/pytest-345%20passed-success.svg)]()
+[![Tests: 100% Passed](https://img.shields.io/badge/pytest-359%20passed-success.svg)]()
 [![Platform: Web & Desktop](https://img.shields.io/badge/Platform-Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-orange.svg)]()
 
 > 面向 **FSAE 方程式赛车、GT3 房车赛车及全地形越野车** 的现代化全车底盘悬架工程分析平台。
@@ -146,11 +146,11 @@ node `vm` 无头沙箱（自带 DOM/Canvas stub），唯一跨语言的是 TPHYS
 cd LABSUS
 
 # ── 一条命令跑完全部门禁（推荐；退出码非零即失败）────────────────────
-python tools/gates/check_all.py           # 37 项：ruff / pytest / 30 套 node / 对拍 / 溯源 / 文档 / 基线
+python tools/gates/check_all.py           # 38 项：ruff / pytest / 30 套 node / 双对拍 / 溯源 / 文档 / 基线
 python tools/gates/check_all.py --quick   # 5 项秒级检查（ruff / 角色审计 / 溯源 / 文档 / 基线）
 
-# ── Python 引擎：物理断言 / 门禁 / 契约守卫 / TPHYS 双端对拍 / 对抗应力 ──
-pytest engine/tests -q                 # 345 passed / 1 skipped（skip = OptimumK 未录入，显式）
+# ── Python 引擎：物理断言 / 门禁 / 契约守卫 / TPHYS & K&C 双端对拍 / 对抗应力 ──
+pytest engine/tests -q                 # 359 passed / 1 skipped（skip = OptimumK 未录入，显式）
                                        #   · test_api_contract          前后端键集契约
                                        #   · test_static_split_invariant 静态载荷分配不变量
                                        #   · test_tire_width_balance      胎宽→侧偏刚度配平
@@ -173,8 +173,9 @@ node web/test/test_ride_bench.js       # 21 断言 · test_compare 27 · test_la
 node web/test/test_tire_parity.js      # 11 断言 · test_compliance_steer 11 · test_load_transfer 20
 node web/test/test_stability_audit.js  # 24 断言 · test_config_contract 15 · test_car_capability 15
 
-# ── 跨语言物理对拍（JS TPHYS ↔ Python transient，门限 5%）────────────
-node web/test/tphys_parity.cjs         # 实测 worst 0.51%
+# ── 跨语言物理对拍（JS TPHYS ↔ Python transient；JS K&C ↔ Python v3service）──
+node web/test/tphys_parity.cjs         # 实测 worst 0.51%（门限 5%）
+node web/test/kc_parity.cjs            # 4 预设双轴 K&C/ARB/Modal 对拍（< 1e-4）
 
 # ── 物理审计（60 项，**已进 CI 回归**；全量 62 项，--ci 跳过 2 项环境性能阈值）──
 node web/test/physics_audit.js         # 惯量恒等式 / 能量单调 / 步长收敛 / 阿克曼 / ISO 路面 / wheel DOF / 碰撞
@@ -237,7 +238,7 @@ LABSUS/                           # 工程代码根（下同）
 │   ├── server.py                 # FastAPI 入口服务 (:8001)
 │   ├── src/                      # 求解器核心源码 (K&C/衬套/Pacejka/轮胎标定/瞬态)
 │   ├── data/                     # 外部数据资产（锁 sha256，见 src/provenance.py）
-│   └── tests/                    # pytest 单元测试套件 (345 passed / 1 skipped)
+│   └── tests/                    # pytest 单元测试套件 (359 passed / 1 skipped)
 ├── tools/gates/                  # 一键全门禁运行器（check_all.py，CI 清单单一真源）
 ├── scripts/                      # 开发与运维工具脚本
 ├── requirements.txt              # Python 运行依赖（精确锁定已验证版本）

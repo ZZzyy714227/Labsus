@@ -137,7 +137,9 @@ def arb_rate(ax: AxleSpec) -> dict:
     d = ax.arb.d
     if d <= 0.5:
         return {"k": 0.0, "J": 0.0, "kt": 0.0}
-    J = math.pi * d ** 4 / 32.0
+    w = max(0.0, float(getattr(ax.arb, "wall", 0.0) or 0.0))
+    di = max(0.0, d - 2.0 * w) if w > 0.0 else 0.0
+    J = math.pi * (d ** 4 - di ** 4) / 32.0
     g = arb_geom(ax.points, ax.arb)
     L = 2 * g["xa"]
     kt = ax.arb.G * J / L

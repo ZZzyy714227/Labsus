@@ -86,6 +86,52 @@ console.log('=== 5. 关闭后完全恢复（无残留）===');
   assert(JSON.stringify(off1.metrics) === JSON.stringify(off2.metrics), '开关来回切换后逐位恢复');
 }
 
+console.log('=== 6. 衬套几何派生等效柔度转向 & 标定刷新 ===');
+{
+  const vm = require('vm');
+  vm.runInContext(`
+    loadVehiclePreset('formula');
+    SIM.FR = buildMech('front', 1); SIM.FL = buildMech('front', -1);
+    SIM.RR = buildMech('rear', 1); SIM.RL = buildMech('rear', -1);
+    delete SIM.bushCalib;
+    refreshDerived(false);
+  `, ctx);
+  const cBase = vm.runInContext(`deriveComplianceSteer('front')`, ctx);
+  assert(Number.isFinite(cBase) && cBase > 0.02 && cBase < 1.0,
+    `Formula 默认衬套派生柔度转向应在物理区间（实测 ${cBase} deg/kN）`);
+
+  const saveBush = JSON.parse(JSON.stringify(S.front.bushings));
+  for (const k of Object.keys(S.front.bushings)) {
+    S.front.bushings[k] = S.front.bushings[k].map(v => v * 0.5);
+  }
+  const cSoft = vm.runInContext(`deriveComplianceSteer('front')`, ctx);
+  assert(cSoft > cBase * 1.5,
+    `衬套刚度减半后等效柔度转向应显著上升（${cBase} → ${cSoft} deg/kN）`);
+  S.front.bushings = saveBush;
+
+  vm.runInContext(`
+    SIM.bushCalib = {
+      front: {
+        LCA_F: { kT: [6000, 6000, 6000] }, LCA_R: { kT: [6000, 6000, 6000] },
+        UCA_F: { kT: [8000, 8000, 8000] }, UCA_R: { kT: [8000, 8000, 8000] },
+      },
+    };
+    refreshDerived(false);
+  `, ctx);
+  const cStiff = S.front.compSteerDegPerKN;
+  assert(cStiff < cBase,
+    `SIM.bushCalib 加硬覆盖应在 refreshDerived 后立即压低 compSteerDegPerKN（${cBase} → ${cStiff}）`);
+
+  vm.runInContext(`
+    S.front.compSteerDegPerKN = 0.55;
+    refreshDerived(false);
+  `, ctx);
+  assert(S.front.compSteerDegPerKN === 0.55,
+    '用户显式设置的 compSteerDegPerKN 在 refreshDerived 后不被覆盖');
+
+  vm.runInContext(`delete SIM.bushCalib; loadVehiclePreset('formula');`, ctx);
+}
+
 console.log(`\n========================================`);
 console.log(`All ${passed}/${total} compliance-steer checks passed!`);
 console.log(`========================================`);

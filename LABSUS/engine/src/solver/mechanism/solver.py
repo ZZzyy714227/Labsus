@@ -155,10 +155,16 @@ def solve_rocker(m: Mechanism) -> tuple[bool, float | None, float | None]:
 
     e0 = err(0.0)
     bracket: tuple[float, float] | None = None
-    for r in (0.05, 0.2, 0.5, 1.0, 2.0, 3.1, -0.05, -0.2, -0.5, -1.0, -2.0, -3.1):
-        if e0 * err(r) <= 0.0:
-            bracket = (0.0, r) if r > 0 else (r, 0.0)
+    pos_prev, neg_prev = 0.0, 0.0
+    for step in (0.05, 0.15, 0.35, 0.7, 1.2, 2.0, 3.1):
+        if e0 * err(step) <= 0.0:
+            bracket = (pos_prev, step)
             break
+        pos_prev = step
+        if e0 * err(-step) <= 0.0:
+            bracket = (-step, neg_prev)
+            break
+        neg_prev = -step
     if bracket is None:
         return False, None, None
     lo, hi = bracket

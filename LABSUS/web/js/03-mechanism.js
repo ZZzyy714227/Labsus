@@ -275,14 +275,121 @@ function arbGeom(lbj, state){
 }
 
 function arbRate(mrArb, state){
-  const d=state.arb.d; if(d<=0.5)return{k:0,J:0,kt:0};
-  const J=PI*Math.pow(d,4)/32, g=arbGeom(state.hp.LBJ, state);
+  const d=state.arb.d; if(d<=0.5)return{k:0,J:0,kt:0,di:0};
+  const w=Math.max(0, state.arb.wall||0);
+  const di=w>0 ? Math.max(0, d-2*w) : 0;
+  const J=PI*(Math.pow(d,4)-Math.pow(di,4))/32, g=arbGeom(state.hp.LBJ, state);
   const L=2*g.xa;
   const kt=state.arb.G*J/L;
-  return{k:kt/(g.a*g.a)*mrArb*mrArb, J:J, kt:kt, a:g.a, L:L};
+  return{k:kt/(g.a*g.a)*mrArb*mrArb, J:J, kt:kt, a:g.a, L:L, di:di};
 }
 
-/* 阿克曼转向解算 */
+/* 共享正则化 6×6 静力平衡解算（二力杆张拉>0/压缩<0 轴力，供 3D 力学叠层与柔度转向复用） */
+function solveStaticLinkLoads(pts, wc, cp, fCp){
+  const pairs=[
+    [pts.LCA_F, pts.LBJ, pts.LBJ],
+    [pts.LCA_R, pts.LBJ, pts.LBJ],
+    [pts.UCA_F, pts.UBJ, pts.UBJ],
+    [pts.UCA_R, pts.UBJ, pts.UBJ],
+    [pts.RACK,  pts.TRO, pts.TRO],
+    [pts.STRUT_BASE, pts.ST_O, pts.ST_O]
+  ];
+  const A=Array.from({length:6},()=>new Float64Array(6));
+  for(let i=0;i<6;i++){
+    const a=pairs[i][0], b=pairs[i][1], app=pairs[i][2];
+    const u=nrm(sub(b,a)), r=sub(app,wc), tau=cross(r,u);
+    A[0][i]=u[0];   A[1][i]=u[1];   A[2][i]=u[2];
+    A[3][i]=tau[0]; A[4][i]=tau[1]; A[5][i]=tau[2];
+  }
+  const rCp=sub(cp,wc), mCp=cross(rCp,fCp);
+  const rhs=[fCp[0], fCp[1], fCp[2], mCp[0], mCp[1], mCp[2]];
+  const n=6, M=Array.from({length:n},()=>new Float64Array(n+1));
+  for(let i=0;i<n;i++){
+    for(let j=0;j<n;j++){
+      let s=i===j?1e-4:0;
+      for(let k=0;k<n;k++) s+=A[k][i]*A[k][j];
+      M[i][j]=s;
+    }
+    let rr=0;
+    for(let k=0;k<n;k++) rr+=A[k][i]*rhs[k];
+    M[i][n]=rr;
+  }
+  for(let col=0;col<n;col++){
+    let piv=col;
+    for(let row=col+1;row<n;row++) if(abs(M[row][col])>abs(M[piv][col])) piv=row;
+    if(piv!==col){const t=M[col];M[col]=M[piv];M[piv]=t;}
+    const dv=M[col][col]; if(abs(dv)<1e-12)continue;
+    for(let j=col;j<=n;j++) M[col][j]/=dv;
+    for(let row=0;row<n;row++){
+      if(row===col)continue;
+      const f=M[row][col];
+      for(let j=col;j<=n;j++) M[row][j]-=f*M[col][j];
+    }
+  }
+  const out=new Float64Array(6);
+  for(let i=0;i<6;i++) out[i]=isFinite(M[i][n])?M[i][n]:0;
+  return out;
+}
+
+/* 由衬套刚度（SIM.bushCalib 优先 → 预设 bushings）推导轴向柔度转向系数 [°/kN] */
+function deriveComplianceSteer(axis){
+  const st=S&&S[axis], M=axis==="front"?SIM.FR:SIM.RR;
+  if(!st||!M||!M.n||typeof solveKin!=="function") return 0.4;
+  const cal=(SIM.bushCalib&&SIM.bushCalib[axis])||null;
+  const bp=st.bushings||{};
+  const kOf=(node,def)=>{
+    if(cal&&cal[node]&&Array.isArray(cal[node].kT)) return cal[node].kT;
+    if(bp[node]&&Array.isArray(bp[node])) return bp[node];
+    return def;
+  };
+  const saved=saveState(M);
+  const bakPos={};
+  ["LCA_F","LCA_R","UCA_F","UCA_R","RACK"].forEach(id=>{bakPos[id]=cpy(M.n[M.idx[id]].p);});
+  try{
+    resetMech(M); setChassis(M,0,axis);
+    const z0=M.n[M.idx.WC].p0[2];
+    driveTo(M,z0,0,axis);
+    const m0=metrics(M,axis);
+    const P=id=>M.n[M.idx[id]].p;
+    const isDirect=st.arch==="direct";
+    const pts={
+      LCA_F:cpy(P("LCA_F")), LCA_R:cpy(P("LCA_R")), LBJ:cpy(P("LBJ")),
+      UCA_F:cpy(P("UCA_F")), UCA_R:cpy(P("UCA_R")), UBJ:cpy(P("UBJ")),
+      RACK:cpy(P("RACK")),   TRO:cpy(P("TRO")),
+      STRUT_BASE:cpy(P(isDirect?"DMP_BODY":"STRUT_IN")), ST_O:cpy(P("STRUT_OUT"))
+    };
+    const wc0=cpy(P("WC"));
+    // +1000 N 向外侧向力作用在胎印中心后 22 mm（含气动拖距力矩）
+    const fLat=[1000, 0, 0];
+    const cpApp=[m0.cp[0], m0.cp[1]-22, m0.cp[2]];
+    const mags=solveStaticLinkLoads(pts, wc0, cpApp, fLat);
+    const nodes=["LCA_F","LCA_R","UCA_F","UCA_R","RACK"];
+    const ends=[pts.LBJ, pts.LBJ, pts.UBJ, pts.UBJ, pts.TRO];
+    nodes.forEach((id, idx)=>{
+      const u=nrm(sub(ends[idx], pts[id]));
+      const Fnode=mul(u, -mags[idx]);
+      const kT=kOf(id, id==="RACK"?[4500,4500,4500]:[2500,2500,2500]);
+      const N=M.n[M.idx[id]];
+      N.p[0]+=Fnode[0]/Math.max(50,kT[0]);
+      N.p[1]+=Fnode[1]/Math.max(50,kT[1]);
+      N.p[2]+=Fnode[2]/Math.max(50,kT[2]);
+    });
+    solveKin(M, wc0[2], 80, 1e-6);
+    const m1=metrics(M,axis);
+    const dToe=m1.toe - m0.toe;
+    // 侧向受载引起向减小侧偏角方向偏转 → 不足转向系数（正值表示增加不足转向）
+    const mag=axis==="front" ? abs(dToe) : abs(dToe)*0.65;
+    return clamp(+(Math.max(0.02, mag)).toFixed(4), 0.02, 2.5);
+  }finally{
+    ["LCA_F","LCA_R","UCA_F","UCA_R","RACK"].forEach(id=>{
+      const N=M.n[M.idx[id]], b=bakPos[id];
+      N.p[0]=b[0]; N.p[1]=b[1]; N.p[2]=b[2];
+    });
+    loadState(M,saved);
+  }
+}
+
+/* 阿克曼转向解算（含回正工况诊断扫掠，消除 S.ackermann 缺失） */
 function ackermann(axis){
   const R = axis==='front' ? SIM.mFR : SIM.mRR;
   const L = axis==='front' ? SIM.mFL : SIM.mRL;
@@ -302,6 +409,70 @@ function ackermann(axis){
     icr = isect2(pR, aR, pL, aL);
   }
   return {dR:dR, dL:dL, pct:pct, R:rad, icr:icr, track:track};
+}
+
+function evalAckermannPct(){
+  if(abs(S.rack||0)>2 && SIM.mFR && SIM.mFL){
+    const a=ackermann("front");
+    if(a && isFinite(a.pct)) return a.pct;
+  }
+  const MF=SIM.FR, NF=SIM.FL;
+  if(!MF||!NF||!MF.n||!NF.n) return null;
+  const stR=saveState(MF), stL=saveState(NF);
+  try{
+    const diagRack=15;
+    const z0F=MF.n[MF.idx.WC].p0[2];
+    driveTo(MF,z0F,diagRack,"front");  const mR=metrics(MF,"front");
+    driveTo(NF,z0F,-diagRack,"front"); const mL=metrics(NF,"front");
+    const dR=-mR.toe, dL=mL.toe;
+    const inner=dR>0?dR:dL, outer=dR>0?dL:dR;
+    if(abs(inner)>0.5 && abs(outer)>0.5 && inner*outer>0){
+      const d=1/Math.tan(abs(outer)*D2R) - 1/Math.tan(abs(inner)*D2R);
+      return +(d / ((abs(mR.cp[0])+abs(mL.cp[0]))/S.wb) * 100).toFixed(2);
+    }
+    return null;
+  }finally{
+    loadState(MF,stR); loadState(NF,stL);
+    setChassis(MF,S.rack||0,"front");
+    setChassis(NF,-(S.rack||0),"front");
+  }
+}
+
+/* 四模式模态交叉审计（严格镜像 engine/src/components/suspension_modes.py + suspension_audit.py） */
+function modalAuditJS(){
+  const mrF=SIM.mrRefF||0.75, mrR=SIM.mrRefR||0.78;
+  const kwf=(S.front.kS*1000)*mrF*mrF, kwr=(S.rear.kS*1000)*mrR*mrR;
+  const arF=arbRate(0.55,S.front), arR=arbRate(0.55,S.rear);
+  const af=arF.k*1000, ar=arR.k*1000;
+  const K=[
+    [kwf+af, -af,    0,      0],
+    [-af,    kwf+af, 0,      0],
+    [0,      0,      kwr+ar, -ar],
+    [0,      0,      -ar,    kwr+ar]
+  ];
+  const T=[
+    [0.5,  0.5,  0.5,  0.5],
+    [0.5, -0.5,  0.5, -0.5],
+    [0.5,  0.5, -0.5, -0.5],
+    [0.5, -0.5, -0.5,  0.5]
+  ];
+  const TK=Array.from({length:4},()=>[0,0,0,0]);
+  for(let i=0;i<4;i++) for(let j=0;j<4;j++){
+    let s=0; for(let k=0;k<4;k++) s+=T[i][k]*K[k][j]; TK[i][j]=s;
+  }
+  const Km=Array.from({length:4},()=>[0,0,0,0]);
+  for(let i=0;i<4;i++) for(let j=0;j<4;j++){
+    let s=0; for(let k=0;k<4;k++) s+=TK[i][k]*T[k][j]; Km[i][j]=s;
+  }
+  let diagMax=0, offMax=0;
+  for(let i=0;i<4;i++){
+    diagMax=Math.max(diagMax, abs(Km[i][i]));
+    for(let j=0;j<4;j++) if(i!==j) offMax=Math.max(offMax, abs(Km[i][j]));
+  }
+  return {
+    kHeave: Km[0][0], kRoll: Km[1][1], kPitch: Km[2][2], kWarp: Km[3][3],
+    coupleRatio: diagMax>0 ? offMax/diagMax : 0
+  };
 }
 
 function metrics(M, axis){
@@ -336,9 +507,18 @@ function metrics(M, axis){
   const ld=[state.hp.LCA_R[1]-state.hp.LCA_F[1],state.hp.LCA_R[2]-state.hp.LCA_F[2]];
   const ud=[state.hp.UCA_R[1]-state.hp.UCA_F[1],state.hp.UCA_R[2]-state.hp.UCA_F[2]];
   const svic=isect2([lbj[1],lbj[2]],ld,[ubj[1],ubj[2]],ud);
+  const isRear=axis==="rear";
   let anti=null;
-  if(svic){const dy=cp[1]-svic[0],dzz=svic[1]-cp[2];
-    if(abs(dy)>1) anti=(dzz/dy)*S.brkF*(S.wb/S.hcg)*100;}
+  if(svic){
+    const dy=isRear?(svic[0]-cp[1]):(cp[1]-svic[0]);
+    const dzz=isRear?(svic[1]-wc[2]):(svic[1]-cp[2]);
+    let scale=S.brkF;
+    if(isRear){
+      const sp=(typeof POWERTRAIN!=="undefined"&&POWERTRAIN.spec)?POWERTRAIN.spec:null;
+      scale=sp?(sp.drive==="fwd"?0:(sp.drive==="rwd"?1:Math.max(0,Math.min(1,1-(sp.splitFront||0))))):1.0;
+    }
+    if(abs(dy)>1) anti=(dzz/dy)*scale*(S.wb/S.hcg)*100;
+  }
 
   const curDamperL = state.arch === "direct" ? dst(strutOut, dmpB) : dst(rckDmp, dmpB);
   const rockerDeg = M.rocker ? M.rocker.angle * R2D : 0;
@@ -608,6 +788,7 @@ function solveQuasiStatic(gyOverride){
     tlltd: tlltd,
     usGrad: usGrad, alphaF: alphaFDeg, alphaR: alphaRDeg,
     jackingN: jackingN, jackingMm: jackingMm,
+    modal: modalAuditJS(),
     fz:{ FL: fzFL, FR: fzFR, RL: fzRL, RR: fzRR }
   };
 }

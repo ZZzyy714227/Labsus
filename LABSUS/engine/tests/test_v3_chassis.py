@@ -346,3 +346,22 @@ def test_kinematics_jacking_formula():
     assert r_neg.status == "VALID" and r_neg.value < 0.0
     assert jacking(5000.0, 50.0, 0.0).status == "SOLVER_FAILED"
     assert jacking(5000.0, float("nan"), 1600.0).status == "NOT_APPLICABLE"
+
+
+def test_hollow_arb_wall_reduces_roll_stiffness():
+    """空心 ARB（arb.wall > 0）须严格按 (d^4 - di^4) / d^4 降低扭转刚度与侧倾刚度。"""
+    from src.api.chassis import arb_rate
+    from src.api.v3models import AxleSpec
+
+    solid = AxleSpec(points=FRONT, arb={"d": 20.0, "wall": 0.0})
+    hollow = AxleSpec(points=FRONT, arb={"d": 20.0, "wall": 3.0})  # di = 14 mm
+    rs, rh = arb_rate(solid), arb_rate(hollow)
+    expected_ratio = (20.0 ** 4 - 14.0 ** 4) / (20.0 ** 4)
+    assert abs(rh["k"] / rs["k"] - expected_ratio) < 1e-9
+    req_h = _req()
+    req_h["vehicle"]["front"]["arb"] = {"d": 20.0, "wall": 3.0}
+    req_s = _req()
+    req_s["vehicle"]["front"]["arb"] = {"d": 20.0, "wall": 0.0}
+    ks = client.post("/api/v3/chassis/solve", json=req_s).json()["loads"]["kphi_f"]
+    kh = client.post("/api/v3/chassis/solve", json=req_h).json()["loads"]["kphi_f"]
+    assert 0 < kh < ks

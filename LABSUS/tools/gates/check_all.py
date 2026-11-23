@@ -122,6 +122,7 @@ def gates(quick: bool = False, node_only: bool = False) -> list[tuple[str, list[
     if node_only:
         g: list[tuple[str, list[str]]] = [(f"node {n}", node_cmd(n)) for n in NODE_SUITES]
         g.append(("跨语言对拍 tphys_parity", ["node", "web/test/tphys_parity.cjs"]))
+        g.append(("跨语言对拍 kc_parity", ["node", "web/test/kc_parity.cjs"]))
         return g
 
     g = [
@@ -138,6 +139,7 @@ def gates(quick: bool = False, node_only: bool = False) -> list[tuple[str, list[
                                           "-p", "no:warnings", "--tb=line"]))
         g += [(f"node {n}", node_cmd(n)) for n in NODE_SUITES]
         g.append(("跨语言对拍 tphys_parity", ["node", "web/test/tphys_parity.cjs"]))
+        g.append(("跨语言对拍 kc_parity", ["node", "web/test/kc_parity.cjs"]))
     return g
 
 

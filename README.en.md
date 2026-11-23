@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.11+](https://img.shields.io/badge/Python-3.11%2B-brightgreen.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-v3%20REST%20API-009688.svg)](https://fastapi.tiangolo.com/)
-[![Tests: 100% Passed](https://img.shields.io/badge/pytest-345%20passed-success.svg)]()
+[![Tests: 100% Passed](https://img.shields.io/badge/pytest-359%20passed-success.svg)]()
 [![Platform: Web & Desktop](https://img.shields.io/badge/Platform-Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-orange.svg)]()
 
 > A modern full-chassis suspension engineering workbench tailored for **Formula Student (FSAE), FIA GT3 racing, and Baja off-road vehicles**.
@@ -146,11 +146,11 @@ DOM/Canvas stubs; only the TPHYS parity check is cross-language:
 cd LABSUS
 
 # ── One command for every gate (recommended; non-zero exit = failure) ───
-python tools/gates/check_all.py           # 37 checks: ruff / pytest / 30 node suites / parity / provenance / docs / baselines
+python tools/gates/check_all.py           # 38 checks: ruff / pytest / 30 node suites / dual parity / provenance / docs / baselines
 python tools/gates/check_all.py --quick   # 5 sub-second checks (ruff / module-roles / provenance / docs / baselines)
 
-# ── Python engine: physics assertions / gates / API-contract guard / TPHYS parity / stress ──
-pytest engine/tests -q                 # 345 passed / 1 skipped (skip = OptimumK rows not entered, explicit)
+# ── Python engine: physics assertions / gates / API-contract guard / TPHYS & K&C parity / stress ──
+pytest engine/tests -q                 # 359 passed / 1 skipped (skip = OptimumK rows not entered, explicit)
                                        #   · test_api_contract            frontend/backend key-set contract
                                        #   · test_static_split_invariant  static load-split invariant
                                        #   · test_tire_width_balance      tire width -> cornering stiffness
@@ -179,8 +179,9 @@ node web/test/test_stability_audit.js  # 24: dt convergence + stiffness sweep (n
 node web/test/test_config_contract.js  # 15: S.* config read/write contract
 node web/test/test_car_capability.js   # 15: CAR_CAPABILITY monotonic envelope
 
-# ── Cross-language physics parity (JS TPHYS <-> Python transient, 5% threshold) ──
-node web/test/tphys_parity.cjs         # measured worst 0.51%
+# ── Cross-language physics parity (JS TPHYS <-> Python transient; JS K&C <-> Python v3service) ──
+node web/test/tphys_parity.cjs         # measured worst 0.51% (5% threshold)
+node web/test/kc_parity.cjs            # 4-preset dual-axle K&C/ARB/Modal parity (< 1e-4)
 
 # ── Physics audit（60 checks, **in CI regression**; --ci skips 2 timing thresholds）──
 node web/test/physics_audit.js         # inertia identities / energy / step convergence / Ackermann / ISO road / wheel DOF / collision
@@ -245,7 +246,7 @@ LABSUS/                           # Engineering Root Directory
 │   ├── server.py                 # FastAPI server entry (:8001)
 │   ├── src/                      # Solvers (K&C / Bushing / Pacejka / Tire Fit / Transient)
 │   ├── data/                     # External data assets (sha256-locked, see src/provenance.py)
-│   └── tests/                    # pytest unit test suite (345 passed / 1 skipped)
+│   └── tests/                    # pytest unit test suite (359 passed / 1 skipped)
 ├── tools/gates/                  # One-command gate runner (single source of truth for CI)
 ├── scripts/                      # Utility and automation scripts
 ├── requirements.txt              # Python runtime dependencies (exact verified pins)

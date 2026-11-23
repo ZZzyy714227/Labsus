@@ -143,11 +143,21 @@ function buildLeft(){
   rowSlider(b,"主弹簧刚度","SPRING RATE","N/mm",40,300,5,()=>S[S.axis].kS,v=>{S[S.axis].kS=v;refreshDerived(false);},0);
   rowSlider(b,"压缩阻尼系数","BUMP DAMP","N·s/mm",1,30,0.5,()=>S[S.axis].cB,v=>S[S.axis].cB=v,1);
   rowSlider(b,"复原阻尼系数","REB DAMP","N·s/mm",1,40,0.5,()=>S[S.axis].cR,v=>S[S.axis].cR=v,1);
+  if(typeof damperForce4Q==="function"){
+    const dqChk=EH("div","chk",'<i></i><span>四象限非线表阻尼 (4Q Table)</span>');
+    dqChk.style.margin="2px 10px 4px";
+    dqChk.onclick=()=>{SIM.damperTableOn=!SIM.damperTableOn;if(SIM.clickC==null)SIM.clickC=5;if(SIM.clickR==null)SIM.clickR=7;};
+    UI.sync.push(()=>dqChk.classList.toggle("on",!!SIM.damperTableOn));
+    b.appendChild(dqChk);
+    rowSlider(b,"压缩挡位","COMP CLICK","clk",0,11,1,()=>SIM.clickC!=null?SIM.clickC:5,v=>{SIM.clickC=Math.round(v);},0);
+    rowSlider(b,"复原挡位","REB CLICK","clk",0,11,1,()=>SIM.clickR!=null?SIM.clickR:7,v=>{SIM.clickR=Math.round(v);},0);
+  }
   rowSlider(b,"轮胎垂向刚度","TIRE RATE","N/mm",100,450,10,()=>S[S.axis].kT,v=>{S[S.axis].kT=v;refreshDerived(false);},0);
   rowSlider(b,"角簧上质量","SPRUNG MASS","kg",150,700,5,()=>S[S.axis].mS,v=>{S[S.axis].mS=v;refreshDerived(false);},0);
   
   b=sec(host,"横向稳定杆 (ARB)","ANTI-ROLL BAR",true);
-  rowSlider(b,"稳定杆直径 (0=拆除)","ARB DIA","mm",0,34,0.5,()=>S[S.axis].arb.d,v=>S[S.axis].arb.d=v,1);
+  rowSlider(b,"稳定杆直径 (0=拆除)","ARB DIA","mm",0,34,0.5,()=>S[S.axis].arb.d,v=>{S[S.axis].arb.d=v;SIM.dirtySweep=true;refreshDerived(false);},1);
+  rowSlider(b,"空心壁厚 (0=实心)","ARB WALL","mm",0,8,0.5,()=>S[S.axis].arb.wall||0,v=>{S[S.axis].arb.wall=Math.min(v,Math.max(0,(S[S.axis].arb.d||0)*0.45));SIM.dirtySweep=true;refreshDerived(false);},1);
   rowSlider(b,"稳定杆连杆位置比","ARB LINK POS","-",0.25,0.92,0.01,()=>S[S.axis].arb.t,v=>{S[S.axis].arb.t=v;SIM.dirtySweep=true;},2);
   rowSlider(b,"稳定杆纵向偏置","ARB OFFSET Y","mm",-60,180,2,()=>S[S.axis].arb.dy,v=>{S[S.axis].arb.dy=v;SIM.dirtySweep=true;},0);
   rowSlider(b,"稳定杆高度偏置","ARB OFFSET Z","mm",40,300,2,()=>S[S.axis].arb.dz,v=>{S[S.axis].arb.dz=v;SIM.dirtySweep=true;},0);
@@ -518,7 +528,7 @@ function buildRight(){
   ro(b,"外倾角增益","CAMBER GAIN","°/25","roCG","hl");
   ro(b,"跳动转向","BUMP STEER","°/25","roBS");
   ro(b,"侧倾中心高度","ROLL CTR H","mm","roRC","k hero");
-  ro(b,"抗俯仰率","ANTI-DIVE","%","roAnti");
+  ro(b,"抗俯仰/下蹲率","ANTI-DIVE / SQUAT","%","roAnti");
   ro(b,"Jacking 抬升","JACKING","mm","roJacking");
   ro(b,"簧载固有频率","RIDE FREQ","Hz","roFreq");
 
@@ -563,6 +573,9 @@ function buildRight(){
   ro(b,"稳定杆侧倾刚度","ARB ROLL K","N·m/°","roArbKr");
   ro(b,"轴总侧倾刚度","AXLE ROLL K","N·m/°","roArbTot","k");
   ro(b,"稳定杆占比","ARB SHARE","%","roArbSh","hl");
+  ro(b,"翘曲模态刚度","WARP STIFFNESS","kN/m","roWarp");
+  ro(b,"侧倾↔翘曲耦合","ROLL-WARP COUPLE","%","roCouple");
+  ro(b,"等效柔度转向 F/R","COMP STEER F/R","°/kN","roCompSteer");
 
   if(S.hasBaseline){
     b=sec(host,"基准线差异分析 (Delta Diff)","BASELINE DELTA",false,"purp");
@@ -718,11 +731,13 @@ function bushCalibApply(){
   if(!SIM.bushCalib)SIM.bushCalib={};
   SIM.bushCalib[S.axis||"front"]=d;
   const nodes=Object.keys(d).join("、");
-  setSt("✓ 已应用"+(S.axis==="rear"?"后轴":"前轴")+"实测衬套（"+nodes+"）→ 重跑“力偏移 COMPLIANCE”工况生效",C.pathC);
+  if(typeof refreshDerived==="function"){refreshDerived(false);if(typeof simulate==="function")simulate(0);UI.sync.forEach(fn=>fn());}
+  setSt("✓ 已应用"+(S.axis==="rear"?"后轴":"前轴")+"实测衬套（"+nodes+"）→ 已同步柔度转向并可重跑 COMPLIANCE",C.pathC);
 }
 function bushCalibReset(){
   const st=document.getElementById("bushCalibStatus");
   if(SIM.bushCalib)delete SIM.bushCalib[S.axis||"front"];
+  if(typeof refreshDerived==="function"){refreshDerived(false);if(typeof simulate==="function")simulate(0);UI.sync.forEach(fn=>fn());}
   if(st)st.textContent="已恢复车型预设衬套刚度。",st.style.color="";
 }
 function buildBushingCalibPanel(host){
@@ -1008,14 +1023,14 @@ function chassisPayload(){
         spring_rate:f.kS,spring_mass_kg:f.mS,unsprung_kg:f.mU,
         motion_ratio:SIM.mrRefF||0.75,
         kw_curve:kwCurve(SIM.swF),
-        arb:{d:f.arb.d,t:f.arb.t,dy:f.arb.dy,dz:f.arb.dz,G:f.arb.G}},
+        arb:{d:f.arb.d,wall:f.arb.wall||0,t:f.arb.t,dy:f.arb.dy,dz:f.arb.dz,G:f.arb.G}},
       rear:{points:JSON.parse(JSON.stringify(r.hp)),arch:r.arch,camber_deg:r.cam0,toe_deg:r.toe0,
         camber_gain_deg_per_25mm:(function(){ const v=sampleSweep(SIM.swR,0,"cg"); return isFinite(v)?v:0; })(),
         tire_radius:r.tire.R,tire_rim_w:r.tire.rimW,tire_et:r.tire.et,tire_width:r.tire.W,
         spring_rate:r.kS,spring_mass_kg:r.mS,unsprung_kg:r.mU,
         motion_ratio:SIM.mrRefR||0.78,
         kw_curve:kwCurve(SIM.swR),
-        arb:{d:r.arb.d,t:r.arb.t,dy:r.arb.dy,dz:r.arb.dz,G:r.arb.G}}
+        arb:{d:r.arb.d,wall:r.arb.wall||0,t:r.arb.t,dy:r.arb.dy,dz:r.arb.dz,G:r.arb.G}}
     },
     quasi:{gy:S.qs.gy,gx:S.qs.gx,aero_force_n:S.qs.aeroF,aero_bias:S.qs.aeroBias},
     travel:{fl:travelL(halfF,S.roll),fr:travelR(halfF,S.roll),
