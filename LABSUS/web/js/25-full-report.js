@@ -20,8 +20,16 @@
  * ============================================================================ */
 
 (function (global) {
-  const _hasRealTimer = (typeof window !== "undefined" && typeof document !== "undefined" && typeof requestAnimationFrame === "function");
-  const _tick = () => _hasRealTimer ? new Promise(resolve => setTimeout(resolve, 0)) : Promise.resolve();
+  /* 无头沙箱（web/test/_stage_harness.js）把 setTimeout 桩成永不回调的 `() => 0`：
+     `new Promise(r => setTimeout(r, 0))` 会永久挂起（实测 test_full_report 卡死在首个 await）。
+     只有确认是**原生**定时器才让出主线程，否则立即 resolve（无头批量分析不需要 UI 让渡）。 */
+  const _timerIsReal = (function () {
+    if (typeof setTimeout !== "function") return false;
+    try {
+      return /\{\s*\[native code\]\s*\}/.test(Function.prototype.toString.call(setTimeout));
+    } catch (e) { return false; }
+  })();
+  const _tick = () => _timerIsReal ? new Promise(resolve => setTimeout(resolve, 0)) : Promise.resolve();
   const fin = (v, d = null) => (typeof v === "number" && isFinite(v)) ? v : d;
   const fmt = (v, d = 2) => (typeof v === "number" && isFinite(v)) ? v.toFixed(d) : "—";
 
